@@ -8,6 +8,8 @@ config :msgr, Messngr.Repo,
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: 10
 
+config :msgr, :llm_client, Messngr.AI.LlmClientMock
+
 config :msgr_web, MessngrWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "35HSZsAA2kXtd6n2f9v+VRhNdScqD8Z+oF0dP6PbIapZF+8h9J0vXdyE3u/Bq5rC",
@@ -18,3 +20,8 @@ config :logger, level: :warning
 config :msgr_web, :expose_otp_codes, true
 
 config :phoenix, :plug_init_mode, :runtime
+
+config :llm_gateway,
+  http_client: LlmGateway.HTTPClientMock,
+  team_resolver: {LlmGateway.TestTeamResolver, []},
+  system_credentials: %{}
