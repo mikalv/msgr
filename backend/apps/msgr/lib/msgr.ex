@@ -4,7 +4,7 @@ defmodule Messngr do
   kan operere på kontoer, profiler og chatter uten å importere moduler direkte.
   """
 
-  alias Messngr.{AI, Accounts, Auth, Chat, Media}
+  alias Messngr.{AI, Accounts, Auth, Calls, Chat, Media}
 
   # Accounts
   defdelegate list_accounts, to: Accounts
@@ -34,4 +34,12 @@ defmodule Messngr do
   defdelegate start_auth_challenge(attrs), to: Auth, as: :start_challenge
   defdelegate verify_auth_challenge(id, code, attrs \\ %{}), to: Auth, as: :verify_challenge
   defdelegate complete_oidc(attrs), to: Auth
+
+  # Calls
+  defdelegate start_call(conversation_id, host_profile_id, opts \\ []), to: Calls
+  defdelegate fetch_call(call_id), to: Calls
+  defdelegate fetch_call_for_conversation(conversation_id), to: Calls
+  defdelegate join_call(call_id, profile_id, opts \\ []), to: Calls
+  defdelegate leave_call(call_id, profile_id, opts \\ []), to: Calls
+  defdelegate end_call(call_id), to: Calls
 end

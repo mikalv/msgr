@@ -11,6 +11,7 @@ defmodule Messngr.Application do
       Messngr.Repo,
       {DNSCluster, query: Application.get_env(:msgr, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Messngr.PubSub},
+      Messngr.Calls.CallRegistry,
       #{Guardian.DB.SweeperServer, []},
       # Start the Finch HTTP client for sending emails
       {Finch, name: Messngr.Finch}
