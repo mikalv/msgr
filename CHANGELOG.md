@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Dokumentert Taskku-produktivitetsappen som referanse for bedriftsmodus med ny
+  forskningsfil som kobler UI-mønstre til eksisterende API-er og bridge-strategi,
+  og oppdatert med plan for å holde produktivitetsmoduler adskilt fra kjernchat i
+  både UI og backend.
 - Designet et modulært Flutter chat-UI-kit (kanalliste, trådvisning, reaksjoner, presence, tilkoblingsbanner) og integrerte det i `ChatPage` og en ny `ChannelListPage`-demo.
 - Utvidet `ChatComposer` med emoji-velger, slash-kommandoer, filvedlegg, simulert taleopptak og forbedret utkast-/feilhåndtering samt nye widgettester.
 - Implementerte hurtigbuffer for samtaler og meldinger med Hive/Sembast, offline statusbanner og integrasjonstester for fallback i `ChatViewModel`.
