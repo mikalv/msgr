@@ -4,6 +4,8 @@
 - Replaced the Telegram/Matrix HTTP clients with queue-driven bridge facades for Telegram, Matrix, IRC, and XMPP plus a shared `ServiceBridge` helper and in-memory queue adapter tests.
 - Introduced a queue behaviour contract to standardise `bridge/<service>/<action>` envelopes with trace IDs for all connectors.
 - Updated bridge strategy, architecture, account linking, and platform research docs to focus on StoneMQ-backed daemons and MTProto-based Telegram support.
+- Redesignet Flutter-hjemmeskjermen med et responsivt oppsett for mobil, nettbrett og desktop, komplett med gradient-sidefelt, innboks-panel og handlingslinje.
+- La til widgettester for brytepunktene og dokumenterte strukturen i `docs/frontend_responsive.md`.
 ## [Unreleased]
 ### Added
 - Konsolidert produktplan og forskningsoppsummering med fokus på chat-MVP, identitet og arkitektur.
@@ -19,6 +21,17 @@
 - OTP- og OIDC-dokumentasjon i `docs/api_contract.md` samt database-migrasjoner for identiteter og utfordringer.
 - Flutter-støtte for OTP-flyt med `AuthChallenge`-modell, redux-tilstand og forbedret kodevisning.
 - AuthShell-layout og delte inputdekorasjoner for autentiseringsskjermene med tilhørende widgettest.
+- Docker-basert utviklingsmiljø for Elixir-backenden med Postgres og Phoenix-server.
+- Konfigurerbar Flutter-backend gjennom `BackendEnvironment` med støtte for
+  `--dart-define` og runtime-overstyringer samt oppdatert README for å beskrive
+  bruken.
+- Docker-image og Compose-tjeneste for StoneMQ slik at meldingskøen kan startes
+  sammen med resten av utviklingsmiljøet.
+- Prometheus-eksport fra backenden med ferdig Prometheus- og Grafana-tjenester i
+  docker-compose.
+- OpenObserve-loggflyt for Elixir-backenden med ny Logger-backend og tester.
+- Flutter-loggklient som kan sende `package:logging`-poster til OpenObserve via
+  `LoggingEnvironment` og en gjenbrukbar HTTP-klient.
 
 ### Changed
 - Backend-konfigurasjon forenklet og unødvendige apper fjernet fra releaseoppsett.

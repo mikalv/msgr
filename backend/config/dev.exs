@@ -1,5 +1,19 @@
 import Config
 
+listen_ip =
+  System.get_env("PHX_LISTEN_IP", "127.0.0.1")
+  |> String.split(".")
+  |> Enum.reduce_while([], fn part, acc ->
+    case Integer.parse(part) do
+      {value, ""} when value in 0..255 -> {:cont, [value | acc]}
+      _ -> {:halt, :error}
+    end
+  end)
+  |> case do
+    [d, c, b, a] -> {a, b, c, d}
+    _ -> {127, 0, 0, 1}
+  end
+
 config :msgr, Messngr.Repo,
   username: System.get_env("POSTGRES_USERNAME", "postgres"),
   password: System.get_env("POSTGRES_PASSWORD", "postgres"),
@@ -10,7 +24,7 @@ config :msgr, Messngr.Repo,
   pool_size: 10
 
 config :msgr_web, MessngrWeb.Endpoint,
-  http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PORT", "4000"))],
+  http: [ip: listen_ip, port: String.to_integer(System.get_env("PORT", "4000"))],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
@@ -33,6 +47,26 @@ config :msgr_web, dev_routes: true
 config :msgr_web, :expose_otp_codes, true
 
 config :logger, :console, format: "[$level] $message\n"
+
+config :logger,
+  backends: [:console, {Messngr.Logging.OpenObserveBackend, :openobserve_dev}]
+
+config :logger, {Messngr.Logging.OpenObserveBackend, :openobserve_dev},
+  enabled: System.get_env("OPENOBSERVE_ENABLED", "true") == "true",
+  endpoint: System.get_env("OPENOBSERVE_ENDPOINT", "http://openobserve:5080"),
+  org: System.get_env("OPENOBSERVE_ORG", "default"),
+  stream: System.get_env("OPENOBSERVE_STREAM", "backend"),
+  dataset: System.get_env("OPENOBSERVE_DATASET", "_json"),
+  username: System.get_env("OPENOBSERVE_USERNAME", "root@example.com"),
+  password: System.get_env("OPENOBSERVE_PASSWORD", "Complexpass#123"),
+  metadata: [:application, :module, :function, :line, :request_id, :pid],
+  level: :debug,
+  service: System.get_env("OPENOBSERVE_SERVICE", "msgr_backend_dev")
+
+config :msgr_web, :prometheus,
+  enabled: true,
+  port: String.to_integer(System.get_env("PROMETHEUS_PORT", "9568")),
+  name: :prometheus_metrics_dev
 
 config :phoenix, :stacktrace_depth, 20
 config :phoenix, :plug_init_mode, :runtime
