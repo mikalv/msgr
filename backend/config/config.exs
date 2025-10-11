@@ -39,6 +39,8 @@ config :phoenix, :json_library, Jason
 
 config :swoosh, :api_client, false
 
+config :msgr_web, :expose_otp_codes, false
+
 config :logger, :console,
   format: "[$level] $message",
   metadata: [:request_id]

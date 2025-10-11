@@ -41,4 +41,25 @@ defmodule Messngr.AccountsTest do
       assert profile.account_id == account.id
     end
   end
+
+  describe "ensure_identity/1" do
+    test "creates account and identity for new email" do
+      assert {:ok, identity} =
+               Accounts.ensure_identity(%{kind: :email, value: "new.user@example.com"})
+
+      assert identity.kind == :email
+      assert identity.value == "new.user@example.com"
+      assert identity.account.display_name == "New User"
+    end
+
+    test "reuses existing account for the same phone" do
+      {:ok, identity} =
+        Accounts.ensure_identity(%{kind: :phone, value: "+4790000000", display_name: "Mobil"})
+
+      {:ok, same_identity} = Accounts.ensure_identity(%{kind: :phone, value: "+47 900 00 000"})
+
+      assert identity.account_id == same_identity.account_id
+      assert same_identity.account.display_name == "Mobil"
+    end
+  end
 end

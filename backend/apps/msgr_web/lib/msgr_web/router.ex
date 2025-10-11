@@ -12,6 +12,9 @@ defmodule MessngrWeb.Router do
   scope "/api", MessngrWeb do
     pipe_through :api
 
+    post "/auth/challenge", AuthController, :challenge
+    post "/auth/verify", AuthController, :verify
+    post "/auth/oidc", AuthController, :oidc
     resources "/users", AccountController, only: [:index, :create]
   end
 

@@ -30,6 +30,7 @@ config :msgr_web, MessngrWeb.Endpoint,
   ]
 
 config :msgr_web, dev_routes: true
+config :msgr_web, :expose_otp_codes, true
 
 config :logger, :console, format: "[$level] $message\n"
 

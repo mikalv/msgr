@@ -10,6 +10,81 @@ Denne siden dokumenterer forventet kontrakt mellom msgr-backend og Flutter-klien
 - Backend verifiserer at profilen tilhører kontoen. Mismatch gir `401 Unauthorized`.
 - WebSocket-tilkoblingen bruker de samme verdiene som join-parametre (se under).
 
+### OTP-innlogging (e-post og mobil)
+
+1. **Start utfordring**
+
+   `POST /api/auth/challenge`
+
+   ```json
+   {
+     "channel": "email",
+     "identifier": "kari@example.com",
+     "device_id": "optional-device-uuid"
+   }
+   ```
+
+   **Respons 201**
+
+   ```json
+   {
+     "id": "challenge-uuid",
+     "channel": "email",
+     "expires_at": "2024-10-04T12:00:00Z",
+     "target_hint": "ka***@example.com",
+     "debug_code": "123456"
+   }
+   ```
+
+   `debug_code` returneres kun i dev/test og skal aldri vises i produksjon.
+
+2. **Verifiser engangskode**
+
+   `POST /api/auth/verify`
+
+   ```json
+   {
+     "challenge_id": "challenge-uuid",
+     "code": "123456",
+     "display_name": "Kari Nordmann"
+   }
+   ```
+
+   **Respons 200**
+
+   ```json
+   {
+     "account": {
+       "id": "acct-uuid",
+       "display_name": "Kari Nordmann",
+       "email": "kari@example.com",
+       "phone_number": null
+     },
+     "identity": {
+       "id": "identity-uuid",
+       "kind": "email",
+       "verified_at": "2024-10-04T12:01:00Z"
+     }
+   }
+   ```
+
+   Samme flyt gjelder for `channel: "phone"` hvor `identifier` er et E.164-nummer.
+
+### Federert pålogging (OIDC)
+
+`POST /api/auth/oidc`
+
+```json
+{
+  "provider": "azuread",
+  "subject": "OIDC-subject",
+  "email": "kari@example.com",
+  "name": "Kari Nordmann"
+}
+```
+
+**Respons 200** matcher `verify`-kallet.
+
 ## REST-endepunkter
 
 ### Opprette konto

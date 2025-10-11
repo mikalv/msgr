@@ -22,6 +22,7 @@ export 'src/models/team.dart';
 export 'src/models/room.dart';
 export 'src/models/conversation.dart';
 export 'src/models/message.dart';
+export 'src/models/auth_challenge.dart';
 
 export 'src/lib_constants.dart';
 

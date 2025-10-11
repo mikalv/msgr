@@ -28,6 +28,7 @@ defmodule Messngr.Accounts.Account do
   def changeset(account, attrs) do
     account
     |> cast(attrs, [:email, :phone_number, :display_name, :handle, :locale, :time_zone])
+    |> put_default_display_name()
     |> validate_required([:display_name])
     |> validate_length(:display_name, min: 2, max: 120)
     |> validate_format(:email, ~r/@/, message: "must look like an email address")
@@ -52,4 +53,45 @@ defmodule Messngr.Accounts.Account do
   end
 
   defp put_default_handle(changeset), do: changeset
+
+  defp put_default_display_name(%{changes: %{display_name: display_name}} = changeset)
+       when is_binary(display_name) and display_name != "" do
+    change(changeset, display_name: String.trim(display_name))
+  end
+
+  defp put_default_display_name(%{changes: changes} = changeset) do
+    fallback =
+      cond do
+        email = Map.get(changes, :email) -> derive_from_email(email)
+        phone = Map.get(changes, :phone_number) -> derive_from_phone(phone)
+        true -> nil
+      end
+
+    if is_binary(fallback) and fallback != "" do
+      change(changeset, display_name: fallback)
+    else
+      changeset
+    end
+  end
+
+  defp put_default_display_name(changeset), do: changeset
+
+  defp derive_from_email(email) when is_binary(email) do
+    email
+    |> String.split("@")
+    |> hd()
+    |> String.replace(~r/[^\w]/, " ")
+    |> String.split()
+    |> Enum.map(&String.capitalize/1)
+    |> Enum.join(" ")
+  end
+
+  defp derive_from_email(_), do: nil
+
+  defp derive_from_phone(phone) when is_binary(phone) do
+    suffix = phone |> String.trim_leading("+") |> String.slice(-4, 4)
+    "Bruker #{suffix}"
+  end
+
+  defp derive_from_phone(_), do: nil
 end

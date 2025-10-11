@@ -18,6 +18,12 @@ class AuthState {
   final String? pendingMsisdn;
   final String? pendingEmail;
   final String? pendingTeam;
+  final String? pendingChallengeId;
+  final String? pendingChannel;
+  final String? pendingTargetHint;
+  final String? pendingDebugCode;
+  final DateTime? pendingChallengeExpiresAt;
+  final String? pendingDisplayName;
 
   bool isLoading;
   bool _kHasSelectedTeam = false;
@@ -36,6 +42,12 @@ class AuthState {
       this.pendingMsisdn,
       this.pendingEmail,
       this.pendingTeam,
+      this.pendingChallengeId,
+      this.pendingChannel,
+      this.pendingTargetHint,
+      this.pendingDebugCode,
+      this.pendingChallengeExpiresAt,
+      this.pendingDisplayName,
       this.currentTeamName,
       this.teamAccessToken})
       : _kIsLoggedIn = kIsLoggedIn {
@@ -58,7 +70,13 @@ class AuthState {
           isLoading == other.isLoading &&
           pendingEmail == other.pendingEmail &&
           pendingMsisdn == other.pendingMsisdn &&
-          pendingTeam == other.pendingTeam;
+          pendingTeam == other.pendingTeam &&
+          pendingChallengeId == other.pendingChallengeId &&
+          pendingChannel == other.pendingChannel &&
+          pendingTargetHint == other.pendingTargetHint &&
+          pendingDebugCode == other.pendingDebugCode &&
+          pendingChallengeExpiresAt == other.pendingChallengeExpiresAt &&
+          pendingDisplayName == other.pendingDisplayName;
 
   @override
   int get hashCode =>
@@ -73,7 +91,13 @@ class AuthState {
       isLoading.hashCode ^
       pendingEmail.hashCode ^
       pendingMsisdn.hashCode ^
-      pendingTeam.hashCode;
+      pendingTeam.hashCode ^
+      pendingChallengeId.hashCode ^
+      pendingChannel.hashCode ^
+      pendingTargetHint.hashCode ^
+      pendingDebugCode.hashCode ^
+      pendingChallengeExpiresAt.hashCode ^
+      pendingDisplayName.hashCode;
 
   @override
   String toString() {
@@ -124,6 +148,14 @@ class AuthState {
         pendingEmail: bJson['pendingEmail'],
         pendingMsisdn: bJson['pendingMsisdn'],
         pendingTeam: bJson['pendingTeam'],
+        pendingChallengeId: bJson['pendingChallengeId'],
+        pendingChannel: bJson['pendingChannel'],
+        pendingTargetHint: bJson['pendingTargetHint'],
+        pendingDebugCode: bJson['pendingDebugCode'],
+        pendingChallengeExpiresAt: bJson['pendingChallengeExpiresAt'] == null
+            ? null
+            : DateTime.parse(bJson['pendingChallengeExpiresAt']),
+        pendingDisplayName: bJson['pendingDisplayName'],
         isLoading: false,
         teams: bJson['teams'].map<Team>((x) => Team.fromJson(x)).toList());
   }
@@ -138,6 +170,13 @@ class AuthState {
         'pendingMsisdn': pendingMsisdn,
         'pendingEmail': pendingEmail,
         'pendingTeam': pendingTeam,
+        'pendingChallengeId': pendingChallengeId,
+        'pendingChannel': pendingChannel,
+        'pendingTargetHint': pendingTargetHint,
+        'pendingDebugCode': pendingDebugCode,
+        'pendingChallengeExpiresAt':
+            pendingChallengeExpiresAt?.toIso8601String(),
+        'pendingDisplayName': pendingDisplayName,
         'teams': teams,
       };
 }

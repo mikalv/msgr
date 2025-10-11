@@ -5,7 +5,7 @@ defmodule Messngr.Accounts do
 
   import Ecto.Query
 
-  alias Messngr.Accounts.{Account, Profile}
+  alias Messngr.Accounts.{Account, Identity, Profile}
   alias Messngr.Repo
 
   @spec list_accounts() :: [Account.t()]
@@ -73,4 +73,167 @@ defmodule Messngr.Accounts do
 
   @spec get_profile!(Ecto.UUID.t()) :: Profile.t()
   def get_profile!(id), do: Repo.get!(Profile, id)
+
+  @doc """
+  Fetches an identity for the given channel (email/phone) or returns nil.
+  """
+  @spec get_identity_by_channel(:email | :phone, String.t()) :: Identity.t() | nil
+  def get_identity_by_channel(channel, target) when channel in [:email, :phone] do
+    Repo.get_by(Identity, kind: channel, value: normalize_target(channel, target))
+    |> maybe_preload_account()
+  end
+
+  @doc """
+  Ensures that an identity exists for the provided attributes, creating the owning
+  account as needed.
+  """
+  @spec ensure_identity(map()) :: {:ok, Identity.t()} | {:error, term()}
+  def ensure_identity(%{kind: :oidc} = attrs) do
+    Repo.transaction(fn ->
+      case Repo.get_by(Identity,
+             kind: :oidc,
+             provider: Map.get(attrs, :provider) || Map.get(attrs, "provider"),
+             subject: Map.get(attrs, :subject) || Map.get(attrs, "subject")
+           ) do
+        nil ->
+          with {:ok, account} <- ensure_account(attrs),
+               {:ok, identity} <- insert_identity(account, attrs) do
+            maybe_preload_account(identity)
+          else
+            {:error, reason} -> Repo.rollback(reason)
+          end
+
+        identity ->
+          maybe_preload_account(identity)
+      end
+    end)
+  end
+
+  def ensure_identity(%{kind: kind} = attrs) when kind in [:email, :phone] do
+    Repo.transaction(fn ->
+      target = Map.get(attrs, :value) || Map.get(attrs, "value")
+      normalized = normalize_target(kind, target)
+
+      case Repo.get_by(Identity, kind: kind, value: normalized) do
+        nil ->
+          with {:ok, account} <- ensure_account(Map.put(attrs, :value, normalized)),
+               {:ok, identity} <- insert_identity(account, Map.put(attrs, :value, normalized)) do
+            maybe_preload_account(identity)
+          else
+            {:error, reason} -> Repo.rollback(reason)
+          end
+
+        identity ->
+          maybe_preload_account(identity)
+      end
+    end)
+  end
+
+  @doc """
+  Marks an identity as verified and updates metadata.
+  """
+  @spec verify_identity(Identity.t(), map()) :: {:ok, Identity.t()} | {:error, term()}
+  def verify_identity(%Identity{} = identity, attrs) do
+    attrs =
+      attrs
+      |> Map.new()
+      |> Map.put_new(:verified_at, DateTime.utc_now())
+
+    identity
+    |> Identity.changeset(attrs)
+    |> Repo.update()
+    |> case do
+      {:ok, identity} -> {:ok, maybe_preload_account(identity)}
+      other -> other
+    end
+  end
+
+  @doc false
+  def touch_identity(%Identity{} = identity, attrs) do
+    identity
+    |> Identity.changeset(attrs)
+    |> Repo.update()
+  end
+
+  defp ensure_account(attrs) do
+    default_attrs =
+      attrs
+      |> account_attrs_from_identity()
+      |> Enum.into(%{})
+
+    create_account(default_attrs)
+  end
+
+  defp insert_identity(account, attrs) do
+    identity_attrs =
+      attrs
+      |> Map.new()
+      |> Map.put(:account_id, account.id)
+      |> Map.put_new(:kind, Map.get(attrs, :kind) || Map.get(attrs, "kind"))
+      |> Map.put_new(:value, Map.get(attrs, :value) || Map.get(attrs, :email) || Map.get(attrs, :phone_number))
+      |> Map.put_new(:provider, Map.get(attrs, :provider) || Map.get(attrs, "provider"))
+      |> Map.put_new(:subject, Map.get(attrs, :subject) || Map.get(attrs, "subject"))
+
+    %Identity{}
+    |> Identity.changeset(identity_attrs)
+    |> Repo.insert()
+  end
+
+  defp maybe_preload_account(nil), do: nil
+
+  defp maybe_preload_account(identity) do
+    Repo.preload(identity, :account)
+  end
+
+  defp normalize_target(_kind, nil), do: nil
+  defp normalize_target(:email, target), do: target |> String.trim() |> String.downcase()
+  defp normalize_target(:phone, target), do: target |> String.replace(~r/\s+/, "")
+
+  defp account_attrs_from_identity(%{kind: :email} = attrs) do
+    value = Map.get(attrs, :value) || Map.get(attrs, :email)
+
+    [
+      {:email, value},
+      {:display_name, Map.get(attrs, :display_name) || derive_email_name(value)}
+    ]
+  end
+
+  defp account_attrs_from_identity(%{kind: :phone} = attrs) do
+    value = Map.get(attrs, :value) || Map.get(attrs, :phone_number)
+
+    [
+      {:phone_number, value},
+      {:display_name, Map.get(attrs, :display_name) || derive_phone_name(value)}
+    ]
+  end
+
+  defp account_attrs_from_identity(%{kind: :oidc} = attrs) do
+    [
+      {:display_name, Map.get(attrs, :display_name) || "Gjennom OIDC"},
+      {:email, Map.get(attrs, :email)}
+    ]
+  end
+
+  defp derive_email_name(nil), do: "Ny bruker"
+
+  defp derive_email_name(email) do
+    email
+    |> String.split("@")
+    |> hd()
+    |> String.replace(~r/[^\w]/, " ")
+    |> String.split()
+    |> Enum.map(&String.capitalize/1)
+    |> Enum.join(" ")
+    |> case do
+      "" -> "Ny bruker"
+      value -> value
+    end
+  end
+
+  defp derive_phone_name(nil), do: "Ny bruker"
+
+  defp derive_phone_name(number) do
+    suffix = number |> String.trim_leading("+") |> String.slice(-4, 4)
+    "Bruker #{suffix}"
+  end
 end

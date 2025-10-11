@@ -15,4 +15,6 @@ config :msgr_web, MessngrWeb.Endpoint,
 
 config :logger, level: :warning
 
+config :msgr_web, :expose_otp_codes, true
+
 config :phoenix, :plug_init_mode, :runtime
