@@ -43,6 +43,7 @@ defmodule Messngr.Noise.SessionStore do
 
     registry = Keyword.get(opts, :registry, Registry)
     {:ok, session} = Registry.put(registry, session)
+    emit_token_event(:issue, session, actor)
     {:ok, session}
   end
 
@@ -57,7 +58,11 @@ defmodule Messngr.Noise.SessionStore do
     registry = Keyword.get(opts, :registry, Registry)
 
     session = Session.with_actor(session, Map.from_struct(actor))
-    Registry.put(registry, session)
+
+    with {:ok, session} <- Registry.put(registry, session) do
+      emit_token_event(:register, session, actor)
+      {:ok, session}
+    end
   end
 
   @doc """
@@ -68,13 +73,23 @@ defmodule Messngr.Noise.SessionStore do
   def fetch(token, opts \\ []) when is_binary(token) do
     registry = Keyword.get(opts, :registry, Registry)
 
-    with {:ok, session} <- Registry.fetch_by_token(registry, token),
-         {:ok, actor_map} <- Session.actor(session) do
-      actor = actor_from_map(actor_map)
-      Registry.touch_by_token(registry, token)
-      {:ok, session, actor}
-    else
-      _ -> :error
+    case Registry.fetch_by_token(registry, token) do
+      {:ok, session} ->
+        case Session.actor(session) do
+          {:ok, actor_map} ->
+            actor = actor_from_map(actor_map)
+            Registry.touch_by_token(registry, token)
+            emit_token_event(:verify, session, actor)
+            {:ok, session, actor}
+
+          :error ->
+            emit_token_failure(:verify, :actor_missing, %{session_id: Session.id(session)})
+            :error
+        end
+
+      :error ->
+        emit_token_failure(:verify, :not_found, %{})
+        :error
     end
   end
 
@@ -124,7 +139,8 @@ defmodule Messngr.Noise.SessionStore do
   end
 
   defp normalize_actor(other) do
-    raise ArgumentError, "Noise session actor must be provided as a map or Actor struct, got: #{inspect(other)}"
+    raise ArgumentError,
+          "Noise session actor must be provided as a map or Actor struct, got: #{inspect(other)}"
   end
 
   defp actor_from_map(%{account_id: account_id, profile_id: profile_id} = map) do
@@ -154,8 +170,12 @@ defmodule Messngr.Noise.SessionStore do
     |> Map.get(key)
     |> Kernel.||(Map.get(attrs, Atom.to_string(key)))
     |> case do
-      value when is_binary(value) and byte_size(String.trim(value)) > 0 -> String.trim(value)
-      other -> raise ArgumentError, "Noise session actor missing #{inspect(key)} (got: #{inspect(other)})"
+      value when is_binary(value) and byte_size(String.trim(value)) > 0 ->
+        String.trim(value)
+
+      other ->
+        raise ArgumentError,
+              "Noise session actor missing #{inspect(key)} (got: #{inspect(other)})"
     end
   end
 
@@ -168,5 +188,21 @@ defmodule Messngr.Noise.SessionStore do
       value when is_binary(value) and byte_size(String.trim(value)) > 0 -> String.trim(value)
       _ -> nil
     end
+  end
+
+  defp emit_token_event(event, %Session{} = session, %Actor{} = actor) do
+    metadata = %{
+      session_id: Session.id(session),
+      account_id: actor.account_id,
+      profile_id: actor.profile_id,
+      device_id: actor.device_id
+    }
+
+    :telemetry.execute([:messngr, :noise, :token, event], %{count: 1}, metadata)
+  end
+
+  defp emit_token_failure(event, reason, metadata) do
+    metadata = Map.put(metadata, :reason, reason)
+    :telemetry.execute([:messngr, :noise, :token, event, :failure], %{count: 1}, metadata)
   end
 end
