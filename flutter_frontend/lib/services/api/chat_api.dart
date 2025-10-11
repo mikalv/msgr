@@ -22,6 +22,102 @@ class AccountIdentity {
   final String profileId;
 }
 
+class ThumbnailUploadInfo {
+  const ThumbnailUploadInfo({
+    required this.method,
+    required this.url,
+    required this.headers,
+    required this.bucket,
+    required this.objectKey,
+    required this.publicUrl,
+    required this.expiresAt,
+  });
+
+  final String method;
+  final Uri url;
+  final Map<String, String> headers;
+  final String bucket;
+  final String objectKey;
+  final Uri publicUrl;
+  final DateTime expiresAt;
+
+  factory ThumbnailUploadInfo.fromJson(Map<String, dynamic> json) {
+    return ThumbnailUploadInfo(
+      method: json['method'] as String? ?? 'PUT',
+      url: Uri.parse(json['url'] as String? ?? ''),
+      headers: _stringMap(json['headers'] as Map<String, dynamic>? ?? const {}),
+      bucket: json['bucket'] as String? ?? '',
+      objectKey: json['object_key'] as String? ?? json['objectKey'] as String? ?? '',
+      publicUrl: Uri.parse(json['public_url'] as String? ?? json['publicUrl'] as String? ?? ''),
+      expiresAt: DateTime.tryParse(json['expires_at'] as String? ?? json['expiresAt'] as String? ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}
+
+class PresignedUploadInfo {
+  const PresignedUploadInfo({
+    required this.method,
+    required this.url,
+    required this.headers,
+    required this.bucket,
+    required this.objectKey,
+    required this.publicUrl,
+    required this.expiresAt,
+    this.retentionExpiresAt,
+    this.thumbnail,
+  });
+
+  final String method;
+  final Uri url;
+  final Map<String, String> headers;
+  final String bucket;
+  final String objectKey;
+  final Uri publicUrl;
+  final DateTime expiresAt;
+  final DateTime? retentionExpiresAt;
+  final ThumbnailUploadInfo? thumbnail;
+
+  factory PresignedUploadInfo.fromJson(Map<String, dynamic> json) {
+    final thumbnail = json['thumbnail_upload'] ?? json['thumbnailUpload'];
+    return PresignedUploadInfo(
+      method: json['method'] as String? ?? 'PUT',
+      url: Uri.parse(json['url'] as String? ?? ''),
+      headers: _stringMap(json['headers'] as Map<String, dynamic>? ?? const {}),
+      bucket: json['bucket'] as String? ?? '',
+      objectKey: json['object_key'] as String? ?? json['objectKey'] as String? ?? '',
+      publicUrl: Uri.parse(json['public_url'] as String? ?? json['publicUrl'] as String? ?? ''),
+      expiresAt: DateTime.tryParse(json['expires_at'] as String? ?? json['expiresAt'] as String? ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0),
+      retentionExpiresAt: DateTime.tryParse(json['retention_expires_at'] as String? ?? json['retentionExpiresAt'] as String? ?? ''),
+      thumbnail: thumbnail is Map<String, dynamic> ? ThumbnailUploadInfo.fromJson(thumbnail) : null,
+    );
+  }
+}
+
+class MediaUploadSession {
+  const MediaUploadSession({
+    required this.id,
+    required this.kind,
+    required this.contentType,
+    required this.byteSize,
+    required this.instructions,
+  });
+
+  final String id;
+  final String kind;
+  final String contentType;
+  final int byteSize;
+  final PresignedUploadInfo instructions;
+
+  factory MediaUploadSession.fromJson(Map<String, dynamic> json) {
+    final upload = json['upload'] as Map<String, dynamic>? ?? const {};
+    return MediaUploadSession(
+      id: json['id'] as String? ?? '',
+      kind: json['kind'] as String? ?? 'file',
+      contentType: json['content_type'] as String? ?? json['contentType'] as String? ?? 'application/octet-stream',
+      byteSize: (json['byte_size'] as num?)?.toInt() ?? 0,
+      instructions: PresignedUploadInfo.fromJson(upload),
+    );
+  }
 class MediaUploadRequest {
   const MediaUploadRequest({
     required this.kind,
@@ -237,6 +333,19 @@ class ChatApi {
     Map<String, dynamic>? media,
     Map<String, dynamic>? payload,
   }) async {
+    final decoded = await sendStructuredMessage(
+      current: current,
+      conversationId: conversationId,
+      message: {'body': body},
+    );
+    return decoded;
+  }
+
+  Future<ChatMessage> sendStructuredMessage({
+    required AccountIdentity current,
+    required String conversationId,
+    required Map<String, dynamic> message,
+  }) async {
     final message = <String, dynamic>{};
     if (body != null) message['body'] = body;
     if (kind != null) message['kind'] = kind;
@@ -255,6 +364,32 @@ class ChatApi {
 
     final decoded = _decodeBody(response);
     return ChatMessage.fromJson(decoded['data'] as Map<String, dynamic>);
+  }
+
+  Future<MediaUploadSession> createMediaUpload({
+    required AccountIdentity current,
+    required String conversationId,
+    required String kind,
+    required String contentType,
+    required int byteSize,
+    String? filename,
+  }) async {
+    final response = await _client.post(
+      backendApiUri('conversations/$conversationId/uploads'),
+      headers: _authHeaders(current),
+      body: jsonEncode({
+        'upload': {
+          'kind': kind,
+          'content_type': contentType,
+          'byte_size': byteSize,
+          if (filename != null) 'filename': filename,
+        }
+      }),
+    );
+
+    final decoded = _decodeBody(response);
+    final data = decoded['data'] as Map<String, dynamic>;
+    return MediaUploadSession.fromJson(data);
   }
 
   Map<String, String> _authHeaders(AccountIdentity identity) {
@@ -307,5 +442,9 @@ class ChatApi {
       return decoded;
     }
     throw ApiException(response.statusCode, response.body);
+  }
+
+  static Map<String, String> _stringMap(Map<String, dynamic> input) {
+    return input.map((key, value) => MapEntry(key.toString(), value == null ? '' : value.toString()));
   }
 }

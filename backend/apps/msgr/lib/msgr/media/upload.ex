@@ -25,6 +25,8 @@ defmodule Messngr.Media.Upload do
     field :expires_at, :utc_datetime
     field :width, :integer
     field :height, :integer
+    field :sha256, :string
+    field :retention_expires_at, :utc_datetime
     field :checksum, :string
 
     belongs_to :conversation, Messngr.Chat.Conversation
@@ -45,6 +47,10 @@ defmodule Messngr.Media.Upload do
       :byte_size,
       :metadata,
       :expires_at,
+      :width,
+      :height,
+      :sha256,
+      :retention_expires_at,
       :conversation_id,
       :profile_id,
       :width,
@@ -59,12 +65,15 @@ defmodule Messngr.Media.Upload do
       :byte_size,
       :expires_at,
       :conversation_id,
-      :profile_id
+      :profile_id,
+      :retention_expires_at
     ])
     |> validate_number(:byte_size, greater_than: 0)
     |> validate_format(:content_type, ~r{/})
     |> validate_number(:width, greater_than: 0, allow_nil: true)
     |> validate_number(:height, greater_than: 0, allow_nil: true)
+    |> validate_change(:sha256, &validate_sha256/2)
+    |> validate_retention_window()
     |> validate_checksum()
     |> unique_constraint(:object_key)
   end
@@ -72,16 +81,18 @@ defmodule Messngr.Media.Upload do
   @doc """
   Builds a changeset that marks the upload as consumed and persists metadata.
   """
-  @spec consume(t(), map(), keyword()) :: Ecto.Changeset.t()
-  def consume(%__MODULE__{} = upload, metadata, attrs \\ []) do
-    update_attrs =
-      attrs
-      |> Enum.into(%{})
-      |> Map.take([:width, :height, :checksum])
+  @spec consume(t(), map()) :: Ecto.Changeset.t()
+  def consume(%__MODULE__{} = upload, metadata) do
+    media_metadata = extract_media_metadata(metadata)
 
     upload
-    |> change(Map.merge(%{status: :consumed}, update_attrs))
-    |> change(metadata: merge_metadata(upload.metadata, metadata))
+    |> change(status: :consumed, metadata: merge_metadata(upload.metadata, metadata))
+    |> maybe_put_change(:width, Map.get(media_metadata, :width))
+    |> maybe_put_change(:height, Map.get(media_metadata, :height))
+    |> maybe_put_change(:sha256, Map.get(media_metadata, :sha256))
+    |> validate_number(:width, greater_than: 0, allow_nil: true)
+    |> validate_number(:height, greater_than: 0, allow_nil: true)
+    |> validate_change(:sha256, &validate_sha256/2)
   end
 
   @doc """
@@ -140,6 +151,80 @@ defmodule Messngr.Media.Upload do
 
   defp merge_metadata(base, _), do: base || %{}
 
+  defp extract_media_metadata(metadata) do
+    media =
+      case metadata do
+        %{"media" => %{} = map} -> map
+        %{media: %{} = map} -> map
+        %{} = map -> map
+        _ -> %{}
+      end
+      |> Map.new(fn {k, v} -> {to_string(k), v} end)
+
+    %{
+      width: normalize_dimension(media["width"]),
+      height: normalize_dimension(media["height"]),
+      sha256: normalize_sha(media)
+    }
+  end
+
+  defp normalize_dimension(value) when is_integer(value) and value > 0, do: value
+  defp normalize_dimension(value) when is_float(value) and value > 0, do: round(value)
+  defp normalize_dimension(value) when is_binary(value) do
+    with {int, ""} <- Integer.parse(value) do
+      normalize_dimension(int)
+    else
+      :error ->
+        case Float.parse(value) do
+          {float, ""} -> normalize_dimension(float)
+          _ -> nil
+        end
+    end
+  end
+  defp normalize_dimension(_), do: nil
+
+  defp normalize_sha(media) do
+    case media["sha256"] || media["hash"] || media["checksum"] do
+      value when is_binary(value) -> String.downcase(value)
+      _ -> nil
+    end
+  end
+
+  defp maybe_put_change(changeset, _field, nil), do: changeset
+  defp maybe_put_change(changeset, field, value), do: put_change(changeset, field, value)
+
+  def thumbnail_object_key(object_key) when is_binary(object_key) do
+    ext = Path.extname(object_key)
+    base = Path.rootname(object_key, ext)
+    base <> "-thumbnail" <> (ext == "" && ".jpg" || ext)
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp validate_sha256(:sha256, nil), do: []
+
+  defp validate_sha256(:sha256, value) when is_binary(value) do
+    if String.match?(value, ~r/\A[0-9a-fA-F]{64}\z/) do
+      []
+    else
+      [sha256: "must be a valid SHA-256 hex digest"]
+    end
+  end
+
+  defp validate_sha256(:sha256, _value), do: [sha256: "must be a valid SHA-256 hex digest"]
+
+  # TODO: Unsure if this is right now.
+  defp validate_retention_window(%Ecto.Changeset{} = changeset) do
+    expires_at = get_field(changeset, :expires_at)
+    retention_expires_at = get_field(changeset, :retention_expires_at)
+
+    cond do
+      is_nil(expires_at) or is_nil(retention_expires_at) -> changeset
+      DateTime.compare(retention_expires_at, expires_at) in [:gt, :eq] -> changeset
+      true -> add_error(changeset, :retention_expires_at, "must be after expires_at")
+    end
+  end
   defp maybe_presign_thumbnail(%{"media" => %{"thumbnail" => %{} = thumbnail}} = payload) do
     bucket = Map.get(thumbnail, "bucket") || Map.get(thumbnail, "bucketName")
     object_key = Map.get(thumbnail, "object_key") || Map.get(thumbnail, "objectKey")

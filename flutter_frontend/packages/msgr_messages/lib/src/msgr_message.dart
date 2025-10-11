@@ -26,10 +26,10 @@ enum MsgrMessageKind {
   /// Audio media content.
   audio,
 
-  /// Short form audio clip or voice memo content.
+  /// Short voice note content.
   voice,
 
-  /// Generic file attachment content.
+  /// Generic file attachment message.
   file,
 
   /// Lightweight thumbnail reference for external content.

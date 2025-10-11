@@ -2,10 +2,14 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:mime/mime.dart';
+import 'package:messngr/features/chat/widgets/chat_theme.dart';
 
 class ChatComposer extends StatefulWidget {
   const ChatComposer({
@@ -38,6 +42,10 @@ class _ChatComposerState extends State<ChatComposer>
   late final AnimationController _expanderController;
   late StreamSubscription<ChatVoiceState> _voiceSubscription;
   late ChatComposerValue _value;
+  StreamSubscription<ChatVoiceState>? _voiceSubscription;
+  final ImagePicker _imagePicker = ImagePicker();
+
+  bool _isDropHover = false;
 
   bool _showEmoji = false;
   int _commandSelection = 0;
@@ -108,7 +116,59 @@ class _ChatComposerState extends State<ChatComposer>
       _expanderController.reverse();
     }
 
-    return SafeArea(
+    final baseDecoration = ChatTheme.composerDecoration(theme);
+    final decoration = baseDecoration.copyWith(
+      border: _isDropHover
+          ? Border.all(color: theme.colorScheme.primary.withOpacity(0.35), width: 2)
+          : baseDecoration.border,
+    );
+
+    return DropTarget(
+      onDragEntered: (_) => setState(() => _isDropHover = true),
+      onDragExited: (_) => setState(() => _isDropHover = false),
+      onDragDone: _handleDrop,
+      /*child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (widget.errorMessage != null || _value.error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _ErrorBanner(message: widget.errorMessage ?? _value.error!),
+              ),
+            if (attachments.isNotEmpty || voiceNote != null)
+              _AttachmentPreview(
+                attachments: attachments,
+                voiceNote: voiceNote,
+                onRemoveAttachment: _removeAttachment,
+                onRemoveVoiceNote: _clearVoiceNote,
+              ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              decoration: decoration,
+              padding: EdgeInsets.symmetric(
+                horizontal: isCompact ? 12 : 16,
+                vertical: isCompact ? 10 : 12,
+              ),
+              child: CallbackShortcuts(
+                bindings: <ShortcutActivator, VoidCallback>{
+                  const SingleActivator(LogicalKeyboardKey.enter, control: true):
+                      _submit,
+                  const SingleActivator(LogicalKeyboardKey.enter, meta: true): _submit,
+                  const SingleActivator(LogicalKeyboardKey.escape): _handleEscape,
+                  const SingleActivator(LogicalKeyboardKey.arrowDown):
+                      _selectNextCommand,
+                  const SingleActivator(LogicalKeyboardKey.arrowUp):
+                      _selectPreviousCommand,
+                },
+                child: Focus(
+                  autofocus: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [*/
+    SafeArea(
       top: false,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -176,6 +236,12 @@ class _ChatComposerState extends State<ChatComposer>
                           onTap: _pickFiles,
                         ),
                         const SizedBox(width: 8),
+                        _ComposerIconButton(
+                          icon: Icons.camera_alt_outlined,
+                          tooltip: 'Åpne kamera',
+                          onTap: _capturePhoto,
+                        ),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: _ComposerTextField(
                             controller: _textController,
@@ -219,8 +285,9 @@ class _ChatComposerState extends State<ChatComposer>
                 ),
               ),
             ),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -251,12 +318,51 @@ class _ChatComposerState extends State<ChatComposer>
       if (result == null) return;
       final attachments = result.files
           .map((file) => ComposerAttachment.fromPlatformFile(file))
-          .whereType<ComposerAttachment>()
+          .where((attachment) => attachment.bytes != null)
           .toList();
       if (attachments.isEmpty) return;
       widget.controller.addAttachments(attachments);
     } on PlatformException catch (error) {
       widget.controller.setError('Kunne ikke hente filer: ${error.message}');
+    }
+  }
+
+  Future<void> _handleDrop(DropDoneDetails details) async {
+    setState(() => _isDropHover = false);
+    if (details.files.isEmpty) return;
+
+    try {
+      final attachments = <ComposerAttachment>[];
+      for (final file in details.files) {
+        final attachment = await ComposerAttachment.fromXFile(file);
+        if (attachment != null && attachment.bytes != null) {
+          attachments.add(attachment);
+        }
+      }
+      if (attachments.isEmpty) return;
+      if (!mounted) return;
+      widget.controller.addAttachments(attachments);
+    } catch (error) {
+      if (!mounted) return;
+      widget.controller.setError('Kunne ikke slippe filer.');
+    }
+  }
+
+  Future<void> _capturePhoto() async {
+    try {
+      final file = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      if (file == null) return;
+      final attachment = await ComposerAttachment.fromXFile(file);
+      if (attachment != null) {
+        widget.controller.addAttachments([attachment]);
+      }
+    } on PlatformException catch (error) {
+      widget.controller.setError('Kunne ikke åpne kamera: ${error.message}');
+    } catch (error) {
+      widget.controller.setError('Klarte ikke å hente bildet.');
     }
   }
 
@@ -929,17 +1035,42 @@ class ComposerAttachment {
     required this.size,
     this.bytes,
     this.path,
+    this.mimeType,
   });
 
   factory ComposerAttachment.fromPlatformFile(PlatformFile file) {
     final id = file.identifier ?? '${file.name}-${DateTime.now().microsecondsSinceEpoch}';
+    final bytes = file.bytes;
+    final mimeType = lookupMimeType(file.name, headerBytes: bytes);
+    if (bytes == null) {
+      return ComposerAttachment(id: id, name: file.name, size: file.size, path: file.path, mimeType: mimeType);
+    }
     return ComposerAttachment(
       id: id,
       name: file.name,
       size: file.size,
-      bytes: file.bytes,
+      bytes: bytes,
       path: file.path,
+      mimeType: mimeType,
     );
+  }
+
+  static Future<ComposerAttachment?> fromXFile(XFile file) async {
+    try {
+      final bytes = await file.readAsBytes();
+      final mimeType = lookupMimeType(file.name, headerBytes: bytes);
+      final id = '${file.name}-${DateTime.now().microsecondsSinceEpoch}';
+      return ComposerAttachment(
+        id: id,
+        name: file.name,
+        size: bytes.length,
+        bytes: bytes,
+        path: file.path,
+        mimeType: mimeType,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   final String id;
@@ -947,6 +1078,11 @@ class ComposerAttachment {
   final int size;
   final Uint8List? bytes;
   final String? path;
+  final String? mimeType;
+
+  bool get isImage => mimeType?.startsWith('image/') ?? false;
+  bool get isVideo => mimeType?.startsWith('video/') ?? false;
+  bool get isAudio => mimeType?.startsWith('audio/') ?? false;
 
   String get humanSize {
     if (size < 1024) return '$size B';
@@ -1030,5 +1166,514 @@ class SimulatedChatVoiceRecorder implements ChatVoiceRecorder {
       List<int>.generate(1200, (_) => _random.nextInt(255)),
     );
     return ComposerVoiceNote(duration: duration, bytes: bytes);
+  }
+}
+
+class _ComposerTextField extends StatelessWidget {
+  const _ComposerTextField({
+    required this.controller,
+    required this.focusNode,
+    required this.onSubmitted,
+    required this.isSending,
+    required this.placeholder,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final ValueChanged<String> onSubmitted;
+  final bool isSending;
+  final String placeholder;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return TextField(
+      controller: controller,
+      focusNode: focusNode,
+      textCapitalization: TextCapitalization.sentences,
+      textInputAction: TextInputAction.send,
+      minLines: 1,
+      maxLines: 6,
+      enabled: !isSending,
+      decoration: InputDecoration(
+        hintText: placeholder,
+        border: InputBorder.none,
+        hintStyle: theme.textTheme.bodyLarge?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+        ),
+      ),
+      onSubmitted: onSubmitted,
+    );
+  }
+}
+
+class _EmojiPicker extends StatelessWidget {
+  const _EmojiPicker({required this.onSelect});
+
+  final ValueChanged<String> onSelect;
+
+  static const _emojis = [
+    '😀', '😁', '😂', '🤣', '😊', '😍', '😘', '😎', '🤩', '🥳', '🤔', '🤯', '😴', '😇',
+    '😡', '😭', '🙌', '👏', '👍', '👎', '🙏', '💡', '🔥', '🌟', '✨', '🎉', '🚀', '🎧',
+    '🍕', '☕️', '🏖️', '📎',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: theme.colorScheme.primary.withOpacity(0.12),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        child: Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final emoji in _emojis)
+              GestureDetector(
+                onTap: () => onSelect(emoji),
+                child: Text(
+                  emoji,
+                  style: const TextStyle(fontSize: 24),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CommandPalette extends StatelessWidget {
+  const _CommandPalette({
+    required this.commands,
+    required this.highlightedIndex,
+    required this.onSelect,
+  });
+
+  final List<SlashCommand> commands;
+  final int highlightedIndex;
+  final ValueChanged<SlashCommand> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.52),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < commands.length; i++)
+            InkWell(
+              onTap: () => onSelect(commands[i]),
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(i == 0 ? 18 : 0),
+                bottom: Radius.circular(i == commands.length - 1 ? 18 : 0),
+              ),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: i == highlightedIndex
+                      ? theme.colorScheme.primary.withOpacity(0.12)
+                      : Colors.transparent,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            commands[i].name,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            commands[i].description,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.keyboard_return, size: 16),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttachmentPreview extends StatelessWidget {
+  const _AttachmentPreview({
+    required this.attachments,
+    required this.voiceNote,
+    required this.onRemoveAttachment,
+    required this.onRemoveVoiceNote,
+  });
+
+  final List<ComposerAttachment> attachments;
+  final ComposerVoiceNote? voiceNote;
+  final ValueChanged<ComposerAttachment> onRemoveAttachment;
+  final VoidCallback onRemoveVoiceNote;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          for (final attachment in attachments)
+            _AttachmentTile(
+              attachment: attachment,
+              onRemove: () => onRemoveAttachment(attachment),
+            ),
+          if (voiceNote != null)
+            _VoiceNoteTile(
+              voiceNote: voiceNote!,
+              onRemove: onRemoveVoiceNote,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttachmentTile extends StatelessWidget {
+  const _AttachmentTile({required this.attachment, required this.onRemove});
+
+  final ComposerAttachment attachment;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final borderRadius = BorderRadius.circular(18);
+
+    if (attachment.isImage && attachment.bytes != null) {
+      return Stack(
+        children: [
+          ClipRRect(
+            borderRadius: borderRadius,
+            child: Image.memory(
+              attachment.bytes!,
+              width: 100,
+              height: 100,
+              fit: BoxFit.cover,
+            ),
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: _AttachmentRemoveButton(onPressed: onRemove),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.vertical(bottom: borderRadius.bottomLeft),
+                color: Colors.black.withOpacity(0.45),
+              ),
+              child: Text(
+                attachment.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    final icon = attachment.isVideo
+        ? Icons.videocam_outlined
+        : attachment.isAudio
+            ? Icons.audiotrack
+            : Icons.insert_drive_file_outlined;
+
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+        borderRadius: borderRadius,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 20, color: theme.colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  attachment.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  attachment.humanSize,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            tooltip: 'Fjern',
+            onPressed: onRemove,
+            splashRadius: 18,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VoiceNoteTile extends StatelessWidget {
+  const _VoiceNoteTile({required this.voiceNote, required this.onRemove});
+
+  final ComposerVoiceNote voiceNote;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.55),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.mic, color: theme.colorScheme.primary),
+          const SizedBox(width: 10),
+          Text(
+            'Lydklipp ${voiceNote.formattedDuration}',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(width: 10),
+          IconButton(
+            icon: const Icon(Icons.close, size: 16),
+            tooltip: 'Fjern lydklipp',
+            onPressed: onRemove,
+            splashRadius: 18,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttachmentRemoveButton extends StatelessWidget {
+  const _AttachmentRemoveButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withOpacity(0.45),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: const Padding(
+          padding: EdgeInsets.all(4),
+          child: Icon(Icons.close, size: 14, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+class _VoiceRecorderButton extends StatelessWidget {
+  const _VoiceRecorderButton({
+    required this.isRecording,
+    required this.onStart,
+    required this.onStop,
+  });
+
+  final bool isRecording;
+  final VoidCallback onStart;
+  final VoidCallback onStop;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Tooltip(
+      message: isRecording ? 'Stopp opptak' : 'Spill inn lydklipp',
+      child: GestureDetector(
+        onTap: isRecording ? onStop : onStart,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: isRecording
+                ? theme.colorScheme.error.withOpacity(0.2)
+                : theme.colorScheme.surfaceVariant.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Icon(
+            isRecording ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
+            color: isRecording
+                ? theme.colorScheme.error
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ComposerIconButton extends StatelessWidget {
+  const _ComposerIconButton({
+    required this.icon,
+    required this.tooltip,
+    this.onTap,
+    this.isActive = false,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = isActive
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkResponse(
+          onTap: onTap,
+          radius: 24,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isActive
+                  ? theme.colorScheme.primary.withOpacity(0.14)
+                  : theme.colorScheme.surfaceVariant.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: color),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SendButton extends StatelessWidget {
+  const _SendButton({
+    required this.isEnabled,
+    required this.isSending,
+    this.onPressed,
+  });
+
+  final bool isEnabled;
+  final bool isSending;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AnimatedScale(
+      scale: isEnabled || isSending ? 1 : 0.92,
+      duration: const Duration(milliseconds: 180),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: ChatTheme.selfBubbleGradient(theme),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: IconButton(
+          iconSize: 22,
+          padding: const EdgeInsets.all(12),
+          icon: isSending
+              ? SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                )
+              : const Icon(Icons.send_rounded),
+          color: theme.colorScheme.onPrimaryContainer,
+          onPressed: isEnabled ? onPressed : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.error.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.error.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline,
+              color: theme.colorScheme.error, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -78,5 +78,58 @@ void main() {
       expect(themed.theme.id, equals('sunrise'));
       expect(themed, isA<ChatMessage>());
     });
+
+    test('fromJson normalises media payload metadata', () {
+      final parsed = ChatMessage.fromJson({
+        'id': 'm1',
+        'type': 'image',
+        'status': 'sent',
+        'sent_at': '2024-01-01T12:00:00Z',
+        'profile': {'id': 'p1', 'name': 'Ola', 'mode': 'private'},
+        'payload': {
+          'media': {
+            'url': 'https://cdn/image.png',
+            'width': '1920',
+            'height': '1080',
+            'caption': ' Sommer ',
+            'thumbnail': {
+              'url': 'https://cdn/thumb.jpg',
+              'width': 320,
+              'height': 180
+            }
+          }
+        }
+      });
+
+      expect(parsed.data, isA<MsgrImageMessage>());
+      final image = parsed.data as MsgrImageMessage;
+      expect(image.url, equals('https://cdn/image.png'));
+      expect(image.width, equals(1920));
+      expect(image.height, equals(1080));
+      expect(image.description, equals('Sommer'));
+      expect(image.thumbnailUrl, equals('https://cdn/thumb.jpg'));
+      expect(image.thumbnailWidth, equals(320));
+      expect(image.thumbnailHeight, equals(180));
+    });
+
+    test('fromJson merges top-level media overrides', () {
+      final parsed = ChatMessage.fromJson({
+        'id': 'voice-1',
+        'type': 'voice',
+        'status': 'sent',
+        'profile': {'id': 'p1', 'name': 'Ola', 'mode': 'private'},
+        'media': {
+          'url': 'https://cdn/voice.ogg',
+          'durationMs': 2500,
+          'waveform': [0, 50, 100]
+        }
+      });
+
+      expect(parsed.data, isA<MsgrAudioMessage>());
+      final audio = parsed.data as MsgrAudioMessage;
+      expect(audio.url, equals('https://cdn/voice.ogg'));
+      expect(audio.duration, closeTo(2.5, 0.001));
+      expect(audio.waveform, equals([0.0, 50.0, 100.0]));
+    });
   });
 }

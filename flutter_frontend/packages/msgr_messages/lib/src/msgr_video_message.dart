@@ -11,6 +11,8 @@ class MsgrVideoMessage extends MsgrAuthoredMessage {
     required super.id,
     required this.url,
     this.thumbnailUrl,
+    this.thumbnailWidth,
+    this.thumbnailHeight,
     this.caption,
     this.duration,
     this.autoplay = false,
@@ -30,6 +32,12 @@ class MsgrVideoMessage extends MsgrAuthoredMessage {
   /// Poster image used before playback starts.
   final String? thumbnailUrl;
 
+  /// Width of the provided thumbnail preview.
+  final int? thumbnailWidth;
+
+  /// Height of the provided thumbnail preview.
+  final int? thumbnailHeight;
+
   /// Optional caption describing the clip.
   final String? caption;
 
@@ -44,6 +52,8 @@ class MsgrVideoMessage extends MsgrAuthoredMessage {
     String? id,
     String? url,
     String? thumbnailUrl,
+    int? thumbnailWidth,
+    int? thumbnailHeight,
     String? caption,
     double? duration,
     bool? autoplay,
@@ -60,6 +70,8 @@ class MsgrVideoMessage extends MsgrAuthoredMessage {
       id: id ?? this.id,
       url: url ?? this.url,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      thumbnailWidth: thumbnailWidth ?? this.thumbnailWidth,
+      thumbnailHeight: thumbnailHeight ?? this.thumbnailHeight,
       caption: caption ?? this.caption,
       duration: duration ?? this.duration,
       autoplay: autoplay ?? this.autoplay,
@@ -77,10 +89,27 @@ class MsgrVideoMessage extends MsgrAuthoredMessage {
   /// Recreates an [MsgrVideoMessage] from a JSON compatible map.
   factory MsgrVideoMessage.fromMap(Map<String, dynamic> map) {
     final author = MsgrAuthoredMessage.readAuthorMap(map);
+    final rawThumbnail = map['thumbnail'];
+    String? thumbnailUrl = map['thumbnailUrl'] as String?;
+    if (thumbnailUrl == null && rawThumbnail is Map<String, dynamic>) {
+      thumbnailUrl = rawThumbnail['url'] as String? ?? rawThumbnail['thumbnailUrl'] as String?;
+    } else if (thumbnailUrl == null && rawThumbnail is String) {
+      thumbnailUrl = rawThumbnail;
+    }
+
+    int? thumbnailWidth = (map['thumbnailWidth'] as num?)?.toInt();
+    int? thumbnailHeight = (map['thumbnailHeight'] as num?)?.toInt();
+    if (rawThumbnail is Map<String, dynamic>) {
+      thumbnailWidth ??= (rawThumbnail['width'] as num?)?.toInt();
+      thumbnailHeight ??= (rawThumbnail['height'] as num?)?.toInt();
+    }
+
     return MsgrVideoMessage(
       id: map['id'] as String,
       url: map['url'] as String? ?? '',
-      thumbnailUrl: map['thumbnailUrl'] as String? ?? map['thumbnail'] as String?,
+      thumbnailUrl: thumbnailUrl,
+      thumbnailWidth: thumbnailWidth,
+      thumbnailHeight: thumbnailHeight,
       caption: map['caption'] as String?,
       duration: (map['duration'] as num?)?.toDouble(),
       autoplay: map['autoplay'] as bool? ?? false,
@@ -102,6 +131,8 @@ class MsgrVideoMessage extends MsgrAuthoredMessage {
       'id': id,
       'url': url,
       'thumbnailUrl': thumbnailUrl,
+      'thumbnailWidth': thumbnailWidth,
+      'thumbnailHeight': thumbnailHeight,
       'caption': caption,
       'duration': duration,
       'autoplay': autoplay,
@@ -118,6 +149,8 @@ class MsgrVideoMessage extends MsgrAuthoredMessage {
         ...super.props,
         url,
         thumbnailUrl,
+        thumbnailWidth,
+        thumbnailHeight,
         caption,
         duration,
         autoplay,
