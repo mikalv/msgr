@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added Noise transport session and registry modules with NX/IK/XX handshake
+  support, session-token generation and registry TTL management, plus
+  integration/property tests for handshake, fallback and rekey flows.
 - Startet Slack API-umbrellaappen med reelle `conversations.*`, `chat.*`, `users.*` og `reactions.*` endepunktimplementasjoner, Slack-ID/timestamp-adaptere, header-basert autentiseringsplugg og tilhørende controller-tester.
 - Implementerte `conversations.mark` for Slack API-et slik at lesestatus lagres, og la til tester som dekker lykkestien og ugyldig timestamp-feil.
 - Lagt til plan i `docs/umbrella_slack_compat_plan.md` for Slack-kompatibel umbrella-plattform og prioritering av Telegram og Discord-integrasjoner.
