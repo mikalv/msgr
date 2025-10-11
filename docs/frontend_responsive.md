@@ -17,6 +17,7 @@ Denne notatfilen beskriver hvordan den nye responsive hjemmeskjermen i Flutter-a
 - `_HomeActionStrip` tilbyr raske snarveier (meny, innstillinger, invitasjon, nytt rom, ny samtale).
 - `_HomeChatPanel` legger inn `ChatPage` i et kort med avrundede hjørner og skygge på større skjermer.
 - `ChatPage` bruker det modulære chat-UI-kitet med kanalpanel, trådvisning og tilkoblingsbanner. På smale skjermer rendres kanallisten over tråden.
+- `ChatComposer` skalerer handlingene sine: på mobil samles ikonknappene tett, mens desktop-visningen viser full verktøylinje med emoji, vedlegg og taleopptak.
 - Trådvisningen viser typing-indikator, reaksjonsaggregat og festede meldinger
   gjennom dedikerte notifiers (`TypingParticipantsNotifier`,
   `ReactionAggregatorNotifier`, `PinnedMessagesNotifier`) og widgetene
@@ -29,3 +30,6 @@ Denne notatfilen beskriver hvordan den nye responsive hjemmeskjermen i Flutter-a
 
 Widget-testen `home_page_test.dart` dekker brytepunktene slik at fremtidige endringer holder layouten responsiv.
 `chat_view_model_offline_test.dart` dekker offline fallback for chatten og bekrefter at hurtigbufferte meldinger brukes når nettverket forsvinner.
+`chat_composer_test.dart` verifiserer tastatursnarveier, emoji-innsetting, slash-kommandoer, filvedlegg og taleopptak på tvers av plattformer.
+
+![Chat composer demo](images/chat_composer_demo.png)
