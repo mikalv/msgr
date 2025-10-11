@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Designet et modulært Flutter chat-UI-kit (kanalliste, trådvisning, reaksjoner, presence, tilkoblingsbanner) og integrerte det i `ChatPage` og en ny `ChannelListPage`-demo.
+- Utvidet `ChatComposer` med emoji-velger, slash-kommandoer, filvedlegg, simulert taleopptak og forbedret utkast-/feilhåndtering samt nye widgettester.
+- Implementerte hurtigbuffer for samtaler og meldinger med Hive/Sembast, offline statusbanner og integrasjonstester for fallback i `ChatViewModel`.
 - Added initial WebRTC signalling stack with in-memory call registry, Phoenix `rtc:*` channel, tests, documentation, and a dockerised coturn service for TURN/STUN.
 - Tightened direct-call support by capping participants to vert + én, utvidet testdekning og dokumentasjon av Flutter-klientplanen.
 - Introduced conversation structure types (familie, bedrift, vennegjeng, prosjekt)
