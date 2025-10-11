@@ -1,0 +1,55 @@
+[general]
+id = 1
+max_msg_size = 1_048_576
+local_db_path = "/var/lib/stonemq/kv_db"
+
+[network]
+ip = "0.0.0.0"
+port = 9092
+max_connection = 65536
+max_package_size = 10_048_576
+conn_read_buffer_size = 4096
+
+[log]
+journal_topic_count = 2
+queue_topic_count = 2
+recovery_checkpoint_interval = 1000
+file_records_comm_channel_size = 1000
+splitter_wait_interval = 100_100
+
+journal_segment_size = 1_073_741_824
+journal_base_dir = "/var/lib/stonemq/journal"
+journal_index_file_size = 10_485_760
+journal_index_interval_bytes = 4096
+
+queue_segment_size = 1_073_741_824
+queue_base_dir = "/var/lib/stonemq/queue"
+queue_index_file_size = 10_485_760
+queue_index_interval_bytes = 4096
+
+[group_consume]
+group_min_session_timeout = 6_000
+group_max_session_timeout = 300_000
+group_initial_rebalance_delay = 3000
+
+[active_segment_writer_pool]
+channel_capacity = 1024
+num_channels = 2
+monitor_interval = 20
+worker_check_timeout = 200
+
+[active_segment_writer]
+buffer_capacity = 1_048_576
+flush_interval = 500
+
+[request_handler_pool]
+channel_capacity = 1024
+num_channels = 6
+monitor_interval = 20
+worker_check_timeout = 200
+
+[partition_appender_pool]
+channel_capacity = 1024
+num_channels = 2
+monitor_interval = 20
+worker_check_timeout = 200

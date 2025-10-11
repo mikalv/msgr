@@ -29,7 +29,7 @@ class ChatApi {
 
   Future<AccountIdentity> createAccount(String displayName, {String? email}) async {
     final response = await _client.post(
-      Uri.parse('$backendBaseUrl/users'),
+      backendApiUri('users'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'display_name': displayName,
@@ -57,7 +57,7 @@ class ChatApi {
     required String targetProfileId,
   }) async {
     final response = await _client.post(
-      Uri.parse('$backendBaseUrl/conversations'),
+      backendApiUri('conversations'),
       headers: _authHeaders(current),
       body: jsonEncode({'target_profile_id': targetProfileId}),
     );
@@ -72,8 +72,10 @@ class ChatApi {
     required String conversationId,
     int limit = 50,
   }) async {
-    final uri = Uri.parse('$backendBaseUrl/conversations/$conversationId/messages')
-        .replace(queryParameters: {'limit': '$limit'});
+    final uri = backendApiUri(
+      'conversations/$conversationId/messages',
+      queryParameters: {'limit': '$limit'},
+    );
 
     final response = await _client.get(uri, headers: _authHeaders(current));
 
@@ -88,7 +90,7 @@ class ChatApi {
     required String body,
   }) async {
     final response = await _client.post(
-      Uri.parse('$backendBaseUrl/conversations/$conversationId/messages'),
+      backendApiUri('conversations/$conversationId/messages'),
       headers: _authHeaders(current),
       body: jsonEncode({
         'message': {'body': body},
