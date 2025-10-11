@@ -16,6 +16,7 @@ final authReducers = <AuthState Function(AuthState, dynamic)>[
   TypedReducer<AuthState, OnCreateTeamSuccessAction>(_onCreateTeam),
   TypedReducer<AuthState, RequestCodeMsisdnAction>(_onMsisdnCodeRequest),
   TypedReducer<AuthState, RequestCodeEmailAction>(_onEmailCodeRequest),
+  TypedReducer<AuthState, ServerRequestCodeFromUserAction>(_onServerRequestCode),
 ];
 
 AuthState _onMsisdnCodeRequest(
@@ -26,7 +27,15 @@ AuthState _onMsisdnCodeRequest(
       currentProfile: null,
       teams: [],
       isLoading: false,
-      pendingMsisdn: action.msisdn);
+      pendingMsisdn: action.msisdn,
+      pendingEmail: null,
+      pendingTeam: null,
+      pendingChallengeId: null,
+      pendingChannel: 'phone',
+      pendingTargetHint: null,
+      pendingDebugCode: null,
+      pendingChallengeExpiresAt: null,
+      pendingDisplayName: action.displayName);
 }
 
 AuthState _onEmailCodeRequest(AuthState state, RequestCodeEmailAction action) {
@@ -36,7 +45,15 @@ AuthState _onEmailCodeRequest(AuthState state, RequestCodeEmailAction action) {
       currentProfile: null,
       teams: [],
       isLoading: false,
-      pendingEmail: action.email);
+      pendingEmail: action.email,
+      pendingMsisdn: null,
+      pendingTeam: null,
+      pendingChallengeId: null,
+      pendingChannel: 'email',
+      pendingTargetHint: null,
+      pendingDebugCode: null,
+      pendingChallengeExpiresAt: null,
+      pendingDisplayName: action.displayName);
 }
 
 AuthState _onAuthenticated(AuthState state, OnAuthenticatedAction action) {
@@ -50,7 +67,13 @@ AuthState _onAuthenticated(AuthState state, OnAuthenticatedAction action) {
       isLoading: false,
       pendingTeam: null, // reset all pending
       pendingEmail: null,
-      pendingMsisdn: null);
+      pendingMsisdn: null,
+      pendingChallengeId: null,
+      pendingChannel: null,
+      pendingTargetHint: null,
+      pendingDebugCode: null,
+      pendingChallengeExpiresAt: null,
+      pendingDisplayName: null);
 }
 
 AuthState _onCreateTeam(AuthState state, OnCreateTeamSuccessAction action) {
@@ -73,7 +96,13 @@ AuthState _onMyTeamsList(AuthState state, OnListMyTeamsResponseAction action) {
       teams: action.teams,
       isLoading: false,
       pendingEmail: null, // reset all pending
-      pendingMsisdn: null);
+      pendingMsisdn: null,
+      pendingChallengeId: null,
+      pendingChannel: null,
+      pendingTargetHint: null,
+      pendingDebugCode: null,
+      pendingChallengeExpiresAt: null,
+      pendingDisplayName: null);
 }
 
 AuthState _onAuthenticatedWithTeam(
@@ -96,7 +125,13 @@ AuthState _onAuthenticatedWithTeam(
       isLoading: false,
       pendingTeam: null, // reset all pending
       pendingEmail: null,
-      pendingMsisdn: null);
+      pendingMsisdn: null,
+      pendingChallengeId: null,
+      pendingChannel: null,
+      pendingTargetHint: null,
+      pendingDebugCode: null,
+      pendingChallengeExpiresAt: null,
+      pendingDisplayName: null);
 }
 
 AuthState _onAuthenticatedFailure(AuthState state, OnAuthFailureAction action) {
@@ -108,7 +143,13 @@ AuthState _onAuthenticatedFailure(AuthState state, OnAuthFailureAction action) {
       isLoading: false,
       pendingTeam: null, // reset all pending
       pendingEmail: null,
-      pendingMsisdn: null);
+      pendingMsisdn: null,
+      pendingChallengeId: null,
+      pendingChannel: null,
+      pendingTargetHint: null,
+      pendingDebugCode: null,
+      pendingChallengeExpiresAt: null,
+      pendingDisplayName: null);
 }
 
 AuthState _onLogout(AuthState state, OnLogoutSuccessAction action) {
@@ -125,5 +166,33 @@ AuthState _onLogout(AuthState state, OnLogoutSuccessAction action) {
       isLoading: false,
       pendingTeam: null, // reset all pending
       pendingEmail: null,
-      pendingMsisdn: null);
+      pendingMsisdn: null,
+      pendingChallengeId: null,
+      pendingChannel: null,
+      pendingTargetHint: null,
+      pendingDebugCode: null,
+      pendingChallengeExpiresAt: null,
+      pendingDisplayName: null);
+}
+
+AuthState _onServerRequestCode(
+    AuthState state, ServerRequestCodeFromUserAction action) {
+  return AuthState(
+      kIsLoggedIn: state.isLoggedIn,
+      currentUser: state.currentUser,
+      currentProfile: state.currentProfile,
+      currentTeam: state.currentTeam,
+      currentTeamName: state.currentTeamName,
+      teamAccessToken: state.teamAccessToken,
+      teams: state.teams,
+      isLoading: state.isLoading,
+      pendingEmail: state.pendingEmail,
+      pendingMsisdn: state.pendingMsisdn,
+      pendingTeam: state.pendingTeam,
+      pendingChallengeId: action.challenge.id,
+      pendingChannel: action.channel,
+      pendingTargetHint: action.challenge.targetHint,
+      pendingDebugCode: action.challenge.debugCode,
+      pendingChallengeExpiresAt: action.challenge.expiresAt,
+      pendingDisplayName: state.pendingDisplayName);
 }

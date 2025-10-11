@@ -215,12 +215,15 @@ void Function(
     next(action);
     try {
       // TODO: Calling RegistrationService service directly is not good. Refactor this.
-      final success =
+      final challenge =
           await RegistrationService().requestForSignInCodeEmail(action.email);
-      if (success) {
-        store.dispatch(ServerRequestCodeFromUserAction(type: 'email'));
+      if (challenge != null) {
+        store.dispatch(
+            ServerRequestCodeFromUserAction(channel: 'email', challenge: challenge));
+        action.completer.complete(challenge);
+      } else {
+        action.completer.completeError('Unable to request code');
       }
-      action.completer.complete(success);
     } on PlatformException catch (e) {
       action.completer.completeError(e);
     }
@@ -236,12 +239,15 @@ void Function(
     next(action);
     try {
       // TODO: Calling RegistrationService service directly is not good. Refactor this.
-      final success =
+      final challenge =
           await RegistrationService().requestForSignInCodeMsisdn(action.msisdn);
-      if (success) {
-        store.dispatch(ServerRequestCodeFromUserAction(type: 'msisdn'));
+      if (challenge != null) {
+        store.dispatch(
+            ServerRequestCodeFromUserAction(channel: 'phone', challenge: challenge));
+        action.completer.complete(challenge);
+      } else {
+        action.completer.completeError('Unable to request code');
       }
-      action.completer.complete(success);
     } on PlatformException catch (e) {
       action.completer.completeError(e);
     }
@@ -257,8 +263,16 @@ void Function(
     next(action);
     try {
       // TODO: Calling RegistrationService service directly is not good. Refactor this.
+      final challengeId = store.state.authState.pendingChallengeId;
+      if (challengeId == null) {
+        action.completer.completeError('No active challenge.');
+        return;
+      }
+
       final user = await RegistrationService().submitMsisdnCodeForToken(
-          store.state.authState.pendingMsisdn!, action.code);
+          challengeId: challengeId,
+          code: action.code,
+          displayName: store.state.authState.pendingDisplayName);
       if (user != null) {
         store.dispatch(OnAuthenticatedAction(user: user));
 
@@ -290,8 +304,16 @@ void Function(
     next(action);
     try {
       // TODO: Calling RegistrationService service directly is not good. Refactor this.
+      final challengeId = store.state.authState.pendingChallengeId;
+      if (challengeId == null) {
+        action.completer.completeError('No active challenge.');
+        return;
+      }
+
       final user = await RegistrationService().submitEmailCodeForToken(
-          store.state.authState.pendingEmail!, action.code);
+          challengeId: challengeId,
+          code: action.code,
+          displayName: store.state.authState.pendingDisplayName);
       if (user != null) {
         store.dispatch(OnAuthenticatedAction(user: user));
 
