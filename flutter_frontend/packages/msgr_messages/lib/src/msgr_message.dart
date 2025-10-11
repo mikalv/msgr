@@ -60,6 +60,9 @@ sealed class MsgrMessage extends Equatable {
   /// Serialises the message into a JSON friendly representation.
   Map<String, dynamic> toMap();
 
+  /// Creates a copy of the message with the provided [theme].
+  MsgrMessage themed(MsgrMessageTheme theme);
+
   /// Attempts to parse a [DateTime] from the provided [value].
   static DateTime? parseTimestamp(dynamic value) {
     if (value == null) {

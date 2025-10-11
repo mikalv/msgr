@@ -104,4 +104,7 @@ class MsgrCodeMessage extends MsgrAuthoredMessage {
         language,
         caption,
       ];
+
+  @override
+  MsgrCodeMessage themed(MsgrMessageTheme theme) => copyWith(theme: theme);
 }

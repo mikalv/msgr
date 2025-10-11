@@ -95,4 +95,7 @@ class MsgrMarkdownMessage extends MsgrAuthoredMessage {
         markdown,
         isTrusted,
       ];
+
+  @override
+  MsgrMarkdownMessage themed(MsgrMessageTheme theme) => copyWith(theme: theme);
 }

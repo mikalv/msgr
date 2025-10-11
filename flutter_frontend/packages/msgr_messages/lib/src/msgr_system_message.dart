@@ -91,4 +91,7 @@ class MsgrSystemMessage extends MsgrMessage {
 
   @override
   List<Object?> get props => [...super.props, text, level];
+
+  @override
+  MsgrSystemMessage themed(MsgrMessageTheme theme) => copyWith(theme: theme);
 }

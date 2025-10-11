@@ -68,5 +68,14 @@ void main() {
       expect(parsed.sentAt, isNotNull);
       expect(parsed.theme.name, equals('Aurora'));
     });
+
+    test('applyTheme uses palette to resolve entry', () {
+      final palette = MsgrThemePalette.standard();
+
+      final themed = message.applyTheme(palette, themeId: 'sunrise');
+
+      expect(themed.theme.id, equals('sunrise'));
+      expect(themed, isA<ChatMessage>());
+    });
   });
 }

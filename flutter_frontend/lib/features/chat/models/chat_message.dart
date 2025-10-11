@@ -72,4 +72,9 @@ class ChatMessage extends MsgrTextMessage {
       'theme': map['theme'],
     };
   }
+
+  ChatMessage applyTheme(MsgrThemePalette palette, {String? themeId}) {
+    final resolved = palette.resolve(themeId ?? theme.id);
+    return copyWith(theme: resolved);
+  }
 }

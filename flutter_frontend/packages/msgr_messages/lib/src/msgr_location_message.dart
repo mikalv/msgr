@@ -113,4 +113,7 @@ class MsgrLocationMessage extends MsgrAuthoredMessage {
         address,
         zoom,
       ];
+
+  @override
+  MsgrLocationMessage themed(MsgrMessageTheme theme) => copyWith(theme: theme);
 }

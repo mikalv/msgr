@@ -122,4 +122,7 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
         width,
         height,
       ];
+
+  @override
+  MsgrImageMessage themed(MsgrMessageTheme theme) => copyWith(theme: theme);
 }

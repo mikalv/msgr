@@ -79,5 +79,19 @@ void main() {
       expect(parsed.sentAt, isNotNull);
       expect(parsed.theme.id, equals('sunset'));
     });
+
+    test('themed applies palette entry', () {
+      const messageTheme = MsgrMessageTheme(
+        id: 'night',
+        name: 'Night',
+        primaryColor: '#111827',
+        backgroundColor: '#0F172A',
+      );
+
+      final updated = base.themed(messageTheme);
+
+      expect(updated.theme.id, equals('night'));
+      expect(updated, isNot(same(base)));
+    });
   });
 }

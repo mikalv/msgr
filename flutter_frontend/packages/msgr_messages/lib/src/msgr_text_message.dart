@@ -86,4 +86,7 @@ class MsgrTextMessage extends MsgrAuthoredMessage {
         ...super.props,
         body,
       ];
+
+  @override
+  MsgrTextMessage themed(MsgrMessageTheme theme) => copyWith(theme: theme);
 }

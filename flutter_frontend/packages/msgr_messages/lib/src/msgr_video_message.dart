@@ -122,4 +122,7 @@ class MsgrVideoMessage extends MsgrAuthoredMessage {
         duration,
         autoplay,
       ];
+
+  @override
+  MsgrVideoMessage themed(MsgrMessageTheme theme) => copyWith(theme: theme);
 }
