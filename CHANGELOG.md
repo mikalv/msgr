@@ -6,6 +6,9 @@
   REST and WebSocket contexts, adds feature-toggled legacy fallback, updates
   channel/controller flows to rely on socket assigns, and introduces Noise
   session fixtures/tests for both plugs and sockets.
+- Expanded Noise authentication coverage with dedicated tests for the shared
+  plug (headers, session persistence, feature flags, device edge cases) and the
+  session store helpers, improving confidence in Noise token validation.
 - Added Noise transport session and registry modules with NX/IK/XX handshake
   support, session-token generation and registry TTL management, plus
   integration/property tests for handshake, fallback and rekey flows.
