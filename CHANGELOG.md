@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Reintroduced the chat backlog broadcast helper so `message:sync` emits shared
+  cursor pages over PubSub again, with backend regression tests.
 - Added configurable TTL cleanup for conversation watcher lists so inactive
   viewers fall out of the PubSub feed automatically, with backend tests and
   refreshed documentation.

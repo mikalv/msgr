@@ -294,6 +294,19 @@ defmodule Messngr.ChatTest do
     assert page.meta.has_more == %{before: false, after: false}
   end
 
+  test "broadcast_backlog/2 emits message backlog", %{profile_a: profile_a, profile_b: profile_b} do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+    {:ok, message} = Chat.send_message(conversation.id, profile_a.id, %{"body" => "Hei"})
+
+    :ok = Chat.subscribe_to_conversation(conversation.id)
+
+    page = Chat.list_messages(conversation.id)
+
+    assert :ok = Chat.broadcast_backlog(conversation.id, page)
+    assert_receive {:message_backlog, %{entries: [^message]} = payload}
+    assert payload.meta.start_cursor == message.id
+  end
+
   test "watch_conversation/2 tracks watchers", %{profile_a: profile_a, profile_b: profile_b} do
     {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
 
