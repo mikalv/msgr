@@ -311,6 +311,9 @@ class ChatMessage {
     if (message is MsgrImageMessage) {
       return (message as MsgrImageMessage).description ?? '';
     }
+    if (message is MsgrFileMessage) {
+      return (message as MsgrFileMessage).caption ?? '';
+    }
     if (message is MsgrLocationMessage) {
       return (message as MsgrLocationMessage).label ?? '';
     }
@@ -382,6 +385,11 @@ Map<String, dynamic> _normalisePayload(Map<String, dynamic> payload) {
       flattened['caption'] = caption;
     }
 
+    final checksum = media['checksum'];
+    if (checksum is String) {
+      flattened['checksum'] = checksum;
+    }
+
     final duration = media['duration'];
     if (duration is num) {
       flattened['duration'] = duration.toDouble();
@@ -395,6 +403,49 @@ Map<String, dynamic> _normalisePayload(Map<String, dynamic> payload) {
     final waveform = media['waveform'];
     if (waveform is List) {
       flattened['waveform'] = waveform;
+    }
+
+    final waveformSampleRate = media['waveformSampleRate'];
+    if (waveformSampleRate is num) {
+      flattened['waveformSampleRate'] = waveformSampleRate.toInt();
+    }
+
+    final width = media['width'];
+    if (width is num) {
+      flattened['width'] = width.toInt();
+    }
+
+    final height = media['height'];
+    if (height is num) {
+      flattened['height'] = height.toInt();
+    }
+
+    final metadata = media['metadata'];
+    if (metadata is Map) {
+      final safeMetadata = Map<String, dynamic>.from(metadata);
+      flattened['metadata'] = safeMetadata;
+      final fileName = safeMetadata['fileName'];
+      if (fileName is String) {
+        flattened['fileName'] = fileName;
+      }
+    }
+
+    final thumbnail = media['thumbnail'];
+    if (thumbnail is Map) {
+      final thumbUrl = thumbnail['url'] ?? thumbnail['publicUrl'];
+      if (thumbUrl is String) {
+        flattened['thumbnailUrl'] = thumbUrl;
+      }
+
+      final thumbWidth = thumbnail['width'];
+      if (thumbWidth is num) {
+        flattened['thumbnailWidth'] = thumbWidth.toInt();
+      }
+
+      final thumbHeight = thumbnail['height'];
+      if (thumbHeight is num) {
+        flattened['thumbnailHeight'] = thumbHeight.toInt();
+      }
     }
   }
 

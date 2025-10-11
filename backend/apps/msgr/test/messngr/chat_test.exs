@@ -124,14 +124,25 @@ defmodule Messngr.ChatTest do
                "body" => "Hør på dette",
                "media" => %{
                  "upload_id" => upload.id,
-                 "durationMs" => 1500
+                 "durationMs" => 1500,
+                 "waveform" => [0.1, 0.4, 0.7],
+                 "thumbnail" => %{
+                   "bucket" => upload.bucket,
+                   "objectKey" => upload.object_key <> "/preview"
+                 }
                }
              })
 
     assert message.kind == :audio
-    assert message.payload["media"]["objectKey"] == upload.object_key
-    assert message.payload["media"]["durationMs"] == 1500
-    assert message.payload["media"]["contentType"] == "audio/mpeg"
+    media_payload = message.payload["media"]
+    assert media_payload["objectKey"] == upload.object_key
+    assert media_payload["durationMs"] == 1500
+    assert media_payload["contentType"] == "audio/mpeg"
+    assert media_payload["waveform"] == [0.1, 0.4, 0.7]
+    assert media_payload["url"] =~ "signature"
+    assert %{"url" => thumb_url} = media_payload["thumbnail"]
+    assert thumb_url =~ "preview"
+    assert %{"expiresAt" => _} = media_payload["retention"]
     assert %Upload{status: :consumed} = Repo.get!(Upload, upload.id)
   end
 

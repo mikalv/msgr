@@ -3,18 +3,19 @@ import 'package:meta/meta.dart';
 import 'msgr_message.dart';
 import 'msgr_theme.dart';
 
-/// Image based message with metadata for rendering thumbnails.
+/// Generic file attachment message with optional preview metadata.
 @immutable
-class MsgrImageMessage extends MsgrAuthoredMessage {
-  /// Creates an image message referencing remote resources.
-  const MsgrImageMessage({
+class MsgrFileMessage extends MsgrAuthoredMessage {
+  /// Creates a new file attachment message.
+  const MsgrFileMessage({
     required super.id,
     required this.url,
+    required this.fileName,
+    this.byteSize,
+    this.mimeType,
+    this.caption,
+    this.checksum,
     this.thumbnailUrl,
-    this.description,
-    this.width,
-    this.height,
-    MsgrMessageKind kind = MsgrMessageKind.image,
     required super.profileId,
     required super.profileName,
     required super.profileMode,
@@ -23,34 +24,39 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
     super.insertedAt,
     super.isLocal,
     super.theme,
-  })  : assert(kind == MsgrMessageKind.image || kind == MsgrMessageKind.thumbnail,
-            'MsgrImageMessage supports image or thumbnail kinds'),
-        super(kind: kind);
+  }) : super(kind: MsgrMessageKind.file);
 
-  /// Full resolution image URL.
+  /// Download URL for the file resource.
   final String url;
 
-  /// Optional thumbnail preview URL.
+  /// Original filename supplied by the uploader.
+  final String fileName;
+
+  /// Total size of the file in bytes, when available.
+  final int? byteSize;
+
+  /// MIME type describing the contents of the file.
+  final String? mimeType;
+
+  /// Optional caption or description associated with the file.
+  final String? caption;
+
+  /// Optional checksum for integrity validation.
+  final String? checksum;
+
+  /// Optional thumbnail preview for the file (e.g. PDF poster).
   final String? thumbnailUrl;
 
-  /// Description or alt text for accessibility.
-  final String? description;
-
-  /// Pixel width of the image.
-  final int? width;
-
-  /// Pixel height of the image.
-  final int? height;
-
   /// Creates a copy with selectively overridden fields.
-  MsgrImageMessage copyWith({
+  MsgrFileMessage copyWith({
     String? id,
     String? url,
+    String? fileName,
+    int? byteSize,
+    String? mimeType,
+    String? caption,
+    String? checksum,
     String? thumbnailUrl,
-    String? description,
-    int? width,
-    int? height,
-    MsgrMessageKind? kind,
     String? profileId,
     String? profileName,
     String? profileMode,
@@ -60,17 +66,15 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
     bool? isLocal,
     MsgrMessageTheme? theme,
   }) {
-    final resolvedKind = kind ?? this.kind;
-    assert(resolvedKind == MsgrMessageKind.image ||
-        resolvedKind == MsgrMessageKind.thumbnail);
-    return MsgrImageMessage(
+    return MsgrFileMessage(
       id: id ?? this.id,
       url: url ?? this.url,
+      fileName: fileName ?? this.fileName,
+      byteSize: byteSize ?? this.byteSize,
+      mimeType: mimeType ?? this.mimeType,
+      caption: caption ?? this.caption,
+      checksum: checksum ?? this.checksum,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
-      description: description ?? this.description,
-      width: width ?? this.width,
-      height: height ?? this.height,
-      kind: resolvedKind,
       profileId: profileId ?? this.profileId,
       profileName: profileName ?? this.profileName,
       profileMode: profileMode ?? this.profileMode,
@@ -82,23 +86,18 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
     );
   }
 
-  /// Recreates an [MsgrImageMessage] from a JSON compatible map.
-  factory MsgrImageMessage.fromMap(Map<String, dynamic> map) {
+  /// Recreates a [MsgrFileMessage] from a serialised payload.
+  factory MsgrFileMessage.fromMap(Map<String, dynamic> map) {
     final author = MsgrAuthoredMessage.readAuthorMap(map);
-    final type = map['type'] as String?;
-    final kind = type == MsgrMessageKind.thumbnail.name
-        ? MsgrMessageKind.thumbnail
-        : MsgrMessageKind.image;
-
-    return MsgrImageMessage(
+    return MsgrFileMessage(
       id: map['id'] as String,
       url: map['url'] as String? ?? '',
+      fileName: map['fileName'] as String? ?? map['name'] as String? ?? '',
+      byteSize: (map['byteSize'] as num?)?.toInt(),
+      mimeType: map['mimeType'] as String? ?? map['contentType'] as String?,
+      caption: map['caption'] as String?,
+      checksum: map['checksum'] as String?,
       thumbnailUrl: map['thumbnailUrl'] as String? ?? map['thumbnail'] as String?,
-      description:
-          map['description'] as String? ?? map['caption'] as String?,
-      width: (map['width'] as num?)?.toInt(),
-      height: (map['height'] as num?)?.toInt(),
-      kind: kind,
       profileId: author.profileId,
       profileName: author.profileName,
       profileMode: author.profileMode,
@@ -116,10 +115,12 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
       'type': kind.name,
       'id': id,
       'url': url,
+      'fileName': fileName,
+      'byteSize': byteSize,
+      'mimeType': mimeType,
+      'caption': caption,
+      'checksum': checksum,
       'thumbnailUrl': thumbnailUrl,
-      'description': description,
-      'width': width,
-      'height': height,
       ...toAuthorMap(),
       'sentAt': MsgrMessage.encodeTimestamp(sentAt),
       'insertedAt': MsgrMessage.encodeTimestamp(insertedAt),
@@ -132,12 +133,14 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
   List<Object?> get props => [
         ...super.props,
         url,
+        fileName,
+        byteSize,
+        mimeType,
+        caption,
+        checksum,
         thumbnailUrl,
-        description,
-        width,
-        height,
       ];
 
   @override
-  MsgrImageMessage themed(MsgrMessageTheme theme) => copyWith(theme: theme);
+  MsgrFileMessage themed(MsgrMessageTheme theme) => copyWith(theme: theme);
 }

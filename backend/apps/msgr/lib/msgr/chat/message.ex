@@ -15,7 +15,7 @@ defmodule Messngr.Chat.Message do
     field :status, Ecto.Enum, values: [:sending, :sent, :delivered, :read], default: :sent
     field :sent_at, :utc_datetime
     field :kind, Ecto.Enum,
-      values: [:text, :markdown, :code, :system, :image, :video, :audio, :location],
+      values: [:text, :markdown, :code, :system, :image, :video, :audio, :voice, :file, :thumbnail, :location],
       default: :text
     field :payload, :map, default: %{}
     field :metadata, :map, default: %{}
@@ -94,11 +94,8 @@ defmodule Messngr.Chat.Message do
     payload = get_field(changeset, :payload) || %{}
 
     cond do
-      kind in [:audio, :video] ->
+      kind in [:audio, :video, :voice, :file, :image, :thumbnail] ->
         validate_media_payload(changeset, payload)
-
-      kind == :image ->
-        require_payload_keys(changeset, payload, ["url"])
 
       kind == :location ->
         require_payload_keys(changeset, payload, ["latitude", "longitude"])
@@ -109,9 +106,7 @@ defmodule Messngr.Chat.Message do
   end
 
   defp validate_media_payload(changeset, payload) do
-    required = ["media"]
-
-    case require_payload_keys(changeset, payload, required) do
+    case require_payload_keys(changeset, payload, ["media"]) do
       %Ecto.Changeset{valid?: false} = changeset -> changeset
       %Ecto.Changeset{} ->
         media = Map.get(payload, "media") || %{}
@@ -121,6 +116,10 @@ defmodule Messngr.Chat.Message do
 
         if missing == [] do
           changeset
+          |> validate_waveform_payload(media)
+          |> validate_thumbnail_payload(media)
+          |> validate_dimensions_payload(media)
+          |> validate_checksum_payload(media)
         else
           add_error(changeset, :payload, "missing media keys: #{Enum.join(missing, ", ")}")
         end
@@ -134,6 +133,82 @@ defmodule Messngr.Chat.Message do
       changeset
     else
       add_error(changeset, :payload, "missing keys: #{Enum.join(missing, ", ")}")
+    end
+  end
+
+  defp validate_waveform_payload(changeset, media) do
+    case Map.get(media, "waveform") do
+      nil -> changeset
+      waveform when is_list(waveform) ->
+        valid? = Enum.all?(waveform, fn value -> is_number(value) and value >= 0 and value <= 1 end)
+
+        if valid? do
+          changeset
+        else
+          add_error(changeset, :payload, "waveform must contain numbers between 0 and 1")
+        end
+
+      _ ->
+        add_error(changeset, :payload, "waveform must be a list")
+    end
+  end
+
+  defp validate_thumbnail_payload(changeset, media) do
+    case Map.get(media, "thumbnail") do
+      nil -> changeset
+      %{} = thumbnail ->
+        missing =
+          ["bucket", "objectKey", "url"]
+          |> Enum.reject(&Map.has_key?(thumbnail, &1))
+
+        if missing == [] do
+          changeset
+        else
+          add_error(changeset, :payload, "thumbnail missing keys: #{Enum.join(missing, ", ")}")
+        end
+
+      _ ->
+        add_error(changeset, :payload, "thumbnail must be a map")
+    end
+  end
+
+  defp validate_dimensions_payload(changeset, media) do
+    [
+      validate_positive_integer(media, "width", "width must be positive"),
+      validate_positive_integer(media, "height", "height must be positive")
+    ]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.reduce(changeset, fn message, acc -> add_error(acc, :payload, message) end)
+  end
+
+  defp validate_positive_integer(media, key, message) do
+    case Map.get(media, key) do
+      nil -> nil
+      value when is_integer(value) and value > 0 -> nil
+      value when is_float(value) and value > 0 -> nil
+      value when is_binary(value) ->
+        case Integer.parse(value) do
+          {int, _} when int > 0 -> nil
+          _ -> message
+        end
+
+      _ ->
+        message
+    end
+  end
+
+  defp validate_checksum_payload(changeset, media) do
+    case Map.get(media, "checksum") do
+      nil -> changeset
+      checksum when is_binary(checksum) ->
+        if Regex.match?(~r/\A[A-Fa-f0-9]{32,128}\z/, checksum) do
+          changeset
+        else
+          add_error(changeset, :payload, "checksum must be hexadecimal")
+        end
+
+      _ ->
+        add_error(changeset, :payload, "checksum must be a string")
     end
   end
 end
