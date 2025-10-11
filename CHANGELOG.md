@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Begynt å implementere lokal SQLite-cache for meldinger og kontakter i Flutter-klienten med nye DAO-er, migrasjoner og tester.
 - Added audio message support across the shared msgr domain, Flutter chat model, and parser including waveform metadata handling.
 - Built a MinIO-ready media upload API on the Elixir backend with audio/video attachment workflows, storage configuration, and test coverage.
 - Replaced the Telegram/Matrix HTTP clients with queue-driven bridge facades for Telegram, Matrix, IRC, and XMPP plus a shared `ServiceBridge` helper and in-memory queue adapter tests.

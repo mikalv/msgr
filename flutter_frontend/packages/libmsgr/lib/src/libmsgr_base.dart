@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:libmsgr/src/connection.dart';
+import 'package:libmsgr/src/database/database.dart';
 import 'package:libmsgr/src/key_manager.dart';
 import 'package:libmsgr/src/server_resolver.dart';
 import 'package:libmsgr/src/typedefs.dart';
@@ -34,7 +35,8 @@ class LibMsgr {
 
   late KeyManager _keyManager;
   late AuthRepository _authRepository;
-  final RepositoryFactory _repositoryFactory = RepositoryFactory();
+  late final RepositoryFactory _repositoryFactory;
+  late final DatabaseService _databaseService;
   final List<MsgrConnection> _wsConnections = [];
   ASharedPreferences? _sharedPreferences;
   ASecureStorage? _secureStorageInstance;
@@ -43,7 +45,8 @@ class LibMsgr {
   String? _currentTeamID;
   bool hasBootstrapped = false;
 
-  get repositoryFactory => _repositoryFactory;
+  RepositoryFactory get repositoryFactory => _repositoryFactory;
+  DatabaseService get databaseService => _databaseService;
   get authRepository => _authRepository;
   get secureStorage => _secureStorageInstance!;
   get deviceInfo => _deviceInfo!;
@@ -117,6 +120,11 @@ class LibMsgr {
   }
 
   Future<bool> bootstrapLibrary() async {
+    if (hasBootstrapped) {
+      _log.fine('LibMsgr already bootstrapped');
+      return true;
+    }
+
     if (_sharedPreferences == null) {
       throw 'Can\'t bootstrap without a SharedPreferences instance! check your implementation!';
     }
@@ -131,6 +139,10 @@ class LibMsgr {
     _keyManager = KeyManager(storage: _secureStorageInstance!);
     await _keyManager.getOrGenerateDeviceId();
     _authRepository = AuthRepository(teamName: 'dummy');
+
+    _databaseService = DatabaseService();
+    await _databaseService.initialize();
+    _repositoryFactory = RepositoryFactory(database: _databaseService);
 
     // Must happen at the end
     hasBootstrapped = true;
