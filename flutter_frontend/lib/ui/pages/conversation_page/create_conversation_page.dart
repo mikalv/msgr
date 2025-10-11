@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/config/AppNavigation.dart';
+import 'package:messngr/features/chat/models/chat_thread.dart';
 import 'package:messngr/ui/widgets/dropdown_search/dropdown_search.dart';
 
 class CreateConversationPage extends StatefulWidget {
@@ -14,9 +15,11 @@ class CreateConversationPage extends StatefulWidget {
 class _CreateConversationPageState extends State<CreateConversationPage> {
   final TextEditingController _conversationMembersController =
       TextEditingController();
+  final TextEditingController _topicController = TextEditingController();
   late TeamRepositories repos;
   late ProfileRepository profileRepository;
   final List<Profile> selectedMembers = [];
+  ChatThreadKind _selectedKind = ChatThreadKind.direct;
 
   @override
   void initState() {
@@ -29,21 +32,47 @@ class _CreateConversationPageState extends State<CreateConversationPage> {
   @override
   void dispose() {
     _conversationMembersController.dispose();
+    _topicController.dispose();
     super.dispose();
   }
 
   void _createConversation() {
-    if (selectedMembers.isNotEmpty) {
-      final membersIDs = selectedMembers.map((e) => e.id).toList();
-      // Logic to create a new chat room
-      print('Conversation create request: $selectedMembers => $membersIDs');
-      // Navigate back or to the new chat room
-      final ConversationRepository conversationRepository =
-          repos.conversationRepository;
-    } else {
-      // Show error message
-      print('Please fill in all fields');
+    final membersIDs = selectedMembers.map((e) => e.id).toList();
+    final topic = _topicController.text.trim();
+
+    String? validationError;
+
+    switch (_selectedKind) {
+      case ChatThreadKind.direct:
+        if (membersIDs.length != 1) {
+          validationError = 'Velg én deltaker for en direkte samtale.';
+        }
+        break;
+      case ChatThreadKind.group:
+        if (membersIDs.isEmpty) {
+          validationError = 'Velg minst én annen deltaker for gruppen.';
+        } else if (topic.isEmpty) {
+          validationError = 'Sett et navn eller tema for gruppen.';
+        }
+        break;
+      case ChatThreadKind.channel:
+        if (topic.isEmpty) {
+          validationError = 'Kanaler må ha et navn eller tema.';
+        }
+        break;
     }
+
+    if (validationError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(validationError)),
+      );
+      return;
+    }
+
+    debugPrint(
+        'Conversation create request ($_selectedKind): members=$membersIDs topic=$topic');
+
+    // TODO: Integrate conversationRepository when backend bindings are ready.
   }
 
   @override
@@ -64,6 +93,44 @@ class _CreateConversationPageState extends State<CreateConversationPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: DropdownButton<ChatThreadKind>(
+                      value: _selectedKind,
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() {
+                          _selectedKind = value;
+                        });
+                      },
+                      items: const [
+                        DropdownMenuItem(
+                          value: ChatThreadKind.direct,
+                          child: Text('Direkte (1:1)'),
+                        ),
+                        DropdownMenuItem(
+                          value: ChatThreadKind.group,
+                          child: Text('Gruppe'),
+                        ),
+                        DropdownMenuItem(
+                          value: ChatThreadKind.channel,
+                          child: Text('Kanal'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_selectedKind != ChatThreadKind.direct)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: TextField(
+                        controller: _topicController,
+                        decoration: InputDecoration(
+                          labelText: _selectedKind == ChatThreadKind.channel
+                              ? 'Kanalnavn'
+                              : 'Gruppenavn',
+                        ),
+                      ),
+                    ),
                   DropdownSearch<Profile>.multiSelection(
                     onChanged: (List<Profile> selected) {
                       selectedMembers.clear();

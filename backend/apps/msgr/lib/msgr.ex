@@ -14,8 +14,23 @@ defmodule Messngr do
   defdelegate list_profiles(account_id), to: Accounts
   defdelegate get_profile!(id), to: Accounts
 
+  def import_contacts(account_id, contacts_attrs, opts \\ []) do
+    Accounts.import_contacts(account_id, contacts_attrs, opts)
+  end
+
+  def lookup_known_contacts(targets) do
+    Accounts.lookup_known_contacts(targets)
+  end
+
   # Chat
   defdelegate ensure_direct_conversation(profile_a_id, profile_b_id), to: Chat
+  def create_group_conversation(owner_profile_id, participant_ids, attrs \\ %{}) do
+    Chat.create_group_conversation(owner_profile_id, participant_ids, attrs)
+  end
+
+  def create_channel_conversation(owner_profile_id, attrs \\ %{}) do
+    Chat.create_channel_conversation(owner_profile_id, attrs)
+  end
   defdelegate send_message(conversation_id, profile_id, attrs), to: Chat
   def list_messages(conversation_id, opts \\ []), do: Chat.list_messages(conversation_id, opts)
   defdelegate ensure_membership(conversation_id, profile_id), to: Chat

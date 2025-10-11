@@ -67,6 +67,46 @@ class ChatApi {
     return ChatThread.fromJson(data);
   }
 
+  Future<ChatThread> createGroupConversation({
+    required AccountIdentity current,
+    required String topic,
+    required List<String> participantIds,
+  }) async {
+    final response = await _client.post(
+      backendApiUri('conversations'),
+      headers: _authHeaders(current),
+      body: jsonEncode({
+        'kind': 'group',
+        'topic': topic,
+        'participant_ids': participantIds,
+      }),
+    );
+
+    final decoded = _decodeBody(response);
+    final data = decoded['data'] as Map<String, dynamic>;
+    return ChatThread.fromJson(data);
+  }
+
+  Future<ChatThread> createChannelConversation({
+    required AccountIdentity current,
+    required String topic,
+    List<String> participantIds = const [],
+  }) async {
+    final response = await _client.post(
+      backendApiUri('conversations'),
+      headers: _authHeaders(current),
+      body: jsonEncode({
+        'kind': 'channel',
+        'topic': topic,
+        'participant_ids': participantIds,
+      }),
+    );
+
+    final decoded = _decodeBody(response);
+    final data = decoded['data'] as Map<String, dynamic>;
+    return ChatThread.fromJson(data);
+  }
+
   Future<List<ChatMessage>> fetchMessages({
     required AccountIdentity current,
     required String conversationId,

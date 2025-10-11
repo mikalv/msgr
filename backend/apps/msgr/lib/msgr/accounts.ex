@@ -5,7 +5,7 @@ defmodule Messngr.Accounts do
 
   import Ecto.Query
 
-  alias Messngr.Accounts.{Account, Identity, Profile}
+  alias Messngr.Accounts.{Account, Contact, Identity, Profile}
   alias Messngr.Repo
 
   @spec list_accounts() :: [Account.t()]
@@ -73,6 +73,56 @@ defmodule Messngr.Accounts do
 
   @spec get_profile!(Ecto.UUID.t()) :: Profile.t()
   def get_profile!(id), do: Repo.get!(Profile, id)
+
+  @doc """
+  Imports a batch of contacts for the given account. Existing contacts are
+  oppdatert basert på e-post eller telefonnummer.
+  """
+  @spec import_contacts(Ecto.UUID.t(), [map()], keyword()) ::
+          {:ok, [Contact.t()]} | {:error, term()}
+  def import_contacts(account_id, contacts_attrs, opts \\ []) when is_list(contacts_attrs) do
+    profile_id = Keyword.get(opts, :profile_id)
+
+    Repo.transaction(fn ->
+      contacts_attrs
+      |> Enum.reduce_while([], fn attrs, acc ->
+        normalized = normalize_contact_attrs(account_id, profile_id, attrs)
+
+        case upsert_contact(normalized) do
+          {:ok, contact} -> {:cont, [contact | acc]}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+      |> case do
+        {:error, reason} -> Repo.rollback(reason)
+        contacts -> Enum.reverse(contacts)
+      end
+    end)
+    |> case do
+      {:ok, contacts} -> {:ok, contacts}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def import_contacts(_account_id, _contacts_attrs, _opts), do: {:error, :invalid_contacts}
+
+  @doc """
+  Looks up kjente kontakter basert på e-post eller telefonnummer.
+  """
+  @spec lookup_known_contacts([map()]) :: {:ok, [map()]}
+  def lookup_known_contacts(targets) when is_list(targets) do
+    results =
+      Enum.map(targets, fn attrs ->
+        normalized = normalize_lookup_attrs(attrs)
+        match = find_identity_match(normalized)
+
+        %{query: normalized, match: match}
+      end)
+
+    {:ok, results}
+  end
+
+  def lookup_known_contacts(_targets), do: {:ok, []}
 
   @doc """
   Fetches an identity for the given channel (email/phone) or returns nil.
@@ -188,6 +238,157 @@ defmodule Messngr.Accounts do
   defp normalize_target(_kind, nil), do: nil
   defp normalize_target(:email, target), do: target |> String.trim() |> String.downcase()
   defp normalize_target(:phone, target), do: target |> String.replace(~r/\s+/, "")
+
+  defp normalize_contact_attrs(account_id, profile_id, attrs) do
+    attrs = Map.new(attrs)
+
+    email =
+      attrs
+      |> Map.get("email")
+      |> Kernel.||(Map.get(attrs, :email))
+
+    phone =
+      attrs
+      |> Map.get("phone_number")
+      |> Kernel.||(Map.get(attrs, :phone_number))
+      |> Kernel.||(Map.get(attrs, :phone))
+
+    name =
+      attrs
+      |> Map.get("name")
+      |> Kernel.||(Map.get(attrs, :name))
+      |> Kernel.||(email)
+      |> Kernel.||(phone)
+      |> Kernel.||("Kontakt")
+      |> to_string()
+      |> String.trim()
+      |> case do
+        "" -> "Kontakt"
+        value -> value
+      end
+
+    labels =
+      attrs
+      |> Map.get("labels")
+      |> Kernel.||(Map.get(attrs, :labels))
+      |> normalize_labels()
+
+    metadata =
+      attrs
+      |> Map.get("metadata")
+      |> Kernel.||(Map.get(attrs, :metadata))
+      |> normalize_metadata()
+
+    base = %{
+      account_id: account_id,
+      name: name,
+      email: normalize_target(:email, email),
+      phone_number: normalize_phone(phone),
+      labels: labels,
+      metadata: metadata
+    }
+
+    case profile_id do
+      nil -> base
+      value -> Map.put(base, :profile_id, value)
+    end
+  end
+
+  defp normalize_lookup_attrs(attrs) do
+    attrs = Map.new(attrs)
+
+    email = attrs |> Map.get("email") |> Kernel.||(Map.get(attrs, :email))
+    phone =
+      attrs
+      |> Map.get("phone_number")
+      |> Kernel.||(Map.get(attrs, :phone_number))
+      |> Kernel.||(Map.get(attrs, :phone))
+
+    %{
+      email: normalize_target(:email, email),
+      phone_number: normalize_phone(phone)
+    }
+  end
+
+  defp normalize_labels(nil), do: []
+  defp normalize_labels(labels) when is_list(labels) do
+    labels
+    |> Enum.map(&to_string/1)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
+
+  defp normalize_labels(_), do: []
+
+  defp normalize_metadata(nil), do: %{}
+  defp normalize_metadata(map) when is_map(map), do: map
+  defp normalize_metadata(_), do: %{}
+
+  defp normalize_phone(nil), do: nil
+  defp normalize_phone(phone), do: phone |> String.replace(~r/\D+/, "") |> empty_to_nil()
+
+  defp empty_to_nil(""), do: nil
+  defp empty_to_nil(value), do: value
+
+  defp upsert_contact(%{account_id: account_id} = attrs) do
+    case find_existing_contact(account_id, attrs) do
+      %Contact{} = contact ->
+        contact
+        |> Contact.changeset(attrs)
+        |> Repo.update()
+
+      nil ->
+        %Contact{}
+        |> Contact.changeset(attrs)
+        |> Repo.insert()
+    end
+  end
+
+  defp upsert_contact(_), do: {:error, :invalid_contact}
+
+  defp find_existing_contact(account_id, %{email: email}) when not is_nil(email) do
+    Repo.get_by(Contact, account_id: account_id, email: email)
+  end
+
+  defp find_existing_contact(account_id, %{phone_number: phone}) when not is_nil(phone) do
+    Repo.get_by(Contact, account_id: account_id, phone_number: phone)
+  end
+
+  defp find_existing_contact(_account_id, _attrs), do: nil
+
+  defp find_identity_match(%{email: email} = normalized) when not is_nil(email) do
+    normalized
+    |> Map.put(:identity_kind, :email)
+    |> do_find_identity(:email, email)
+  end
+
+  defp find_identity_match(%{phone_number: phone} = normalized) when not is_nil(phone) do
+    normalized
+    |> Map.put(:identity_kind, :phone)
+    |> do_find_identity(:phone, phone)
+  end
+
+  defp find_identity_match(_), do: nil
+
+  defp do_find_identity(normalized, kind, value) do
+    case get_identity_by_channel(kind, value) do
+      %Identity{} = identity ->
+        account = Repo.preload(identity.account, :profiles)
+        profile = List.first(account.profiles)
+
+        %{
+          account_id: account.id,
+          account_name: account.display_name,
+          identity_kind: identity.kind,
+          identity_value: identity.value,
+          profile:
+            if(profile, do: %{id: profile.id, name: profile.name, mode: profile.mode}, else: nil)
+        }
+
+      _ ->
+        nil
+    end
+  end
 
   defp account_attrs_from_identity(%{kind: :email} = attrs) do
     value = Map.get(attrs, :value) || Map.get(attrs, :email)

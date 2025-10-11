@@ -26,6 +26,8 @@ defmodule MessngrWeb.Router do
     get "/conversations/:id/messages", MessageController, :index
     post "/conversations/:id/messages", MessageController, :create
     post "/conversations/:id/assistant", AIController, :conversation_reply
+    post "/contacts/import", ContactController, :import
+    post "/contacts/lookup", ContactController, :lookup
     post "/ai/chat", AIController, :chat
     post "/ai/summarize", AIController, :summarize
     post "/ai/run", AIController, :run

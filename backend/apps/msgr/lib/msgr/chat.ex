@@ -26,6 +26,25 @@ defmodule Messngr.Chat do
     end)
   end
 
+  @spec create_group_conversation(binary(), [binary()], map()) ::
+          {:ok, Conversation.t()} | {:error, Ecto.Changeset.t()} | {:error, term()}
+  def create_group_conversation(owner_profile_id, participant_ids, attrs \\ %{}) do
+    participant_ids = List.wrap(participant_ids)
+    create_structured_conversation(:group, owner_profile_id, participant_ids, attrs)
+  end
+
+  @spec create_channel_conversation(binary(), map()) ::
+          {:ok, Conversation.t()} | {:error, Ecto.Changeset.t()} | {:error, term()}
+  def create_channel_conversation(owner_profile_id, attrs \\ %{}) do
+    participant_ids =
+      attrs
+      |> Map.get("participant_ids")
+      |> Kernel.||(Map.get(attrs, :participant_ids))
+      |> List.wrap()
+
+    create_structured_conversation(:channel, owner_profile_id, participant_ids, attrs)
+  end
+
   @spec add_participant(Conversation.t(), binary(), :member | :owner) ::
           {:ok, Participant.t()} | {:error, Ecto.Changeset.t()}
   def add_participant(%Conversation{id: conversation_id}, profile_id, role \\ :member) do
@@ -183,6 +202,55 @@ defmodule Messngr.Chat do
         :text
     end
   end
+
+  defp create_structured_conversation(kind, owner_profile_id, participant_ids, attrs) do
+    owner_profile_id = to_string(owner_profile_id)
+    topic = attrs |> Map.get("topic") |> Kernel.||(Map.get(attrs, :topic))
+
+    conversation_attrs =
+      %{kind: kind}
+      |> maybe_put_topic(topic)
+
+    member_ids = normalize_participant_ids(participant_ids, owner_profile_id)
+
+    Repo.transaction(fn ->
+      with {:ok, conversation} <- %Conversation{} |> Conversation.changeset(conversation_attrs) |> Repo.insert(),
+           {:ok, _owner} <- add_participant(conversation, owner_profile_id, :owner),
+           {:ok, _members} <- add_members(conversation, member_ids) do
+        preload_conversation(conversation.id)
+      else
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+  end
+
+  defp add_members(_conversation, []), do: {:ok, []}
+
+  defp add_members(conversation, member_ids) do
+    Enum.reduce_while(member_ids, {:ok, []}, fn member_id, {:ok, acc} ->
+      case add_participant(conversation, member_id, :member) do
+        {:ok, participant} -> {:cont, {:ok, [participant | acc]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, participants} -> {:ok, Enum.reverse(participants)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp normalize_participant_ids(ids, owner_profile_id) do
+    owner_profile_id = to_string(owner_profile_id)
+
+    ids
+    |> List.wrap()
+    |> Enum.map(&to_string/1)
+    |> Enum.reject(&(&1 == owner_profile_id))
+    |> Enum.uniq()
+  end
+
+  defp maybe_put_topic(attrs, nil), do: attrs
+  defp maybe_put_topic(attrs, topic), do: Map.put(attrs, :topic, topic)
 
   defp maybe_resolve_media(kind, conversation_id, profile_id, attrs) when kind in [:audio, :video] do
     media =

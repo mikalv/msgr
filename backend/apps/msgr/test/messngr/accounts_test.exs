@@ -62,4 +62,49 @@ defmodule Messngr.AccountsTest do
       assert same_identity.account.display_name == "Mobil"
     end
   end
+
+  describe "import_contacts/3" do
+    setup do
+      {:ok, account} = Accounts.create_account(%{"display_name" => "Eva"})
+      profile = List.first(account.profiles)
+
+      {:ok, account: account, profile: profile}
+    end
+
+    test "creates and updates contacts", %{account: account, profile: profile} do
+      {:ok, [contact]} =
+        Accounts.import_contacts(account.id, [%{name: "  Eva N.  ", email: "Eva.N@example.com"}],
+          profile_id: profile.id
+        )
+
+      assert contact.email == "eva.n@example.com"
+      assert contact.profile_id == profile.id
+      assert contact.name == "Eva N."
+
+      {:ok, [updated]} =
+        Accounts.import_contacts(account.id, [%{email: "eva.n@example.com", phone_number: "+47 900 00 000"}])
+
+      assert updated.id == contact.id
+      assert updated.phone_number == "4790000000"
+    end
+  end
+
+  describe "lookup_known_contacts/1" do
+    test "returns match for known email" do
+      {:ok, identity} =
+        Accounts.ensure_identity(%{kind: :email, value: "known@example.com", display_name: "Known"})
+
+      {:ok, [%{query: %{email: "known@example.com"}, match: match}]} =
+        Accounts.lookup_known_contacts([%{email: "KNOWN@example.com"}])
+
+      assert match.account_id == identity.account_id
+      assert match.identity_kind == :email
+      assert match.identity_value == "known@example.com"
+    end
+
+    test "returns nil match for unknown target" do
+      assert {:ok, [%{match: nil, query: %{email: "missing@example.com", phone_number: nil}}]} =
+               Accounts.lookup_known_contacts([%{email: "missing@example.com"}])
+    end
+  end
 end

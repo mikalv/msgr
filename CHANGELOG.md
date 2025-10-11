@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+- Utvidet samtalekonseptet med støtte for `group`- og `channel`-typer i Elixir-
+  backenden, nye API-endepunkter og validering av temaer.
+- Lagt til kontaktskjema, migrasjoner og REST-endepunkter for import og
+  identitetsoppslag samt Flutter-klienter for begge operasjoner.
+- Oppdatert Flutter-chatmodeller, API-klient, view-model og opprettelsesdialog
+  for å forstå kanal- og gruppesamtaler og tilgjengeliggjort enhetstester for
+  parsing av tråder.
 - Added audio message support across the shared msgr domain, Flutter chat model, and parser including waveform metadata handling.
 - Built a MinIO-ready media upload API on the Elixir backend with audio/video attachment workflows, storage configuration, and test coverage.
 - Replaced the Telegram/Matrix HTTP clients with queue-driven bridge facades for Telegram, Matrix, IRC, and XMPP plus a shared `ServiceBridge` helper and in-memory queue adapter tests.
