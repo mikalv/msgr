@@ -4,6 +4,9 @@
 - Added REST-støtte for kontaktimport og match i backenden med nye
   controller-tester, oppdatert API-kontrakt og Flutter `libmsgr`
   klientimplementasjon for å lagre kontakter og slå opp kjente venner.
+- Documented the `libmsgr` API surface, added a dedicated CLI entry point for
+  the registration flow (`tool/msgr_cli.dart`), and updated the integration test
+  suite to use the new command for provisioning accounts.
 - Added multi-identity account linking so `Accounts.ensure_identity/1` can attach
   new email/phone/OIDC credentials to an existing account via `account_id`, with
   safeguards against cross-account hijacking, refreshed docs and regression
