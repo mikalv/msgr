@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Dokumentert Taskku-produktivitetsappen som referanse for bedriftsmodus med ny
+  forskningsfil som kobler UI-mønstre til eksisterende API-er og bridge-strategi,
+  og oppdatert med plan for å holde produktivitetsmoduler adskilt fra kjernchat i
+  både UI og backend.
 - Secured media uploads with mandatory server-side encryption headers in presigned instructions, configurable SSE/KMS settings, tests, and updated API documentation.
 - Enhanced media upload pipeline with voice/file/thumbnail kinds, width/height/checksum metadata, retention TTLs and presigned URL helpers in the Elixir backend (new migration, config, storage helpers and tests).
 - Normalised chat media payloads (captions, thumbnails, waveform) with updated JSON views, message validations and API contract documentation.
