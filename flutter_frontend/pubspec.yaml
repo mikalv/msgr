@@ -41,6 +41,7 @@ dependencies:
   overlay_support: ^2.1.0
   fluttertoast: ^8.2.8
   http: ^1.2.1
+  phoenix_socket: ^0.8.0
   equatable: ^2.0.5
 
 

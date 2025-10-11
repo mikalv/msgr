@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:messngr/features/chat/models/chat_message.dart';
 import 'package:messngr/features/chat/models/chat_thread.dart';
 import 'package:messngr/features/chat/state/chat_view_model.dart';
 import 'package:messngr/services/api/chat_api.dart';
+import 'package:messngr/services/api/chat_socket.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class StubChatApi implements ChatApi {
@@ -62,6 +65,72 @@ class StubChatApi implements ChatApi {
   }
 }
 
+class StubRealtime implements ChatRealtime {
+  final StreamController<ChatMessage> _controller =
+      StreamController<ChatMessage>.broadcast();
+
+  bool wasConnected = false;
+  bool _isConnected = false;
+  AccountIdentity? identity;
+  String? conversationId;
+  final List<String> sentBodies = [];
+
+  @override
+  Stream<ChatMessage> get messages => _controller.stream;
+
+  @override
+  bool get isConnected => _isConnected;
+
+  @override
+  Future<void> connect({
+    required AccountIdentity identity,
+    required String conversationId,
+  }) async {
+    this.identity = identity;
+    this.conversationId = conversationId;
+    wasConnected = true;
+    _isConnected = true;
+  }
+
+  @override
+  Future<void> disconnect() async {
+    _isConnected = false;
+  }
+
+  @override
+  Future<void> dispose() async {
+    await _controller.close();
+  }
+
+  @override
+  Future<ChatMessage> send(String body) async {
+    sentBodies.add(body);
+
+    final message = ChatMessage(
+      id: 'ws-${sentBodies.length}',
+      body: body,
+      profileId: identity?.profileId ?? 'profile-self',
+      profileName: 'Deg',
+      profileMode: 'private',
+      status: 'sent',
+      sentAt: DateTime.now(),
+      insertedAt: DateTime.now(),
+    );
+
+    if (!_controller.isClosed) {
+      _controller.add(message);
+    }
+
+    return message;
+  }
+
+  void emit(ChatMessage message) {
+    if (!_controller.isClosed) {
+      _controller.add(message);
+    }
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -82,22 +151,50 @@ void main() {
       insertedAt: DateTime.now(),
     ));
 
-    final viewModel = ChatViewModel(api: api);
+    final realtime = StubRealtime();
+    final viewModel = ChatViewModel(api: api, realtime: realtime);
     await viewModel.bootstrap();
 
     expect(viewModel.identity, isNotNull);
     expect(viewModel.thread, equals(api.thread));
     expect(viewModel.messages, isNotEmpty);
+    expect(realtime.wasConnected, isTrue);
+    expect(realtime.conversationId, equals(api.thread.id));
   });
 
   test('sendMessage forwards to api and updates timeline', () async {
     final api = StubChatApi();
-    final viewModel = ChatViewModel(api: api);
+    final realtime = StubRealtime();
+    final viewModel = ChatViewModel(api: api, realtime: realtime);
     await viewModel.bootstrap();
 
     await viewModel.sendMessage('Hallo verden');
 
     expect(api.messages.map((m) => m.body), contains('Hallo verden'));
     expect(viewModel.messages.last.body, equals('Hallo verden'));
+    expect(realtime.sentBodies, contains('Hallo verden'));
+  });
+
+  test('incoming realtime messages are merged into timeline', () async {
+    final api = StubChatApi();
+    final realtime = StubRealtime();
+    final viewModel = ChatViewModel(api: api, realtime: realtime);
+    await viewModel.bootstrap();
+
+    final incoming = ChatMessage(
+      id: 'incoming-1',
+      body: 'Hei fra andre',
+      profileId: 'peer-profile',
+      profileName: 'Buddy',
+      profileMode: 'private',
+      status: 'sent',
+      sentAt: DateTime.now(),
+      insertedAt: DateTime.now(),
+    );
+
+    realtime.emit(incoming);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(viewModel.messages.last, equals(incoming));
   });
 }

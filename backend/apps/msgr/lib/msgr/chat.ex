@@ -5,8 +5,12 @@ defmodule Messngr.Chat do
 
   import Ecto.Query
 
+  alias Phoenix.PubSub
+
   alias Messngr.{Accounts, Repo}
   alias Messngr.Chat.{Conversation, Message, Participant}
+
+  @conversation_topic_prefix "conversation"
 
   @spec create_direct_conversation(binary(), binary()) ::
           {:ok, Conversation.t()} | {:error, Ecto.Changeset.t()} | {:error, term()}
@@ -47,7 +51,9 @@ defmodule Messngr.Chat do
       end
     end)
     |> case do
-      {:ok, message} -> {:ok, message}
+      {:ok, message} ->
+        broadcast_message(message)
+        {:ok, message}
       {:error, reason} -> {:error, reason}
     end
   end
@@ -109,6 +115,25 @@ defmodule Messngr.Chat do
     end
   end
 
+  @doc """
+  Subscribe prosessen til PubSub-strømmen for en gitt samtale.
+  """
+  @spec subscribe_to_conversation(binary()) :: :ok | {:error, term()}
+  def subscribe_to_conversation(conversation_id) do
+    PubSub.subscribe(Messngr.PubSub, conversation_topic(conversation_id))
+  end
+
+  @doc false
+  def broadcast_message(%Message{} = message) do
+    PubSub.broadcast(
+      Messngr.PubSub,
+      conversation_topic(message.conversation_id),
+      {:message_created, message}
+    )
+
+    :ok
+  end
+
   @spec ensure_profile!(binary(), binary()) :: Accounts.Profile.t()
   def ensure_profile!(account_id, profile_id) do
     profile = Accounts.get_profile!(profile_id)
@@ -123,5 +148,9 @@ defmodule Messngr.Chat do
   @spec ensure_membership(binary(), binary()) :: Participant.t()
   def ensure_membership(conversation_id, profile_id) do
     ensure_participant!(conversation_id, profile_id)
+  end
+
+  defp conversation_topic(conversation_id) do
+    "#{@conversation_topic_prefix}:#{conversation_id}"
   end
 end
