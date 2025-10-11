@@ -111,3 +111,32 @@ func TestDaemonStartRequiresHandlers(t *testing.T) {
 		t.Fatalf("expected error when no handlers registered")
 	}
 }
+
+func TestDaemonStartRegistersInstanceScopedHandlers(t *testing.T) {
+	queue := &memoryQueue{}
+	daemon, err := NewDaemon("matrix", queue, WithInstance("matrix-1"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	daemon.Register("outbound_event", func(ctx context.Context, env Envelope) error { return nil })
+
+	if err := daemon.Start(context.Background()); err != nil {
+		t.Fatalf("start error: %v", err)
+	}
+
+	queue.mu.Lock()
+	defer queue.mu.Unlock()
+	if _, ok := queue.subscriptions[TopicForInstance("matrix", "matrix-1", "outbound_event")]; !ok {
+		t.Fatalf("expected subscription to targeted topic, got %#v", queue.subscriptions)
+	}
+}
+
+func TestDaemonRejectsInvalidInstance(t *testing.T) {
+	if _, err := NewDaemon("irc", &memoryQueue{}, WithInstance(" ")); err == nil {
+		t.Fatalf("expected error for blank instance")
+	}
+	if _, err := NewDaemon("irc", &memoryQueue{}, WithInstance("bad/name")); err == nil {
+		t.Fatalf("expected error for invalid characters")
+	}
+}

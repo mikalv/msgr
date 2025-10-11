@@ -1,7 +1,7 @@
 # Bridge Architecture Overview
 
 ## Component Map
-- **Connector Daemons**: One per external platform, implemented in the language that best matches the reverse-engineered stack (GramJS for Telegram, mautrix for Matrix, plain IRC/XMPP libraries). Each daemon exposes queue handlers for `bridge/<service>/<action>` topics and translates intents to native protocol calls.
+- **Connector Daemons**: One per external platform, implemented in the language that best matches the reverse-engineered stack (GramJS for Telegram, mautrix for Matrix, plain IRC/XMPP libraries). Each daemon exposes queue handlers for `bridge/<service>/<action>` topics (or `bridge/<service>/<instance>/<action>` when sharded) and translates intents to native protocol calls.
 - **Elixir Connector Facade**: The Msgr backend uses `ServiceBridge` helpers to build deterministic envelopes and publish them to the queue. Incoming events are normalised and persisted in Postgres before fanning out to clients.
 - **Message Fabric**: StoneMQ (or a compatible broker) provides pub/sub plus request/response semantics. We reserve namespaces per tenant and service to guarantee isolation and allow selective replay.
 - **Impersonation & Policy Layer**: Holds outbound routing logic, resolves which linked identity to impersonate, injects credentials, and enforces workspace policy before publishing intents.
@@ -10,10 +10,10 @@
 
 ## Data Flow
 1. **Inbound Messages**
-   - Daemon receives network traffic → emits canonical events to `bridge/<service>/inbound_event` (or service-specific topics).
+   - Daemon receives network traffic → emits canonical events to `bridge/<service>/inbound_event` (or `bridge/<service>/<instance>/inbound_event` when reporting from a sharded worker).
    - Elixir subscribers normalise the payload, persist it, and schedule ack messages such as `ack_update`, `ack_sync`, or `ack_offset`.
 2. **Outbound Messages**
-   - Clients send a message → backend records intent → publishes an outbound envelope (`outbound_message`, `outbound_event`, etc.).
+   - Clients send a message → backend records intent → publishes an outbound envelope (`outbound_message`, `outbound_event`, etc.). The `ServiceBridge` helper optionally scopes the topic to a daemon instance (`bridge/<service>/<instance>/<action>`) when we need to target a specific shard.
    - Daemon delivers the message using the platform protocol, then emits delivery status or errors referencing the original `trace_id`.
 3. **State Synchronisation**
    - Workers trigger periodic sync actions (`request_history`, `refresh_roster`) over the queue.
@@ -32,7 +32,7 @@
 - Policy enforcement before publishing outbound intents to guard against DLP violations and cross-tenant leakage.
 
 ## Scalability Considerations
-- Horizontal scale by spinning up daemon shards per workspace or region; shards subscribe to the same topics with competing consumers.
+- Horizontal scale by spinning up daemon shards per workspace or region. Shards can subscribe as competing consumers on `bridge/<service>/<action>` or, when connection caps require deterministic routing, use per-instance topics (`bridge/<service>/<instance>/<action>`) so the Elixir layer can steer traffic to specific deployments.
 - Rate limiting implemented at the daemon level to respect platform-specific quotas, with back-pressure fed to Elixir through `throttle` events.
 - Idempotent processing using platform message IDs combined with Msgr `trace_id`s to deduplicate retries.
 - Replay buffers (StoneMQ durable topics) allow catch-up after outages without losing handshake state.

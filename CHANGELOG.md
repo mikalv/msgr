@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Implemented instance-aware bridge routing so Msgr can target specific Matrix/IRC shards via `bridge/<service>/<bridge_id>/<action>` topics, updating the Elixir connector facade, Go/Python SDKs, docs, and tests to respect connection caps per daemon deployment.
+- Documented the initial Matrix and IRC bridge blueprint, covering MVP
+  transport goals, queue mappings, and an `msgr://` deep-linking scheme for
+  channels, identities, and messages.
 - Routed backend logger output through StoneMQ envelopes so `Messngr.Logging.OpenObserveBackend` can forward entries to
   OpenObserve via the `observability/logs` topic, including StoneMQ transport configuration and tests.
 - Added StoneMQ-aware OpenObserve loggers to the Go and Python bridge SDKs so daemons can emit envelopes compatible with the
