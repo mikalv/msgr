@@ -144,6 +144,7 @@
 - Flutter-loggklient som kan sende `package:logging`-poster til OpenObserve via
   `LoggingEnvironment` og en gjenbrukbar HTTP-klient.
 - Familie- og space-funksjoner flyttet til eget `family_space`-bibliotek med kalender, handlelister og todo-støtte samt oppdatert API-dokumentasjon.
+- Dokumentasjon av ulike driftsmodeller for bridge-daemons (administrert, kundeoperert og hybrid) i `docs/bridge_hosting_options.md`, nå utvidet med research-notater fra Beepers Bridge Manager.
 
 ### Changed
 - Backend-konfigurasjon forenklet og unødvendige apper fjernet fra releaseoppsett.
