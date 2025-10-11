@@ -73,7 +73,7 @@ dependencies:
   connectivity_plus: ^6.0.5
   # It will be essential to be able to spread the app to gain a chance in world market
   share_plus: ^10.0.2
-  file_picker: ^8.0.6
+  file_picker: ^8.1.2
   desktop_drop: ^0.4.4
 
   # Media
@@ -85,6 +85,8 @@ dependencies:
   image_picker_for_web: ^3.0.6
   cached_network_image: ^3.3.1
   image: ^4.1.7
+  crypto: ^3.0.3
+  mime: ^1.0.5
 
   # For messages
   flutter_markdown: ^0.7.3+2

@@ -8,6 +8,7 @@ import 'package:messngr/features/chat/state/chat_cache_repository.dart';
 import 'package:messngr/features/chat/state/chat_view_model.dart';
 import 'package:messngr/features/chat/widgets/chat_composer.dart';
 import 'package:messngr/services/api/chat_api.dart';
+import 'package:messngr/services/api/chat_realtime_event.dart';
 import 'package:messngr/services/api/chat_socket.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -103,7 +104,10 @@ class _FakeRealtime implements ChatRealtime {
   bool get isConnected => false;
 
   @override
-  Stream<ChatMessage> get messages => const Stream.empty();
+  Stream<ChatRealtimeEvent> get events => const Stream<ChatRealtimeEvent>.empty();
+
+  @override
+  Stream<ChatMessage> get messages => const Stream<ChatMessage>.empty();
 
   @override
   Future<void> connect({required AccountIdentity identity, required String conversationId}) async {}
@@ -118,6 +122,27 @@ class _FakeRealtime implements ChatRealtime {
   Future<ChatMessage> send(String body) async {
     throw ChatSocketException('offline');
   }
+
+  @override
+  Future<void> startTyping({String? threadId}) async {}
+
+  @override
+  Future<void> stopTyping({String? threadId}) async {}
+
+  @override
+  Future<void> markRead(String messageId) async {}
+
+  @override
+  Future<void> addReaction(String messageId, String emoji, {Map<String, dynamic>? metadata}) async {}
+
+  @override
+  Future<void> removeReaction(String messageId, String emoji) async {}
+
+  @override
+  Future<void> pinMessage(String messageId, {Map<String, dynamic>? metadata}) async {}
+
+  @override
+  Future<void> unpinMessage(String messageId) async {}
 }
 
 class _FakeConnectivity extends Connectivity {

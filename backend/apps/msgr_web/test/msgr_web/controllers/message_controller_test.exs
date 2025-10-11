@@ -92,6 +92,7 @@ defmodule MessngrWeb.MessageControllerTest do
 
     assert media["durationMs"] == 1200
     assert media["url"] =~ upload_info["object_key"]
+    assert media["retention"]["expiresAt"]
     assert media["waveform"] == [0, 10, 20]
     assert media_view == media
     assert Media.consume_upload(upload_id, conversation.id, profile.id, %{}) == {:error, :already_consumed}

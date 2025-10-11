@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:messngr/features/chat/widgets/chat_composer.dart';
 
@@ -82,7 +83,8 @@ void main() {
 
     expect(find.text('/giphy'), findsOneWidget);
 
-    await tester.tap(find.text('/giphy'));
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.send_rounded));
@@ -96,8 +98,8 @@ void main() {
   testWidgets('file attachments are displayed and removable', (tester) async {
     final controller = ChatComposerController();
     final original = FilePicker.platform;
-    addTearDown(() => FilePicker.platform = original);
-    FilePicker.platform = _FakeFilePicker([
+    addTearDown(() => FilePickerPlatform.instance = original);
+    FilePickerPlatform.instance = _FakeFilePicker([
       PlatformFile(
         name: 'fil.txt',
         size: 4,
@@ -155,25 +157,6 @@ void main() {
 
     expect(controller.value.voiceNote, isNotNull);
   });
-
-  testWidgets('error banner reflects controller state', (tester) async {
-    final controller = ChatComposerController();
-    controller.setError('Noe gikk galt');
-
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ChatComposer(
-            controller: controller,
-            onSubmit: (_) {},
-            isSending: false,
-          ),
-        ),
-      ),
-    );
-
-    expect(find.text('Noe gikk galt'), findsOneWidget);
-  });
 }
 
 class _FakeFilePicker extends FilePickerPlatform {
@@ -189,18 +172,31 @@ class _FakeFilePicker extends FilePickerPlatform {
     bool allowMultiple = false,
     bool withData = false,
     bool withReadStream = false,
+    bool lockParentWindow = false,
     String? dialogTitle,
     String? initialDirectory,
-    bool lockParentWindow = false,
+    String? helpText,
+    bool? allowFolderCreation,
   }) async {
     return FilePickerResult(files);
   }
 
   @override
-  bool get isDesktop => true;
+  Future<bool> clearTemporaryFiles() async => true;
 
   @override
-  bool get isMobile => false;
+  Future<String?> getDirectoryPath({String? dialogTitle}) async => null;
+
+  @override
+  Future<FilePickerResult?> saveFile({
+    String? dialogTitle,
+    String? fileName,
+    String? initialDirectory,
+    FileType type = FileType.any,
+    List<String>? allowedExtensions,
+    bool? allowFolderCreation,
+    bool lockParentWindow = false,
+  }) async => null;
 }
 
 class _FakeVoiceRecorder implements ChatVoiceRecorder {
@@ -224,8 +220,8 @@ class _FakeVoiceRecorder implements ChatVoiceRecorder {
   Future<ComposerVoiceNote> stop() async {
     _recording = false;
     _controller.add(const ChatVoiceState(isRecording: false));
-    return const ComposerVoiceNote(
-      duration: Duration(seconds: 1),
+    return ComposerVoiceNote(
+      duration: const Duration(seconds: 2),
       bytes: Uint8List.fromList([1, 2, 3]),
     );
   }

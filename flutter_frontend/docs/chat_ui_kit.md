@@ -10,11 +10,13 @@ Dette dokumentet beskriver komponentene i det modulære chat-UI-kitet og hvordan
 - **`PresenceBadge`** – et kompakt nærværsikon som justerer farge etter profiltema.
 - **`ConnectionStatusBanner`** – informerer om nettverkstilstand og tilbyr «Forsøk igjen»-handling.
 
-Alle komponentene finnes under `flutter_frontend/lib/ui/chat_kit/` og eksporteres samlet via `chat_kit.dart`.
+Alle komponentene finnes under `flutter_frontend/lib/ui/chat_kit/` og eksporteres samlet via `chat_kit.dart`. Tilhørende stories/demos er dokumentert i `ui_kit_stories.md`.
 
 ## Demo
 
 En dedikert `ChannelListPage` demonstrerer komponentene i kombinasjon. Siden kan kjøres via `ChannelListPage`-ruten og viser både kanaloversikt og en trådvisning med dummydata.
+
+![Composer demo](../../docs/images/chat_composer_demo.png)
 
 ## Stories
 

@@ -3,17 +3,19 @@ import 'package:meta/meta.dart';
 import 'msgr_message.dart';
 import 'msgr_theme.dart';
 
-/// Generic file attachment message containing metadata for downloads.
+/// Generic file attachment message with optional preview metadata.
 @immutable
 class MsgrFileMessage extends MsgrAuthoredMessage {
-  /// Creates a new file message.
+  /// Creates a new file attachment message.
   const MsgrFileMessage({
     required super.id,
     required this.url,
     required this.fileName,
-    this.mimeType,
     this.byteSize,
+    this.mimeType,
     this.caption,
+    this.checksum,
+    this.thumbnailUrl,
     required super.profileId,
     required super.profileName,
     required super.profileMode,
@@ -61,6 +63,28 @@ class MsgrFileMessage extends MsgrAuthoredMessage {
   }
 
   /// Creates a copy with the provided overrides.
+  /// Download URL for the file resource.
+  final String url;
+
+  /// Original filename supplied by the uploader.
+  final String fileName;
+
+  /// Total size of the file in bytes, when available.
+  final int? byteSize;
+
+  /// MIME type describing the contents of the file.
+  final String? mimeType;
+
+  /// Optional caption or description associated with the file.
+  final String? caption;
+
+  /// Optional checksum for integrity validation.
+  final String? checksum;
+
+  /// Optional thumbnail preview for the file (e.g. PDF poster).
+  final String? thumbnailUrl;
+
+  /// Creates a copy with selectively overridden fields.
   MsgrFileMessage copyWith({
     String? id,
     String? url,
@@ -68,6 +92,11 @@ class MsgrFileMessage extends MsgrAuthoredMessage {
     String? mimeType,
     int? byteSize,
     String? caption,
+    int? byteSize,
+    String? mimeType,
+    String? caption,
+    String? checksum,
+    String? thumbnailUrl,
     String? profileId,
     String? profileName,
     String? profileMode,
@@ -81,9 +110,11 @@ class MsgrFileMessage extends MsgrAuthoredMessage {
       id: id ?? this.id,
       url: url ?? this.url,
       fileName: fileName ?? this.fileName,
-      mimeType: mimeType ?? this.mimeType,
       byteSize: byteSize ?? this.byteSize,
+      mimeType: mimeType ?? this.mimeType,
       caption: caption ?? this.caption,
+      checksum: checksum ?? this.checksum,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
       profileId: profileId ?? this.profileId,
       profileName: profileName ?? this.profileName,
       profileMode: profileMode ?? this.profileMode,
@@ -95,6 +126,29 @@ class MsgrFileMessage extends MsgrAuthoredMessage {
     );
   }
 
+  /// Recreates a [MsgrFileMessage] from a serialised payload.
+  factory MsgrFileMessage.fromMap(Map<String, dynamic> map) {
+    final author = MsgrAuthoredMessage.readAuthorMap(map);
+    return MsgrFileMessage(
+      id: map['id'] as String,
+      url: map['url'] as String? ?? '',
+      fileName: map['fileName'] as String? ?? map['name'] as String? ?? '',
+      byteSize: (map['byteSize'] as num?)?.toInt(),
+      mimeType: map['mimeType'] as String? ?? map['contentType'] as String?,
+      caption: map['caption'] as String?,
+      checksum: map['checksum'] as String?,
+      thumbnailUrl: map['thumbnailUrl'] as String? ?? map['thumbnail'] as String?,
+      profileId: author.profileId,
+      profileName: author.profileName,
+      profileMode: author.profileMode,
+      status: author.status,
+      sentAt: author.sentAt,
+      insertedAt: author.insertedAt,
+      isLocal: author.isLocal,
+      theme: MsgrMessage.readTheme(map),
+    );
+  }
+
   @override
   Map<String, dynamic> toMap() {
     return {
@@ -102,9 +156,11 @@ class MsgrFileMessage extends MsgrAuthoredMessage {
       'id': id,
       'url': url,
       'fileName': fileName,
-      'mimeType': mimeType,
       'byteSize': byteSize,
+      'mimeType': mimeType,
       'caption': caption,
+      'checksum': checksum,
+      'thumbnailUrl': thumbnailUrl,
       ...toAuthorMap(),
       'sentAt': MsgrMessage.encodeTimestamp(sentAt),
       'insertedAt': MsgrMessage.encodeTimestamp(insertedAt),
@@ -118,9 +174,11 @@ class MsgrFileMessage extends MsgrAuthoredMessage {
         ...super.props,
         url,
         fileName,
-        mimeType,
         byteSize,
+        mimeType,
         caption,
+        checksum,
+        thumbnailUrl,
       ];
 
   @override

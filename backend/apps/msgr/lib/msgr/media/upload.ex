@@ -9,6 +9,11 @@ defmodule Messngr.Media.Upload do
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
 
+  @typedoc """
+  Metadata stored on the media upload record.
+  """
+  @type metadata :: map()
+
   schema "media_uploads" do
     field :kind, Ecto.Enum, values: [:audio, :video, :image, :file, :voice, :thumbnail]
     field :status, Ecto.Enum, values: [:pending, :consumed], default: :pending
@@ -22,6 +27,7 @@ defmodule Messngr.Media.Upload do
     field :height, :integer
     field :sha256, :string
     field :retention_expires_at, :utc_datetime
+    field :checksum, :string
 
     belongs_to :conversation, Messngr.Chat.Conversation
     belongs_to :profile, Messngr.Accounts.Profile
@@ -46,7 +52,10 @@ defmodule Messngr.Media.Upload do
       :sha256,
       :retention_expires_at,
       :conversation_id,
-      :profile_id
+      :profile_id,
+      :width,
+      :height,
+      :checksum
     ])
     |> validate_required([
       :kind,
@@ -65,6 +74,7 @@ defmodule Messngr.Media.Upload do
     |> validate_number(:height, greater_than: 0, allow_nil: true)
     |> validate_change(:sha256, &validate_sha256/2)
     |> validate_retention_window()
+    |> validate_checksum()
     |> unique_constraint(:object_key)
   end
 
@@ -100,20 +110,29 @@ defmodule Messngr.Media.Upload do
   """
   @spec payload(t()) :: map()
   def payload(%__MODULE__{} = upload) do
-    media = %{
-      "bucket" => upload.bucket,
-      "objectKey" => upload.object_key,
-      "contentType" => upload.content_type,
-      "byteSize" => upload.byte_size,
-      "url" => Messngr.Media.Storage.public_url(upload.bucket, upload.object_key)
-    }
-    |> maybe_put("width", upload.width)
-    |> maybe_put("height", upload.height)
-    |> maybe_put("sha256", upload.sha256)
-    |> maybe_put("retentionExpiresAt", upload.retention_expires_at)
+    download =
+      Messngr.Media.Storage.presign_download(upload.bucket, upload.object_key,
+        content_type: upload.content_type
+      )
 
-    %{"media" => media}
+    base_media =
+      %{
+        "bucket" => upload.bucket,
+        "objectKey" => upload.object_key,
+        "contentType" => upload.content_type,
+        "byteSize" => upload.byte_size,
+        "url" => download.url,
+        "urlExpiresAt" => download.expires_at,
+        "checksum" => upload.checksum,
+        "width" => upload.width,
+        "height" => upload.height
+      }
+      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+      |> Enum.into(%{})
+
+    %{"media" => base_media}
     |> merge_metadata(upload.metadata)
+    |> maybe_presign_thumbnail()
   end
 
   defp merge_metadata(base, metadata) when is_map(metadata) do
@@ -195,6 +214,7 @@ defmodule Messngr.Media.Upload do
 
   defp validate_sha256(:sha256, _value), do: [sha256: "must be a valid SHA-256 hex digest"]
 
+  # TODO: Unsure if this is right now.
   defp validate_retention_window(%Ecto.Changeset{} = changeset) do
     expires_at = get_field(changeset, :expires_at)
     retention_expires_at = get_field(changeset, :retention_expires_at)
@@ -203,6 +223,39 @@ defmodule Messngr.Media.Upload do
       is_nil(expires_at) or is_nil(retention_expires_at) -> changeset
       DateTime.compare(retention_expires_at, expires_at) in [:gt, :eq] -> changeset
       true -> add_error(changeset, :retention_expires_at, "must be after expires_at")
+    end
+  end
+  defp maybe_presign_thumbnail(%{"media" => %{"thumbnail" => %{} = thumbnail}} = payload) do
+    bucket = Map.get(thumbnail, "bucket") || Map.get(thumbnail, "bucketName")
+    object_key = Map.get(thumbnail, "object_key") || Map.get(thumbnail, "objectKey")
+
+    cond do
+      is_binary(bucket) and is_binary(object_key) ->
+        download = Messngr.Media.Storage.presign_download(bucket, object_key)
+
+        updated =
+          thumbnail
+          |> Map.put_new("bucket", bucket)
+          |> Map.put("objectKey", object_key)
+          |> Map.put("url", download.url)
+          |> Map.put("urlExpiresAt", download.expires_at)
+
+        put_in(payload, ["media", "thumbnail"], updated)
+
+      true ->
+        payload
+    end
+  end
+
+  defp maybe_presign_thumbnail(payload), do: payload
+
+  defp validate_checksum(changeset) do
+    checksum = get_field(changeset, :checksum)
+
+    cond do
+      is_nil(checksum) -> changeset
+      Regex.match?(~r/\A[A-Fa-f0-9]{32,128}\z/, checksum) -> changeset
+      true -> add_error(changeset, :checksum, "must be a hexadecimal digest")
     end
   end
 end

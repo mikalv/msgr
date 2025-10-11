@@ -8,8 +8,15 @@ defmodule Messngr.Chat do
   alias Phoenix.PubSub
 
   alias Messngr.{Accounts, Media, Repo}
+  alias Messngr.Chat.{
+    Conversation,
+    Message,
+    MessageReaction,
+    MessageThread,
+    Participant,
+    PinnedMessage
+  }
   alias Messngr.Accounts.Profile
-  alias Messngr.Chat.{Conversation, Message, Participant}
 
   @conversation_topic_prefix "conversation"
 
@@ -56,7 +63,7 @@ defmodule Messngr.Chat do
   end
 
   @spec send_message(binary(), binary(), map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()} | {:error, term()}
-  @message_kinds [:text, :markdown, :code, :system, :image, :video, :audio, :voice, :file, :location]
+  @message_kinds [:text, :markdown, :code, :system, :image, :video, :audio, :voice, :file, :thumbnail, :location]
 
   def send_message(conversation_id, profile_id, attrs) do
     Repo.transaction(fn ->
@@ -83,10 +90,242 @@ defmodule Messngr.Chat do
       end
     end)
     |> case do
+        {:ok, message} ->
+          broadcast_message(message)
+          {:ok, message}
+        {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @spec react_to_message(binary(), binary(), binary(), String.t(), map()) ::
+          {:ok, MessageReaction.t()} | {:error, term()}
+  def react_to_message(conversation_id, profile_id, message_id, emoji, opts \\ %{}) do
+    Repo.transaction(fn ->
+      _participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+
+      attrs = %{
+        message_id: message.id,
+        profile_id: profile_id,
+        emoji: normalize_emoji(emoji),
+        metadata: normalize_metadata(opts[:metadata] || Map.get(opts, "metadata"))
+      }
+
+      %MessageReaction{}
+      |> MessageReaction.changeset(attrs)
+      |> Repo.insert(
+        conflict_target: [:message_id, :profile_id, :emoji],
+        on_conflict: {:replace, [:metadata, :updated_at]}
+      )
+      |> case do
+        {:ok, reaction} -> Repo.preload(reaction, :profile)
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, reaction} ->
+        broadcast_reaction_added(conversation_id, reaction)
+        {:ok, reaction}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec remove_reaction(binary(), binary(), binary(), String.t()) ::
+          {:ok, :removed | :noop} | {:error, term()}
+  def remove_reaction(conversation_id, profile_id, message_id, emoji) do
+    Repo.transaction(fn ->
+      _participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+      normalized = normalize_emoji(emoji)
+
+      case Repo.get_by(MessageReaction,
+             message_id: message.id,
+             profile_id: profile_id,
+             emoji: normalized
+           ) do
+        nil ->
+          :noop
+
+        %MessageReaction{} = reaction ->
+          {:ok, _} = Repo.delete(reaction)
+          {:removed, reaction}
+      end
+    end)
+    |> case do
+      {:ok, {:removed, reaction}} ->
+        broadcast_reaction_removed(conversation_id, reaction)
+        {:ok, :removed}
+
+      {:ok, :noop} ->
+        {:ok, :noop}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec pin_message(binary(), binary(), binary(), map()) ::
+          {:ok, PinnedMessage.t()} | {:error, term()}
+  def pin_message(conversation_id, profile_id, message_id, opts \\ %{}) do
+    Repo.transaction(fn ->
+      _participant = ensure_participant!(conversation_id, profile_id)
+      _message = fetch_message!(conversation_id, message_id)
+
+      attrs = %{
+        conversation_id: conversation_id,
+        message_id: message_id,
+        pinned_by_id: profile_id,
+        pinned_at: opts[:pinned_at] || Map.get(opts, "pinned_at") || DateTime.utc_now(),
+        metadata: normalize_metadata(opts[:metadata] || Map.get(opts, "metadata"))
+      }
+
+      %PinnedMessage{}
+      |> PinnedMessage.changeset(attrs)
+      |> Repo.insert(
+        conflict_target: [:conversation_id, :message_id],
+        on_conflict: {:replace, [:pinned_by_id, :pinned_at, :metadata, :updated_at]}
+      )
+      |> case do
+        {:ok, pinned} -> Repo.preload(pinned, [:message, :pinned_by])
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, pinned} ->
+        broadcast_message_pinned(conversation_id, pinned)
+        {:ok, pinned}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec unpin_message(binary(), binary(), binary()) :: {:ok, :unpinned | :noop} | {:error, term()}
+  def unpin_message(conversation_id, profile_id, message_id) do
+    Repo.transaction(fn ->
+      _participant = ensure_participant!(conversation_id, profile_id)
+      _message = fetch_message!(conversation_id, message_id)
+
+      case Repo.get_by(PinnedMessage,
+             conversation_id: conversation_id,
+             message_id: message_id
+           ) do
+        nil ->
+          :noop
+
+        %PinnedMessage{} = pinned ->
+          {:ok, _} = Repo.delete(pinned)
+          {:unpinned, pinned}
+      end
+    end)
+    |> case do
+      {:ok, {:unpinned, pinned}} ->
+        broadcast_message_unpinned(conversation_id, pinned)
+        {:ok, :unpinned}
+
+      {:ok, :noop} ->
+        {:ok, :noop}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec mark_message_read(binary(), binary(), binary()) ::
+          {:ok, Participant.t()} | {:error, term()}
+  def mark_message_read(conversation_id, profile_id, message_id) do
+    Repo.transaction(fn ->
+      participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+
+      read_at = DateTime.utc_now()
+      attrs = %{last_read_at: read_at}
+
+      participant
+      |> Participant.changeset(attrs)
+      |> Repo.update()
+      |> case do
+        {:ok, updated} -> {updated, message, read_at}
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, {participant, message, read_at}} ->
+        broadcast_message_read(conversation_id, participant.profile_id, message.id, read_at)
+        {:ok, participant}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec update_message(binary(), binary(), binary(), map()) ::
+          {:ok, Message.t()} | {:error, term()}
+  def update_message(conversation_id, profile_id, message_id, attrs) do
+    Repo.transaction(fn ->
+      participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+
+      if message.profile_id != participant.profile_id do
+        Repo.rollback(:forbidden)
+      end
+
+      update_attrs =
+        attrs
+        |> take_permitted_attrs([:body, :payload, :metadata])
+        |> maybe_normalize_metadata()
+        |> Map.put(:edited_at, DateTime.utc_now())
+
+      message
+      |> Message.changeset(update_attrs)
+      |> Repo.update()
+      |> case do
+        {:ok, updated} -> Repo.preload(updated, :profile)
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
       {:ok, message} ->
-        broadcast_message(message)
+        broadcast_message_updated(message)
         {:ok, message}
-      {:error, reason} -> {:error, reason}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec delete_message(binary(), binary(), binary(), map()) ::
+          {:ok, Message.t()} | {:error, term()}
+  def delete_message(conversation_id, profile_id, message_id, opts \\ %{}) do
+    Repo.transaction(fn ->
+      participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+
+      if message.profile_id != participant.profile_id do
+        Repo.rollback(:forbidden)
+      end
+
+      delete_attrs =
+        %{deleted_at: DateTime.utc_now()}
+        |> maybe_put_delete_metadata(opts)
+
+      message
+      |> Message.changeset(delete_attrs)
+      |> Repo.update()
+      |> case do
+        {:ok, deleted} -> Repo.preload(deleted, :profile)
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, message} ->
+        broadcast_message_deleted(message)
+        {:ok, message}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -381,7 +620,9 @@ defmodule Messngr.Chat do
     ensure_participant!(conversation_id, profile_id)
 
     table = ensure_watcher_table!()
-    :ets.insert(table, {conversation_id, profile_id})
+    purge_expired_watchers(conversation_id)
+    :ets.match_delete(table, {conversation_id, profile_id, :_})
+    :ets.insert(table, {conversation_id, profile_id, current_time_ms()})
 
     payload = watcher_payload(conversation_id)
     broadcast_watchers(conversation_id, payload)
@@ -390,7 +631,7 @@ defmodule Messngr.Chat do
 
   def unwatch_conversation(conversation_id, profile_id) do
     table = ensure_watcher_table!()
-    :ets.delete_object(table, {conversation_id, profile_id})
+    :ets.match_delete(table, {conversation_id, profile_id, :_})
 
     payload = watcher_payload(conversation_id)
     broadcast_watchers(conversation_id, payload)
@@ -440,6 +681,30 @@ defmodule Messngr.Chat do
     :ok
   end
 
+  @doc false
+  def broadcast_message_updated(%Message{} = message) do
+    PubSub.broadcast(
+      Messngr.PubSub,
+      conversation_topic(message.conversation_id),
+      {:message_updated, message}
+    )
+
+    :ok
+  end
+
+  @doc false
+  def broadcast_message_deleted(%Message{} = message) do
+    PubSub.broadcast(
+      Messngr.PubSub,
+      conversation_topic(message.conversation_id),
+      {:message_deleted, %{message_id: message.id, deleted_at: message.deleted_at}}
+    )
+
+    :ok
+  end
+
+  @doc false
+  @spec broadcast_backlog(binary(), map()) :: :ok
   def broadcast_backlog(conversation_id, page) when is_map(page) do
     PubSub.broadcast(
       Messngr.PubSub,
@@ -579,6 +844,7 @@ defmodule Messngr.Chat do
   end
 
   defp watcher_payload(conversation_id) do
+    purge_expired_watchers(conversation_id)
     profiles = conversation_watcher_profiles(conversation_id)
 
     watchers = Enum.map(profiles, &watcher_profile_payload/1)
@@ -594,11 +860,25 @@ defmodule Messngr.Chat do
   end
 
   defp watcher_ids(conversation_id) do
-    ensure_watcher_table!()
+    table = ensure_watcher_table!()
+
+    now = current_time_ms()
+    ttl = watcher_ttl_ms()
 
     conversation_id
-    |> :ets.lookup(@watcher_table)
-    |> Enum.map(fn {^conversation_id, profile_id} -> profile_id end)
+    |> :ets.lookup(table)
+    |> Enum.reduce([], fn
+      {^conversation_id, profile_id, inserted_at}, acc ->
+        if expired_watcher?(inserted_at, now, ttl) do
+          :ets.delete_object(table, {conversation_id, profile_id, inserted_at})
+          acc
+        else
+          [profile_id | acc]
+        end
+
+      _other, acc ->
+        acc
+    end)
     |> Enum.uniq()
   end
 
@@ -621,6 +901,44 @@ defmodule Messngr.Chat do
     )
 
     :ok
+  end
+
+  defp purge_expired_watchers(conversation_id) do
+    table = ensure_watcher_table!()
+    ttl = watcher_ttl_ms()
+    now = current_time_ms()
+
+    :ets.lookup(table, conversation_id)
+    |> Enum.each(fn
+      {^conversation_id, profile_id, inserted_at} when expired_watcher?(inserted_at, now, ttl) ->
+        :ets.delete_object(table, {conversation_id, profile_id, inserted_at})
+
+      _ ->
+        :ok
+    end)
+
+    :ok
+  end
+
+  defp expired_watcher?(inserted_at, now, ttl) when is_integer(ttl) do
+    now - inserted_at > ttl
+  end
+
+  defp watcher_ttl_ms do
+    case Application.get_env(:msgr, :conversation_watcher_ttl_ms, 30_000) do
+      value when is_integer(value) and value >= 0 -> value
+      value when is_binary(value) ->
+        case Integer.parse(value) do
+          {int, _} when int >= 0 -> int
+          _ -> 30_000
+        end
+
+      _ -> 30_000
+    end
+  end
+
+  defp current_time_ms do
+    System.system_time(:millisecond)
   end
 
 
@@ -766,7 +1084,7 @@ defmodule Messngr.Chat do
   defp default_visibility_for(_kind), do: :private
 
   defp maybe_resolve_media(kind, conversation_id, profile_id, attrs)
-       when kind in [:audio, :video, :image, :voice, :file] do
+       when kind in [:audio, :video, :image, :voice, :file, :thumbnail] do
     media =
       case Map.get(attrs, "media") || Map.get(attrs, :media) do
         %{} = map -> map
@@ -778,7 +1096,7 @@ defmodule Messngr.Chat do
         attrs["upload_id"] || attrs["uploadId"] || attrs[:upload_id] || attrs[:uploadId]
 
     if is_binary(upload_id) do
-      metadata = Map.drop(media, ["upload_id", "uploadId"])
+      metadata = build_media_metadata(kind, media)
 
       case Media.consume_upload(upload_id, conversation_id, profile_id, metadata) do
         {:ok, payload} ->
@@ -922,5 +1240,438 @@ defmodule Messngr.Chat do
           incoming
       end
     end)
+  end
+
+  defp build_media_metadata(kind, media) do
+    media_map =
+      media
+      |> Map.drop(["upload_id", "uploadId", :upload_id, :uploadId])
+      |> normalize_media_map(kind)
+
+    if Enum.empty?(media_map) do
+      %{}
+    else
+      %{"media" => media_map}
+    end
+  end
+
+  defp normalize_media_map(media, kind) do
+    media
+    |> Enum.reduce(%{}, fn {key, value}, acc ->
+      case normalize_media_entry(kind, key, value) do
+        {normalized_key, normalized_value} -> Map.put(acc, normalized_key, normalized_value)
+        :skip -> acc
+      end
+    end)
+    |> maybe_attach_dimensions(media)
+  end
+
+  defp maybe_attach_dimensions(map, media) do
+    case fetch_dimensions(media) do
+      {nil, nil} -> map
+      {width, height} ->
+        map
+        |> Map.put_new("width", width)
+        |> Map.put_new("height", height)
+    end
+  end
+
+  defp fetch_dimensions(media) do
+    direct_width = normalize_positive_integer(Map.get(media, "width") || Map.get(media, :width))
+    direct_height = normalize_positive_integer(Map.get(media, "height") || Map.get(media, :height))
+
+    case Map.get(media, "dimensions") || Map.get(media, :dimensions) do
+      %{} = dims ->
+        width = direct_width || normalize_positive_integer(Map.get(dims, "width") || Map.get(dims, :width))
+        height = direct_height || normalize_positive_integer(Map.get(dims, "height") || Map.get(dims, :height))
+        {width, height}
+
+      _ ->
+        {direct_width, direct_height}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["caption", :caption] do
+    case normalize_string(value, 0, 2000) do
+      nil -> :skip
+      caption -> {"caption", caption}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["checksum", :checksum, "hash", :hash] do
+    case normalize_checksum(value) do
+      nil -> :skip
+      checksum -> {"checksum", checksum}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["duration", :duration] do
+    case normalize_duration(value) do
+      nil -> :skip
+      duration -> {"duration", duration}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["durationMs", :durationMs, "duration_ms", :duration_ms] do
+    case normalize_duration_ms(value) do
+      nil -> :skip
+      duration_ms -> {"durationMs", duration_ms}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["waveform", :waveform] do
+    case normalize_waveform(value) do
+      nil -> :skip
+      waveform -> {"waveform", waveform}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["thumbnail", :thumbnail] do
+    case normalize_thumbnail(value) do
+      nil -> :skip
+      thumbnail -> {"thumbnail", thumbnail}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["waveformSampleRate", :waveformSampleRate] do
+    case normalize_positive_integer(value) do
+      nil -> :skip
+      rate -> {"waveformSampleRate", rate}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["metadata", :metadata] do
+    case value do
+      %{} = metadata ->
+        nested =
+          metadata
+          |> Enum.reduce(%{}, fn {nested_key, nested_value}, acc ->
+            if is_binary(nested_key) do
+              Map.put(acc, nested_key, nested_value)
+            else
+              acc
+            end
+          end)
+
+        if map_size(nested) == 0, do: :skip, else: {"metadata", nested}
+
+      _ ->
+        :skip
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["width", :width, "height", :height] do
+    # Dimensions handled separately to support nested maps.
+    case normalize_positive_integer(value) do
+      nil -> :skip
+      normalized -> {Atom.to_string(key), normalized}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["mimeType", :mimeType] do
+    case normalize_string(value, 3, 256) do
+      nil -> :skip
+      mime -> {"mimeType", mime}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["contentType", :contentType] do
+    case normalize_string(value, 3, 256) do
+      nil -> :skip
+      mime -> {"contentType", mime}
+    end
+  end
+
+  defp normalize_media_entry(_kind, _key, _value), do: :skip
+
+  defp normalize_duration(value) when is_binary(value) do
+    case Float.parse(value) do
+      {number, _} -> normalize_duration(number)
+      :error -> nil
+    end
+  end
+
+  defp normalize_duration(value) when is_number(value) do
+    cond do
+      value <= 0 -> nil
+      true -> Float.round(value * 1.0, 3)
+    end
+  end
+
+  defp normalize_duration(_), do: nil
+
+  defp normalize_duration_ms(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {number, _} -> normalize_duration_ms(number)
+      :error -> nil
+    end
+  end
+
+  defp normalize_duration_ms(value) when is_integer(value) and value > 0, do: value
+  defp normalize_duration_ms(value) when is_float(value) and value > 0, do: trunc(Float.round(value))
+  defp normalize_duration_ms(_), do: nil
+
+  defp normalize_checksum(value) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    if Regex.match?(~r/\A[A-Fa-f0-9]{32,128}\z/, trimmed) do
+      String.downcase(trimmed)
+    else
+      nil
+    end
+  end
+
+  defp normalize_checksum(_), do: nil
+
+  defp normalize_waveform(value) when is_list(value) do
+    normalized =
+      value
+      |> Enum.map(fn point ->
+        cond do
+          is_number(point) ->
+            point
+            |> Kernel./(1.0)
+            |> max(0.0)
+            |> min(1.0)
+
+          true ->
+            nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.take(512)
+
+    if normalized == [], do: nil, else: normalized
+  end
+
+  defp normalize_waveform(_), do: nil
+
+  defp normalize_thumbnail(%{} = value) do
+    normalized =
+      value
+      |> Enum.reduce(%{}, fn {key, val}, acc ->
+        case normalize_thumbnail_entry(key, val) do
+          {normalized_key, normalized_value} -> Map.put(acc, normalized_key, normalized_value)
+          :skip -> acc
+        end
+      end)
+
+    if map_size(normalized) == 0 do
+      nil
+    else
+      normalized
+    end
+  end
+
+  defp normalize_thumbnail(_), do: nil
+
+  defp normalize_thumbnail_entry(key, value) when key in ["bucket", :bucket, "bucketName", :bucketName] do
+    case normalize_string(value, 1, 200) do
+      nil -> :skip
+      bucket -> {"bucket", bucket}
+    end
+  end
+
+  defp normalize_thumbnail_entry(key, value) when key in ["objectKey", :objectKey, "object_key", :object_key] do
+    case normalize_string(value, 1, 500) do
+      nil -> :skip
+      object_key -> {"objectKey", object_key}
+    end
+  end
+
+  defp normalize_thumbnail_entry(key, value) when key in ["width", :width, "height", :height] do
+    case normalize_positive_integer(value) do
+      nil -> :skip
+      normalized -> {Atom.to_string(key), normalized}
+    end
+  end
+
+  defp normalize_thumbnail_entry(key, value) when key in ["url", :url] do
+    case normalize_string(value, 5, 2048) do
+      nil -> :skip
+      url -> {"url", url}
+    end
+  end
+
+  defp normalize_thumbnail_entry(key, value) when key in ["contentType", :contentType, "mimeType", :mimeType] do
+    case normalize_string(value, 3, 256) do
+      nil -> :skip
+      mime -> {"contentType", mime}
+    end
+  end
+
+  defp normalize_thumbnail_entry(_key, _value), do: :skip
+
+  defp normalize_string(value, min, max) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    if String.length(trimmed) in min..max do
+      trimmed
+    else
+      nil
+    end
+  end
+
+  defp normalize_string(_, _, _), do: nil
+
+  defp normalize_positive_integer(value) when is_integer(value) and value > 0, do: value
+
+  defp normalize_positive_integer(value) when is_float(value) and value > 0 do
+    trunc(Float.round(value))
+  end
+
+  defp normalize_positive_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {number, _} when number > 0 -> number
+      _ -> nil
+    end
+  end
+
+  defp normalize_positive_integer(_), do: nil
+  defp fetch_message!(conversation_id, message_id) do
+    case Repo.get_by(Message, id: message_id, conversation_id: conversation_id) do
+      %Message{deleted_at: nil} = message -> message
+      %Message{deleted_at: _} -> Repo.rollback(:message_deleted)
+      nil -> Repo.rollback(:message_not_found)
+    end
+  end
+
+  defp normalize_emoji(nil), do: Repo.rollback(:invalid_emoji)
+
+  defp normalize_emoji(emoji) when is_binary(emoji) do
+    value = emoji |> String.trim()
+
+    if value == "" do
+      Repo.rollback(:invalid_emoji)
+    else
+      value
+    end
+  end
+
+  defp normalize_emoji(_emoji), do: Repo.rollback(:invalid_emoji)
+
+  defp normalize_metadata(nil), do: %{}
+  defp normalize_metadata(metadata) when is_map(metadata), do: metadata
+  defp normalize_metadata(_metadata), do: Repo.rollback(:invalid_metadata)
+
+  defp broadcast_reaction_added(conversation_id, %MessageReaction{} = reaction) do
+    broadcast_conversation_event(conversation_id, {:reaction_added, reaction_payload(reaction)})
+  end
+
+  defp broadcast_reaction_removed(conversation_id, %MessageReaction{} = reaction) do
+    broadcast_conversation_event(conversation_id, {:reaction_removed, reaction_payload(reaction)})
+  end
+
+  defp broadcast_message_pinned(conversation_id, %PinnedMessage{} = pinned) do
+    broadcast_conversation_event(conversation_id, {:message_pinned, pinned_payload(pinned)})
+  end
+
+  defp broadcast_message_unpinned(conversation_id, %PinnedMessage{} = pinned) do
+    broadcast_conversation_event(conversation_id, {:message_unpinned, pinned_payload(pinned)})
+  end
+
+  defp broadcast_message_read(conversation_id, profile_id, message_id, read_at) do
+    broadcast_conversation_event(conversation_id, {:message_read, %{
+      profile_id: profile_id,
+      message_id: message_id,
+      read_at: read_at
+    }})
+  end
+
+  defp broadcast_conversation_event(conversation_id, event) do
+    payload =
+      case event do
+        {:reaction_added, reaction} ->
+          {:reaction_added, enrich_reaction_event(reaction)}
+
+        {:reaction_removed, reaction} ->
+          {:reaction_removed, enrich_reaction_event(reaction)}
+
+        {:message_pinned, pinned} ->
+          {:message_pinned, pinned}
+
+        {:message_unpinned, pinned} ->
+          {:message_unpinned, pinned}
+
+        {:message_read, attrs} ->
+          {:message_read, attrs}
+
+        other ->
+          other
+      end
+
+    PubSub.broadcast(Messngr.PubSub, conversation_topic(conversation_id), payload)
+    :ok
+  end
+
+  defp enrich_reaction_event(reaction) do
+    message_id = Map.fetch!(reaction, :message_id)
+    Map.put(reaction, :aggregates, reaction_aggregates(message_id))
+  end
+
+  defp reaction_payload(%MessageReaction{} = reaction) do
+    %{
+      id: reaction.id,
+      message_id: reaction.message_id,
+      profile_id: reaction.profile_id,
+      emoji: reaction.emoji,
+      metadata: reaction.metadata,
+      inserted_at: reaction.inserted_at,
+      updated_at: reaction.updated_at
+    }
+  end
+
+  defp pinned_payload(%PinnedMessage{} = pinned) do
+    %{
+      id: pinned.id,
+      conversation_id: pinned.conversation_id,
+      message_id: pinned.message_id,
+      pinned_by_id: pinned.pinned_by_id,
+      pinned_at: pinned.pinned_at,
+      metadata: pinned.metadata
+    }
+  end
+
+  defp reaction_aggregates(message_id) do
+    MessageReaction
+    |> where([r], r.message_id == ^message_id)
+    |> Repo.all()
+    |> Enum.group_by(& &1.emoji)
+    |> Enum.map(fn {emoji, reactions} ->
+      %{
+        emoji: emoji,
+        count: Enum.count(reactions),
+        profile_ids: reactions |> Enum.map(& &1.profile_id) |> Enum.uniq()
+      }
+    end)
+  end
+
+  defp take_permitted_attrs(attrs, keys) do
+    Enum.reduce(keys, %{}, fn key, acc ->
+      value = Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key))
+
+      if is_nil(value) do
+        acc
+      else
+        Map.put(acc, key, value)
+      end
+    end)
+  end
+
+  defp maybe_normalize_metadata(attrs) do
+    case Map.fetch(attrs, :metadata) do
+      {:ok, metadata} -> Map.put(attrs, :metadata, normalize_metadata(metadata))
+      :error -> attrs
+    end
+  end
+
+  defp maybe_put_delete_metadata(map, opts) do
+    metadata = opts[:metadata] || Map.get(opts, "metadata")
+
+    if is_nil(metadata) do
+      map
+    else
+      Map.put(map, :metadata, normalize_metadata(metadata))
+    end
   end
 end

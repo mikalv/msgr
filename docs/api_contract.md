@@ -216,6 +216,152 @@ Denne siden dokumenterer forventet kontrakt mellom msgr-backend og Flutter-klien
 `media`-feltet er en forhåndsnormalisert representasjon av `payload.media`. Den
 kan brukes direkte av klienter til å gjengi vedlegg uten å måtte vite alt om
 intern lagringsstruktur.
+### Forberede mediaopplasting
+
+`POST /api/conversations/{conversation_id}/uploads`
+
+```json
+{
+  "upload": {
+    "kind": "image",
+    "content_type": "image/png",
+    "byte_size": 48123,
+    "filename": "ferie.png"
+  }
+}
+```
+
+**Respons 201**
+
+```json
+{
+  "data": {
+    "id": "upload-uuid",
+    "kind": "image",
+    "status": "pending",
+    "bucket": "msgr-media",
+    "object_key": "conversations/123/image/upload-uuid.png",
+    "content_type": "image/png",
+    "byte_size": 48123,
+    "expires_at": "2024-10-04T12:15:00Z",
+    "public_url": "https://cdn.example.com/msgr-media/conversations/123/image/upload-uuid.png",
+    "retention_until": "2024-10-11T12:15:00Z",
+    "upload": {
+      "method": "PUT",
+      "url": "https://storage.example.com/msgr-media/conversations/123/image/upload-uuid.png?signature=...",
+      "headers": {
+        "content-type": "image/png",
+        "x-amz-server-side-encryption": "AES256"
+      },
+      "expires_at": "2024-10-04T12:05:00Z"
+    },
+    "download": {
+      "method": "GET",
+      "url": "https://cdn.example.com/msgr-media/conversations/123/image/upload-uuid.png?signature=...",
+      "expires_at": "2024-10-04T12:25:00Z"
+    }
+  }
+}
+```
+
+Klienten laster opp binæren direkte til `upload.url` før `expires_at` og sender deretter en melding med `media.upload_id` og valgfri metadata (caption, waveform, dimensjoner, checksum). Alle opplastinger må inkludere de signerede headerne – `content-type` og eventuelle `x-amz-server-side-encryption*`-felt – slik at objekter lagres kryptert i S3-kompatibel lagring.
+
+Backend-konfigurasjonen støtter både standard SSE-S3 (`MEDIA_SSE_ALGORITHM`, default `AES256`) og KMS-nøkler (`MEDIA_SSE_KMS_KEY_ID`). Når en KMS-nøkkel er konfigurert returneres både algoritme- og nøkkel-ID-headere i opplastingsinstruksjonene.
+
+### Eksempel på mediamelding
+
+```json
+{
+  "message": {
+    "kind": "image",
+    "media": {
+      "upload_id": "upload-uuid",
+      "caption": "Ferie!",
+      "width": 1280,
+      "height": 720,
+      "checksum": "d41d8cd98f00b204e9800998ecf8427e"
+    }
+  }
+}
+```
+
+**Respons 201**
+
+```json
+{
+  "data": {
+    "id": "message-uuid",
+    "type": "image",
+    "status": "sent",
+    "sent_at": "2024-10-04T12:16:00Z",
+    "inserted_at": "2024-10-04T12:16:00Z",
+    "profile": {
+      "id": "profile-uuid",
+      "name": "Deg",
+      "mode": "private"
+    },
+    "payload": {
+      "media": {
+        "url": "https://cdn.example.com/msgr-media/conversations/123/image/upload-uuid.png?signature=...",
+        "contentType": "image/png",
+        "byteSize": 48123,
+        "checksum": "d41d8cd98f00b204e9800998ecf8427e",
+        "width": 1280,
+        "height": 720,
+        "caption": "Ferie!",
+        "retention": {
+          "expiresAt": "2024-10-11T12:15:00Z"
+        },
+        "thumbnail": {
+          "url": "https://cdn.example.com/msgr-media/conversations/123/image/upload-uuid.png?thumb=1",
+          "width": 320,
+          "height": 180
+        }
+      }
+    }
+  }
+}
+```
+
+Backenden normaliserer også lydmeldinger (`type: "audio"` eller `"voice"`) med `waveform` og `duration`, samt generiske filer (`type: "file"`) som eksponerer `fileName`, `byteSize`, `checksum` og valgfritt `thumbnail`.
+### Realtime ConversationChannel
+
+- **Join**: `conversation:{conversation_id}`
+  - Params: `{ "account_id": "...", "profile_id": "..." }`
+- **Events**:
+  - `message_created` / `message_updated`: `{ "data": { ...message payload med metadata, edited_at, deleted_at, thread_id } }`
+  - `message_deleted`: `{ "message_id": "uuid", "deleted_at": "2024-10-04T12:10:00Z" }`
+  - `reaction_added` / `reaction_removed`:
+
+    ```json
+    {
+      "id": "reaction-uuid",
+      "message_id": "message-uuid",
+      "profile_id": "profile-uuid",
+      "emoji": "👍",
+      "metadata": {},
+      "aggregates": [
+        { "emoji": "👍", "count": 2, "profile_ids": ["profile-uuid", "peer-uuid"] }
+      ]
+    }
+    ```
+
+  - `message_pinned` / `message_unpinned`: `{ "message_id": "uuid", "pinned_by_id": "profile", "pinned_at": "2024-10-04T12:15:00Z", "metadata": {} }`
+  - `message_read`: `{ "profile_id": "profile-uuid", "message_id": "message-uuid", "read_at": "2024-10-04T12:12:00Z" }`
+  - `typing_started` / `typing_stopped`: `{ "profile_id": "profile-uuid", "profile_name": "Kari", "thread_id": null, "expires_at": "2024-10-04T12:05:05Z" }`
+  - `conversation_watchers`: `{ "count": 2, "watchers": [{ "id": "profile-uuid", "name": "Kari", "mode": "private" }] }`
+  - Presence diff/stat er levert via Phoenix `presence_state` og `presence_diff` events.
+
+- **Client events**:
+  - `typing:start` / `typing:stop` (payload `{ "thread_id": "optional-thread" }`)
+  - `message:read`, `reaction:add`, `reaction:remove`, `message:update`, `message:delete`
+  - `message:pin`, `message:unpin`
+  - `conversation:watch`, `conversation:unwatch`
+
+`conversation:watch` holder en profiler-liste aktiv i maks 30 sekunder per invitasjon
+(`conversation_watcher_ttl_ms` kan overstyres i konfig). Når tiden utløper vil
+backenden automatisk droppe profilen fra `conversation_watchers`-strømmen og
+returnere en tom liste ved neste `list_watchers`-kall.
 
 ### Familie-spaces med kalender, handleliste og todo
 

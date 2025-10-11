@@ -20,6 +20,7 @@ class ChatComposer extends StatefulWidget {
     this.errorMessage,
     this.availableCommands = SlashCommand.defaults,
     ChatVoiceRecorder? voiceRecorder,
+    this.filePicker,
   }) : voiceRecorder = voiceRecorder ?? SimulatedChatVoiceRecorder();
 
   final ChatComposerController controller;
@@ -28,6 +29,7 @@ class ChatComposer extends StatefulWidget {
   final String? errorMessage;
   final List<SlashCommand> availableCommands;
   final ChatVoiceRecorder voiceRecorder;
+  final FilePickerPlatform? filePicker;
 
   @override
   State<ChatComposer> createState() => _ChatComposerState();
@@ -35,9 +37,10 @@ class ChatComposer extends StatefulWidget {
 
 class _ChatComposerState extends State<ChatComposer>
     with SingleTickerProviderStateMixin {
-  late final TextEditingController _textController;
   late final FocusNode _focusNode;
+  late final TextEditingController _textController;
   late final AnimationController _expanderController;
+  late StreamSubscription<ChatVoiceState> _voiceSubscription;
   late ChatComposerValue _value;
   StreamSubscription<ChatVoiceState>? _voiceSubscription;
   final ImagePicker _imagePicker = ImagePicker();
@@ -64,16 +67,17 @@ class _ChatComposerState extends State<ChatComposer>
   @override
   void initState() {
     super.initState();
-    _value = widget.controller.value;
-    _textController = TextEditingController(text: _value.text);
     _focusNode = FocusNode();
+    _textController = TextEditingController(text: widget.controller.value.text);
     _expanderController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
     );
+    _value = widget.controller.value;
     widget.controller.addListener(_handleControllerChanged);
-    _voiceSubscription = widget.voiceRecorder.stateStream.listen(_handleVoiceState);
     _textController.addListener(_handleDraftChanged);
+    _voiceSubscription =
+        widget.voiceRecorder.stateStream.listen(_handleVoiceState);
   }
 
   @override
@@ -89,7 +93,7 @@ class _ChatComposerState extends State<ChatComposer>
 
   @override
   void dispose() {
-    _voiceSubscription?.cancel();
+    _voiceSubscription.cancel();
     widget.controller.removeListener(_handleControllerChanged);
     _textController.dispose();
     _focusNode.dispose();
@@ -100,13 +104,13 @@ class _ChatComposerState extends State<ChatComposer>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isCompact = MediaQuery.of(context).size.width < 640;
+    final mediaQuery = MediaQuery.of(context);
+    final isCompact = mediaQuery.size.width < 640;
 
     final attachments = _value.attachments;
     final voiceNote = _value.voiceNote;
 
-    final showExpander = _showEmoji;
-    if (showExpander) {
+    if (_showEmoji) {
       _expanderController.forward();
     } else {
       _expanderController.reverse();
@@ -123,7 +127,7 @@ class _ChatComposerState extends State<ChatComposer>
       onDragEntered: (_) => setState(() => _isDropHover = true),
       onDragExited: (_) => setState(() => _isDropHover = false),
       onDragDone: _handleDrop,
-      child: SafeArea(
+      /*child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -163,7 +167,59 @@ class _ChatComposerState extends State<ChatComposer>
                   autofocus: false,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    children: [
+                    children: [*/
+    SafeArea(
+      top: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (widget.errorMessage != null || _value.error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _ErrorBanner(message: widget.errorMessage ?? _value.error!),
+            ),
+          if (attachments.isNotEmpty || voiceNote != null)
+            _AttachmentPreview(
+              attachments: attachments,
+              voiceNote: voiceNote,
+              onRemoveAttachment: _removeAttachment,
+              onRemoveVoiceNote: _clearVoiceNote,
+            ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
+                  color: theme.shadowColor.withOpacity(0.08),
+                ),
+              ],
+            ),
+            padding: EdgeInsets.symmetric(
+              horizontal: isCompact ? 12 : 16,
+              vertical: isCompact ? 10 : 12,
+            ),
+            child: CallbackShortcuts(
+              bindings: <ShortcutActivator, VoidCallback>{
+                const SingleActivator(LogicalKeyboardKey.enter, control: true):
+                    _submit,
+                const SingleActivator(LogicalKeyboardKey.enter, meta: true):
+                    _submit,
+                const SingleActivator(LogicalKeyboardKey.escape): _handleEscape,
+                const SingleActivator(LogicalKeyboardKey.arrowDown):
+                    _selectNextCommand,
+                const SingleActivator(LogicalKeyboardKey.arrowUp):
+                    _selectPreviousCommand,
+              },
+              child: Focus(
+                autofocus: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -255,51 +311,10 @@ class _ChatComposerState extends State<ChatComposer>
     });
   }
 
-  void _handleDraftChanged() {
-    widget.controller.setText(_textController.text);
-    if (_shouldShowCommandPalette) {
-      setState(() {
-        _commandSelection = 0;
-      });
-    }
-  }
-
-  void _insertEmoji(String emoji) {
-    final selection = _textController.selection;
-    final text = _textController.text;
-    final newText = selection.isValid
-        ? text.replaceRange(
-            selection.start,
-            selection.end,
-            emoji,
-          )
-        : '$text$emoji';
-    _textController
-      ..text = newText
-      ..selection = TextSelection.collapsed(
-        offset: selection.start + emoji.length,
-      );
-    widget.controller.setText(newText);
-    _focusNode.requestFocus();
-  }
-
-  void _toggleEmoji() {
-    setState(() {
-      _showEmoji = !_showEmoji;
-    });
-    if (_showEmoji) {
-      _focusNode.unfocus();
-    } else {
-      _focusNode.requestFocus();
-    }
-  }
-
   Future<void> _pickFiles() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        withData: true,
-      );
+      final picker = widget.filePicker ?? FilePicker.platform;
+      final result = await picker.pickFiles(allowMultiple: true);
       if (result == null) return;
       final attachments = result.files
           .map((file) => ComposerAttachment.fromPlatformFile(file))
@@ -376,6 +391,40 @@ class _ChatComposerState extends State<ChatComposer>
     });
   }
 
+  void _handleDraftChanged() {
+    widget.controller.setText(_textController.text);
+    if (_shouldShowCommandPalette) {
+      setState(() {
+        _commandSelection = 0;
+      });
+    }
+  }
+
+  void _toggleEmoji() {
+    setState(() {
+      _showEmoji = !_showEmoji;
+    });
+  }
+
+  void _insertEmoji(String emoji) {
+    final selection = _textController.selection;
+    final text = _textController.text;
+    final newText = selection.isValid
+        ? text.replaceRange(
+            selection.start,
+            selection.end,
+            emoji,
+          )
+        : '$text$emoji';
+    _textController
+      ..text = newText
+      ..selection = TextSelection.collapsed(
+        offset: selection.isValid ? selection.start + emoji.length : newText.length,
+      );
+    widget.controller.setText(newText);
+    _focusNode.requestFocus();
+  }
+
   void _handleEscape() {
     if (_showEmoji) {
       setState(() => _showEmoji = false);
@@ -430,6 +479,390 @@ class _ChatComposerState extends State<ChatComposer>
       _commandSelection = 0;
     });
     _focusNode.requestFocus();
+  }
+}
+
+class _ComposerTextField extends StatelessWidget {
+  const _ComposerTextField({
+    required this.controller,
+    required this.focusNode,
+    required this.onSubmitted,
+    required this.isSending,
+    required this.placeholder,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final ValueChanged<String> onSubmitted;
+  final bool isSending;
+  final String placeholder;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return TextField(
+      controller: controller,
+      focusNode: focusNode,
+      textCapitalization: TextCapitalization.sentences,
+      textInputAction: TextInputAction.send,
+      minLines: 1,
+      maxLines: 6,
+      enabled: !isSending,
+      onSubmitted: onSubmitted,
+      decoration: InputDecoration(
+        isDense: true,
+        border: InputBorder.none,
+        hintText: placeholder,
+        hintStyle: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+        ),
+      ),
+    );
+  }
+}
+
+class _ComposerIconButton extends StatelessWidget {
+  const _ComposerIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.isActive = false,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  final bool isActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Tooltip(
+      message: tooltip,
+      child: InkResponse(
+        onTap: onTap,
+        radius: 24,
+        child: Icon(
+          icon,
+          color: isActive
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _SendButton extends StatelessWidget {
+  const _SendButton({
+    required this.isEnabled,
+    required this.isSending,
+    required this.onPressed,
+  });
+
+  final bool isEnabled;
+  final bool isSending;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      height: 44,
+      width: 44,
+      child: FilledButton(
+        onPressed: isEnabled && !isSending ? onPressed : null,
+        style: FilledButton.styleFrom(
+          padding: EdgeInsets.zero,
+          shape: const CircleBorder(),
+        ),
+        child: isSending
+            ? SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    theme.colorScheme.onPrimary,
+                  ),
+                ),
+              )
+            : const Icon(Icons.send_rounded),
+      ),
+    );
+  }
+}
+
+class _CommandPalette extends StatelessWidget {
+  const _CommandPalette({
+    required this.commands,
+    required this.highlightedIndex,
+    required this.onSelect,
+  });
+
+  final List<SlashCommand> commands;
+  final int highlightedIndex;
+  final ValueChanged<SlashCommand> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < commands.length; i++)
+            _CommandTile(
+              command: commands[i],
+              isHighlighted: i == highlightedIndex,
+              onTap: () => onSelect(commands[i]),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CommandTile extends StatelessWidget {
+  const _CommandTile({
+    required this.command,
+    required this.isHighlighted,
+    required this.onTap,
+  });
+
+  final SlashCommand command;
+  final bool isHighlighted;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: isHighlighted
+          ? theme.colorScheme.primary.withOpacity(0.12)
+          : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Text(
+                command.name,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  command.description,
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmojiPicker extends StatelessWidget {
+  const _EmojiPicker({required this.onSelect});
+
+  static const _emoji = [
+    '😀', '😁', '😂', '🤣', '😅', '😊', '😍', '🤩', '😎', '🤔',
+    '🙌', '👍', '👏', '🙏', '🔥', '🎉', '💡', '🚀', '❤️', '🤝',
+  ];
+
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final emoji in _emoji)
+            GestureDetector(
+              onTap: () => onSelect(emoji),
+              child: Text(
+                emoji,
+                style: const TextStyle(fontSize: 24),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VoiceRecorderButton extends StatelessWidget {
+  const _VoiceRecorderButton({
+    required this.isRecording,
+    required this.onStart,
+    required this.onStop,
+  });
+
+  final bool isRecording;
+  final VoidCallback onStart;
+  final VoidCallback onStop;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Tooltip(
+      message: isRecording ? 'Stopp opptak' : 'Ta opp lyd',
+      child: InkResponse(
+        radius: 24,
+        onTap: isRecording ? onStop : onStart,
+        child: Icon(
+          isRecording ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
+          color: isRecording
+              ? theme.colorScheme.error
+              : theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _AttachmentPreview extends StatelessWidget {
+  const _AttachmentPreview({
+    required this.attachments,
+    required this.voiceNote,
+    required this.onRemoveAttachment,
+    required this.onRemoveVoiceNote,
+  });
+
+  final List<ComposerAttachment> attachments;
+  final ComposerVoiceNote? voiceNote;
+  final ValueChanged<ComposerAttachment> onRemoveAttachment;
+  final VoidCallback onRemoveVoiceNote;
+
+  @override
+  Widget build(BuildContext context) {
+    if (attachments.isEmpty && voiceNote == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final attachment in attachments)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _AttachmentChip(
+                  attachment: attachment,
+                  onRemove: () => onRemoveAttachment(attachment),
+                ),
+              ),
+            if (voiceNote != null)
+              _VoiceNoteChip(
+                note: voiceNote!,
+                onRemove: onRemoveVoiceNote,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AttachmentChip extends StatelessWidget {
+  const _AttachmentChip({required this.attachment, required this.onRemove});
+
+  final ComposerAttachment attachment;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InputChip(
+      onDeleted: onRemove,
+      deleteIcon: const Icon(Icons.cancel, size: 18),
+      label: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            attachment.name,
+            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          Text(
+            attachment.humanSize,
+            style: theme.textTheme.labelSmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VoiceNoteChip extends StatelessWidget {
+  const _VoiceNoteChip({required this.note, required this.onRemove});
+
+  final ComposerVoiceNote note;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return InputChip(
+      avatar: const Icon(Icons.graphic_eq_rounded),
+      label: Text('Stemmeopptak • ${note.formattedDuration}'),
+      onDeleted: onRemove,
+      deleteIcon: const Icon(Icons.cancel, size: 18),
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: theme.colorScheme.onErrorContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onErrorContainer,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -672,7 +1105,8 @@ class ComposerVoiceNote {
   final Uint8List bytes;
 
   String get formattedDuration =>
-      '${duration.inMinutes.remainder(60).toString().padLeft(2, '0')}:${(duration.inSeconds.remainder(60)).toString().padLeft(2, '0')}';
+      '${duration.inMinutes.remainder(60).toString().padLeft(2, '0')}:'
+      '${(duration.inSeconds.remainder(60)).toString().padLeft(2, '0')}';
 }
 
 class SlashCommand {

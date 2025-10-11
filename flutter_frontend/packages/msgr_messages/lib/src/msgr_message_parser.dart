@@ -29,10 +29,12 @@ MsgrMessage msgrMessageFromMap(Map<String, dynamic> map) {
     case MsgrMessageKind.system:
       return MsgrSystemMessage.fromMap(map);
     case MsgrMessageKind.image:
+    case MsgrMessageKind.thumbnail:
       return MsgrImageMessage.fromMap(map);
     case MsgrMessageKind.video:
       return MsgrVideoMessage.fromMap(map);
     case MsgrMessageKind.audio:
+    case MsgrMessageKind.voice:
       return MsgrAudioMessage.fromMap(map);
     case MsgrMessageKind.voice:
       return MsgrAudioMessage.fromMap(map);

@@ -32,6 +32,9 @@ enum MsgrMessageKind {
   /// Generic file attachment message.
   file,
 
+  /// Lightweight thumbnail reference for external content.
+  thumbnail,
+
   /// Shared location or map message.
   location,
 }

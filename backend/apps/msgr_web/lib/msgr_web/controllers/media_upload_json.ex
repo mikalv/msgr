@@ -23,6 +23,18 @@ defmodule MessngrWeb.MediaUploadJSON do
           retention_expires_at: instructions["retentionExpiresAt"],
           thumbnail_upload: encode_thumbnail(instructions["thumbnailUpload"])
         }
+          method: instructions["upload"]["method"],
+          url: instructions["upload"]["url"],
+          headers: instructions["upload"]["headers"],
+          expires_at: instructions["upload"]["expiresAt"]
+        },
+        download: %{
+          method: instructions["download"]["method"],
+          url: instructions["download"]["url"],
+          expires_at: instructions["download"]["expiresAt"]
+        },
+        public_url: instructions["publicUrl"],
+        retention_until: instructions["retentionUntil"]
       }
     }
   end

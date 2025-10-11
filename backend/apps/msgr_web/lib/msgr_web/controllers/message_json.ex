@@ -36,6 +36,11 @@ defmodule MessngrWeb.MessageJSON do
       inserted_at: message.inserted_at,
       payload: payload,
       media: media,
+      edited_at: message.edited_at,
+      deleted_at: message.deleted_at,
+      payload: message.payload || %{},
+      metadata: message.metadata || %{},
+      thread_id: message.thread_id,
       profile: profile_payload(message.profile)
     }
   end
