@@ -29,6 +29,7 @@ defmodule AuthProvider.Router do
     pipe_through :api
 
     post "/v1/device/register", ApiController, :device_register
+    post "/v1/device/context", ApiController, :device_context
     post "/v1/login", ApiController, :login
     post "/v1/login/code", ApiController, :login_code
     post "/v1/refresh_token", ApiController, :refresh_token

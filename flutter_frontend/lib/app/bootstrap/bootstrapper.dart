@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:messngr/app/bootstrap/device_context_bootstrap.dart';
 import 'package:messngr/app/bootstrap/libmsgr_bootstrap.dart';
 import 'package:messngr/app/bootstrap/logging_bootstrap.dart';
 import 'package:messngr/config/AppNavigation.dart';
@@ -13,6 +14,8 @@ class Bootstrapper {
     AppNavigation.instance;
 
     await bootstrapLibMsgr();
+    final deviceContextBootstrapper = DeviceContextBootstrapper.create();
+    await deviceContextBootstrapper.initialize();
 
     final binding = WidgetsFlutterBinding.ensureInitialized();
     binding.renderView.automaticSystemUiAdjustment = false;

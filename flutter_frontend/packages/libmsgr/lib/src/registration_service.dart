@@ -16,7 +16,8 @@ class RegistrationService {
 
   final client = http.Client();
   late String deviceId;
-  var mapDeviceInfo = {};
+  Map<String, dynamic>? _cachedDeviceInfo;
+  Map<String, dynamic>? _cachedAppInfo;
   String? msisdn;
   String? email;
   AuthChallenge? lastChallenge;
@@ -27,32 +28,65 @@ class RegistrationService {
 
   RegistrationService._internal() {
     _log.info('RegistrationService starting up');
-    _setdeviceinfo();
   }
 
-  maybeRegisterDevice() async {
+  void updateCachedContext({
+    required Map<String, dynamic> deviceInfo,
+    required Map<String, dynamic> appInfo,
+  }) {
+    _cachedDeviceInfo = Map<String, dynamic>.from(deviceInfo);
+    _cachedAppInfo = Map<String, dynamic>.from(appInfo);
+  }
+
+  Future<Map<String, dynamic>> _deviceInfoForRequest(
+      Map<String, dynamic>? overrideDeviceInfo) async {
+    if (overrideDeviceInfo != null) {
+      return Map<String, dynamic>.from(overrideDeviceInfo);
+    }
+    if (_cachedDeviceInfo != null) {
+      return Map<String, dynamic>.from(_cachedDeviceInfo!);
+    }
+    final info = await LibMsgr().deviceInfo.extractInformation();
+    return info.map((key, value) => MapEntry(key.toString(), value));
+  }
+
+  Map<String, dynamic> _appInfoForRequest(Map<String, dynamic>? overrideAppInfo) {
+    final resolved = overrideAppInfo ?? _cachedAppInfo ?? const {};
+    return Map<String, dynamic>.from(resolved);
+  }
+
+  Future<void> maybeRegisterDevice({
+    Map<String, dynamic>? deviceInfo,
+    Map<String, dynamic>? appInfo,
+  }) async {
     var isReg = await LibMsgr()
         .secureStorage
         .containsKey(kIsDeviceRegisteredWithServerNameStr);
     if (!isReg) {
       _log.info('Attempting to register device!');
-      await registerDevice();
+      await registerDevice(deviceInfo: deviceInfo, appInfo: appInfo);
       await LibMsgr()
           .secureStorage
           .writeValue(kIsDeviceRegisteredWithServerNameStr, deviceId);
-    } else {}
+    }
   }
 
-  Future<bool> registerDevice() async {
+  Future<bool> registerDevice({
+    Map<String, dynamic>? deviceInfo,
+    Map<String, dynamic>? appInfo,
+  }) async {
     _log.finest('registerDevice triggered');
     var url = ServerResolver.getAuthServer('/api/v1/device/register');
     var keyData = await LibMsgr().keyManager.getDataForServer();
     deviceId = LibMsgr().keyManager.deviceId!;
+    final resolvedDeviceInfo = await _deviceInfoForRequest(deviceInfo);
+    final resolvedAppInfo = _appInfoForRequest(appInfo);
     var srvData = jsonEncode({
       'from': deviceId,
       'payload': {
         'keyData': keyData,
-        'deviceInfo': mapDeviceInfo,
+        'deviceInfo': resolvedDeviceInfo,
+        if (resolvedAppInfo.isNotEmpty) 'appInfo': resolvedAppInfo,
       }
     });
     var hdrs = {
@@ -67,6 +101,32 @@ class RegistrationService {
     } else {
       return false;
     }
+  }
+
+  Future<bool> syncDeviceContext({
+    Map<String, dynamic>? deviceInfo,
+    Map<String, dynamic>? appInfo,
+  }) async {
+    _log.finest('syncDeviceContext triggered');
+    var url = ServerResolver.getAuthServer('/api/v1/device/context');
+    deviceId = LibMsgr().keyManager.deviceId!;
+    final resolvedDeviceInfo = await _deviceInfoForRequest(deviceInfo);
+    final resolvedAppInfo = _appInfoForRequest(appInfo);
+
+    final body = jsonEncode({
+      'from': deviceId,
+      'deviceInfo': resolvedDeviceInfo,
+      'appInfo': resolvedAppInfo,
+    });
+
+    final hdrs = {
+      'Content-Type': 'application/json; charset=UTF-8',
+      'User-Agent': kUserAgentNameString
+    };
+    final response = await http.post(url, body: body, headers: hdrs);
+    _log.finest(
+        'syncDeviceContext Response status: ${response.statusCode} body: ${response.body}');
+    return response.statusCode == 200;
   }
 
   Future<Profile?> createProfile(String teamName, String token, String username,
@@ -331,7 +391,47 @@ class RegistrationService {
     }
   }
 
-  _setdeviceinfo() async {
-    _log.finer('Device Info: $mapDeviceInfo');
+  Future<RefreshSessionResponse?> refreshSession(
+      {required String refreshToken}) async {
+    _log.finest('refreshSession triggered');
+    var url = ServerResolver.getAuthServer('/api/v1/refresh_token');
+    deviceId = LibMsgr().keyManager.deviceId!;
+
+    final body = jsonEncode({'from': deviceId, 'token': refreshToken});
+    final hdrs = {
+      'Content-Type': 'application/json; charset=UTF-8',
+      'User-Agent': kUserAgentNameString
+    };
+
+    final response = await http.post(url, body: body, headers: hdrs);
+    _log.finest('refreshSession Response status: ${response.statusCode}');
+    _log.finest('refreshSession Response body: ${response.body}');
+
+    if (response.statusCode != 200) {
+      return null;
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    if (decoded['status'] != 'ok') {
+      return null;
+    }
+
+    final token = decoded['token'] as String?;
+    final refresh = decoded['refresh_token'] as String?;
+    if (token == null || refresh == null) {
+      return null;
+    }
+
+    return RefreshSessionResponse(accessToken: token, refreshToken: refresh);
   }
+}
+
+class RefreshSessionResponse {
+  const RefreshSessionResponse({
+    required this.accessToken,
+    required this.refreshToken,
+  });
+
+  final String accessToken;
+  final String refreshToken;
 }

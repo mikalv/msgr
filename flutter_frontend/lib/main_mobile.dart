@@ -51,6 +51,7 @@ class _MessngrWrapperState extends State<MessngrWrapper>
   void initState() {
     super.initState();
     reduxStore.then((store) {
+      store.dispatch(VerifyAuthStateAction());
       store.dispatch(OpenWebsocketIfNotAlready());
     });
     getLocale().then((locale) {
