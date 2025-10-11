@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Added bridge integration execution plan documenting RE rounds and candidate
+  upstream projects for Discord, Slack, Snapchat and other chat networks.
 - Added multi-identity account linking so `Accounts.ensure_identity/1` can attach
   new email/phone/OIDC credentials to an existing account via `account_id`, with
   safeguards against cross-account hijacking, refreshed docs and regression
