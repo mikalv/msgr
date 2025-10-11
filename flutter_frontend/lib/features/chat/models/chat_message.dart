@@ -1,10 +1,28 @@
 import 'package:msgr_messages/msgr_messages.dart';
 
 class ChatMessage {
-  const ChatMessage._(this.message);
+  const ChatMessage._(
+    this.message, {
+    this.metadata = const <String, dynamic>{},
+    this.editedAt,
+    this.deletedAt,
+    this.threadId,
+  });
 
   /// Underlying domain message.
   final MsgrMessage message;
+
+  /// Optional metadata associated with the message.
+  final Map<String, dynamic> metadata;
+
+  /// When the message was last edited.
+  final DateTime? editedAt;
+
+  /// When the message was deleted (soft delete).
+  final DateTime? deletedAt;
+
+  /// Optional thread identifier.
+  final String? threadId;
 
   /// Creates a chat message from an existing msgr message instance.
   factory ChatMessage.fromMsgrMessage(MsgrMessage message) => ChatMessage._(message);
@@ -61,7 +79,25 @@ class ChatMessage {
     }
 
     final message = msgrMessageFromMap(base);
-    return ChatMessage._(message);
+
+    final metadata = Map<String, dynamic>.from(
+      (json['metadata'] as Map?)?.cast<String, dynamic>() ?? const {},
+    );
+
+    DateTime? parseDate(dynamic value) {
+      if (value is String && value.isNotEmpty) {
+        return DateTime.tryParse(value);
+      }
+      return null;
+    }
+
+    return ChatMessage._(
+      message,
+      metadata: metadata,
+      editedAt: parseDate(json['edited_at'] ?? json['editedAt']),
+      deletedAt: parseDate(json['deleted_at'] ?? json['deletedAt']),
+      threadId: json['thread_id'] as String? ?? json['threadId'] as String?,
+    );
   }
 
   /// Serialises the chat message into a JSON compatible structure.
@@ -114,6 +150,22 @@ class ChatMessage {
       json['payload'] = payload;
     }
 
+    if (metadata.isNotEmpty) {
+      json['metadata'] = metadata;
+    }
+
+    if (threadId != null) {
+      json['threadId'] = threadId;
+    }
+
+    if (editedAt != null) {
+      json['editedAt'] = editedAt!.toIso8601String();
+    }
+
+    if (deletedAt != null) {
+      json['deletedAt'] = deletedAt!.toIso8601String();
+    }
+
     json.removeWhere((_, value) => value == null);
 
     return json;
@@ -122,7 +174,13 @@ class ChatMessage {
   /// Applies a palette theme to the underlying message.
   ChatMessage applyTheme(MsgrThemePalette palette, {String? themeId}) {
     final resolved = palette.resolve(themeId ?? theme.id);
-    return ChatMessage._(message.themed(resolved));
+    return ChatMessage._(
+      message.themed(resolved),
+      metadata: metadata,
+      editedAt: editedAt,
+      deletedAt: deletedAt,
+      threadId: threadId,
+    );
   }
 
   /// Updates the message using a subset of common fields.
@@ -134,6 +192,10 @@ class ChatMessage {
     DateTime? insertedAt,
     bool? isLocal,
     MsgrMessageTheme? theme,
+    Map<String, dynamic>? metadata,
+    DateTime? editedAt,
+    DateTime? deletedAt,
+    String? threadId,
   }) {
     MsgrMessage updated;
 
@@ -220,7 +282,13 @@ class ChatMessage {
       throw UnsupportedError('Unsupported message type: ${message.runtimeType}');
     }
 
-    return ChatMessage._(updated);
+    return ChatMessage._(
+      updated,
+      metadata: metadata ?? this.metadata,
+      editedAt: editedAt ?? this.editedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      threadId: threadId ?? this.threadId,
+    );
   }
 
   /// Returns the textual representation for the message when available.
@@ -276,6 +344,12 @@ class ChatMessage {
   /// Delivery status for authored messages.
   String get status =>
       message is MsgrAuthoredMessage ? (message as MsgrAuthoredMessage).status : 'sent';
+
+  /// Indicates whether the message has been edited since creation.
+  bool get isEdited => editedAt != null;
+
+  /// Indicates whether the message has been soft deleted.
+  bool get isDeleted => deletedAt != null;
 
   /// When the message was sent by the client.
   DateTime? get sentAt => message.sentAt;

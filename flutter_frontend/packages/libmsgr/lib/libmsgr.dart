@@ -24,6 +24,8 @@ export 'src/models/conversation.dart';
 export 'src/models/message.dart';
 export 'src/models/auth_challenge.dart';
 
+export 'src/registration_service.dart';
+
 export 'src/lib_constants.dart';
 
 export 'src/repositories/repository_factory.dart';

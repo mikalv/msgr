@@ -48,7 +48,7 @@ dependencies:
   # Database
   sqflite: ^2.3.3+2
   sqflite_common: ^2.5.4+4
-  sqflite_sqlcipher: ^2.0.0
+  sqflite_sqlcipher: ^3.4.0
   #sqflite_migration: ^0.3.0
   meta: ^1.15.0
   # HTTP Client

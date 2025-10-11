@@ -8,7 +8,15 @@ defmodule Messngr.Chat do
   alias Phoenix.PubSub
 
   alias Messngr.{Accounts, Media, Repo}
-  alias Messngr.Chat.{Conversation, Message, Participant}
+  alias Messngr.Chat.{
+    Conversation,
+    Message,
+    MessageReaction,
+    MessageThread,
+    Participant,
+    PinnedMessage
+  }
+  alias Messngr.Accounts.Profile
 
   @conversation_topic_prefix "conversation"
 
@@ -82,29 +90,260 @@ defmodule Messngr.Chat do
       end
     end)
     |> case do
-      {:ok, message} ->
-        broadcast_message(message)
-        {:ok, message}
-      {:error, reason} -> {:error, reason}
+        {:ok, message} ->
+          broadcast_message(message)
+          {:ok, message}
+        {:error, reason} -> {:error, reason}
     end
   end
 
-  @spec list_messages(binary(), keyword()) :: [Message.t()]
+  @spec react_to_message(binary(), binary(), binary(), String.t(), map()) ::
+          {:ok, MessageReaction.t()} | {:error, term()}
+  def react_to_message(conversation_id, profile_id, message_id, emoji, opts \\ %{}) do
+    Repo.transaction(fn ->
+      _participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+
+      attrs = %{
+        message_id: message.id,
+        profile_id: profile_id,
+        emoji: normalize_emoji(emoji),
+        metadata: normalize_metadata(opts[:metadata] || Map.get(opts, "metadata"))
+      }
+
+      %MessageReaction{}
+      |> MessageReaction.changeset(attrs)
+      |> Repo.insert(
+        conflict_target: [:message_id, :profile_id, :emoji],
+        on_conflict: {:replace, [:metadata, :updated_at]}
+      )
+      |> case do
+        {:ok, reaction} -> Repo.preload(reaction, :profile)
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, reaction} ->
+        broadcast_reaction_added(conversation_id, reaction)
+        {:ok, reaction}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec remove_reaction(binary(), binary(), binary(), String.t()) ::
+          {:ok, :removed | :noop} | {:error, term()}
+  def remove_reaction(conversation_id, profile_id, message_id, emoji) do
+    Repo.transaction(fn ->
+      _participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+      normalized = normalize_emoji(emoji)
+
+      case Repo.get_by(MessageReaction,
+             message_id: message.id,
+             profile_id: profile_id,
+             emoji: normalized
+           ) do
+        nil ->
+          :noop
+
+        %MessageReaction{} = reaction ->
+          {:ok, _} = Repo.delete(reaction)
+          {:removed, reaction}
+      end
+    end)
+    |> case do
+      {:ok, {:removed, reaction}} ->
+        broadcast_reaction_removed(conversation_id, reaction)
+        {:ok, :removed}
+
+      {:ok, :noop} ->
+        {:ok, :noop}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec pin_message(binary(), binary(), binary(), map()) ::
+          {:ok, PinnedMessage.t()} | {:error, term()}
+  def pin_message(conversation_id, profile_id, message_id, opts \\ %{}) do
+    Repo.transaction(fn ->
+      _participant = ensure_participant!(conversation_id, profile_id)
+      _message = fetch_message!(conversation_id, message_id)
+
+      attrs = %{
+        conversation_id: conversation_id,
+        message_id: message_id,
+        pinned_by_id: profile_id,
+        pinned_at: opts[:pinned_at] || Map.get(opts, "pinned_at") || DateTime.utc_now(),
+        metadata: normalize_metadata(opts[:metadata] || Map.get(opts, "metadata"))
+      }
+
+      %PinnedMessage{}
+      |> PinnedMessage.changeset(attrs)
+      |> Repo.insert(
+        conflict_target: [:conversation_id, :message_id],
+        on_conflict: {:replace, [:pinned_by_id, :pinned_at, :metadata, :updated_at]}
+      )
+      |> case do
+        {:ok, pinned} -> Repo.preload(pinned, [:message, :pinned_by])
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, pinned} ->
+        broadcast_message_pinned(conversation_id, pinned)
+        {:ok, pinned}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec unpin_message(binary(), binary(), binary()) :: {:ok, :unpinned | :noop} | {:error, term()}
+  def unpin_message(conversation_id, profile_id, message_id) do
+    Repo.transaction(fn ->
+      _participant = ensure_participant!(conversation_id, profile_id)
+      _message = fetch_message!(conversation_id, message_id)
+
+      case Repo.get_by(PinnedMessage,
+             conversation_id: conversation_id,
+             message_id: message_id
+           ) do
+        nil ->
+          :noop
+
+        %PinnedMessage{} = pinned ->
+          {:ok, _} = Repo.delete(pinned)
+          {:unpinned, pinned}
+      end
+    end)
+    |> case do
+      {:ok, {:unpinned, pinned}} ->
+        broadcast_message_unpinned(conversation_id, pinned)
+        {:ok, :unpinned}
+
+      {:ok, :noop} ->
+        {:ok, :noop}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec mark_message_read(binary(), binary(), binary()) ::
+          {:ok, Participant.t()} | {:error, term()}
+  def mark_message_read(conversation_id, profile_id, message_id) do
+    Repo.transaction(fn ->
+      participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+
+      read_at = DateTime.utc_now()
+      attrs = %{last_read_at: read_at}
+
+      participant
+      |> Participant.changeset(attrs)
+      |> Repo.update()
+      |> case do
+        {:ok, updated} -> {updated, message, read_at}
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, {participant, message, read_at}} ->
+        broadcast_message_read(conversation_id, participant.profile_id, message.id, read_at)
+        {:ok, participant}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec update_message(binary(), binary(), binary(), map()) ::
+          {:ok, Message.t()} | {:error, term()}
+  def update_message(conversation_id, profile_id, message_id, attrs) do
+    Repo.transaction(fn ->
+      participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+
+      if message.profile_id != participant.profile_id do
+        Repo.rollback(:forbidden)
+      end
+
+      update_attrs =
+        attrs
+        |> take_permitted_attrs([:body, :payload, :metadata])
+        |> maybe_normalize_metadata()
+        |> Map.put(:edited_at, DateTime.utc_now())
+
+      message
+      |> Message.changeset(update_attrs)
+      |> Repo.update()
+      |> case do
+        {:ok, updated} -> Repo.preload(updated, :profile)
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, message} ->
+        broadcast_message_updated(message)
+        {:ok, message}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec delete_message(binary(), binary(), binary(), map()) ::
+          {:ok, Message.t()} | {:error, term()}
+  def delete_message(conversation_id, profile_id, message_id, opts \\ %{}) do
+    Repo.transaction(fn ->
+      participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+
+      if message.profile_id != participant.profile_id do
+        Repo.rollback(:forbidden)
+      end
+
+      delete_attrs =
+        %{deleted_at: DateTime.utc_now()}
+        |> maybe_put_delete_metadata(opts)
+
+      message
+      |> Message.changeset(delete_attrs)
+      |> Repo.update()
+      |> case do
+        {:ok, deleted} -> Repo.preload(deleted, :profile)
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, message} ->
+        broadcast_message_deleted(message)
+        {:ok, message}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @default_limit 50
+  @watcher_table :messngr_conversation_watchers
+
+  @spec list_messages(binary(), keyword()) :: %{entries: [Message.t()], meta: map()}
   def list_messages(conversation_id, opts \\ []) do
-    limit = Keyword.get(opts, :limit, 50)
-    before_id = Keyword.get(opts, :before_id)
+    limit =
+      opts
+      |> Keyword.get(:limit, @default_limit)
+      |> clamp_limit()
 
-    base_query =
-      from m in Message,
-        where: m.conversation_id == ^conversation_id,
-        order_by: [desc: m.sent_at, desc: m.inserted_at]
-
-    query = base_query |> maybe_before(before_id) |> limit(^limit)
-
-    query
-    |> Repo.all()
-    |> Repo.preload(:profile)
-    |> Enum.reverse()
+    cond do
+      opts[:around_id] -> list_messages_around(conversation_id, opts[:around_id], limit)
+      opts[:after_id] -> list_messages_after(conversation_id, opts[:after_id], limit)
+      true -> list_messages_before(conversation_id, opts[:before_id], limit)
+    end
   end
 
   defp preload_conversation(id) do
@@ -117,13 +356,288 @@ defmodule Messngr.Chat do
     Repo.get_by!(Participant, conversation_id: conversation_id, profile_id: profile_id)
   end
 
-  defp maybe_before(query, nil), do: query
+  defp clamp_limit(value) when is_integer(value) and value > 0 do
+    min(value, 200)
+  end
 
-  defp maybe_before(query, message_id) do
-    case Repo.get(Message, message_id) do
-      %Message{inserted_at: inserted_at} -> from m in query, where: m.inserted_at < ^inserted_at
-      _ -> query
+  defp clamp_limit(_value), do: @default_limit
+
+  defp list_messages_before(conversation_id, before_id, limit)
+       when is_integer(limit) and limit <= 0 do
+    empty_page()
+  end
+
+  defp list_messages_before(conversation_id, before_id, limit) do
+    base_query =
+      from m in Message,
+        where: m.conversation_id == ^conversation_id,
+        order_by: [desc: m.inserted_at, desc: m.id]
+
+    {query, pivot} = maybe_before_cursor(conversation_id, base_query, before_id)
+
+    results =
+      query
+      |> limit(^(limit + 1))
+      |> Repo.all()
+
+    has_more_before = length(results) > limit
+
+    entries =
+      results
+      |> Enum.take(limit)
+      |> Enum.reverse()
+      |> Repo.preload(:profile)
+
+    %{entries: entries, meta: build_meta(conversation_id, entries, pivot, :before, has_more_before)}
+  end
+
+  defp list_messages_after(conversation_id, after_id, limit)
+       when is_integer(limit) and limit <= 0 do
+    empty_page()
+  end
+
+  defp list_messages_after(conversation_id, after_id, limit) do
+    base_query =
+      from m in Message,
+        where: m.conversation_id == ^conversation_id,
+        order_by: [asc: m.inserted_at, asc: m.id]
+
+    {query, pivot} = maybe_after_cursor(conversation_id, base_query, after_id)
+
+    results =
+      query
+      |> limit(^(limit + 1))
+      |> Repo.all()
+
+    has_more_after = length(results) > limit
+
+    entries =
+      results
+      |> Enum.take(limit)
+      |> Repo.preload(:profile)
+
+    %{entries: entries, meta: build_meta(conversation_id, entries, pivot, :after, has_more_after)}
+  end
+
+  defp list_messages_around(conversation_id, message_id, limit) do
+    with %Message{conversation_id: ^conversation_id} = pivot <- Repo.get(Message, message_id) do
+      pivot = Repo.preload(pivot, :profile)
+
+      before_limit = div(limit, 2)
+      after_limit = max(limit - before_limit - 1, 0)
+
+      before_page =
+        if before_limit > 0 do
+          list_messages_before(conversation_id, message_id, before_limit)
+        else
+          empty_page()
+        end
+
+      after_page =
+        if after_limit > 0 do
+          list_messages_after(conversation_id, message_id, after_limit)
+        else
+          empty_page()
+        end
+
+      entries = before_page.entries ++ [pivot] ++ after_page.entries
+
+      meta = %{
+        start_cursor: cursor_id(List.first(entries)),
+        end_cursor: cursor_id(List.last(entries)),
+        has_more: %{
+          before:
+            before_page.meta.has_more.before || has_more(conversation_id, List.first(entries), :before),
+          after:
+            after_page.meta.has_more.after || has_more(conversation_id, List.last(entries), :after)
+        }
+      }
+
+      %{entries: entries, meta: meta}
+    else
+      _ -> list_messages_before(conversation_id, nil, limit)
     end
+  end
+
+  def after_id(messages) when is_list(messages) do
+    messages
+    |> List.last()
+    |> cursor_id()
+  end
+
+  def around_id(conversation_id, message_id, opts \\ []) do
+    limit = opts |> Keyword.get(:limit, @default_limit) |> clamp_limit()
+    list_messages_around(conversation_id, message_id, limit)
+  end
+
+  def has_more(_conversation_id, nil, _direction), do: false
+
+  def has_more(conversation_id, %Message{} = pivot, :before) do
+    from(m in Message,
+      where: m.conversation_id == ^conversation_id,
+      where:
+        m.inserted_at < ^pivot.inserted_at or
+          (m.inserted_at == ^pivot.inserted_at and m.id < ^pivot.id),
+      select: 1,
+      limit: 1
+    )
+    |> Repo.exists?()
+  end
+
+  def has_more(conversation_id, %Message{} = pivot, :after) do
+    from(m in Message,
+      where: m.conversation_id == ^conversation_id,
+      where:
+        m.inserted_at > ^pivot.inserted_at or
+          (m.inserted_at == ^pivot.inserted_at and m.id > ^pivot.id),
+      select: 1,
+      limit: 1
+    )
+    |> Repo.exists?()
+  end
+
+  defp build_meta(conversation_id, entries, pivot, :before, has_more_before) do
+    first = List.first(entries) || pivot
+    last = List.last(entries) || pivot
+
+    %{
+      start_cursor: cursor_id(List.first(entries)),
+      end_cursor: cursor_id(List.last(entries)),
+      has_more: %{
+        before: has_more_before,
+        after: has_more(conversation_id, last, :after)
+      }
+    }
+  end
+
+  defp build_meta(conversation_id, entries, pivot, :after, has_more_after) do
+    first = List.first(entries) || pivot
+    last = List.last(entries) || pivot
+
+    %{
+      start_cursor: cursor_id(List.first(entries)),
+      end_cursor: cursor_id(List.last(entries)),
+      has_more: %{
+        before: has_more(conversation_id, first, :before),
+        after: has_more_after
+      }
+    }
+  end
+
+  defp build_meta(_conversation_id, _entries, _pivot, _direction, _flag) do
+    %{start_cursor: nil, end_cursor: nil, has_more: %{before: false, after: false}}
+  end
+
+  defp maybe_before_cursor(_conversation_id, query, nil), do: {query, nil}
+
+  defp maybe_before_cursor(conversation_id, query, message_id) do
+    case Repo.get(Message, message_id) do
+      %Message{conversation_id: ^conversation_id} = message ->
+        {
+          from(m in query,
+            where:
+              m.inserted_at < ^message.inserted_at or
+                (m.inserted_at == ^message.inserted_at and m.id < ^message.id)
+          ),
+          Repo.preload(message, :profile)
+        }
+
+      _ ->
+        {query, nil}
+    end
+  end
+
+  defp maybe_after_cursor(_conversation_id, query, nil), do: {query, nil}
+
+  defp maybe_after_cursor(conversation_id, query, message_id) do
+    case Repo.get(Message, message_id) do
+      %Message{conversation_id: ^conversation_id} = message ->
+        {
+          from(m in query,
+            where:
+              m.inserted_at > ^message.inserted_at or
+                (m.inserted_at == ^message.inserted_at and m.id > ^message.id)
+          ),
+          Repo.preload(message, :profile)
+        }
+
+      _ ->
+        {query, nil}
+    end
+  end
+
+  defp cursor_id(nil), do: nil
+  defp cursor_id(%Message{id: id}), do: id
+
+  defp empty_page do
+    %{entries: [], meta: %{start_cursor: nil, end_cursor: nil, has_more: %{before: false, after: false}}}
+  end
+
+  @spec list_conversations(binary(), keyword()) :: %{entries: [Conversation.t()], meta: map()}
+  def list_conversations(profile_id, opts \\ []) do
+    limit = opts |> Keyword.get(:limit, @default_limit) |> clamp_limit()
+
+    base_query =
+      from c in Conversation,
+        join: cp in assoc(c, :participants),
+        where: cp.profile_id == ^profile_id,
+        preload: [participants: [:profile]],
+        order_by: [desc: c.updated_at, desc: c.inserted_at, desc: c.id],
+        select: {c, cp}
+
+    {query, pivot} = maybe_conversation_after(profile_id, base_query, opts[:after_id])
+
+    results =
+      query
+      |> limit(^(limit + 1))
+      |> Repo.all()
+
+    has_more_after = length(results) > limit
+
+    entries =
+      results
+      |> Enum.take(limit)
+      |> Enum.map(&hydrate_conversation_summary(&1))
+
+    pivot_conversation = pivot && elem(pivot, 0)
+
+    first_entry = List.first(entries) || pivot_conversation
+    last_entry = List.last(entries) || pivot_conversation
+
+    meta = %{
+      start_cursor: conversation_cursor(List.first(entries)),
+      end_cursor: conversation_cursor(List.last(entries)),
+      has_more: %{
+        before: conversation_has_more(profile_id, first_entry, :before),
+        after: has_more_after or conversation_has_more(profile_id, last_entry, :after)
+      }
+    }
+
+    %{entries: entries, meta: meta}
+  end
+
+  def watch_conversation(conversation_id, profile_id) do
+    ensure_participant!(conversation_id, profile_id)
+
+    table = ensure_watcher_table!()
+    :ets.insert(table, {conversation_id, profile_id})
+
+    payload = watcher_payload(conversation_id)
+    broadcast_watchers(conversation_id, payload)
+    {:ok, payload}
+  end
+
+  def unwatch_conversation(conversation_id, profile_id) do
+    table = ensure_watcher_table!()
+    :ets.delete_object(table, {conversation_id, profile_id})
+
+    payload = watcher_payload(conversation_id)
+    broadcast_watchers(conversation_id, payload)
+    {:ok, payload}
+  end
+
+  def list_watchers(conversation_id) do
+    watcher_payload(conversation_id)
   end
 
   @spec conversation_for_profiles(binary(), binary()) :: Conversation.t() | nil
@@ -165,6 +679,28 @@ defmodule Messngr.Chat do
     :ok
   end
 
+  @doc false
+  def broadcast_message_updated(%Message{} = message) do
+    PubSub.broadcast(
+      Messngr.PubSub,
+      conversation_topic(message.conversation_id),
+      {:message_updated, message}
+    )
+
+    :ok
+  end
+
+  @doc false
+  def broadcast_message_deleted(%Message{} = message) do
+    PubSub.broadcast(
+      Messngr.PubSub,
+      conversation_topic(message.conversation_id),
+      {:message_deleted, %{message_id: message.id, deleted_at: message.deleted_at}}
+    )
+
+    :ok
+  end
+
   @spec ensure_profile!(binary(), binary()) :: Accounts.Profile.t()
   def ensure_profile!(account_id, profile_id) do
     profile = Accounts.get_profile!(profile_id)
@@ -184,6 +720,160 @@ defmodule Messngr.Chat do
   defp conversation_topic(conversation_id) do
     "#{@conversation_topic_prefix}:#{conversation_id}"
   end
+
+  defp conversation_cursor(nil), do: nil
+  defp conversation_cursor(%Conversation{id: id}), do: id
+
+  defp maybe_conversation_after(_profile_id, query, nil), do: {query, nil}
+
+  defp maybe_conversation_after(profile_id, query, conversation_id) do
+    case fetch_membership(conversation_id, profile_id) do
+      {conversation, participant} ->
+        cutoff = conversation.updated_at || conversation.inserted_at
+
+        filtered =
+          from {c, _cp} in query,
+            where:
+              fragment("COALESCE(?, ?) < ?", c.updated_at, c.inserted_at, ^cutoff) or
+                (fragment("COALESCE(?, ?) = ?", c.updated_at, c.inserted_at, ^cutoff) and
+                   c.id < ^conversation.id)
+
+        {filtered, {conversation, participant}}
+
+      _ ->
+        {query, nil}
+    end
+  end
+
+  defp fetch_membership(conversation_id, profile_id) do
+    from(c in Conversation,
+      join: cp in assoc(c, :participants),
+      where: c.id == ^conversation_id and cp.profile_id == ^profile_id,
+      preload: [participants: [:profile]],
+      select: {c, cp}
+    )
+    |> Repo.one()
+  end
+
+  defp hydrate_conversation_summary({conversation, participant}) do
+    last_message =
+      from(m in Message,
+        where: m.conversation_id == ^conversation.id,
+        order_by: [desc: m.inserted_at, desc: m.id],
+        limit: 1
+      )
+      |> Repo.one()
+      |> case do
+        nil -> nil
+        message -> Repo.preload(message, :profile)
+      end
+
+    last_read_at = participant.last_read_at
+
+    unread_count =
+      from(m in Message,
+        where: m.conversation_id == ^conversation.id,
+        where:
+          is_nil(^last_read_at) or m.inserted_at > ^last_read_at
+      )
+      |> Repo.aggregate(:count, :id)
+
+    conversation
+    |> Map.put(:unread_count, unread_count)
+    |> Map.put(:last_message, last_message)
+  end
+
+  defp conversation_has_more(_profile_id, nil, _direction), do: false
+
+  defp conversation_has_more(profile_id, %Conversation{} = pivot, :before) do
+    cutoff = pivot.updated_at || pivot.inserted_at
+
+    from(c in Conversation,
+      join: cp in assoc(c, :participants),
+      where: cp.profile_id == ^profile_id,
+      where:
+        fragment("COALESCE(?, ?) > ?", c.updated_at, c.inserted_at, ^cutoff) or
+          (fragment("COALESCE(?, ?) = ?", c.updated_at, c.inserted_at, ^cutoff) and c.id > ^pivot.id),
+      select: 1,
+      limit: 1
+    )
+    |> Repo.exists?()
+  end
+
+  defp conversation_has_more(profile_id, %Conversation{} = pivot, :after) do
+    cutoff = pivot.updated_at || pivot.inserted_at
+
+    from(c in Conversation,
+      join: cp in assoc(c, :participants),
+      where: cp.profile_id == ^profile_id,
+      where:
+        fragment("COALESCE(?, ?) < ?", c.updated_at, c.inserted_at, ^cutoff) or
+          (fragment("COALESCE(?, ?) = ?", c.updated_at, c.inserted_at, ^cutoff) and c.id < ^pivot.id),
+      select: 1,
+      limit: 1
+    )
+    |> Repo.exists?()
+  end
+
+  defp ensure_watcher_table! do
+    case :ets.whereis(@watcher_table) do
+      :undefined ->
+        try do
+          :ets.new(@watcher_table, [:named_table, :bag, :public, read_concurrency: true, write_concurrency: true])
+        rescue
+          ArgumentError -> :ets.whereis(@watcher_table)
+        end
+
+      tid ->
+        tid
+    end
+  end
+
+  defp watcher_payload(conversation_id) do
+    profiles = conversation_watcher_profiles(conversation_id)
+
+    watchers = Enum.map(profiles, &watcher_profile_payload/1)
+
+    %{watchers: watchers, count: length(watchers)}
+  end
+
+  defp conversation_watcher_profiles(conversation_id) do
+    conversation_id
+    |> watcher_ids()
+    |> load_profiles()
+    |> Enum.sort_by(& &1.name)
+  end
+
+  defp watcher_ids(conversation_id) do
+    ensure_watcher_table!()
+
+    conversation_id
+    |> :ets.lookup(@watcher_table)
+    |> Enum.map(fn {^conversation_id, profile_id} -> profile_id end)
+    |> Enum.uniq()
+  end
+
+  defp load_profiles([]), do: []
+
+  defp load_profiles(ids) do
+    from(p in Profile, where: p.id in ^ids)
+    |> Repo.all()
+  end
+
+  defp watcher_profile_payload(%Profile{} = profile) do
+    %{id: profile.id, name: profile.name, mode: profile.mode}
+  end
+
+  defp broadcast_watchers(conversation_id, payload) do
+    PubSub.broadcast(
+      Messngr.PubSub,
+      conversation_topic(conversation_id),
+      {:conversation_watchers, payload}
+    )
+
+    :ok
+  end
+
 
   defp resolve_kind(attrs) do
     attrs
@@ -658,4 +1348,150 @@ defmodule Messngr.Chat do
   end
 
   defp normalize_positive_integer(_), do: nil
+  defp fetch_message!(conversation_id, message_id) do
+    case Repo.get_by(Message, id: message_id, conversation_id: conversation_id) do
+      %Message{deleted_at: nil} = message -> message
+      %Message{deleted_at: _} -> Repo.rollback(:message_deleted)
+      nil -> Repo.rollback(:message_not_found)
+    end
+  end
+
+  defp normalize_emoji(nil), do: Repo.rollback(:invalid_emoji)
+
+  defp normalize_emoji(emoji) when is_binary(emoji) do
+    value = emoji |> String.trim()
+
+    if value == "" do
+      Repo.rollback(:invalid_emoji)
+    else
+      value
+    end
+  end
+
+  defp normalize_emoji(_emoji), do: Repo.rollback(:invalid_emoji)
+
+  defp normalize_metadata(nil), do: %{}
+  defp normalize_metadata(metadata) when is_map(metadata), do: metadata
+  defp normalize_metadata(_metadata), do: Repo.rollback(:invalid_metadata)
+
+  defp broadcast_reaction_added(conversation_id, %MessageReaction{} = reaction) do
+    broadcast_conversation_event(conversation_id, {:reaction_added, reaction_payload(reaction)})
+  end
+
+  defp broadcast_reaction_removed(conversation_id, %MessageReaction{} = reaction) do
+    broadcast_conversation_event(conversation_id, {:reaction_removed, reaction_payload(reaction)})
+  end
+
+  defp broadcast_message_pinned(conversation_id, %PinnedMessage{} = pinned) do
+    broadcast_conversation_event(conversation_id, {:message_pinned, pinned_payload(pinned)})
+  end
+
+  defp broadcast_message_unpinned(conversation_id, %PinnedMessage{} = pinned) do
+    broadcast_conversation_event(conversation_id, {:message_unpinned, pinned_payload(pinned)})
+  end
+
+  defp broadcast_message_read(conversation_id, profile_id, message_id, read_at) do
+    broadcast_conversation_event(conversation_id, {:message_read, %{
+      profile_id: profile_id,
+      message_id: message_id,
+      read_at: read_at
+    }})
+  end
+
+  defp broadcast_conversation_event(conversation_id, event) do
+    payload =
+      case event do
+        {:reaction_added, reaction} ->
+          {:reaction_added, enrich_reaction_event(reaction)}
+
+        {:reaction_removed, reaction} ->
+          {:reaction_removed, enrich_reaction_event(reaction)}
+
+        {:message_pinned, pinned} ->
+          {:message_pinned, pinned}
+
+        {:message_unpinned, pinned} ->
+          {:message_unpinned, pinned}
+
+        {:message_read, attrs} ->
+          {:message_read, attrs}
+
+        other ->
+          other
+      end
+
+    PubSub.broadcast(Messngr.PubSub, conversation_topic(conversation_id), payload)
+    :ok
+  end
+
+  defp enrich_reaction_event(reaction) do
+    message_id = Map.fetch!(reaction, :message_id)
+    Map.put(reaction, :aggregates, reaction_aggregates(message_id))
+  end
+
+  defp reaction_payload(%MessageReaction{} = reaction) do
+    %{
+      id: reaction.id,
+      message_id: reaction.message_id,
+      profile_id: reaction.profile_id,
+      emoji: reaction.emoji,
+      metadata: reaction.metadata,
+      inserted_at: reaction.inserted_at,
+      updated_at: reaction.updated_at
+    }
+  end
+
+  defp pinned_payload(%PinnedMessage{} = pinned) do
+    %{
+      id: pinned.id,
+      conversation_id: pinned.conversation_id,
+      message_id: pinned.message_id,
+      pinned_by_id: pinned.pinned_by_id,
+      pinned_at: pinned.pinned_at,
+      metadata: pinned.metadata
+    }
+  end
+
+  defp reaction_aggregates(message_id) do
+    MessageReaction
+    |> where([r], r.message_id == ^message_id)
+    |> Repo.all()
+    |> Enum.group_by(& &1.emoji)
+    |> Enum.map(fn {emoji, reactions} ->
+      %{
+        emoji: emoji,
+        count: Enum.count(reactions),
+        profile_ids: reactions |> Enum.map(& &1.profile_id) |> Enum.uniq()
+      }
+    end)
+  end
+
+  defp take_permitted_attrs(attrs, keys) do
+    Enum.reduce(keys, %{}, fn key, acc ->
+      value = Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key))
+
+      if is_nil(value) do
+        acc
+      else
+        Map.put(acc, key, value)
+      end
+    end)
+  end
+
+  defp maybe_normalize_metadata(attrs) do
+    case Map.fetch(attrs, :metadata) do
+      {:ok, metadata} -> Map.put(attrs, :metadata, normalize_metadata(metadata))
+      :error -> attrs
+    end
+  end
+
+  defp maybe_put_delete_metadata(map, opts) do
+    metadata = opts[:metadata] || Map.get(opts, "metadata")
+
+    if is_nil(metadata) do
+      map
+    else
+      Map.put(map, :metadata, normalize_metadata(metadata))
+    end
+  end
 end

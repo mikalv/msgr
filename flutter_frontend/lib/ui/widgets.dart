@@ -4,6 +4,7 @@ library widgets;
 export 'widgets/dropdown_search/dropdown_search.dart';
 // Another sub library
 export 'widgets/platform_widget_builder/platform_widget_builder.dart';
+export 'chat_kit/chat_kit.dart';
 
 // Misc
 export 'widgets/AppleAppScaffold.dart';

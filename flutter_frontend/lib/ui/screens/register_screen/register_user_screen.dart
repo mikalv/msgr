@@ -9,6 +9,7 @@ import 'package:messngr/redux/authentication/auth_actions.dart';
 import 'package:messngr/redux/navigation/navigation_actions.dart';
 import 'package:messngr/ui/widgets/MobileInputWithOutline.dart';
 import 'package:messngr/ui/widgets/PhoneField/phone_number.dart';
+import 'package:messngr/ui/widgets/PhoneField/countries.dart';
 import 'package:messngr/ui/widgets/auth/auth_input_decoration.dart';
 import 'package:messngr/ui/widgets/auth/auth_shell.dart';
 import 'package:messngr/utils/flutter_redux.dart';
@@ -61,11 +62,42 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
   void _updatePhone(PhoneNumber? phone) {
     setState(() {
       _phone = phone;
-      final raw = phone?.number?.trim() ?? '';
-      final dialCode = phone?.countryCode ?? '';
-      final isValid = raw.length >= 6 && dialCode.isNotEmpty;
-      _canSubmit = useMsisdnForAuth && isValid;
+      _canSubmit = useMsisdnForAuth && _isValidPhone(phone);
     });
+  }
+
+  bool _isValidPhone(PhoneNumber? phone) {
+    if (phone == null) {
+      return false;
+    }
+    final raw = phone.number?.trim() ?? '';
+    final dialCode = phone.countryCode?.trim() ?? '';
+    if (raw.isEmpty || dialCode.isEmpty) {
+      return false;
+    }
+    final expectedLength = _countryMaxLength(phone.countryISOCode);
+    if (expectedLength != null) {
+      return raw.length == expectedLength;
+    }
+    return raw.length >= 6;
+  }
+
+  int? _countryMaxLength(String? isoCode) {
+    if (isoCode == null) {
+      return null;
+    }
+    for (final country in countries) {
+      if (country['code'] == isoCode) {
+        final value = country['max_length'];
+        if (value is int) {
+          return value;
+        }
+        if (value is String) {
+          return int.tryParse(value);
+        }
+      }
+    }
+    return null;
   }
 
   String? _validateEmail(String? value) {
@@ -74,12 +106,14 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
       return 'Skriv inn e-postadressen din';
     }
     const pattern =
-        r"(?:[a-z0-9!#\$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#\$%&'*+/=?^_`{|}~-]+)*|"
-        r"(?:[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f\\x21\\x23-\\x5b\\x5d-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])*")@"
-        r"(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\\["
-        r"(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\\.){3}(?:(2(5[0-5]|[0-4]"
-        r"[0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\\x01-\\x08\\x0b\\x0c\\x0e-"
-        r"\\x1f\\x21-\\x5a\\x5e-\\x7f]|\\\\[\\x01-\\x09\\x0b\\x0c\\x0e-\\x7f])+)\\])";
+        r'''(?:[a-z0-9!#\$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#\$%&'*+/=?^_`{|}~-]+)*|
+(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*)
+@
+(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[
+(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}
+(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|
+[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x5e-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)
+\])''';
     final regex = RegExp(pattern);
     if (!regex.hasMatch(trimmed)) {
       return 'Oppgi en gyldig e-postadresse';
@@ -92,13 +126,14 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
     if (!useMsisdnForAuth && !_formKey.currentState!.validate()) {
       return;
     }
-    if (useMsisdnForAuth && (_phone == null || !_canSubmit)) {
+    if (useMsisdnForAuth && !_isValidPhone(_phone)) {
       return;
     }
 
     final completer = Completer();
-    final displayName =
-        _displayNameController.text.trim().isEmpty ? null : _displayNameController.text.trim();
+    final displayName = _displayNameController.text.trim().isEmpty
+        ? null
+        : _displayNameController.text.trim();
 
     if (useMsisdnForAuth) {
       final phoneNumber = _phone!.completeNumber;
@@ -121,8 +156,8 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
     try {
       await completer.future;
       if (!mounted) return;
-      StoreProvider.of<AppState>(context)
-          .dispatch(NavigateToNewRouteAction(route: AppNavigation.registerCodePath));
+      StoreProvider.of<AppState>(context).dispatch(
+          NavigateToNewRouteAction(route: AppNavigation.registerCodePath));
     } catch (error, stackTrace) {
       _log.severe(error, stackTrace);
       if (!mounted) return;
@@ -209,7 +244,7 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
                 setState(() {
                   useMsisdnForAuth = selection.first;
                   if (useMsisdnForAuth) {
-                    _canSubmit = _phone != null && (_phone!.number?.trim().length ?? 0) >= 6;
+                    _canSubmit = _isValidPhone(_phone);
                   } else {
                     _canSubmit = _validateEmail(_emailFieldCtrl.text) == null;
                   }

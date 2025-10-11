@@ -111,6 +111,21 @@ class ChatApi {
     return ChatThread.fromJson(data);
   }
 
+  Future<List<ChatThread>> listConversations({
+    required AccountIdentity current,
+  }) async {
+    final response = await _client.get(
+      backendApiUri('conversations'),
+      headers: _authHeaders(current),
+    );
+
+    final decoded = _decodeBody(response);
+    final data = decoded['data'] as List<dynamic>? ?? const [];
+    return data
+        .map((raw) => ChatThread.fromJson(raw as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<ChatThread> createGroupConversation({
     required AccountIdentity current,
     required String topic,

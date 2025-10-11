@@ -281,6 +281,32 @@ Backend-konfigurasjonen støtter både standard SSE-S3 (`MEDIA_SSE_ALGORITHM`, d
 ```
 
 Backenden normaliserer også lydmeldinger (`type: "audio"` eller `"voice"`) med `waveform` og `duration`, samt generiske filer (`type: "file"`) som eksponerer `fileName`, `byteSize`, `checksum` og valgfritt `thumbnail`.
+### Realtime ConversationChannel
+
+- **Join**: `conversation:{conversation_id}`
+  - Params: `{ "account_id": "...", "profile_id": "..." }`
+- **Events**:
+  - `message_created` / `message_updated`: `{ "data": { ...message payload med metadata, edited_at, deleted_at, thread_id } }`
+  - `message_deleted`: `{ "message_id": "uuid", "deleted_at": "2024-10-04T12:10:00Z" }`
+  - `reaction_added` / `reaction_removed`:
+
+    ```json
+    {
+      "id": "reaction-uuid",
+      "message_id": "message-uuid",
+      "profile_id": "profile-uuid",
+      "emoji": "👍",
+      "metadata": {},
+      "aggregates": [
+        { "emoji": "👍", "count": 2, "profile_ids": ["profile-uuid", "peer-uuid"] }
+      ]
+    }
+    ```
+
+  - `message_pinned` / `message_unpinned`: `{ "message_id": "uuid", "pinned_by_id": "profile", "pinned_at": "2024-10-04T12:15:00Z", "metadata": {} }`
+  - `message_read`: `{ "profile_id": "profile-uuid", "message_id": "message-uuid", "read_at": "2024-10-04T12:12:00Z" }`
+  - `typing_started` / `typing_stopped`: `{ "profile_id": "profile-uuid", "profile_name": "Kari", "thread_id": null, "expires_at": "2024-10-04T12:05:05Z" }`
+  - Presence diff/stat er levert via Phoenix `presence_state` og `presence_diff` events.
 
 ### Familie-spaces med kalender, handleliste og todo
 

@@ -11,6 +11,7 @@ import 'package:messngr/services/app_localizations.dart';
 import 'package:messngr/utils/flutter_redux.dart';
 import 'package:messngr/services/localization/translator.dart';
 import 'package:redux/redux.dart';
+import 'package:messngr/ui/widgets/misc/connectivity_banner.dart';
 
 class MessngrApp extends StatelessWidget {
   const MessngrApp({super.key});
@@ -51,6 +52,7 @@ class _MessngrWrapperState extends State<MessngrWrapper>
   void initState() {
     super.initState();
     reduxStore.then((store) {
+      store.dispatch(VerifyAuthStateAction());
       store.dispatch(OpenWebsocketIfNotAlready());
     });
     getLocale().then((locale) {
@@ -134,6 +136,8 @@ class _MessngrWrapperState extends State<MessngrWrapper>
                           title: appTitle,
                           theme: materialThemeData,
                           debugShowCheckedModeBanner: false,
+                          builder: (context, child) =>
+                              ConnectivityBanner(child: child),
                           localizationsDelegates: const [
                             AppLocalizations.delegate,
                             DefaultMaterialLocalizations.delegate,

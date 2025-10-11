@@ -1013,13 +1013,6 @@ packages:
       relative: true
     source: path
     version: "0.1.1"
-  msgr_messages:
-    dependency: "direct main"
-    description:
-      path: "packages/msgr_messages"
-      relative: true
-    source: path
-    version: "0.1.0"
   linkify:
     dependency: transitive
     description:
@@ -1124,6 +1117,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.4.4"
+  msgr_messages:
+    dependency: "direct main"
+    description:
+      path: "packages/msgr_messages"
+      relative: true
+    source: path
+    version: "0.1.0"
   nested:
     dependency: transitive
     description:

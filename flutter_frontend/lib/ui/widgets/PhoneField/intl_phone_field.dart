@@ -199,9 +199,17 @@ class _IntlPhoneFieldState extends State<IntlPhoneField> {
         orElse: () => _countryList.first);
 
     validator = widget.autoValidate
-        ? ((value) => value != null && value.length != 10
-            ? 'Invalid Mobile Number'
-            : null)
+        ? (value) {
+            final trimmed = value?.trim() ?? '';
+            if (trimmed.isEmpty) {
+              return 'Enter your mobile number';
+            }
+            final maxLength = _selectedCountry['max_length'];
+            if (maxLength is int && trimmed.length != maxLength) {
+              return 'Number must contain $maxLength digits';
+            }
+            return null;
+          }
         : widget.validator;
   }
 

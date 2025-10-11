@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:logging/logging.dart';
+import 'package:messngr/app/bootstrap/session_refresher.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/redux/app_state.dart';
 import 'package:messngr/redux/authentication/auth_actions.dart';
@@ -15,6 +16,7 @@ import 'package:redux/redux.dart';
 import 'package:libmsgr/src/registration_service.dart';
 
 final Logger _log = Logger('AuthenticationMiddlewares');
+final SessionRefresher _sessionRefresher = SessionRefresher();
 
 /// Authentication Middleware
 /// RequestCodeMsisdnAction / RequestCodeEmailAction: Request login code to auth user
@@ -50,8 +52,23 @@ void Function(
   VerifyAuthStateAction action,
   NextDispatcher next,
 ) _verifyAuthState() {
-  return (store, action, next) {
+  return (store, action, next) async {
     next(action);
+
+    final currentUser = store.state.authState.currentUser;
+    if (currentUser != null) {
+      try {
+        final refreshedUser = await _sessionRefresher.refreshIfExpired(currentUser);
+        if (refreshedUser != null && refreshedUser != currentUser) {
+          store.dispatch(OnAuthenticatedAction(user: refreshedUser));
+        }
+      } on SessionRefreshException catch (error, stackTrace) {
+        _log.warning('Session refresh failed', error, stackTrace);
+      } catch (error, stackTrace) {
+        _log.severe('Unexpected error while refreshing session', error, stackTrace);
+      }
+    }
+
     if (store.state.authState.teamAccessToken != null) {
       store.dispatch(SelectAndAuthWithTeamAction(
           teamName: store.state.authState.currentTeamName!));

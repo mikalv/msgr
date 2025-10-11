@@ -19,6 +19,30 @@ defmodule AuthProvider.ApiController do
     end
   end
 
+  def device_context(conn, %{"from" => from, "deviceInfo" => device_info} = params) do
+    app_info = Map.get(params, "appInfo", %{})
+
+    case AuthProvider.DeviceHelper.upsert_device_context(from, device_info, app_info) do
+      {:ok, _device} ->
+        json(conn, %{"status" => "ok"})
+
+      {:error, :not_found} ->
+        conn
+        |> send_resp(404, Jason.encode!(%{"status" => "error", "error" => "device_not_found"}))
+
+      {:error, changeset} ->
+        conn
+        |> send_resp(
+          400,
+          Jason.encode!(%{
+            "status" => "error",
+            "error" => "invalid_device_context",
+            "details" => inspect(changeset.errors)
+          })
+        )
+    end
+  end
+
   def login_code(conn, %{"from" => from, "code" => code, "msisdn" => msisdn} = _params) do
     Logger.info "Login code (#{code}) from #{msisdn} via deviceId #{from}"
     {:ok, user} = AuthProvider.UserHelper.find_or_register_user_by_msisdn(msisdn, from)
@@ -73,10 +97,37 @@ defmodule AuthProvider.ApiController do
   end
 
   def refresh_token(conn, %{"from" => from, "token" => token} = _params) do
-    {:ok, claims} = AuthProvider.Guardian.decode_and_verify(token)
-    Logger.info "Refresh token. Old claims: #{inspect claims}"
-    {:ok, _old_stuff, {new_token, new_claims}} = AuthProvider.Guardian.refresh(token)
-    json(conn, %{"status" => "ok", "token" => new_token, "claims" => new_claims, "uid" => new_claims["sub"]})
+    with {:ok, _device} <- ensure_device_exists(from),
+         {:ok, user, claims} <- AuthProvider.Guardian.resource_from_token(token),
+         {:ok, _old, {new_token, new_claims}} <- AuthProvider.Guardian.refresh(token),
+         {:ok, new_refresh_token, _} <-
+           AuthProvider.Guardian.encode_and_sign(user, %{}, @refresh_opts),
+         {:ok, _} <- AuthProvider.DeviceHelper.upsert_device_context(from, %{}, %{}) do
+      Logger.info "Refresh token. Old claims: #{inspect claims}"
+      json(conn, %{
+        "status" => "ok",
+        "token" => new_token,
+        "refresh_token" => new_refresh_token,
+        "claims" => new_claims,
+        "uid" => new_claims["sub"]
+      })
+    else
+      {:error, :device_not_found} ->
+        conn
+        |> send_resp(404, Jason.encode!(%{"status" => "error", "error" => "device_not_found"}))
+
+      {:error, reason} ->
+        Logger.warning "Failed to refresh token: #{inspect reason}"
+        conn
+        |> send_resp(401, Jason.encode!(%{"status" => "error", "error" => "invalid_token"}))
+    end
+  end
+
+  defp ensure_device_exists(device_id) do
+    case AuthProvider.DeviceHelper.find_by_device_id(device_id) do
+      nil -> {:error, :device_not_found}
+      device -> {:ok, device}
+    end
   end
 
   ## MongooseIM API implementation

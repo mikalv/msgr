@@ -90,8 +90,9 @@ defmodule Messngr.ChatTest do
     assert message.kind == :text
     assert message.profile.id == profile_a.id
 
-    messages = Chat.list_messages(conversation.id)
-    assert Enum.map(messages, & &1.body) == ["Hei"]
+    page = Chat.list_messages(conversation.id)
+    assert Enum.map(page.entries, & &1.body) == ["Hei"]
+    assert page.meta.has_more == %{before: false, after: false}
   end
 
   test "list_messages/2 respects limit", %{profile_a: profile_a, profile_b: profile_b} do
@@ -101,7 +102,10 @@ defmodule Messngr.ChatTest do
       {:ok, _} = Chat.send_message(conversation.id, profile_a.id, %{"body" => body})
     end
 
-    assert [%{body: "2"}, %{body: "3"}] = Chat.list_messages(conversation.id, limit: 2)
+    page = Chat.list_messages(conversation.id, limit: 2)
+    assert Enum.map(page.entries, & &1.body) == ["2", "3"]
+    assert page.meta.has_more.before
+    refute page.meta.has_more.after
   end
 
   test "send_message/3 attaches audio payload", %{profile_a: profile_a, profile_b: profile_b} do
@@ -140,5 +144,168 @@ defmodule Messngr.ChatTest do
     assert thumb_url =~ "preview"
     assert %{"expiresAt" => _} = media_payload["retention"]
     assert %Upload{status: :consumed} = Repo.get!(Upload, upload.id)
+  end
+
+  describe "message interactions" do
+    setup %{profile_a: profile_a, profile_b: profile_b} do
+      {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+      {:ok, message} = Chat.send_message(conversation.id, profile_a.id, %{"body" => "Hei"})
+
+      {:ok,
+       %{
+         conversation: conversation,
+         message: message,
+         author: profile_a,
+         other: profile_b
+       }}
+    end
+
+    test "react_to_message/5 persists reaction and broadcasts", %{
+      conversation: conversation,
+      message: message,
+      author: author
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      assert {:ok, reaction} =
+               Chat.react_to_message(conversation.id, author.id, message.id, "👍")
+
+      assert reaction.emoji == "👍"
+      assert reaction.profile_id == author.id
+
+      assert_receive {:reaction_added, payload}
+      assert payload[:emoji] == "👍"
+
+      aggregate = Enum.find(payload[:aggregates], &(&1[:emoji] == "👍"))
+      assert aggregate[:count] == 1
+      assert author.id in aggregate[:profile_ids]
+    end
+
+    test "remove_reaction/4 removes reaction and broadcasts", %{
+      conversation: conversation,
+      message: message,
+      author: author
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      {:ok, _} = Chat.react_to_message(conversation.id, author.id, message.id, "❤️")
+
+      assert {:ok, :removed} =
+               Chat.remove_reaction(conversation.id, author.id, message.id, "❤️")
+
+      assert_receive {:reaction_removed, payload}
+      assert payload[:emoji] == "❤️"
+      refute Enum.any?(payload[:aggregates], &(&1[:emoji] == "❤️" && &1[:count] > 0))
+    end
+
+    test "pin_message/4 stores pin and broadcasts", %{
+      conversation: conversation,
+      message: message,
+      author: author
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      assert {:ok, pinned} =
+               Chat.pin_message(conversation.id, author.id, message.id, %{"metadata" => %{"section" => "important"}})
+
+      assert pinned.pinned_by_id == author.id
+      assert pinned.metadata == %{"section" => "important"}
+
+      assert_receive {:message_pinned, payload}
+      assert payload[:message_id] == message.id
+      assert payload[:pinned_by_id] == author.id
+    end
+
+    test "unpin_message/3 broadcasts removal", %{
+      conversation: conversation,
+      message: message,
+      author: author
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+      {:ok, _} = Chat.pin_message(conversation.id, author.id, message.id)
+
+      assert {:ok, :unpinned} = Chat.unpin_message(conversation.id, author.id, message.id)
+
+      assert_receive {:message_unpinned, payload}
+      assert payload[:message_id] == message.id
+    end
+
+    test "mark_message_read/3 updates participant and broadcasts", %{
+      conversation: conversation,
+      message: message,
+      other: other
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      assert {:ok, participant} =
+               Chat.mark_message_read(conversation.id, other.id, message.id)
+
+      assert participant.last_read_at
+
+      assert_receive {:message_read, payload}
+      assert payload[:profile_id] == other.id
+      assert payload[:message_id] == message.id
+    end
+
+    test "update_message/4 updates body and broadcasts", %{
+      conversation: conversation,
+      message: message,
+      author: author
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      assert {:ok, updated} =
+               Chat.update_message(conversation.id, author.id, message.id, %{"body" => "Oppdatert"})
+
+      assert updated.body == "Oppdatert"
+      assert updated.edited_at
+
+      assert_receive {:message_updated, broadcasted}
+      assert broadcasted.body == "Oppdatert"
+    end
+
+    test "delete_message/4 marks message deleted and broadcasts", %{
+      conversation: conversation,
+      message: message,
+      author: author
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      assert {:ok, deleted} =
+               Chat.delete_message(conversation.id, author.id, message.id)
+
+      assert deleted.deleted_at
+
+      assert_receive {:message_deleted, payload}
+      assert payload[:message_id] == message.id
+      assert payload[:deleted_at]
+    end
+  test "list_conversations/2 includes unread counts and last message", %{profile_a: profile_a, profile_b: profile_b} do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+
+    {:ok, _} = Chat.send_message(conversation.id, profile_a.id, %{"body" => "Hei"})
+
+    page = Chat.list_conversations(profile_a.id)
+
+    assert [conversation_summary] = page.entries
+    assert conversation_summary.id == conversation.id
+    assert conversation_summary.unread_count == 1
+    assert conversation_summary.last_message.body == "Hei"
+    assert page.meta.has_more == %{before: false, after: false}
+  end
+
+  test "watch_conversation/2 tracks watchers", %{profile_a: profile_a, profile_b: profile_b} do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+
+    {:ok, watch_payload} = Chat.watch_conversation(conversation.id, profile_a.id)
+    assert watch_payload.count == 1
+    assert Enum.any?(watch_payload.watchers, &(&1.id == profile_a.id))
+
+    {:ok, watch_payload} = Chat.watch_conversation(conversation.id, profile_b.id)
+    assert watch_payload.count == 2
+
+    {:ok, unwatch_payload} = Chat.unwatch_conversation(conversation.id, profile_a.id)
+    assert unwatch_payload.count == 1
+    refute Enum.any?(unwatch_payload.watchers, &(&1.id == profile_a.id))
   end
 end
