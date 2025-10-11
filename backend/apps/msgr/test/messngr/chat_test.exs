@@ -1,7 +1,8 @@
 defmodule Messngr.ChatTest do
   use Messngr.DataCase
 
-  alias Messngr.{Accounts, Chat}
+  alias Messngr.{Accounts, Chat, Media, Repo}
+  alias Messngr.Media.Upload
 
   setup do
     {:ok, account_a} = Accounts.create_account(%{"display_name" => "Kari"})
@@ -26,6 +27,7 @@ defmodule Messngr.ChatTest do
              Chat.send_message(conversation.id, profile_a.id, %{"body" => "Hei"})
 
     assert message.body == "Hei"
+    assert message.kind == :text
     assert message.profile.id == profile_a.id
 
     messages = Chat.list_messages(conversation.id)
@@ -40,5 +42,32 @@ defmodule Messngr.ChatTest do
     end
 
     assert [%{body: "2"}, %{body: "3"}] = Chat.list_messages(conversation.id, limit: 2)
+  end
+
+  test "send_message/3 attaches audio payload", %{profile_a: profile_a, profile_b: profile_b} do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+
+    {:ok, upload, _instructions} =
+      Media.create_upload(conversation.id, profile_a.id, %{
+        "kind" => "audio",
+        "content_type" => "audio/mpeg",
+        "byte_size" => 1024
+      })
+
+    assert {:ok, message} =
+             Chat.send_message(conversation.id, profile_a.id, %{
+               "kind" => "audio",
+               "body" => "Hør på dette",
+               "media" => %{
+                 "upload_id" => upload.id,
+                 "durationMs" => 1500
+               }
+             })
+
+    assert message.kind == :audio
+    assert message.payload["media"]["objectKey"] == upload.object_key
+    assert message.payload["media"]["durationMs"] == 1500
+    assert message.payload["media"]["contentType"] == "audio/mpeg"
+    assert %Upload{status: :consumed} = Repo.get!(Upload, upload.id)
   end
 end

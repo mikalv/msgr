@@ -22,6 +22,7 @@ defmodule MessngrWeb.Router do
     pipe_through [:api, :actor]
 
     post "/conversations", ConversationController, :create
+    post "/conversations/:id/uploads", MediaUploadController, :create
     get "/conversations/:id/messages", MessageController, :index
     post "/conversations/:id/messages", MessageController, :create
   end

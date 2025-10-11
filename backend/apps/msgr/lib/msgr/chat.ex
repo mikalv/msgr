@@ -7,7 +7,7 @@ defmodule Messngr.Chat do
 
   alias Phoenix.PubSub
 
-  alias Messngr.{Accounts, Repo}
+  alias Messngr.{Accounts, Media, Repo}
   alias Messngr.Chat.{Conversation, Message, Participant}
 
   @conversation_topic_prefix "conversation"
@@ -35,17 +35,28 @@ defmodule Messngr.Chat do
   end
 
   @spec send_message(binary(), binary(), map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()} | {:error, term()}
+  @message_kinds [:text, :markdown, :code, :system, :image, :video, :audio, :location]
+
   def send_message(conversation_id, profile_id, attrs) do
     Repo.transaction(fn ->
       _participant = ensure_participant!(conversation_id, profile_id)
 
-      payload =
-        attrs
+      kind = resolve_kind(attrs)
+      {media_payload, sanitized_attrs} =
+        maybe_resolve_media(kind, conversation_id, profile_id, attrs)
+
+      base_payload = Map.get(sanitized_attrs, "payload") || %{}
+      merged_payload = merge_payload(base_payload, media_payload)
+
+      message_attrs =
+        sanitized_attrs
+        |> Map.put("payload", merged_payload)
+        |> Map.put("kind", kind)
         |> Map.put_new("conversation_id", conversation_id)
         |> Map.put_new("profile_id", profile_id)
         |> Map.put_new_lazy("sent_at", fn -> DateTime.utc_now() end)
 
-      case %Message{} |> Message.changeset(payload) |> Repo.insert() do
+      case %Message{} |> Message.changeset(message_attrs) |> Repo.insert() do
         {:ok, message} -> Repo.preload(message, :profile)
         {:error, reason} -> Repo.rollback(reason)
       end
@@ -152,5 +163,69 @@ defmodule Messngr.Chat do
 
   defp conversation_topic(conversation_id) do
     "#{@conversation_topic_prefix}:#{conversation_id}"
+  end
+
+  defp resolve_kind(attrs) do
+    attrs
+    |> Map.get("kind")
+    |> Kernel.||(Map.get(attrs, :kind))
+    |> Kernel.||(Map.get(attrs, "type"))
+    |> Kernel.||(Map.get(attrs, :type))
+    |> case do
+      value when is_binary(value) ->
+        normalized = String.downcase(value)
+        Enum.find(@message_kinds, :text, &(&1 |> Atom.to_string() == normalized))
+
+      value when is_atom(value) and value in @message_kinds ->
+        value
+
+      _ ->
+        :text
+    end
+  end
+
+  defp maybe_resolve_media(kind, conversation_id, profile_id, attrs) when kind in [:audio, :video] do
+    media =
+      case Map.get(attrs, "media") || Map.get(attrs, :media) do
+        %{} = map -> map
+        _ -> %{}
+      end
+
+    upload_id =
+      media["upload_id"] || media["uploadId"] || media[:upload_id] || media[:uploadId] ||
+        attrs["upload_id"] || attrs["uploadId"] || attrs[:upload_id] || attrs[:uploadId]
+
+    if is_binary(upload_id) do
+      metadata = Map.drop(media, ["upload_id", "uploadId"])
+
+      case Media.consume_upload(upload_id, conversation_id, profile_id, metadata) do
+        {:ok, payload} ->
+          sanitized =
+            attrs
+            |> Map.drop(["media", "upload_id", "uploadId"])
+
+          {payload, sanitized}
+
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    else
+      Repo.rollback(:missing_media_upload)
+    end
+  end
+
+  defp maybe_resolve_media(_kind, _conversation_id, _profile_id, attrs), do: {nil, attrs}
+
+  defp merge_payload(base, nil), do: base || %{}
+
+  defp merge_payload(base, media_payload) when is_map(media_payload) do
+    Map.merge(base || %{}, media_payload, fn _key, existing, incoming ->
+      cond do
+        is_map(existing) and is_map(incoming) ->
+          Map.merge(existing, incoming, fn _inner_key, _old, new -> new end)
+
+        true ->
+          incoming
+      end
+    end)
   end
 end
