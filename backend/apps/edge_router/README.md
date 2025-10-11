@@ -1,0 +1,125 @@
+# EdgeRouter
+
+<!-- MDOC !-->
+
+Route requests to other Phoenix Endpoints or Plugs with WebSocket support.
+
+> This library is useful for Gigalixir, Render, Heroku or other deployments where only one web port is exposed.
+
+
+## Installation
+
+```elixir
+def deps do
+  [
+    {:edge_router, "~> 0.1.0"}
+  ]
+end
+```
+
+## Usage
+
+Configure listening options for MainProxy:
+
+```elixir
+config :main_proxy,
+  http: [port: 4080],
+  https: [port: 4443]
+```
+
+Create a proxy module which configures backends:
+
+```elixir
+defmodule MyApp.Proxy do
+  use MainProxy.Proxy
+
+  @impl MainProxy.Proxy
+  def backends do
+    [
+      %{
+        domain: "my-cool-app.com",
+        phoenix_endpoint: MyAppWeb.Endpoint
+      },
+      %{
+        domain: "members.my-cool-app.com",
+        phoenix_endpoint: MyAppMembersWeb.Endpoint
+      },
+      %{
+        verb: ~r/get/i,
+        path: ~r{^/main-proxy-plug-test$},
+        plug: MainProxy.Plug.Test,
+        opts: [1, 2, 3]
+      }
+    ]
+  end
+end
+```
+
+> Backends can also be configured via configuration:
+>
+> ```elixir
+> config :main_proxy,
+>   http: [port: 4080],
+>   https: [port: 4443],
+>   backends: [
+>     # ...
+>   ]
+> ```
+>
+> But, it's not the recommended way.
+
+Add above created proxy module to the supervision tree:
+
+```elixir
+children = [
+  # ... other children
+  MyApp.Proxy,
+]
+```
+
+Configure all endpoints to not start a server in order to avoid endpoints bypassing MainProxy:
+
+```elixir
+# ...
+config :my_app, MyAppWeb.Endpoint, server: false
+config :my_app_members, MyAppMembersWeb.Endpoint, server: false
+```
+
+## Available Configuration Options
+
+- `:http` - the configuration for the HTTP server. It accepts all options as defined by [Plug.Cowboy](https://hexdocs.pm/plug_cowboy/).
+- `:https` - the configuration for the HTTPS server. It accepts all options as defined by [Plug.Cowboy](https://hexdocs.pm/plug_cowboy/).
+- `:server` - `true` by default. If you are running application with `mix phx.server`, this option is ignored, and the server will always be started.
+- `:backends` - the rule for routing requests:
+  - `:domain`
+  - `:verb`
+  - `:host`
+  - `:path`
+  - `:phoenix_endpoint` / `:plug`
+  - `:opts` - only for `:plug`
+- `:log_requests` - `true` by default. Log the requests or not.
+
+<!-- MDOC !-->
+
+## How does MainProxy work?
+
+1. MainProxy starts a Cowboy server with a single dispatch handler: `MainProxy.Cowboy2Handler`.
+2. The handler checks the verb, host and path of the request, and compares them to the supplied configuration to determine where to route the request.
+3. If the backend that matched is a `phoenix_endpoint`, MainProxy delegates to the `Phoenix.Endpoint.Cowboy2Handler` with your app's Endpoint.
+4. If the backend that matched is a `plug`, MainProxy calls the plug as normal.
+5. If no backend is matched, a text response with a status code of 404 is returned.
+
+## Development
+
+```bash
+mix run --no-halt
+curl -i foo.com.127.0.0.1.xip.io:4080
+curl -i localhost:4080
+```
+
+## Thanks
+
+This library is based on:
+
+- [master_proxy](https://github.com/wojtekmach/acme_bank/tree/master/apps/master_proxy) application inside the [acme_bank](https://github.com/wojtekmach/acme_bank) project from [wojtekmach](https://github.com/wojtekmach).
+- [master_proxy.ex](https://gist.github.com/Gazler/fe7ed5dc598250002dfe) from [Gazler](https://github.com/Gazler).

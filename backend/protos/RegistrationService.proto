@@ -1,0 +1,277 @@
+syntax = "proto3";
+
+
+enum MessageTransport {
+  MESSAGE_TRANSPORT_UNSPECIFIED = 0;
+  MESSAGE_TRANSPORT_SMS = 1;
+  MESSAGE_TRANSPORT_VOICE = 2;
+}
+
+enum ClientType {
+  CLIENT_TYPE_UNSPECIFIED = 0;
+  CLIENT_TYPE_IOS = 1;
+  CLIENT_TYPE_ANDROID_WITH_FCM = 2;
+  CLIENT_TYPE_ANDROID_WITHOUT_FCM = 3;
+  CLIENT_TYPE_MACOS = 4;
+  CLIENT_TYPE_LINUX = 5;
+  CLIENT_TYPE_WINDOWS = 6;
+  CLIENT_TYPE_WEB = 7;
+}
+
+package dev.meeh.msgr.registration.rpc;
+
+service RegistrationService {
+  /**
+   * Create a new registration session for a given destination phone number.
+   */
+   rpc CreateSession (CreateRegistrationSessionRequest) returns (CreateRegistrationSessionResponse) {}
+
+  /**
+   * Retrieves session metadata for a given session.
+   */
+   rpc GetSessionMetadata (GetRegistrationSessionMetadataRequest) returns (GetRegistrationSessionMetadataResponse) {}
+
+  /**
+   * Sends a verification code to a destination phone number within the context
+   * of a previously-created registration session.
+   */
+   rpc SendVerificationCode (SendVerificationCodeRequest) returns (SendVerificationCodeResponse) {}
+
+  /**
+   * Checks a client-provided verification code for a given registration
+   * session.
+   */
+  rpc CheckVerificationCode (CheckVerificationCodeRequest) returns (CheckVerificationCodeResponse) {}
+}
+
+message CreateRegistrationSessionRequest {
+  /**
+   * The phone number for which to create a new registration session.
+   */
+  uint64 e164 = 1;
+
+  /**
+   * Indicates whether an account already exists with the given e164 (i.e. this
+   * session represents a "re-registration" attempt).
+   */
+  bool account_exists_with_e164 = 2;
+}
+
+message RegistrationSessionMetadata {
+  /**
+   * An opaque sequence of bytes that uniquely identifies the registration
+   * session associated with this registration attempt.
+   */
+  bytes session_id = 1;
+
+  /**
+   * Indicates whether a valid verification code has been submitted in the scope
+   * of this session.
+   */
+  bool verified = 2;
+
+  /**
+   * The phone number associated with this registration session.
+   */
+  uint64 e164 = 3;
+
+  /**
+   * Indicates whether the caller may request delivery of a verification code
+   * via SMS now or at some time in the future. If true, the time a caller must
+   * wait before requesting a verification code via SMS is given in the
+   * `next_sms_seconds` field.
+   */
+  bool may_request_sms = 4;
+
+  /**
+   * The duration, in seconds, after which a caller will next be allowed to
+   * request delivery of a verification code via SMS if `may_request_sms` is
+   * true. If zero, a caller may request a verification code via SMS
+   * immediately. If `may_request_sms` is false, this field has no meaning.
+   */
+  uint64 next_sms_seconds = 5;
+}
+
+message CreateRegistrationSessionResponse {
+  oneof response {
+    /**
+     * Metadata for the newly-created session.
+     */
+    RegistrationSessionMetadata session_metadata = 1;
+
+    /**
+     * A response explaining why a session could not be created as requested.
+     */
+    CreateRegistrationSessionError error = 2;
+  }
+}
+
+message SendVerificationCodeRequest {
+  /**
+   * The message transport to use to send a verification code to the destination
+   * phone number.
+   */
+  MessageTransport transport = 1;
+  /**
+   * A prioritized list of languages accepted by the destination; should be
+   * provided in the same format as the value of an HTTP Accept-Language header.
+   */
+   string accept_language = 3;
+
+   /**
+    * The type of client requesting a verification code.
+    */
+   ClientType client_type = 4;
+}
+
+message SendVerificationCodeResponse {
+  reserved 1;
+
+  /**
+   * Metadata for the named session. May be absent if the session could not be
+   * found or has expired.
+   */
+  RegistrationSessionMetadata session_metadata = 2;
+
+  /**
+   * If a code could not be sent, explains the underlying error. Will be absent
+   * if a code was sent successfully. Note that both an error and session
+   * metadata may be present in the same response because the session metadata
+   * may include information helpful for resolving the underlying error (i.e.
+   * "next attempt" times).
+   */
+  SendVerificationCodeError error = 3;
+}
+
+message SendVerificationCodeError {
+  /**
+   * The type of error that prevented a verification code from being sent.
+   */
+  SendVerificationCodeErrorType error_type = 1;
+
+  /**
+   * Indicates that this error may succeed if retried without modification after
+   * a delay indicated by `retry_after_seconds`. If false, callers should not
+   * retry the request without modification.
+   */
+  bool may_retry = 2;
+
+  /**
+   * If this error may be retried,, indicates the duration in seconds from the
+   * present after which the request may be retried without modification. This
+   * value has no meaning otherwise.
+   */
+  uint64 retry_after_seconds = 3;
+}
+
+enum SendVerificationCodeErrorType {
+  SEND_VERIFICATION_CODE_ERROR_TYPE_UNSPECIFIED = 0;
+}
+
+message CheckVerificationCodeRequest {
+  /**
+   * The session ID returned when sending a verification code.
+   */
+  bytes session_id = 1;
+
+  /**
+   * The client-provided verification code.
+   */
+  string verification_code = 2;
+}
+
+message CheckVerificationCodeResponse {
+  reserved 1;
+
+  /**
+   * Metadata for the named session. May be absent if the session could not be
+   * found or has expired.
+   */
+  RegistrationSessionMetadata session_metadata = 2;
+
+  /**
+   * If a code could not be checked, explains the underlying error. Will be
+   * absent if no error occurred. Note that both an error and session
+   * metadata may be present in the same response because the session metadata
+   * may include information helpful for resolving the underlying error (i.e.
+   * "next attempt" times).
+   */
+  CheckVerificationCodeError error = 3;
+}
+
+message CheckVerificationCodeError {
+  /**
+   * The type of error that prevented a verification code from being checked.
+   */
+  CheckVerificationCodeErrorType error_type = 1;
+
+  /**
+   * Indicates that this error may succeed if retried without modification after
+   * a delay indicated by `retry_after_seconds`. If false, callers should not
+   * retry the request without modification.
+   */
+  bool may_retry = 2;
+
+  /**
+   * If this error may be retried,, indicates the duration in seconds from the
+   * present after which the request may be retried without modification. This
+   * value has no meaning otherwise.
+   */
+  uint64 retry_after_seconds = 3;
+}
+
+enum CheckVerificationCodeErrorType {
+  CHECK_VERIFICATION_CODE_ERROR_TYPE_UNSPECIFIED = 0;
+}
+
+message CreateRegistrationSessionError {
+  /**
+   * The type of error that prevented a session from being created.
+   */
+  CreateRegistrationSessionErrorType error_type = 1;
+
+  /**
+   * Indicates that this error may succeed if retried without modification after
+   * a delay indicated by `retry_after_seconds`. If false, callers should not
+   * retry the request without modification.
+   */
+  bool may_retry = 2;
+
+  /**
+   * If this error may be retried,, indicates the duration in seconds from the
+   * present after which the request may be retried without modification. This
+   * value has no meaning otherwise.
+   */
+  uint64 retry_after_seconds = 3;
+}
+
+enum CreateRegistrationSessionErrorType {
+  CREATE_REGISTRATION_SESSION_ERROR_TYPE_UNSPECIFIED = 0;
+}
+
+message GetRegistrationSessionMetadataRequest {
+  /**
+   * The ID of the session for which to retrieve metadata.
+   */
+  bytes session_id = 1;
+}
+
+message GetRegistrationSessionMetadataResponse {
+  oneof response {
+    RegistrationSessionMetadata session_metadata = 1;
+    GetRegistrationSessionMetadataError error = 2;
+  }
+}
+
+message GetRegistrationSessionMetadataError {
+  GetRegistrationSessionMetadataErrorType error_type = 1;
+}
+
+enum GetRegistrationSessionMetadataErrorType {
+  GET_REGISTRATION_SESSION_METADATA_ERROR_TYPE_UNSPECIFIED = 0;
+
+  /**
+   * No session was found with the given identifier.
+   */
+  GET_REGISTRATION_SESSION_METADATA_ERROR_TYPE_NOT_FOUND = 1;
+}

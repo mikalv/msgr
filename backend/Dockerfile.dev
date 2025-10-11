@@ -1,0 +1,28 @@
+# ==============================================================================
+# Future versions of the official elixir image use otp24 onwards wich is
+# incompatible with the libcrypto dependency. When/if that dependency drops from
+# the project we can use `elixir:latest` instead
+
+FROM elixir:1.17
+
+# ==============================================================================
+
+# ==============================================================================
+# Notify tools is used for the `import` tasks and nodejs is used for asset
+# management. This will also install npm v6 which is required for the current
+# verison of the project to work.
+
+ENV NODE_VERSION=node_18.x
+RUN echo "deb https://deb.nodesource.com/$NODE_VERSION bullseye main" | tee /etc/apt/sources.list.d/nodesource.list
+RUN echo "deb-src https://deb.nodesource.com/$NODE_VERSION bullseye main" | tee -a /etc/apt/sources.list.d/nodesource.list
+RUN curl -sSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add -
+
+RUN apt-get update && apt-get install -y inotify-tools nodejs
+
+# ==============================================================================
+
+# ==============================================================================
+
+WORKDIR /var/app
+
+RUN mix do local.hex --force, local.rebar --force

@@ -1,0 +1,146 @@
+pipeline {
+  agent none
+  options {
+    buildDiscarder(
+        logRotator(
+            // number of build logs to keep
+            numToKeepStr:'5',
+            // history to keep in days
+            daysToKeepStr: '14',
+            // artifacts are kept for days
+            artifactDaysToKeepStr: '14',
+            // number of builds have their artifacts kept
+            artifactNumToKeepStr: '10'
+        )
+    )
+  }
+  stages {
+    stage('Checkout code') {
+      agent { node { label 'docker' } }
+      steps {
+        //checkout scm
+        checkout([
+        $class: 'GitSCM', 
+        branches: [[name: '*/main']], 
+        doGenerateSubmoduleConfigurations: false, 
+        extensions: [[$class: 'CleanCheckout']], 
+        submoduleCfg: [], 
+        userRemoteConfigs: [[credentialsId: 'jenkins-github-sshkey-1', url: 'git@github.com:msgr-no/main_backend.git']]
+    ])
+      }
+    }
+
+    stage('Build') {
+      environment {
+        MIX_HOME = "${env.WORKSPACE}/.mix"
+        HEX_HOME = "${env.WORKSPACE}/.hex"
+        MIX_DEV = "prod"
+      }
+      agent {
+        dockerfile {
+          filename 'Dockerfile.prod'
+          label 'docker'
+        }
+      }
+      steps {
+        echo "Woho!"
+      }
+    }
+
+    stage('Test') {
+      agent { node { label 'docker' } }
+      environment {
+        MIX_HOME = "${env.WORKSPACE}/.mix"
+        HEX_HOME = "${env.WORKSPACE}/.hex"
+        MIX_ENV="test"
+        POSTGRES_PASSWORD="687g65GhR8796fddse463"
+      }
+      steps {
+        /*deleteDir()
+        withCredentials([gitUsernamePassword(credentialsId: 'bekkevolljenkins-github-token-as-user-and-pw',
+                 gitToolName: 'git-meeh')]) {
+          checkout scmGit(
+            branches: [[name: 'main']],
+            extensions: [ pruneStaleBranch(), pruneTags(true) ],
+            userRemoteConfigs: [[url: 'https://github.com/msgr-no/main_backend.git']])
+        }*/
+        // This ensures we run the tests on a node that has both docker and amd64 labels
+        node('docker||amd64') {
+          script {
+            try {
+            /* try {
+              unstash name: 'deps'
+              unstash name: 'lock'
+              unstash name: 'build'
+            } catch (e) {
+              print "Unstash failed, ignoring"
+            } */
+              docker.image('postgres:latest').withRun("-e POSTGRES_PASSWORD=687g65GhR8796fddse463 -e POSTGRES_USERNAME=mikalv") { db ->
+                sh 'ls -sla'
+                docker.build('msgr-no-test:latest', '-f Dockerfile.dev .').inside("--link ${db.id}") {
+                  sh "mix local.hex --force"
+                  sh "mix local.rebar --force"
+                  sh "mix deps.get"
+                  sh "mix compile --force"
+                  sh ". ./.envrc && MIX_ENV=test POSTGRES_HOSTNAME=${db.id} mix test --stale --timeout 300000 --max-failures 1"
+                }
+              }
+            } catch (err) {
+                echo err.getMessage()
+            }
+          }
+        }
+        //stash name: 'deps', includes: "deps/**/*"
+        //stash name: 'lock', includes: "mix.lock"
+        //stash name: 'build', includes: "_build/**/*"
+      }
+    }
+
+    stage('Package') {
+      when { anyOf { buildingTag(); branch "main" } }
+      agent { label 'docker' }
+      environment {
+        CURRENT_HASH = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+      }
+      steps {
+        script {
+          sh 'mkdir -p ./assets/static; echo "${BRANCH_NAME}:${CURRENT_HASH}" > ./assets/static/version.txt'
+          docker.build("meeh/msgr-main-backend:${BRANCH_NAME}", "-f Dockerfile.prod .")
+        }
+      }
+    }
+
+    stage('Staging Deploy') {
+      when {
+        beforeInput true
+        anyOf { buildingTag(); branch "main" }
+      }
+      agent { label 'docker' }
+      input {
+        message "Deploy to staging?"
+        id "simple-input"
+      }
+      steps {
+        script {
+          docker.withRegistry('', 'dockerhub_id') {
+            image = docker.image("docker.io/meeh/msgr-main-backend:${BRANCH_NAME}")
+            image.push()
+          }
+        }
+      }
+    }
+
+    stage('Auto Deploy') {
+      when {
+        triggeredBy "TimerTrigger"
+        anyOf { buildingTag(); branch "main" }
+      }
+      steps {
+        echo 'Deploying'
+      }
+    }
+
+    //stage('Publish') {}
+
+  }
+}
