@@ -2,7 +2,7 @@ defmodule FamilySpaceTest do
   use FamilySpace.DataCase, async: true
 
   alias FamilySpace
-  alias FamilySpace.{Membership, ShoppingItem, TodoItem}
+  alias FamilySpace.{Membership, Note, ShoppingItem, TodoItem}
   alias Messngr.Accounts
 
   setup do
@@ -109,5 +109,34 @@ defmodule FamilySpaceTest do
 
     lists = FamilySpace.list_todo_lists(space.id)
     assert [%{items: [%TodoItem{status: :done}]}] = lists
+  end
+
+  test "notes support rich editing", %{parent: parent, partner: partner} do
+    {:ok, space} = FamilySpace.create_space(parent.id, %{"name" => "Familie"})
+    {:ok, _} = FamilySpace.add_member(space.id, partner.id)
+
+    {:ok, note} =
+      FamilySpace.create_note(space.id, partner.id, %{
+        "title" => "Ukemeny",
+        "body" => "Taco tirsdag",
+        "pinned" => "true",
+        "color" => "sunshine"
+      })
+
+    assert %Note{pinned: true, created_by_profile_id: ^partner.id} = note
+
+    {:ok, updated} =
+      FamilySpace.update_note(space.id, note.id, parent.id, %{
+        title: "Oppdatert meny",
+        body: "Pizza fredag",
+        pinned: false
+      })
+
+    assert updated.title == "Oppdatert meny"
+    assert updated.pinned == false
+    assert updated.updated_by_profile_id == parent.id
+
+    assert [^updated] = FamilySpace.list_notes(space.id)
+    assert [] == FamilySpace.list_notes(space.id, pinned_only: true)
   end
 end

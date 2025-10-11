@@ -1,7 +1,7 @@
 defmodule FamilySpace do
   @moduledoc """
   Domain logic for collaborative family spaces including shared calendars,
-  shopping lists, and general todo management.
+  shopping lists, todo management, and shared notes.
   """
 
   import Ecto.Query
@@ -10,6 +10,7 @@ defmodule FamilySpace do
   alias FamilySpace.{
     Event,
     Membership,
+    Note,
     ShoppingItem,
     ShoppingList,
     Space,
@@ -165,6 +166,82 @@ defmodule FamilySpace do
 
       case Repo.delete(event) do
         {:ok, event} -> event
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> normalize_transaction()
+  end
+
+  # -- Notes -------------------------------------------------------------------
+
+  @spec list_notes(Ecto.UUID.t(), keyword()) :: [Note.t()]
+  def list_notes(space_id, opts \\ []) do
+    pinned_only? = Keyword.get(opts, :pinned_only, false)
+
+    Note
+    |> where([n], n.space_id == ^space_id)
+    |> maybe_filter_pinned(pinned_only?)
+    |> order_by([n], desc: n.pinned, desc: n.updated_at, desc: n.inserted_at)
+    |> Repo.all()
+    |> Repo.preload([:created_by, :updated_by])
+  end
+
+  @spec get_note!(Ecto.UUID.t(), Ecto.UUID.t()) :: Note.t()
+  def get_note!(space_id, note_id) do
+    Note
+    |> Repo.get_by!(id: note_id, space_id: space_id)
+    |> Repo.preload([:created_by, :updated_by])
+  end
+
+  @spec create_note(Ecto.UUID.t(), Ecto.UUID.t(), map()) :: {:ok, Note.t()} | {:error, term()}
+  def create_note(space_id, profile_id, attrs) do
+    attrs = attrs |> Map.new() |> normalize_note_attrs()
+
+    Repo.transaction(fn ->
+      _ = ensure_membership(space_id, profile_id)
+
+      note_attrs =
+        attrs
+        |> Map.put(:space_id, space_id)
+        |> Map.put(:created_by_profile_id, profile_id)
+        |> Map.put(:updated_by_profile_id, profile_id)
+
+      case %Note{} |> Note.changeset(note_attrs) |> Repo.insert() do
+        {:ok, note} -> Repo.preload(note, [:created_by, :updated_by])
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> normalize_transaction()
+  end
+
+  @spec update_note(Ecto.UUID.t(), Ecto.UUID.t(), Ecto.UUID.t(), map()) ::
+          {:ok, Note.t()} | {:error, term()}
+  def update_note(space_id, note_id, profile_id, attrs) do
+    attrs = attrs |> Map.new() |> normalize_note_attrs()
+
+    Repo.transaction(fn ->
+      _ = ensure_membership(space_id, profile_id)
+
+      note = Repo.get_by!(Note, id: note_id, space_id: space_id)
+      update_attrs = Map.put(attrs, :updated_by_profile_id, profile_id)
+
+      case note |> Note.changeset(update_attrs) |> Repo.update() do
+        {:ok, note} -> Repo.preload(note, [:created_by, :updated_by])
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> normalize_transaction()
+  end
+
+  @spec delete_note(Ecto.UUID.t(), Ecto.UUID.t(), Ecto.UUID.t()) :: {:ok, Note.t()} | {:error, term()}
+  def delete_note(space_id, note_id, profile_id) do
+    Repo.transaction(fn ->
+      _ = ensure_membership(space_id, profile_id)
+
+      note = Repo.get_by!(Note, id: note_id, space_id: space_id)
+
+      case Repo.delete(note) do
+        {:ok, note} -> note
         {:error, reason} -> Repo.rollback(reason)
       end
     end)
@@ -488,6 +565,12 @@ defmodule FamilySpace do
     where(query, [l], l.status != :archived)
   end
 
+  defp maybe_filter_pinned(query, true) do
+    where(query, [n], n.pinned == true)
+  end
+
+  defp maybe_filter_pinned(query, false), do: query
+
   defp ensure_slug(attrs) do
     attrs
     |> Map.get(:slug) || Map.get(attrs, "slug") || Map.get(attrs, :name) || Map.get(attrs, "name") || "space"
@@ -573,6 +656,32 @@ defmodule FamilySpace do
         attrs
     end
   end
+
+  defp normalize_note_attrs(attrs) do
+    attrs
+    |> maybe_normalize_boolean(:pinned)
+  end
+
+  defp maybe_normalize_boolean(attrs, key) do
+    cond do
+      Map.has_key?(attrs, key) ->
+        Map.update!(attrs, key, &normalize_boolean/1)
+
+      Map.has_key?(attrs, Atom.to_string(key)) ->
+        value = Map.fetch!(attrs, Atom.to_string(key))
+
+        attrs
+        |> Map.delete(Atom.to_string(key))
+        |> Map.put(key, normalize_boolean(value))
+
+      true ->
+        attrs
+    end
+  end
+
+  defp normalize_boolean(value) when value in [true, "true", "1", 1], do: true
+  defp normalize_boolean(value) when value in [false, "false", "0", 0], do: false
+  defp normalize_boolean(value), do: value
 
   defp maybe_put_completion(attrs, profile_id) do
     attrs = Map.new(attrs)

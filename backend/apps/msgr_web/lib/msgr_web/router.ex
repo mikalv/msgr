@@ -36,6 +36,8 @@ defmodule MessngrWeb.Router do
       resources "/todo_lists", FamilyTodoListController, only: [:index, :create, :show, :update, :delete] do
         resources "/items", FamilyTodoItemController, only: [:index, :create, :update, :delete]
       end
+
+      resources "/notes", FamilyNoteController, only: [:index, :create, :show, :update, :delete]
     end
   end
 

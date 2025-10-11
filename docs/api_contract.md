@@ -373,6 +373,53 @@ Returnerer alle todolister og deres oppgaver. Listen kan arkiveres ved å sette 
 
 Oppdater status med `PUT /api/families/{family_id}/todo_lists/{list_id}/items/{item_id}` (`{"item": {"status": "done"}}`). Når `status` settes til `done` registreres automatisk hvem som fullførte oppgaven.
 
+`GET /api/families/{family_id}/notes`
+
+```json
+{
+  "data": [
+    {
+      "id": "note-uuid",
+      "title": "Ukemeny",
+      "body": "Mandag: Suppe",
+      "color": "sunshine",
+      "pinned": true,
+      "created_by_profile_id": "profile-uuid",
+      "updated_by_profile_id": "profile-uuid",
+      "inserted_at": "2024-10-07T10:00:00Z",
+      "updated_at": "2024-10-07T10:15:00Z"
+    }
+  ]
+}
+```
+
+Legg til `?pinned_only=true` i query-string for å kun hente notater som er markert som festet.
+
+`POST /api/families/{family_id}/notes`
+
+```json
+{
+  "note": {
+    "title": "Pakkeliste høstferien",
+    "body": "Ski, votter, ullsokker",
+    "pinned": false
+  }
+}
+```
+
+`PUT /api/families/{family_id}/notes/{note_id}`
+
+```json
+{
+  "note": {
+    "title": "Oppdatert pakkeliste",
+    "pinned": true
+  }
+}
+```
+
+Slett notater med `DELETE /api/families/{family_id}/notes/{note_id}`. Feltet `pinned` aksepterer både booleans og tekstverdier (`"true"`, `"false"`).
+
 ### Sende melding
 
 `POST /api/conversations/{conversation_id}/messages`
