@@ -18,6 +18,14 @@ Vi må finne ut hvilke prosjekt som er best utgangspunkt for det vi prøver å l
 * https://github.com/mautrix/slack
 * https://github.com/matrix-org/matrix-appservice-slack
 
+### Snapchat (Prioritert!)
+
+* https://github.com/Rob--/SnapWrap
+* https://github.com/transitive-bullshit/snapchat.git
+* https://scrapecreators.com/blog/snapchat-api-follower-count-stories
+* https://pypi.org/project/snapchat/
+*
+
 ### Signal
 
 * https://github.com/mautrix/signal
