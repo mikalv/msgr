@@ -36,6 +36,7 @@ services:
       POSTGRES_USERNAME: postgres
       POSTGRES_PASSWORD: postgres
       PORT: 4000
+      MSGR_WEB_LEGACY_ACTOR_HEADERS: ${MSGR_WEB_LEGACY_ACTOR_HEADERS:-false}
     working_dir: /app
     command: ["sh", "-c", "mix setup && mix phx.server"]
     volumes:
