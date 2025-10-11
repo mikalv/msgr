@@ -52,6 +52,18 @@ or `:external_oidc` for bring-your-own-IDP scenarios.
 - `AuthProvider.Idp.Session` – utilities to store tenant/provider/user metadata
   inside the Phoenix session safely.
 
+## Multi-identity account linking
+
+Messngr accounts can now own several identities at the same time—email, phone,
+and any number of federated OpenID Connect credentials. The `Messngr.Accounts`
+context accepts an optional `account_id` (or `account` struct) when calling
+`ensure_identity/1`. When provided, new identities are attached to the existing
+account instead of creating duplicates. If an identity already belongs to a
+different account we return `{:error, :identity_already_linked}` to avoid
+cross-tenant hijacking. This powers flows where a person signs in with a phone
+number and later connects their GitHub, Google Workspace or Facebook identity to
+the same Messngr account.
+
 ## Acting as a service provider
 
 When a tenant registers an `external_oidc` provider, we store issuer metadata,
@@ -65,5 +77,8 @@ retrieve userinfo/JWKS data.
 - Tenant-specific JWKS rotation and signing keys so each tenant can publish its
   own metadata.
 - Admin UI for managing tenants and upstream provider credentials.
+- Self-service account management surface so end users can review linked
+  identities, revoke sessions and add new providers without operator
+  intervention.
 - Federation adapters (SAML, SCIM) building on top of the existing structures.
 

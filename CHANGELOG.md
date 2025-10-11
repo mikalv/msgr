@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Added multi-identity account linking so `Accounts.ensure_identity/1` can attach
+  new email/phone/OIDC credentials to an existing account via `account_id`, with
+  safeguards against cross-account hijacking, refreshed docs and regression
+  tests for linking flows.
 - Added Noise transport session and registry modules with NX/IK/XX handshake
   support, session-token generation and registry TTL management, plus
   integration/property tests for handshake, fallback and rekey flows.
