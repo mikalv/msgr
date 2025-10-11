@@ -1,13 +1,23 @@
 defmodule SlackApiWeb.Router do
   use SlackApiWeb, :router
-  alias Controllers.{ApiController, ChatApiController, ConversationsApiController, UsersApiController, ReactionsApiController, RemindersApiController}
+
+  alias SlackApiWeb.Controllers.{
+    ApiController,
+    ChatApiController,
+    ConversationsApiController,
+    ReactionsApiController,
+    RemindersApiController,
+    UsersApiController
+  }
 
   pipeline :api do
     plug :accepts, ["json"]
+    plug SlackApiWeb.Plugs.CurrentActor
   end
 
   scope "/api", SlackApiWeb do
     pipe_through :api
+
     post "/conversations.create", ConversationsApiController, :create
     post "/conversations.rename", ConversationsApiController, :rename
     post "/conversations.mark", ConversationsApiController, :mark
@@ -50,9 +60,7 @@ defmodule SlackApiWeb.Router do
     get "/status", ApiController, :status_test
   end
 
-  # Enable Swoosh mailbox preview in development
   if Application.compile_env(:slack_api, :dev_routes) do
-
     scope "/dev" do
       pipe_through [:fetch_session, :protect_from_forgery]
 
