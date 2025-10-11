@@ -10,6 +10,7 @@ import 'package:messngr/desktop/web.dart';
 import 'package:messngr/main_desktop.dart';
 import 'package:messngr/main_mobile.dart';
 import 'package:messngr/config/AppNavigation.dart';
+import 'package:messngr/services/logging/open_observe_log_client.dart';
 import 'package:messngr/utils/device_info_impl.dart';
 import 'package:messngr/utils/secure_store_impl.dart';
 import 'package:messngr/utils/shared_preferences_impl.dart';
@@ -30,11 +31,15 @@ void checkNetwork() async {
 
 Future<void> main() async {
   Logger.root.level = Level.FINE;
+  final openObserveClient = OpenObserveLogClient.maybeCreate();
   Logger.root.onRecord.listen((record) {
     print(
       '[${record.loggerName}] ${record.level.name} ${record.time}: '
       '${record.message}',
     );
+    if (openObserveClient != null) {
+      unawaited(openObserveClient.send(record));
+    }
   });
   AppNavigation.instance;
   LibMsgr().secureStorage = SecureStore();

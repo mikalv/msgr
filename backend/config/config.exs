@@ -9,6 +9,14 @@ config :msgr, Messngr.Mailer,
 
 config :msgr, :llm_client, Messngr.AI.LlmGatewayClient
 
+config :msgr, Messngr.Media.Storage,
+  bucket: System.get_env("MEDIA_BUCKET", "msgr-media"),
+  endpoint: System.get_env("MEDIA_ENDPOINT", "http://localhost:9000"),
+  public_endpoint: System.get_env("MEDIA_PUBLIC_ENDPOINT")
+
+config :msgr, Messngr.Media,
+  upload_ttl_seconds: String.to_integer(System.get_env("MEDIA_UPLOAD_TTL", "900"))
+
 host = System.get_env("PHX_HOST", "localhost")
 
 config :msgr_web, MessngrWeb.Endpoint,
@@ -46,6 +54,25 @@ config :msgr_web, :expose_otp_codes, false
 config :logger, :console,
   format: "[$level] $message",
   metadata: [:request_id]
+
+config :logger, backends: [:console]
+
+config :msgr_web, :prometheus,
+  enabled: false,
+  port: 9568,
+  name: :prometheus_metrics
+
+config :logger, Messngr.Logging.OpenObserveBackend,
+  enabled: false,
+  endpoint: "http://localhost:5080",
+  org: "default",
+  stream: "backend",
+  dataset: "_json",
+  username: "root@example.com",
+  password: "Complexpass#123",
+  metadata: [:application, :module, :function, :line, :request_id, :pid],
+  level: :info,
+  service: "msgr_backend"
 
 config :phoenix, :stacktrace_depth, 20
 

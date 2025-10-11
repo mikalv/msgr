@@ -1,0 +1,119 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: msgr_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: msgr_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: msgr_backend
+    depends_on:
+      db:
+        condition: service_healthy
+      stonemq:
+        condition: service_started
+    environment:
+      MIX_ENV: dev
+      PHX_SERVER: "true"
+      PHX_LISTEN_IP: 0.0.0.0
+      POSTGRES_HOST: db
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: postgres
+      PORT: 4000
+    working_dir: /app
+    command: ["sh", "-c", "mix setup && mix phx.server"]
+    volumes:
+      - ./backend:/app
+      - elixir_deps:/app/deps
+      - elixir_build:/app/_build
+      - tailwind_cache:/root/.cache
+      - node_modules:/app/apps/msgr_web/assets/node_modules
+    ports:
+      - "4000:4000"
+    tty: true
+    stdin_open: true
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: msgr_prometheus
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      backend:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: msgr_grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    container_name: msgr_openobserve
+    environment:
+      ZO_ROOT_USER_EMAIL: root@example.com
+      ZO_ROOT_USER_PASSWORD: Complexpass#123
+      ZO_DATA_DIR: /data
+      ZO_TELEMETRY: "false"
+    volumes:
+      - openobserve_data:/data
+    ports:
+      - "5080:5080"
+    restart: unless-stopped
+
+  stonemq:
+    build:
+      context: .
+      dockerfile: docker/stonemq/Dockerfile
+    container_name: msgr_stonemq
+    ports:
+      - "9092:9092"
+    volumes:
+      - stonemq_data:/var/lib/stonemq
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "9092"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  elixir_deps:
+  elixir_build:
+  tailwind_cache:
+  node_modules:
+  stonemq_data:
+  prometheus_data:
+  grafana_data:
+  openobserve_data:

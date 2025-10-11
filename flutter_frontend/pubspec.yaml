@@ -52,6 +52,8 @@ dependencies:
   # Core
   libmsgr:
     path: packages/libmsgr
+  msgr_messages:
+    path: packages/msgr_messages
 
   flutter_profile_picture: ^2.0.0
   # The following adds the Cupertino Icons font to your application.

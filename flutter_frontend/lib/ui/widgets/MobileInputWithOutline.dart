@@ -19,6 +19,10 @@ class MobileInputWithOutline extends StatefulWidget {
   final Function(PhoneNumber? phone)? onSaved;
   final void Function(String)? onSubmitted;
   final bool autofocus;
+  final Color? backgroundColor;
+  final Color? fillColor;
+  final TextStyle? textStyle;
+  final double? borderWidth;
 
   const MobileInputWithOutline(
       {super.key,
@@ -34,7 +38,11 @@ class MobileInputWithOutline extends StatefulWidget {
       this.initialCountryCode,
       this.buttonText,
       this.autofocus = true,
-      this.onSubmitted});
+      this.onSubmitted,
+      this.backgroundColor,
+      this.fillColor,
+      this.textStyle,
+      this.borderWidth});
   @override
   _MobileInputWithOutlineState createState() => _MobileInputWithOutlineState();
 }
@@ -53,7 +61,9 @@ class _MobileInputWithOutlineState extends State<MobileInputWithOutline> {
               ]
             : [const BoxShadow(color: Colors.transparent)],
         border:
-            Border.all(color: widget.borderColor ?? Colors.grey, width: 1.5),
+            Border.all(
+                color: widget.borderColor ?? Colors.grey,
+                width: widget.borderWidth ?? 1.5),
         borderRadius: BorderRadius.all(Radius.circular(radius)));
   }
 
@@ -65,7 +75,9 @@ class _MobileInputWithOutlineState extends State<MobileInputWithOutline> {
           padding: const EdgeInsetsDirectional.only(bottom: 7, top: 5),
           height: widget.height ?? 50,
           width: widget.width ?? MediaQuery.of(this.context).size.width,
-          decoration: boxDecoration(),
+          decoration: boxDecoration(
+            bgColor: widget.backgroundColor ?? Colors.white,
+          ),
           child: IntlPhoneField(
               onSubmitted: widget.onSubmitted,
               dropDownArrowColor:
@@ -74,12 +86,13 @@ class _MobileInputWithOutlineState extends State<MobileInputWithOutline> {
               initialCountryCode: widget.initialCountryCode,
               controller: widget.controller,
               autofocus: widget.autofocus,
-              style: TextStyle(
-                  height: 1.35,
-                  letterSpacing: 1,
-                  fontSize: 16.0,
-                  color: widget.buttonTextColor ?? Colors.black87,
-                  fontWeight: FontWeight.bold),
+              style: widget.textStyle ??
+                  TextStyle(
+                      height: 1.35,
+                      letterSpacing: 1,
+                      fontSize: 16.0,
+                      color: widget.buttonTextColor ?? Colors.black87,
+                      fontWeight: FontWeight.bold),
               inputFormatters: [
                 FilteringTextInputFormatter.digitsOnly,
               ],
@@ -94,7 +107,8 @@ class _MobileInputWithOutlineState extends State<MobileInputWithOutline> {
                           fontSize: 15.5,
                           fontWeight: FontWeight.w400,
                           color: widget.buttonhintTextColor ?? messngrGrey),
-                  fillColor: Colors.white,
+                  fillColor: widget.fillColor ??
+                      widget.backgroundColor ?? Colors.white,
                   filled: true,
                   border: const OutlineInputBorder(
                     borderRadius: BorderRadius.all(

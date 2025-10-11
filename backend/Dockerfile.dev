@@ -1,28 +1,47 @@
 # ==============================================================================
-# Future versions of the official elixir image use otp24 onwards wich is
-# incompatible with the libcrypto dependency. When/if that dependency drops from
-# the project we can use `elixir:latest` instead
-
+# Development container for the Messngr Elixir umbrella
+# ==============================================================================
 FROM elixir:1.17
 
 # ==============================================================================
+# Tooling required for Phoenix asset watchers and database access
+# ==============================================================================
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+        git \
+        inotify-tools \
+        postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 18 for Phoenix asset tooling (esbuild/tailwind)
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install --global npm@9 \
+    && rm -rf /var/lib/apt/lists/*
 
 # ==============================================================================
-# Notify tools is used for the `import` tasks and nodejs is used for asset
-# management. This will also install npm v6 which is required for the current
-# verison of the project to work.
-
-ENV NODE_VERSION=node_18.x
-RUN echo "deb https://deb.nodesource.com/$NODE_VERSION bullseye main" | tee /etc/apt/sources.list.d/nodesource.list
-RUN echo "deb-src https://deb.nodesource.com/$NODE_VERSION bullseye main" | tee -a /etc/apt/sources.list.d/nodesource.list
-RUN curl -sSL https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add -
-
-RUN apt-get update && apt-get install -y inotify-tools nodejs
-
+# Project setup
 # ==============================================================================
+ENV MIX_ENV=dev \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
 
-# ==============================================================================
+WORKDIR /app
 
-WORKDIR /var/app
+# Pre-install Hex and Rebar for mix tooling
+RUN mix local.hex --force && mix local.rebar --force
 
-RUN mix do local.hex --force, local.rebar --force
+# Copy minimal files to leverage Docker layer caching for deps
+COPY mix.exs mix.lock ./
+COPY config ./config
+COPY apps/msgr/mix.exs ./apps/msgr/mix.exs
+COPY apps/msgr_web/mix.exs ./apps/msgr_web/mix.exs
+
+# Fetch Elixir dependencies during build to speed up container start
+RUN mix deps.get
+
+# Default command keeps parity with local development (`mix phx.server`)
+CMD ["mix", "phx.server"]

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:messngr/config/app_constants.dart';
+import 'package:messngr/config/backend_environment.dart';
 import 'package:messngr/features/chat/models/chat_message.dart';
 import 'package:messngr/services/api/chat_api.dart';
 import 'package:phoenix_socket/phoenix_socket.dart';
@@ -202,7 +202,7 @@ class ChatSocket implements ChatRealtime {
   }
 
   String _buildEndpoint() {
-    final apiUri = Uri.parse(backendBaseUrl);
+    final apiUri = BackendEnvironment.instance.apiBaseUri;
     final isSecure = apiUri.scheme == 'https';
 
     final socketUri = Uri(

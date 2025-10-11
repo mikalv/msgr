@@ -7,13 +7,38 @@ defmodule MessngrWeb.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      MessngrWeb.Telemetry,
-      # Start a worker by calling: MessngrWeb.Worker.start_link(arg)
-      # {MessngrWeb.Worker, arg},
-      # Start to serve requests, typically the last entry
-      MessngrWeb.Endpoint
-    ]
+    prometheus_options =
+      Application.get_env(:msgr_web, :prometheus, [])
+      |> Enum.into(%{})
+
+    prometheus_child =
+      case prometheus_options do
+        %{enabled: true} ->
+          metrics = MessngrWeb.Telemetry.metrics()
+          name = Map.get(prometheus_options, :name, :prometheus_metrics)
+          port = Map.get(prometheus_options, :port, 9_568)
+
+          {TelemetryMetricsPrometheus,
+           [
+             metrics: metrics,
+             name: name,
+             port: port
+           ]}
+
+        _ ->
+          nil
+      end
+
+    children =
+      [
+        MessngrWeb.Telemetry,
+        prometheus_child,
+        # Start a worker by calling: MessngrWeb.Worker.start_link(arg)
+        # {MessngrWeb.Worker, arg},
+        # Start to serve requests, typically the last entry
+        MessngrWeb.Endpoint
+      ]
+      |> Enum.reject(&is_nil/1)
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

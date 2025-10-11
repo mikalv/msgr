@@ -4,7 +4,7 @@ defmodule Messngr do
   kan operere på kontoer, profiler og chatter uten å importere moduler direkte.
   """
 
-  alias Messngr.{AI, Accounts, Auth, Chat}
+  alias Messngr.{AI, Accounts, Auth, Chat, Media}
 
   # Accounts
   defdelegate list_accounts, to: Accounts
@@ -19,6 +19,7 @@ defmodule Messngr do
   defdelegate send_message(conversation_id, profile_id, attrs), to: Chat
   def list_messages(conversation_id, opts \\ []), do: Chat.list_messages(conversation_id, opts)
   defdelegate ensure_membership(conversation_id, profile_id), to: Chat
+  defdelegate create_media_upload(conversation_id, profile_id, attrs), to: Media, as: :create_upload
 
   # AI
   defdelegate ai_chat(team_id, messages, opts \\ []), to: AI, as: :chat
