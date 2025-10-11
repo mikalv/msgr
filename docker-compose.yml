@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: msgr_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: msgr_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: msgr_backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MIX_ENV: dev
+      PHX_SERVER: "true"
+      PHX_LISTEN_IP: 0.0.0.0
+      POSTGRES_HOST: db
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: postgres
+      PORT: 4000
+    working_dir: /app
+    command: ["sh", "-c", "mix setup && mix phx.server"]
+    volumes:
+      - ./backend:/app
+      - elixir_deps:/app/deps
+      - elixir_build:/app/_build
+      - tailwind_cache:/root/.cache
+      - node_modules:/app/apps/msgr_web/assets/node_modules
+    ports:
+      - "4000:4000"
+    tty: true
+    stdin_open: true
+
+volumes:
+  postgres_data:
+  elixir_deps:
+  elixir_build:
+  tailwind_cache:
+  node_modules:

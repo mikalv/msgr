@@ -1,5 +1,19 @@
 import Config
 
+listen_ip =
+  System.get_env("PHX_LISTEN_IP", "127.0.0.1")
+  |> String.split(".")
+  |> Enum.reduce_while([], fn part, acc ->
+    case Integer.parse(part) do
+      {value, ""} when value in 0..255 -> {:cont, [value | acc]}
+      _ -> {:halt, :error}
+    end
+  end)
+  |> case do
+    [d, c, b, a] -> {a, b, c, d}
+    _ -> {127, 0, 0, 1}
+  end
+
 config :msgr, Messngr.Repo,
   username: System.get_env("POSTGRES_USERNAME", "postgres"),
   password: System.get_env("POSTGRES_PASSWORD", "postgres"),
@@ -10,7 +24,7 @@ config :msgr, Messngr.Repo,
   pool_size: 10
 
 config :msgr_web, MessngrWeb.Endpoint,
-  http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PORT", "4000"))],
+  http: [ip: listen_ip, port: String.to_integer(System.get_env("PORT", "4000"))],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
