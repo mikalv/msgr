@@ -1,15 +1,50 @@
 import 'dart:async';
 
 import 'package:libmsgr/libmsgr.dart';
+import 'package:libmsgr/src/database/daos/message_dao.dart';
 import 'package:libmsgr/src/repositories/base.dart';
 import 'package:libmsgr/src/typedefs.dart';
 import 'package:phoenix_socket/phoenix_socket.dart';
 
 class MessageRepository extends BaseRepository<MMessage> {
   final MessagesInTransit _outgoingMessages = [];
+  final MessageDao _dao;
 
-  MessageRepository({required super.teamName}) {
+  MessageRepository({required super.teamName, required MessageDao dao})
+      : _dao = dao {
     log.info('MessageRepository is starting up.');
+    unawaited(_hydrateFromDisk());
+  }
+
+  Future<void> _hydrateFromDisk() async {
+    final stored = await _dao.getMessagesForTeam(teamName);
+    if (stored.isNotEmpty) {
+      super.fillLocalCache(stored);
+    }
+  }
+
+  @override
+  void fillLocalCache(List<MMessage> items) {
+    super.fillLocalCache(items);
+    unawaited(_dao.upsertMessages(teamName, items));
+  }
+
+  @override
+  void addItem(MMessage item) {
+    super.addItem(item);
+    unawaited(_dao.upsertMessages(teamName, [item]));
+  }
+
+  @override
+  void updateItem(MMessage item) {
+    super.updateItem(item);
+    unawaited(_dao.upsertMessages(teamName, [item]));
+  }
+
+  @override
+  void removeItem(String id) {
+    super.removeItem(id);
+    unawaited(_dao.deleteMessages(teamName, [id]));
   }
 
   List<MMessage> fetchRoomHistory(String roomID) {

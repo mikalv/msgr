@@ -11,6 +11,12 @@
 - Oppdatert Flutter-chatmodeller, API-klient, view-model og opprettelsesdialog
   for å forstå kanal- og gruppesamtaler og tilgjengeliggjort enhetstester for
   parsing av tråder.
+- Utvidet `family_space`-biblioteket med delt notatfunksjon, REST-endepunkter og migrasjon for `space_notes`.
+- Replaced the Telegram/Matrix HTTP clients with queue-driven bridge facades for Telegram, Matrix, IRC, and XMPP plus a shared `ServiceBridge` helper and in-memory queue adapter tests.
+- Introduced a queue behaviour contract to standardise `bridge/<service>/<action>` envelopes with trace IDs for all connectors.
+- Updated bridge strategy, architecture, account linking, and platform research docs to focus on StoneMQ-backed daemons and MTProto-based Telegram support.
+- Spun opp nytt `family_space`-bibliotek med generaliserte "spaces" for familier/bedrifter, delt kalender samt handleliste- og todo-funksjoner med REST-endepunkter, Ecto-migrasjoner og tester.
+- Begynt å implementere lokal SQLite-cache for meldinger og kontakter i Flutter-klienten med nye DAO-er, migrasjoner og tester.
 - Added audio message support across the shared msgr domain, Flutter chat model, and parser including waveform metadata handling.
 - Built a MinIO-ready media upload API on the Elixir backend with audio/video attachment workflows, storage configuration, and test coverage.
 - Replaced the Telegram/Matrix HTTP clients with queue-driven bridge facades for Telegram, Matrix, IRC, and XMPP plus a shared `ServiceBridge` helper and in-memory queue adapter tests.
@@ -49,6 +55,7 @@
 - OpenObserve-loggflyt for Elixir-backenden med ny Logger-backend og tester.
 - Flutter-loggklient som kan sende `package:logging`-poster til OpenObserve via
   `LoggingEnvironment` og en gjenbrukbar HTTP-klient.
+- Familie- og space-funksjoner flyttet til eget `family_space`-bibliotek med kalender, handlelister og todo-støtte samt oppdatert API-dokumentasjon.
 
 ### Changed
 - Backend-konfigurasjon forenklet og unødvendige apper fjernet fra releaseoppsett.

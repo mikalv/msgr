@@ -58,6 +58,7 @@ defmodule MessngrWeb.MixProject do
       {:telemetry_metrics_prometheus, "~> 1.1"},
       {:gettext, "~> 0.20"},
       {:msgr, in_umbrella: true},
+      {:family_space, in_umbrella: true},
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.5"},
       # GRPC

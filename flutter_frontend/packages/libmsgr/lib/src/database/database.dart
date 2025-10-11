@@ -1,6 +1,7 @@
 import 'package:libmsgr/src/database/creation.dart';
 import 'package:libmsgr/src/database/migration.dart';
 import 'package:libmsgr/src/database/migrations/000_initial_migration.dart';
+import 'package:libmsgr/src/database/migrations/001_add_messages_and_contacts.dart';
 import 'package:logging/logging.dart';
 import 'package:sqflite_common/src/sql_builder.dart';
 import 'package:sqflite_sqlcipher/sqflite.dart';
@@ -12,6 +13,7 @@ typedef DatabaseMigrationData = (Database, Logger);
 //@internal
 const List<Migration<DatabaseMigrationData>> migrations = [
   Migration(2, upgradeFromV1ToV2),
+  Migration(3, upgradeFromV2ToV3),
 ];
 
 class DatabaseService {
@@ -20,6 +22,8 @@ class DatabaseService {
 
   /// The database.
   late Database database;
+
+  Database get instance => database;
 
   Future<void> initialize() async {
     final dbPath = path.join(

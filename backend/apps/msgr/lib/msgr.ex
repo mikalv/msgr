@@ -49,4 +49,5 @@ defmodule Messngr do
   defdelegate start_auth_challenge(attrs), to: Auth, as: :start_challenge
   defdelegate verify_auth_challenge(id, code, attrs \\ %{}), to: Auth, as: :verify_challenge
   defdelegate complete_oidc(attrs), to: Auth
+
 end
