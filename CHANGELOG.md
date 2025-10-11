@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Documented Noise handshake expectations with new server-key endpoint contract, configured backend runtime to load static Noise keys from env/Secrets Manager, added rotation mix task with tests, and updated README guidance.
+- Added a feature toggle and dedicated port configuration for the Noise transport so static keys only load when explicitly enabled.
 - Utvidet mediasystemet med nye skjema-felter (dimensjoner, SHA-256, retention),
   nye opplastingskategorier (image, file, voice, thumbnail) og presignerte
   URL-instruksjoner for forhåndsgenererte thumbnails.

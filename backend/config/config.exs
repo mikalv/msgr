@@ -9,6 +9,8 @@ config :msgr, Messngr.Mailer,
 
 config :msgr, :llm_client, Messngr.AI.LlmGatewayClient
 
+config :msgr, :secrets_manager, Messngr.Secrets.Aws
+
 media_sse_algorithm =
   case System.get_env("MEDIA_SSE_ALGORITHM", "AES256") do
     "" -> nil
