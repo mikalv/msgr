@@ -1,7 +1,7 @@
 # Changelog
 
 ## Unreleased
-- Added GitHub Actions deploy workflow that runs on release tags to build the Elixir release, ship it via rsync, and restart the systemd service.
+- Added GitHub Actions deploy workflow that runs on release tags to build the Elixir release, ship it via rsync to `msgr.no`, and restart the systemd service on Ubuntu 22.04 runners.
 - Added Noise transport session and registry modules with NX/IK/XX handshake
   support, session-token generation and registry TTL management, plus
   integration/property tests for handshake, fallback and rekey flows.

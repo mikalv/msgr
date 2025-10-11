@@ -9,17 +9,17 @@ on:
 
 env:
   MIX_ENV: prod
-  UBUNTU_VERSION: ubuntu-20.04
-  DEPLOY_PATH: /var/www/hello.yellowduck.be
-  DEPLOY_APP_NAME: hello
-  DEPLOY_DAEMON_NAME: hello-yellowduck-be
+  UBUNTU_VERSION: ubuntu-22.04
+  DEPLOY_PATH: /var/www/msgr.no
+  DEPLOY_APP_NAME: msgr
+  DEPLOY_DAEMON_NAME: msgr-no
 
 permissions:
   contents: write
 
 jobs:
   deploy:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
