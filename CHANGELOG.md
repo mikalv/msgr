@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Lagt til plan i `docs/umbrella_slack_compat_plan.md` for Slack-kompatibel umbrella-plattform og prioritering av Telegram og Discord-integrasjoner.
 - Documented Noise handshake expectations with new server-key endpoint contract, configured backend runtime to load static Noise keys from env/Secrets Manager, added rotation mix task with tests, and updated README guidance.
 - Added a feature toggle and dedicated port configuration for the Noise transport so static keys only load when explicitly enabled.
 - Utvidet mediasystemet med nye skjema-felter (dimensjoner, SHA-256, retention),
