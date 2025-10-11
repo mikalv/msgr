@@ -8,7 +8,7 @@ defmodule MessngrWeb.ConversationChannel do
   alias Ecto.Changeset
   alias Messngr
   alias Messngr.Chat
-  alias MessngrWeb.MessageJSON
+  alias MessngrWeb.{ConversationJSON, MessageJSON}
 
   @impl true
   def join("conversation:" <> conversation_id, params, socket) do
@@ -55,8 +55,58 @@ defmodule MessngrWeb.ConversationChannel do
   end
 
   @impl true
+  def handle_in("message:sync", payload, socket) when is_map(payload) do
+    opts = build_sync_opts(payload)
+    page = Messngr.list_messages(socket.assigns.conversation_id, opts)
+
+    Messngr.broadcast_backlog(socket.assigns.conversation_id, page)
+
+    {:reply, {:ok, MessageJSON.index(%{page: page})}, socket}
+  end
+
+  def handle_in("message:sync", _payload, socket) do
+    {:reply, {:error, %{errors: ["invalid payload"]}}, socket}
+  end
+
+  @impl true
+  def handle_in("conversation:watch", _payload, socket) do
+    case Messngr.watch_conversation(socket.assigns.conversation_id, socket.assigns.current_profile.id) do
+      {:ok, payload} ->
+        {:reply, {:ok, ConversationJSON.watchers(%{payload: payload})}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{reason: reason}}, socket}
+    end
+  rescue
+    Ecto.NoResultsError -> {:reply, {:error, %{reason: "forbidden"}}, socket}
+  end
+
+  @impl true
+  def handle_in("conversation:unwatch", _payload, socket) do
+    case Messngr.unwatch_conversation(socket.assigns.conversation_id, socket.assigns.current_profile.id) do
+      {:ok, payload} ->
+        {:reply, {:ok, ConversationJSON.watchers(%{payload: payload})}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{reason: reason}}, socket}
+    end
+  rescue
+    Ecto.NoResultsError -> {:reply, {:error, %{reason: "forbidden"}}, socket}
+  end
+
+  @impl true
   def handle_info({:message_created, message}, socket) do
     push(socket, "message_created", MessageJSON.show(%{message: message}))
+    {:noreply, socket}
+  end
+
+  def handle_info({:message_backlog, page}, socket) do
+    push(socket, "message_backlog", MessageJSON.index(%{page: page}))
+    {:noreply, socket}
+  end
+
+  def handle_info({:conversation_watchers, payload}, socket) do
+    push(socket, "conversation_watchers", ConversationJSON.watchers(%{payload: payload}))
     {:noreply, socket}
   end
 
@@ -88,6 +138,26 @@ defmodule MessngrWeb.ConversationChannel do
   end
 
   defp extract_body(_), do: {:error, %{errors: ["body is required"]}}
+
+  defp build_sync_opts(params) do
+    []
+    |> maybe_put(:limit, params["limit"])
+    |> maybe_put(:before_id, params["before_id"])
+    |> maybe_put(:after_id, params["after_id"])
+    |> maybe_put(:around_id, params["around_id"])
+  end
+
+  defp maybe_put(opts, _key, nil), do: opts
+
+  defp maybe_put(opts, :limit, value) do
+    case Integer.parse(to_string(value)) do
+      {int, _} when int > 0 and int <= 200 -> Keyword.put(opts, :limit, int)
+      _ -> opts
+    end
+  end
+
+  defp maybe_put(opts, key, value) when key in [:before_id, :after_id, :around_id],
+    do: Keyword.put(opts, key, value)
 
   defp translate_errors(changeset) do
     Changeset.traverse_errors(changeset, fn {message, opts} ->

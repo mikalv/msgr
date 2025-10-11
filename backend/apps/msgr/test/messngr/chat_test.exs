@@ -90,8 +90,9 @@ defmodule Messngr.ChatTest do
     assert message.kind == :text
     assert message.profile.id == profile_a.id
 
-    messages = Chat.list_messages(conversation.id)
-    assert Enum.map(messages, & &1.body) == ["Hei"]
+    page = Chat.list_messages(conversation.id)
+    assert Enum.map(page.entries, & &1.body) == ["Hei"]
+    assert page.meta.has_more == %{before: false, after: false}
   end
 
   test "list_messages/2 respects limit", %{profile_a: profile_a, profile_b: profile_b} do
@@ -101,7 +102,10 @@ defmodule Messngr.ChatTest do
       {:ok, _} = Chat.send_message(conversation.id, profile_a.id, %{"body" => body})
     end
 
-    assert [%{body: "2"}, %{body: "3"}] = Chat.list_messages(conversation.id, limit: 2)
+    page = Chat.list_messages(conversation.id, limit: 2)
+    assert Enum.map(page.entries, & &1.body) == ["2", "3"]
+    assert page.meta.has_more.before
+    refute page.meta.has_more.after
   end
 
   test "send_message/3 attaches audio payload", %{profile_a: profile_a, profile_b: profile_b} do
@@ -129,5 +133,34 @@ defmodule Messngr.ChatTest do
     assert message.payload["media"]["durationMs"] == 1500
     assert message.payload["media"]["contentType"] == "audio/mpeg"
     assert %Upload{status: :consumed} = Repo.get!(Upload, upload.id)
+  end
+
+  test "list_conversations/2 includes unread counts and last message", %{profile_a: profile_a, profile_b: profile_b} do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+
+    {:ok, _} = Chat.send_message(conversation.id, profile_a.id, %{"body" => "Hei"})
+
+    page = Chat.list_conversations(profile_a.id)
+
+    assert [conversation_summary] = page.entries
+    assert conversation_summary.id == conversation.id
+    assert conversation_summary.unread_count == 1
+    assert conversation_summary.last_message.body == "Hei"
+    assert page.meta.has_more == %{before: false, after: false}
+  end
+
+  test "watch_conversation/2 tracks watchers", %{profile_a: profile_a, profile_b: profile_b} do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+
+    {:ok, watch_payload} = Chat.watch_conversation(conversation.id, profile_a.id)
+    assert watch_payload.count == 1
+    assert Enum.any?(watch_payload.watchers, &(&1.id == profile_a.id))
+
+    {:ok, watch_payload} = Chat.watch_conversation(conversation.id, profile_b.id)
+    assert watch_payload.count == 2
+
+    {:ok, unwatch_payload} = Chat.unwatch_conversation(conversation.id, profile_a.id)
+    assert unwatch_payload.count == 1
+    refute Enum.any?(unwatch_payload.watchers, &(&1.id == profile_a.id))
   end
 end
