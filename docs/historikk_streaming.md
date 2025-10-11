@@ -9,6 +9,12 @@ Denne notatet beskriver arbeidsplanen for å levere cursor-basert historikk og w
 - Legg til kanalhandlere for `message:sync`, `conversation:watch`, `conversation:unwatch` og broadcast backlog-sider ved ny tilkobling.
 - Skriv ExUnit-tester for paginering, watchers og PubSub-varslinger.
 
+### Status (Implementert)
+- `Messngr.Chat.list_messages/2` returnerer nå både meldingsliste og cursor-meta (`before_id`, `after_id`, `around_id`, `has_more`), og `Chat.broadcast_backlog/2` sprer resultatet over PubSub.
+- `Messngr.Chat.list_conversations/2` leverer siste melding og midlertidig `unread_count` for hver deltaker, med egne cursorer for paginering.
+- REST-endepunktene `/api/conversations` og `/api/conversations/:id/messages` serialiserer cursor-meta, mens `ConversationChannel` eksponerer `message:sync`, `conversation:watch` og `conversation:unwatch` med Presence-sporing.
+- ExUnit- og Channel-tester dekker cursorene, backlog-broadcast og watcher-flyt.
+
 ## Flutter
 - Refaktorer `ChatViewModel` til å støtte flere kanaler, lazy loading og cursor-baserte fetches.
 - Introduser `ChannelListViewModel` under `lib/features/chat/state/` og oppdater `ChatTimeline` for prepend/pagination.

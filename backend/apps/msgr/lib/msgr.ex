@@ -33,6 +33,7 @@ defmodule Messngr do
   end
   defdelegate send_message(conversation_id, profile_id, attrs), to: Chat
   def list_messages(conversation_id, opts \\ []), do: Chat.list_messages(conversation_id, opts)
+  def list_conversations(profile_id, opts \\ []), do: Chat.list_conversations(profile_id, opts)
   defdelegate ensure_membership(conversation_id, profile_id), to: Chat
   defdelegate create_media_upload(conversation_id, profile_id, attrs), to: Media, as: :create_upload
 

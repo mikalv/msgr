@@ -8,7 +8,7 @@ defmodule MessngrWeb.ConversationChannel do
   alias Ecto.Changeset
   alias Messngr
   alias Messngr.Chat
-  alias MessngrWeb.MessageJSON
+  alias MessngrWeb.{ConversationPresence, MessageJSON}
 
   @impl true
   def join("conversation:" <> conversation_id, params, socket) do
@@ -54,9 +54,45 @@ defmodule MessngrWeb.ConversationChannel do
     {:reply, {:error, %{errors: ["invalid payload"]}}, socket}
   end
 
+  def handle_in("message:sync", params, socket) when is_map(params) do
+    opts = build_list_opts(params)
+    page = Messngr.list_messages(socket.assigns.conversation_id, opts)
+
+    :ok = Chat.broadcast_backlog(socket.assigns.conversation_id, page)
+
+    {:reply, :ok, socket}
+  end
+
+  def handle_in("message:sync", _params, socket) do
+    {:reply, {:error, %{errors: ["invalid payload"]}}, socket}
+  end
+
+  def handle_in("conversation:watch", _params, socket) do
+    profile = socket.assigns.current_profile
+
+    {:ok, _} =
+      ConversationPresence.track(socket, profile.id, %{
+        profile_id: profile.id,
+        name: profile.name,
+        mode: profile.mode
+      })
+
+    {:reply, {:ok, %{watchers: ConversationPresence.list(socket)}}, socket}
+  end
+
+  def handle_in("conversation:unwatch", _params, socket) do
+    :ok = ConversationPresence.untrack(socket, socket.assigns.current_profile.id)
+    {:reply, :ok, socket}
+  end
+
   @impl true
   def handle_info({:message_created, message}, socket) do
     push(socket, "message_created", MessageJSON.show(%{message: message}))
+    {:noreply, socket}
+  end
+
+  def handle_info({:message_page, page}, socket) do
+    push(socket, "message_page", MessageJSON.index(%{page: page}))
     {:noreply, socket}
   end
 
@@ -95,5 +131,26 @@ defmodule MessngrWeb.ConversationChannel do
         String.replace(acc, "%{#{key}}", to_string(value))
       end)
     end)
+  end
+
+  defp build_list_opts(params) do
+    []
+    |> maybe_put(:limit, params["limit"])
+    |> maybe_put(:before_id, params["before_id"])
+    |> maybe_put(:after_id, params["after_id"])
+    |> maybe_put(:around_id, params["around_id"])
+  end
+
+  defp maybe_put(opts, _key, nil), do: opts
+
+  defp maybe_put(opts, :limit, value) do
+    case Integer.parse(to_string(value)) do
+      {int, _} when int > 0 and int <= 200 -> Keyword.put(opts, :limit, int)
+      _ -> opts
+    end
+  end
+
+  defp maybe_put(opts, key, value) when key in [:before_id, :after_id, :around_id] do
+    Keyword.put(opts, key, value)
   end
 end

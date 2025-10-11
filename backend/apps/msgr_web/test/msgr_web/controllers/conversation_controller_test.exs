@@ -1,7 +1,7 @@
 defmodule MessngrWeb.ConversationControllerTest do
   use MessngrWeb.ConnCase, async: true
 
-  alias Messngr.Accounts
+  alias Messngr.{Accounts, Chat}
 
   setup %{conn: conn} do
     {:ok, current_account} = Accounts.create_account(%{"display_name" => "Kari"})
@@ -35,5 +35,18 @@ defmodule MessngrWeb.ConversationControllerTest do
     conn = post(conn, ~p"/api/conversations", %{target_profile_id: target_profile.id})
 
     assert conn.status == 401
+  end
+
+  test "lists conversations with last message", %{conn: conn, target_profile: target_profile} do
+    conn_create = post(conn, ~p"/api/conversations", %{target_profile_id: target_profile.id})
+    %{"data" => %{"id" => conversation_id}} = json_response(conn_create, 200)
+
+    {:ok, _} = Chat.send_message(conversation_id, target_profile.id, %{"body" => "Hei"})
+
+    conn_index = get(conn, ~p"/api/conversations")
+
+    assert %{"data" => [conversation], "meta" => meta} = json_response(conn_index, 200)
+    assert conversation["last_message"]["body"] == "Hei"
+    assert meta["after_id"] == conversation_id
   end
 end

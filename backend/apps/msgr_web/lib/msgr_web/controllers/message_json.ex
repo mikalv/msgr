@@ -2,8 +2,8 @@ defmodule MessngrWeb.MessageJSON do
   alias Messngr.Chat.Message
   alias Messngr.Accounts.Profile
 
-  def index(%{messages: messages}) do
-    %{data: Enum.map(messages, &message/1)}
+  def index(%{page: %{entries: messages, meta: meta}}) do
+    %{data: Enum.map(messages, &message/1), meta: cursor_meta(meta)}
   end
 
   def show(%{message: message}) do
@@ -32,4 +32,13 @@ defmodule MessngrWeb.MessageJSON do
   end
 
   defp profile_payload(_), do: nil
+
+  defp cursor_meta(meta) do
+    %{
+      before_id: meta[:before_id],
+      after_id: meta[:after_id],
+      around_id: meta[:around_id],
+      has_more: meta[:has_more]
+    }
+  end
 end

@@ -32,6 +32,7 @@ defmodule MessngrWeb.Application do
     children =
       [
         MessngrWeb.Telemetry,
+        MessngrWeb.ConversationPresence,
         prometheus_child,
         # Start a worker by calling: MessngrWeb.Worker.start_link(arg)
         # {MessngrWeb.Worker, arg},

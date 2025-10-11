@@ -107,7 +107,10 @@ defmodule Messngr.AI do
   def conversation_reply(team_id, conversation_id, %Profile{} = profile, opts \\ []) do
     history_limit = Keyword.get(opts, :history_limit, 20)
 
-    history = Chat.list_messages(conversation_id, limit: history_limit)
+    history =
+      conversation_id
+      |> Chat.list_messages(limit: history_limit)
+      |> Map.get(:entries, [])
 
     system_prompt =
       opts

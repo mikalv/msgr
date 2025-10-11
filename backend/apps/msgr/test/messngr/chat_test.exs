@@ -90,8 +90,8 @@ defmodule Messngr.ChatTest do
     assert message.kind == :text
     assert message.profile.id == profile_a.id
 
-    messages = Chat.list_messages(conversation.id)
-    assert Enum.map(messages, & &1.body) == ["Hei"]
+    page = Chat.list_messages(conversation.id)
+    assert Enum.map(page.entries, & &1.body) == ["Hei"]
   end
 
   test "list_messages/2 respects limit", %{profile_a: profile_a, profile_b: profile_b} do
@@ -101,7 +101,50 @@ defmodule Messngr.ChatTest do
       {:ok, _} = Chat.send_message(conversation.id, profile_a.id, %{"body" => body})
     end
 
-    assert [%{body: "2"}, %{body: "3"}] = Chat.list_messages(conversation.id, limit: 2)
+    page = Chat.list_messages(conversation.id, limit: 2)
+    assert Enum.map(page.entries, & &1.body) == ["2", "3"]
+    assert page.meta.has_more
+    assert page.meta.before_id
+    assert page.meta.after_id
+  end
+
+  test "list_messages/2 supports after_id cursor", %{profile_a: profile_a, profile_b: profile_b} do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+
+    Enum.each(1..3, fn index ->
+      {:ok, _} = Chat.send_message(conversation.id, profile_a.id, %{"body" => Integer.to_string(index)})
+    end)
+
+    first_page = Chat.list_messages(conversation.id, limit: 2)
+    after_cursor = first_page.meta.after_id
+
+    page = Chat.list_messages(conversation.id, limit: 2, after_id: after_cursor)
+
+    assert Enum.map(page.entries, & &1.body) == ["3"]
+    refute page.meta.has_more
+    assert page.meta.before_id
+  end
+
+  test "list_conversations/2 returns unread counts and last message", %{
+    profile_a: profile_a,
+    profile_b: profile_b
+  } do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+
+    {:ok, _} = Chat.send_message(conversation.id, profile_b.id, %{"body" => "Hei"})
+    {:ok, _} = Chat.send_message(conversation.id, profile_b.id, %{"body" => "Hvordan går det?"})
+
+    page = Chat.list_conversations(profile_a.id, limit: 10)
+
+    assert length(page.entries) == 1
+
+    [%{conversation: entry_conversation, unread_count: unread, last_message: last}] = page.entries
+
+    assert entry_conversation.id == conversation.id
+    assert unread == 2
+    assert last.body == "Hvordan går det?"
+    assert page.meta.after_id == conversation.id
+    assert page.meta.before_id == conversation.id
   end
 
   test "send_message/3 attaches audio payload", %{profile_a: profile_a, profile_b: profile_b} do
