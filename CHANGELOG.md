@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Startet migreringen til ny Flutter-arkitektur med modulært `app/bootstrap`,
+  ryddigere `main.dart` og første test for loggoppsettet.
 - Lagt ved `IMPROVE_ARCHITECTURE.md` med veikart for å modernisere Flutter-klientens struktur,
   state-håndtering og moduloppdeling.
 - Added initial WebRTC signalling stack with in-memory call registry, Phoenix `rtc:*` channel, tests, documentation, and a dockerised coturn service for TURN/STUN.
