@@ -1,2 +1,7 @@
 ExUnit.start()
-Ecto.Adapters.SQL.Sandbox.mode(Messngr.Repo, :manual)
+
+try do
+  Ecto.Adapters.SQL.Sandbox.mode(Messngr.Repo, :manual)
+rescue
+  _ -> :ok
+end

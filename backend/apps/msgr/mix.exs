@@ -49,6 +49,7 @@ defmodule Messngr.MixProject do
       {:finch, "~> 0.13"},
       {:guardian, "~> 2.3"},
       {:guardian_db, "~> 3.0"},
+      {:bypass, "~> 2.1", only: :test}
     ]
   end
 
