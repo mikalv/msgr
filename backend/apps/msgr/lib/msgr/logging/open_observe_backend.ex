@@ -3,7 +3,8 @@ defmodule Messngr.Logging.OpenObserveBackend do
   Logger backend that forwards structured log entries to OpenObserve.
 
   The backend posts each log record as a JSON payload to the configured
-  ingestion endpoint. Configuration lives under
+  ingestion endpoint or forwards the payload to StoneMQ so a downstream
+  consumer can ingest it. Configuration lives under
   `config :logger, Messngr.Logging.OpenObserveBackend` and can be overridden with
   environment variables in `dev.exs`.
   """
@@ -12,13 +13,22 @@ defmodule Messngr.Logging.OpenObserveBackend do
 
   require Logger
 
+  alias Msgr.Connectors.Envelope
+
   defstruct [
     :auth_header,
     :enabled,
+    :envelope_action,
+    :envelope_service,
     :http_client,
     :level,
     :metadata_keys,
+    :queue,
+    :queue_opts,
+    :queue_topic,
     :service,
+    :stream,
+    :transport,
     :url
   ]
 
@@ -29,7 +39,7 @@ defmodule Messngr.Logging.OpenObserveBackend do
       |> load_options()
       |> build_state()
 
-    if state.enabled do
+    if state.enabled and state.transport == :http do
       ensure_clients_started()
     end
 
@@ -49,10 +59,10 @@ defmodule Messngr.Logging.OpenObserveBackend do
 
   def handle_event({level, _gl, {Logger, message, timestamp, metadata}}, state) do
     if Logger.compare_levels(level, state.level) != :lt do
-      payload =
-        build_payload(level, message, timestamp, metadata, state.metadata_keys, state.service)
+      entry =
+        build_entry(level, message, timestamp, metadata, state.metadata_keys, state.service)
 
-      send_payload(state, payload)
+      send_payload(state, entry)
     end
 
     {:ok, state}
@@ -75,26 +85,42 @@ defmodule Messngr.Logging.OpenObserveBackend do
   defp build_state(opts) do
     opts_map = Enum.into(opts, %{})
 
-    endpoint =
-      opts_map
-      |> Map.fetch!(:endpoint)
-      |> String.trim_trailing("/")
-
+    endpoint = opts_map |> Map.get(:endpoint, "") |> String.trim_trailing("/")
     org = Map.get(opts_map, :org, "default") |> String.trim("/")
     stream = Map.get(opts_map, :stream, "backend") |> String.trim("/")
     dataset = Map.get(opts_map, :dataset, "_json") |> to_string() |> String.trim("/")
     username = Map.get(opts_map, :username)
     password = Map.get(opts_map, :password)
     enabled? = Map.get(opts_map, :enabled, true)
+    transport = Map.get(opts_map, :transport, :http)
+    queue_module = Map.get(opts_map, :queue_module)
+    queue_opts = Map.get(opts_map, :queue_opts, [])
+    queue_topic = Map.get(opts_map, :queue_topic, "observability/logs")
+    envelope_service = Map.get(opts_map, :envelope_service, "observability")
+    envelope_action = Map.get(opts_map, :envelope_action, "log")
+
+    enabled? =
+      enabled? &&
+        case transport do
+          :stonemq -> not is_nil(queue_module)
+          _ -> endpoint != ""
+        end
 
     %__MODULE__{
-      enabled: enabled? && endpoint != "",
+      enabled: enabled?,
       url: build_url(endpoint, org, stream, dataset),
       metadata_keys: Map.get(opts_map, :metadata, []),
       level: Map.get(opts_map, :level, :info),
       service: Map.get(opts_map, :service, "msgr_backend"),
+      stream: stream,
       auth_header: build_auth(username, password),
-      http_client: Map.get(opts_map, :http_client, &default_request/4)
+      http_client: Map.get(opts_map, :http_client, &default_request/4),
+      transport: transport,
+      queue: queue_module,
+      queue_opts: queue_opts,
+      queue_topic: queue_topic,
+      envelope_service: envelope_service,
+      envelope_action: envelope_action
     }
   end
 
@@ -114,6 +140,8 @@ defmodule Messngr.Logging.OpenObserveBackend do
     {:ok, _} = Application.ensure_all_started(:ssl)
   end
 
+  defp build_url("", _org, _stream, _dataset), do: ""
+
   defp build_url(endpoint, org, stream, dataset) do
     [endpoint, "api", org, "logs", stream, dataset]
     |> Enum.map(&String.trim(&1, "/"))
@@ -129,7 +157,7 @@ defmodule Messngr.Logging.OpenObserveBackend do
     "Basic #{credentials}"
   end
 
-  defp build_payload(level, message, timestamp, metadata, metadata_keys, service) do
+  defp build_entry(level, message, timestamp, metadata, metadata_keys, service) do
     metadata_map =
       metadata
       |> Enum.into(%{})
@@ -138,16 +166,13 @@ defmodule Messngr.Logging.OpenObserveBackend do
         {to_string(key), inspect_metadata(value)}
       end)
 
-    entry =
-      %{
-        "level" => Atom.to_string(level),
-        "message" => normalize_message(message),
-        "service" => service,
-        "timestamp" => format_timestamp(timestamp)
-      }
-      |> maybe_put_metadata(metadata_map)
-
-    Jason.encode!([entry])
+    %{
+      "level" => Atom.to_string(level),
+      "message" => normalize_message(message),
+      "service" => service,
+      "timestamp" => format_timestamp(timestamp)
+    }
+    |> maybe_put_metadata(metadata_map)
   end
 
   defp normalize_message(message) when is_binary(message), do: message
@@ -155,6 +180,7 @@ defmodule Messngr.Logging.OpenObserveBackend do
   defp normalize_message(message), do: inspect(message)
 
   defp inspect_metadata(%{__struct__: _} = value), do: inspect(value)
+
   defp inspect_metadata(value) when is_tuple(value) or is_map(value) or is_list(value),
     do: inspect(value)
 
@@ -166,14 +192,16 @@ defmodule Messngr.Logging.OpenObserveBackend do
     |> DateTime.to_iso8601()
   end
 
-  defp send_payload(%{http_client: client, url: url, auth_header: auth, enabled: true}, payload) do
+  defp send_payload(%{transport: :http, enabled: true} = state, entry) do
+    payload = Jason.encode!([entry])
+
     headers =
       [{'content-type', 'application/json'}]
-      |> maybe_add_auth(auth)
+      |> maybe_add_auth(state.auth_header)
 
-    request = {String.to_charlist(url), headers, 'application/json', payload}
+    request = {String.to_charlist(state.url), headers, 'application/json', payload}
 
-    case client.(:post, request, [], []) do
+    case state.http_client.(:post, request, [], []) do
       {:ok, _response} -> :ok
       {:error, reason} ->
         IO.warn("Failed to deliver log entry to OpenObserve: #{inspect(reason)}")
@@ -181,7 +209,11 @@ defmodule Messngr.Logging.OpenObserveBackend do
     end
   end
 
-  defp send_payload(_state, _payload), do: :ok
+  defp send_payload(%{transport: :stonemq} = state, entry) do
+    publish_queue(state, entry)
+  end
+
+  defp send_payload(_state, _entry), do: :ok
 
   defp maybe_add_auth(headers, nil), do: headers
 
@@ -195,3 +227,25 @@ defmodule Messngr.Logging.OpenObserveBackend do
   defp default_request(method, request, headers, options) do
     :httpc.request(method, request, headers, options)
   end
+
+  defp publish_queue(%{enabled: true, queue: queue} = state, entry) when not is_nil(queue) do
+    metadata = %{
+      "destination" => "openobserve",
+      "stream" => state.stream,
+      "service" => state.service
+    }
+
+    payload = %{"entry" => entry}
+
+    case Envelope.new(state.envelope_service, state.envelope_action, payload, metadata: metadata) do
+      {:ok, envelope} ->
+        queue.publish(state.queue_topic, Envelope.to_map(envelope), state.queue_opts)
+
+      {:error, reason} ->
+        IO.warn("Failed to deliver log entry to OpenObserve via StoneMQ: #{inspect(reason)}")
+        :error
+    end
+  end
+
+  defp publish_queue(_state, _entry), do: :ok
+end

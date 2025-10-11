@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Routed backend logger output through StoneMQ envelopes so `Messngr.Logging.OpenObserveBackend` can forward entries to
+  OpenObserve via the `observability/logs` topic, including StoneMQ transport configuration and tests.
+- Added StoneMQ-aware OpenObserve loggers to the Go and Python bridge SDKs so daemons can emit envelopes compatible with the
+  backend pipeline, with unit test coverage.
 - Finalised the StoneMQ bridge envelope contract with typed Elixir helpers,
   updated ServiceBridge publishing/request flows, and added envelope test
   coverage.

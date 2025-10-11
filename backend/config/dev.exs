@@ -68,7 +68,24 @@ config :logger, {Messngr.Logging.OpenObserveBackend, :openobserve_dev},
   password: System.get_env("OPENOBSERVE_PASSWORD", "Complexpass#123"),
   metadata: [:application, :module, :function, :line, :request_id, :pid],
   level: :debug,
-  service: System.get_env("OPENOBSERVE_SERVICE", "msgr_backend_dev")
+  service: System.get_env("OPENOBSERVE_SERVICE", "msgr_backend_dev"),
+  transport:
+    case String.downcase(System.get_env("OPENOBSERVE_TRANSPORT", "http")) do
+      "stonemq" -> :stonemq
+      _ -> :http
+    end,
+  queue_topic: System.get_env("OPENOBSERVE_QUEUE_TOPIC", "observability/logs"),
+  queue_module:
+    System.get_env("OPENOBSERVE_QUEUE_MODULE")
+    |> case do
+      nil -> nil
+      "" -> nil
+      module ->
+        module
+        |> String.split(".")
+        |> Enum.map(&String.to_atom/1)
+        |> Module.concat()
+    end
 
 config :msgr_web, :prometheus,
   enabled: true,
