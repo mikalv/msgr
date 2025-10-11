@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Added initial WebRTC signalling stack with in-memory call registry, Phoenix `rtc:*` channel, tests, documentation, and a dockerised coturn service for TURN/STUN.
+- Tightened direct-call support by capping participants to vert + én, utvidet testdekning og dokumentasjon av Flutter-klientplanen.
 - Introduced conversation structure types (familie, bedrift, vennegjeng, prosjekt)
   with private/team visibility, backend validation, and updated Flutter UI/API for
   creating skjulte kanaler og grupper.

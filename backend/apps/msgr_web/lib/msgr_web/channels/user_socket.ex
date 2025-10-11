@@ -43,6 +43,7 @@ defmodule MessngrWeb.UserSocket do
 
   channel "msgr:device", MessngrWeb.DeviceChannel
   channel "conversation:*", MessngrWeb.ConversationChannel
+  channel "rtc:*", MessngrWeb.RTCChannel
 
   # Socket IDs are topics that allow you to identify all sockets for a given user:
   #
