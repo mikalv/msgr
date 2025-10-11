@@ -1,6 +1,16 @@
 # Changelog
 
 ## Unreleased
+- Introduced conversation structure types (familie, bedrift, vennegjeng, prosjekt)
+  with private/team visibility, backend validation, and updated Flutter UI/API for
+  creating skjulte kanaler og grupper.
+- Utvidet samtalekonseptet med støtte for `group`- og `channel`-typer i Elixir-
+  backenden, nye API-endepunkter og validering av temaer.
+- Lagt til kontaktskjema, migrasjoner og REST-endepunkter for import og
+  identitetsoppslag samt Flutter-klienter for begge operasjoner.
+- Oppdatert Flutter-chatmodeller, API-klient, view-model og opprettelsesdialog
+  for å forstå kanal- og gruppesamtaler og tilgjengeliggjort enhetstester for
+  parsing av tråder.
 - Utvidet `family_space`-biblioteket med delt notatfunksjon, REST-endepunkter og migrasjon for `space_notes`.
 - Replaced the Telegram/Matrix HTTP clients with queue-driven bridge facades for Telegram, Matrix, IRC, and XMPP plus a shared `ServiceBridge` helper and in-memory queue adapter tests.
 - Introduced a queue behaviour contract to standardise `bridge/<service>/<action>` envelopes with trace IDs for all connectors.

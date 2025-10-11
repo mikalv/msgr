@@ -41,6 +41,8 @@ defmodule MessngrWeb.Router do
       resources "/notes", FamilyNoteController, only: [:index, :create, :show, :update, :delete]
     end
     post "/conversations/:id/assistant", AIController, :conversation_reply
+    post "/contacts/import", ContactController, :import
+    post "/contacts/lookup", ContactController, :lookup
     post "/ai/chat", AIController, :chat
     post "/ai/summarize", AIController, :summarize
     post "/ai/run", AIController, :run

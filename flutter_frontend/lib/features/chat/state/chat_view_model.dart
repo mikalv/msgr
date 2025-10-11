@@ -73,6 +73,50 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> createGroupConversation(String topic, List<String> participantIds) async {
+    if (_identity == null) return;
+
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      _thread = await _api.createGroupConversation(
+        current: _identity!,
+        topic: topic,
+        participantIds: participantIds,
+      );
+
+      await fetchMessages();
+    } on ApiException catch (error) {
+      debugPrint('createGroupConversation failed: $error');
+      _setError('Kunne ikke opprette gruppe (${error.statusCode}).');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> createChannelConversation(String topic, List<String> participantIds) async {
+    if (_identity == null) return;
+
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      _thread = await _api.createChannelConversation(
+        current: _identity!,
+        topic: topic,
+        participantIds: participantIds,
+      );
+
+      await fetchMessages();
+    } on ApiException catch (error) {
+      debugPrint('createChannelConversation failed: $error');
+      _setError('Kunne ikke opprette kanal (${error.statusCode}).');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<void> sendMessage(String text) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty || _identity == null || _thread == null) {
@@ -203,7 +247,7 @@ class ChatViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _setError(String message) {
+  void _setError(String? message) {
     _error = message;
     notifyListeners();
   }
