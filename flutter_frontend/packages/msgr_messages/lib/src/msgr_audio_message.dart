@@ -1,0 +1,132 @@
+import 'package:meta/meta.dart';
+
+import 'msgr_message.dart';
+import 'msgr_theme.dart';
+
+/// Audio message with playback metadata and waveform support.
+@immutable
+class MsgrAudioMessage extends MsgrAuthoredMessage {
+  /// Creates a new audio message entry.
+  const MsgrAudioMessage({
+    required super.id,
+    required this.url,
+    this.caption,
+    this.duration,
+    this.waveform,
+    this.mimeType,
+    super.status,
+    required super.profileId,
+    required super.profileName,
+    required super.profileMode,
+    super.sentAt,
+    super.insertedAt,
+    super.isLocal,
+    super.theme,
+  }) : super(kind: MsgrMessageKind.audio);
+
+  /// Public playback URL for the audio resource.
+  final String url;
+
+  /// Optional caption associated with the clip.
+  final String? caption;
+
+  /// Duration of the audio in seconds.
+  final double? duration;
+
+  /// Optional normalised waveform samples (0-1).
+  final List<double>? waveform;
+
+  /// MIME type for the stored resource.
+  final String? mimeType;
+
+  /// Creates a copy with the provided overrides.
+  MsgrAudioMessage copyWith({
+    String? id,
+    String? url,
+    String? caption,
+    double? duration,
+    List<double>? waveform,
+    String? mimeType,
+    String? profileId,
+    String? profileName,
+    String? profileMode,
+    String? status,
+    DateTime? sentAt,
+    DateTime? insertedAt,
+    bool? isLocal,
+    MsgrMessageTheme? theme,
+  }) {
+    return MsgrAudioMessage(
+      id: id ?? this.id,
+      url: url ?? this.url,
+      caption: caption ?? this.caption,
+      duration: duration ?? this.duration,
+      waveform: waveform ?? this.waveform,
+      mimeType: mimeType ?? this.mimeType,
+      profileId: profileId ?? this.profileId,
+      profileName: profileName ?? this.profileName,
+      profileMode: profileMode ?? this.profileMode,
+      status: status ?? this.status,
+      sentAt: sentAt ?? this.sentAt,
+      insertedAt: insertedAt ?? this.insertedAt,
+      isLocal: isLocal ?? this.isLocal,
+      theme: theme ?? this.theme,
+    );
+  }
+
+  /// Recreates an [MsgrAudioMessage] from a serialised map.
+  factory MsgrAudioMessage.fromMap(Map<String, dynamic> map) {
+    final author = MsgrAuthoredMessage.readAuthorMap(map);
+    final waveform = (map['waveform'] as List?)
+        ?.map((value) => (value as num).toDouble())
+        .toList(growable: false);
+
+    return MsgrAudioMessage(
+      id: map['id'] as String,
+      url: map['url'] as String? ?? '',
+      caption: map['caption'] as String?,
+      duration: (map['duration'] as num?)?.toDouble(),
+      waveform: waveform,
+      mimeType: map['mimeType'] as String? ?? map['contentType'] as String?,
+      profileId: author.profileId,
+      profileName: author.profileName,
+      profileMode: author.profileMode,
+      status: author.status,
+      sentAt: author.sentAt,
+      insertedAt: author.insertedAt,
+      isLocal: author.isLocal,
+      theme: MsgrMessage.readTheme(map),
+    );
+  }
+
+  @override
+  Map<String, dynamic> toMap() {
+    return {
+      'type': kind.name,
+      'id': id,
+      'url': url,
+      'caption': caption,
+      'duration': duration,
+      'waveform': waveform,
+      'mimeType': mimeType,
+      ...toAuthorMap(),
+      'sentAt': MsgrMessage.encodeTimestamp(sentAt),
+      'insertedAt': MsgrMessage.encodeTimestamp(insertedAt),
+      'isLocal': isLocal,
+      'theme': theme.toMap(),
+    };
+  }
+
+  @override
+  List<Object?> get props => [
+        ...super.props,
+        url,
+        caption,
+        duration,
+        waveform,
+        mimeType,
+      ];
+
+  @override
+  MsgrAudioMessage themed(MsgrMessageTheme theme) => copyWith(theme: theme);
+}

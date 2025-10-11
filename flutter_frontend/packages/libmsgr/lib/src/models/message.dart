@@ -91,8 +91,20 @@ class MMessage extends BaseModel {
       updatedAt: map['updated_at'].runtimeType == DateTime
           ? map['updated_at']
           : DateTime.parse(map['updated_at']),
-      kIsSystemMsg: map['is_system_msg'],
+      kIsSystemMsg: map['is_system_msg'] is bool
+          ? map['is_system_msg']
+          : (map['is_system_msg'] as num) != 0,
       inReplyToMsgID: map['in_reply_to_id'],
+      isServerAck: map['is_server_ack'] is bool
+          ? map['is_server_ack']
+          : map['is_server_ack'] == null
+              ? true
+              : (map['is_server_ack'] as num) != 0,
+      isMsgRead: map['is_msg_read'] is bool
+          ? map['is_msg_read']
+          : map['is_msg_read'] == null
+              ? false
+              : (map['is_msg_read'] as num) != 0,
     );
   }
 
@@ -107,6 +119,8 @@ class MMessage extends BaseModel {
       'updated_at': updatedAt.toIso8601String(),
       'is_system_msg': kIsSystemMsg,
       'in_reply_to_id': inReplyToMsgID,
+      'is_server_ack': isServerAck,
+      'is_msg_read': isMsgRead,
     };
   }
 

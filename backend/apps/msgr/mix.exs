@@ -48,7 +48,8 @@ defmodule Messngr.MixProject do
       {:swoosh, "~> 1.5"},
       {:finch, "~> 0.13"},
       {:guardian, "~> 2.3"},
-      {:guardian_db, "~> 3.0"}
+      {:guardian_db, "~> 3.0"},
+      {:mox, "~> 0.5", only: :test}
     ]
   end
 

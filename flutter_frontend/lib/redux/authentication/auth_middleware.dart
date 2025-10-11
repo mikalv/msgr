@@ -63,8 +63,8 @@ void Function(Store<AppState> store, OnWebSocketConnectedAction action,
     NextDispatcher next) _onWebSocketConnected() {
   return (store, action, next) async {
     next(action);
-    final RepositoryFactory repositoryFactory = RepositoryFactory();
-    TeamRepositories repos = repositoryFactory
+    final repositoryFactory = LibMsgr().repositoryFactory;
+    final repos = repositoryFactory
         .getRepositories(store.state.authState.currentTeamName!);
     for (var room in repos.roomRepository.items) {
       LibMsgr().getWebsocketConnection()?.joinChannel(

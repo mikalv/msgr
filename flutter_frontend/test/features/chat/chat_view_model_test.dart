@@ -50,7 +50,7 @@ class StubChatApi implements ChatApi {
     required String conversationId,
     required String body,
   }) async {
-    final message = ChatMessage(
+    final message = ChatMessage.text(
       id: 'msg-${messages.length + 1}',
       body: body,
       profileId: current.profileId,
@@ -106,7 +106,7 @@ class StubRealtime implements ChatRealtime {
   Future<ChatMessage> send(String body) async {
     sentBodies.add(body);
 
-    final message = ChatMessage(
+    final message = ChatMessage.text(
       id: 'ws-${sentBodies.length}',
       body: body,
       profileId: identity?.profileId ?? 'profile-self',
@@ -140,7 +140,7 @@ void main() {
 
   test('bootstrap creates identities and loads messages', () async {
     final api = StubChatApi();
-    api.messages.add(ChatMessage(
+    api.messages.add(ChatMessage.text(
       id: 'initial',
       body: 'Hei der!',
       profileId: 'profile-peer',
@@ -181,7 +181,7 @@ void main() {
     final viewModel = ChatViewModel(api: api, realtime: realtime);
     await viewModel.bootstrap();
 
-    final incoming = ChatMessage(
+    final incoming = ChatMessage.text(
       id: 'incoming-1',
       body: 'Hei fra andre',
       profileId: 'peer-profile',

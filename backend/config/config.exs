@@ -7,6 +7,16 @@ config :msgr,
 config :msgr, Messngr.Mailer,
   adapter: Swoosh.Adapters.Local
 
+config :msgr, :llm_client, Messngr.AI.LlmGatewayClient
+
+config :msgr, Messngr.Media.Storage,
+  bucket: System.get_env("MEDIA_BUCKET", "msgr-media"),
+  endpoint: System.get_env("MEDIA_ENDPOINT", "http://localhost:9000"),
+  public_endpoint: System.get_env("MEDIA_PUBLIC_ENDPOINT")
+
+config :msgr, Messngr.Media,
+  upload_ttl_seconds: String.to_integer(System.get_env("MEDIA_UPLOAD_TTL", "900"))
+
 host = System.get_env("PHX_HOST", "localhost")
 
 config :msgr_web, MessngrWeb.Endpoint,
@@ -67,3 +77,39 @@ config :logger, Messngr.Logging.OpenObserveBackend,
 config :phoenix, :stacktrace_depth, 20
 
 config :phoenix, :plug_init_mode, :runtime
+
+config :llm_gateway,
+  default_provider: :openai,
+  default_model: "gpt-4o-mini",
+  http_client: LlmGateway.HTTP,
+  team_resolver: {LlmGateway.TeamKeyResolver.Noop, []},
+  providers: %{
+    openai: [
+      module: LlmGateway.Provider.OpenAI,
+      base_url: "https://api.openai.com/v1",
+      required_credentials: [:api_key]
+    ],
+    azure_openai: [
+      module: LlmGateway.Provider.AzureOpenAI,
+      endpoint: System.get_env("AZURE_OPENAI_ENDPOINT", "https://example-resource.openai.azure.com"),
+      deployment: System.get_env("AZURE_OPENAI_DEPLOYMENT", "gpt-4o"),
+      api_version: System.get_env("AZURE_OPENAI_API_VERSION", "2024-05-01-preview"),
+      required_credentials: [:api_key]
+    ],
+    google_vertex: [
+      module: LlmGateway.Provider.GoogleVertex,
+      endpoint: "https://generativelanguage.googleapis.com",
+      required_credentials: [:api_key]
+    ],
+    openai_compatible: [
+      module: LlmGateway.Provider.OpenAI,
+      base_url: System.get_env("SELF_HOSTED_OPENAI_URL", "https://openrouter.ai/api/v1"),
+      required_credentials: [:api_key]
+    ]
+  },
+  system_credentials: %{
+    openai: %{api_key: System.get_env("OPENAI_API_KEY")},
+    azure_openai: %{api_key: System.get_env("AZURE_OPENAI_API_KEY")},
+    google_vertex: %{api_key: System.get_env("GOOGLE_VERTEX_API_KEY")},
+    openai_compatible: %{api_key: System.get_env("SELF_HOSTED_OPENAI_KEY")}
+  }

@@ -79,19 +79,21 @@ class _PinputLoginCodeState extends State<PinputLoginCode> {
         authState.pendingTargetHint ?? authState.pendingEmail ?? authState.pendingMsisdn;
     final debugCode = authState.pendingDebugCode;
 
-    const focusedBorderColor = Color.fromRGBO(23, 171, 144, 1);
-    const fillColor = Color.fromRGBO(243, 246, 249, 0);
-    const borderColor = Color.fromRGBO(23, 171, 144, 0.4);
+    const focusedBorderColor = Color(0xFF6366F1);
+    final fillColor = Colors.white.withOpacity(0.06);
+    final borderColor = Colors.white.withOpacity(0.28);
 
     final defaultPinTheme = PinTheme(
       width: 56,
       height: 56,
       textStyle: const TextStyle(
         fontSize: 22,
-        color: Color.fromRGBO(30, 60, 87, 1),
+        color: Colors.white,
+        fontWeight: FontWeight.w600,
       ),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(19),
+        color: Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: borderColor),
       ),
     );
@@ -104,24 +106,33 @@ class _PinputLoginCodeState extends State<PinputLoginCode> {
         children: [
           if (targetHint != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.only(bottom: 20),
               child: Column(
                 children: [
                   const Text(
                     'Skriv inn engangskoden vi nettopp sendte deg',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Text(
                     targetHint,
-                    style: const TextStyle(color: Colors.grey),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white70),
                   ),
                   if (debugCode != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(
                         'Kode (kun utvikling): $debugCode',
-                        style: const TextStyle(fontSize: 12, color: Colors.orange),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.amberAccent,
+                        ),
                       ),
                     )
                 ],
@@ -173,7 +184,7 @@ class _PinputLoginCodeState extends State<PinputLoginCode> {
               submittedPinTheme: defaultPinTheme.copyWith(
                 decoration: defaultPinTheme.decoration!.copyWith(
                   color: fillColor,
-                  borderRadius: BorderRadius.circular(19),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: focusedBorderColor),
                 ),
               ),
@@ -181,13 +192,6 @@ class _PinputLoginCodeState extends State<PinputLoginCode> {
                 border: Border.all(color: Colors.redAccent),
               ),
             ),
-          ),
-          TextButton(
-            onPressed: () {
-              focusNode.unfocus();
-              formKey.currentState!.validate();
-            },
-            child: const Text('Validate'),
           ),
         ],
       ),

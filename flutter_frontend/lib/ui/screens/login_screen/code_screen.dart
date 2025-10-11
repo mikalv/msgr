@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:messngr/ui/widgets/auth/auth_shell.dart';
 import 'package:messngr/ui/widgets/pinput_login_code.dart';
 
 class CodeScreen extends StatelessWidget {
@@ -6,47 +7,31 @@ class CodeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF1F1C2C), Color(0xFF928DAB)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Card(
-              elevation: 20,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
-              ),
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.lock_clock_rounded,
-                        size: 48, color: Color(0xFF4F46E5)),
-                    SizedBox(height: 16),
-                    Text(
-                      'Skriv inn engangskoden',
-                      style:
-                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 24),
-                    PinputLoginCode(),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+    return AuthShell(
+      icon: Icons.lock_clock_rounded,
+      title: 'Skriv inn engangskoden',
+      subtitle:
+          'Koden ble sendt til kontaktpunktet du valgte. Den utløper snart, så legg den inn med en gang.',
+      illustrationAsset: 'assets/images/welcome/key.png',
+      bulletPoints: const [
+        'Hold koden hemmelig – del den aldri med andre.',
+        'Du kan be om en ny kode hvis denne utløper.',
+      ],
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: 8),
+          PinputLoginCode(),
+        ],
       ),
+      footer: const [
+        Text(
+          'Sjekk søppelposten eller vent et øyeblikk om koden ikke har kommet ennå.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white38),
+        ),
+      ],
     );
   }
 }

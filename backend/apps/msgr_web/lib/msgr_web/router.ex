@@ -22,6 +22,7 @@ defmodule MessngrWeb.Router do
     pipe_through [:api, :actor]
 
     post "/conversations", ConversationController, :create
+    post "/conversations/:id/uploads", MediaUploadController, :create
     get "/conversations/:id/messages", MessageController, :index
     post "/conversations/:id/messages", MessageController, :create
 
@@ -39,6 +40,10 @@ defmodule MessngrWeb.Router do
 
       resources "/notes", FamilyNoteController, only: [:index, :create, :show, :update, :delete]
     end
+    post "/conversations/:id/assistant", AIController, :conversation_reply
+    post "/ai/chat", AIController, :chat
+    post "/ai/summarize", AIController, :summarize
+    post "/ai/run", AIController, :run
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

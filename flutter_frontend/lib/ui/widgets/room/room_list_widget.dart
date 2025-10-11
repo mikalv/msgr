@@ -23,6 +23,7 @@ class RoomListWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final theList = ListView.builder(
       shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: rooms.length,
       itemBuilder: (BuildContext context, int index) {
         final Room room = rooms[index];
