@@ -139,6 +139,108 @@ Feil:
 
 ## REST-endepunkter
 
+### Importere kontakter
+
+`POST /api/contacts/import`
+
+Klienten sender inn en batch med kontakter som skal knyttes til den aktive
+kontoen. Backend lagrer (eller oppdaterer) kontakter per konto/profil og
+returnerer de normaliserte radene. Requesten må inkludere
+`x-account-id` og `x-profile-id`-headerne for å identifisere avsenderen.
+
+**Request**
+
+```json
+{
+  "contacts": [
+    {
+      "name": "Eva Nordmann",
+      "email": "eva@example.com",
+      "phone_number": "+47 900 00 000",
+      "labels": ["venn", "jobb"],
+      "metadata": {"source": "device"}
+    }
+  ]
+}
+```
+
+**Respons 200**
+
+```json
+{
+  "data": [
+    {
+      "id": "contact-uuid",
+      "name": "Eva Nordmann",
+      "email": "eva@example.com",
+      "phone_number": "4790000000",
+      "labels": ["venn", "jobb"],
+      "metadata": {"source": "device"},
+      "account_id": "acct-uuid",
+      "profile_id": "profile-uuid"
+    }
+  ]
+}
+```
+
+Valideringsfeil gir `400 Bad Request`. Ugyldige kontakter ruller hele batchen
+tilbake og svarer med `422 Unprocessable Entity`.
+
+### Matche kjente kontakter
+
+`POST /api/contacts/lookup`
+
+Tar inn en liste med e-poster eller telefonnumre og returnerer hvilke av dem som
+matcher eksisterende msgr-identiteter. Responsen inkluderer hvilken konto som
+ble funnet, hvilken identitet som traff, og et profil-sammendrag når vi kjenner
+minst én profil.
+
+**Request**
+
+```json
+{
+  "targets": [
+    {"email": "eva@example.com"},
+    {"phone_number": "+47 900 00 000"}
+  ]
+}
+```
+
+**Respons 200**
+
+```json
+{
+  "data": [
+    {
+      "query": {
+        "email": "eva@example.com",
+        "phone_number": null
+      },
+      "match": {
+        "account_id": "acct-uuid",
+        "account_name": "Eva Nordmann",
+        "identity_kind": "email",
+        "identity_value": "eva@example.com",
+        "profile": {
+          "id": "profile-uuid",
+          "name": "Privat",
+          "mode": "personal"
+        }
+      }
+    },
+    {
+      "query": {
+        "email": null,
+        "phone_number": "4790000000"
+      },
+      "match": null
+    }
+  ]
+}
+```
+
+Når ingen treff finnes returneres `match: null` for den aktuelle oppføringen.
+
 ### Opprette konto
 
 `POST /api/users`
