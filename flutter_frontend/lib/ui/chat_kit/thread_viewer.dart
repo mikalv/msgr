@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:messngr/features/chat/models/reaction_aggregate.dart';
+
 import 'presence_badge.dart';
 import 'reaction_picker.dart';
 import 'theme/chat_profile_theme.dart';
@@ -14,8 +16,10 @@ class ChatThreadMessage {
     required this.timestamp,
     required this.isOwn,
     this.avatar,
-    this.reactions = const <String, int>{},
+    this.reactions = const <ReactionAggregate>[],
     this.isOnline = false,
+    this.isEdited = false,
+    this.isDeleted = false,
   });
 
   final String id;
@@ -25,8 +29,10 @@ class ChatThreadMessage {
   final DateTime timestamp;
   final bool isOwn;
   final ImageProvider<Object>? avatar;
-  final Map<String, int> reactions;
+  final List<ReactionAggregate> reactions;
   final bool isOnline;
+  final bool isEdited;
+  final bool isDeleted;
 }
 
 class ChatThreadViewer extends StatelessWidget {
@@ -103,13 +109,24 @@ class _ThreadMessageTile extends StatelessWidget {
             message.isOwn ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Text(
-            message.body,
+            message.isDeleted ? 'Denne meldingen ble slettet.' : message.body,
             style: profileTheme.textStyle.copyWith(
               color: message.isOwn
                   ? profileTheme.textStyle.color
                   : theme.colorScheme.onSurface,
+              fontStyle: message.isDeleted ? FontStyle.italic : FontStyle.normal,
             ),
           ),
+          if (message.isEdited && !message.isDeleted)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Redigert',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
           const SizedBox(height: 8),
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -137,10 +154,10 @@ class _ThreadMessageTile extends StatelessWidget {
               spacing: 8,
               runSpacing: 6,
               children: [
-                for (final entry in message.reactions.entries)
+                for (final aggregate in message.reactions)
                   _ReactionPill(
-                    emoji: entry.key,
-                    count: entry.value,
+                    emoji: aggregate.emoji,
+                    count: aggregate.count,
                     accentColor: profileTheme.accentColor,
                   ),
               ],

@@ -30,8 +30,16 @@ defmodule MessngrWeb.MessageControllerTest do
 
     conn = get(conn, ~p"/api/conversations/#{conversation.id}/messages")
 
-    assert %{"data" => [%{"body" => "Hei", "type" => "text", "payload" => %{}}]} =
-             json_response(conn, 200)
+    assert %{
+             "data" => [
+               %{"body" => "Hei", "type" => "text", "payload" => %{}, "id" => message_id}
+             ],
+             "meta" => %{
+               "start_cursor" => ^message_id,
+               "end_cursor" => ^message_id,
+               "has_more" => %{"before" => false, "after" => false}
+             }
+           } = json_response(conn, 200)
   end
 
   test "creates message", %{conn: conn, conversation: conversation} do
@@ -54,8 +62,8 @@ defmodule MessngrWeb.MessageControllerTest do
       })
 
     %{"data" => %{"id" => upload_id, "upload" => upload_info}} = json_response(conn_upload, 201)
-    assert upload_info["method"] == "PUT"
-    assert upload_info["object_key"]
+    assert upload_info["upload"]["method"] == "PUT"
+    assert upload_info["objectKey"]
 
     conn_message =
       post(conn, ~p"/api/conversations/#{conversation.id}/messages", %{
@@ -73,7 +81,8 @@ defmodule MessngrWeb.MessageControllerTest do
              json_response(conn_message, 201)
 
     assert media["durationMs"] == 1200
-    assert media["url"] =~ upload_info["object_key"]
+    assert media["url"] =~ upload_info["objectKey"]
+    assert media["retention"]["expiresAt"]
     assert Media.consume_upload(upload_id, conversation.id, profile.id, %{}) == {:error, :already_consumed}
   end
 end

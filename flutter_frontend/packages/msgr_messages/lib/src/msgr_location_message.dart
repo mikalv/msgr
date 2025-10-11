@@ -11,7 +11,7 @@ class MsgrLocationMessage extends MsgrAuthoredMessage {
     required super.id,
     required this.latitude,
     required this.longitude,
-    this.address,
+    this.label,
     this.zoom,
     required super.profileId,
     required super.profileName,
@@ -29,8 +29,8 @@ class MsgrLocationMessage extends MsgrAuthoredMessage {
   /// Longitude component of the shared location.
   final double longitude;
 
-  /// Optional formatted address for the coordinate.
-  final String? address;
+  /// Optional label or formatted address for the coordinate.
+  final String? label;
 
   /// Preferred map zoom level when opening the link.
   final double? zoom;
@@ -40,7 +40,7 @@ class MsgrLocationMessage extends MsgrAuthoredMessage {
     String? id,
     double? latitude,
     double? longitude,
-    String? address,
+    String? label,
     double? zoom,
     String? profileId,
     String? profileName,
@@ -55,7 +55,7 @@ class MsgrLocationMessage extends MsgrAuthoredMessage {
       id: id ?? this.id,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
-      address: address ?? this.address,
+      label: label ?? this.label,
       zoom: zoom ?? this.zoom,
       profileId: profileId ?? this.profileId,
       profileName: profileName ?? this.profileName,
@@ -75,7 +75,7 @@ class MsgrLocationMessage extends MsgrAuthoredMessage {
       id: map['id'] as String,
       latitude: (map['latitude'] as num?)?.toDouble() ?? 0,
       longitude: (map['longitude'] as num?)?.toDouble() ?? 0,
-      address: map['address'] as String?,
+      label: map['label'] as String? ?? map['address'] as String?,
       zoom: (map['zoom'] as num?)?.toDouble(),
       profileId: author.profileId,
       profileName: author.profileName,
@@ -95,7 +95,9 @@ class MsgrLocationMessage extends MsgrAuthoredMessage {
       'id': id,
       'latitude': latitude,
       'longitude': longitude,
-      'address': address,
+      'label': label,
+      // Preserve legacy payloads still reading `address`.
+      'address': label,
       'zoom': zoom,
       ...toAuthorMap(),
       'sentAt': MsgrMessage.encodeTimestamp(sentAt),
@@ -110,7 +112,7 @@ class MsgrLocationMessage extends MsgrAuthoredMessage {
         ...super.props,
         latitude,
         longitude,
-        address,
+        label,
         zoom,
       ];
 

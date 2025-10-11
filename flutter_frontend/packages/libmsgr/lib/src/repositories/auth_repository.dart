@@ -13,22 +13,38 @@ class AuthRepository extends BaseRepository<User> {
   Future<User?> getAuthenticatedUser() async {}
   Future<Device?> getDevice() async {}
 
-  Future<bool> requestMsisdnCode(String msisdn) async {
+  Future<AuthChallenge?> requestMsisdnCode(String msisdn) async {
     await RegistrationService().maybeRegisterDevice();
     return RegistrationService().requestForSignInCodeMsisdn(msisdn);
   }
 
-  Future<bool> requestEmailCode(String email) async {
+  Future<AuthChallenge?> requestEmailCode(String email) async {
     await RegistrationService().maybeRegisterDevice();
     return RegistrationService().requestForSignInCodeEmail(email);
   }
 
-  Future<User?> loginWithEmailAndCode(String email, String code) {
-    return RegistrationService().submitEmailCodeForToken(email, code);
+  Future<User?> loginWithEmailAndCode({
+    required String challengeId,
+    required String code,
+    String? displayName,
+  }) {
+    return RegistrationService().submitEmailCodeForToken(
+      challengeId: challengeId,
+      code: code,
+      displayName: displayName,
+    );
   }
 
-  Future<User?> loginWithMsisdnAndCode(String msisdn, String code) {
-    return RegistrationService().submitMsisdnCodeForToken(msisdn, code);
+  Future<User?> loginWithMsisdnAndCode({
+    required String challengeId,
+    required String code,
+    String? displayName,
+  }) {
+    return RegistrationService().submitMsisdnCodeForToken(
+      challengeId: challengeId,
+      code: code,
+      displayName: displayName,
+    );
   }
 
   Future<List<Team>> listMyTeams(String accessToken) async {

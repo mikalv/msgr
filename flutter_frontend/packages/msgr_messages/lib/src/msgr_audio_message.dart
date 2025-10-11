@@ -14,6 +14,8 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
     this.duration,
     this.waveform,
     this.mimeType,
+    this.waveformSampleRate,
+    MsgrMessageKind kind = MsgrMessageKind.audio,
     super.status,
     required super.profileId,
     required super.profileName,
@@ -22,7 +24,9 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
     super.insertedAt,
     super.isLocal,
     super.theme,
-  }) : super(kind: MsgrMessageKind.audio);
+  })  : assert(kind == MsgrMessageKind.audio || kind == MsgrMessageKind.voice,
+            'MsgrAudioMessage supports audio or voice kinds'),
+        super(kind: kind);
 
   /// Public playback URL for the audio resource.
   final String url;
@@ -39,6 +43,9 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
   /// MIME type for the stored resource.
   final String? mimeType;
 
+  /// Sample rate used when generating the waveform, if provided.
+  final int? waveformSampleRate;
+
   /// Creates a copy with the provided overrides.
   MsgrAudioMessage copyWith({
     String? id,
@@ -47,6 +54,8 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
     double? duration,
     List<double>? waveform,
     String? mimeType,
+    int? waveformSampleRate,
+    MsgrMessageKind? kind,
     String? profileId,
     String? profileName,
     String? profileMode,
@@ -56,6 +65,9 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
     bool? isLocal,
     MsgrMessageTheme? theme,
   }) {
+    final resolvedKind = kind ?? this.kind;
+    assert(resolvedKind == MsgrMessageKind.audio ||
+        resolvedKind == MsgrMessageKind.voice);
     return MsgrAudioMessage(
       id: id ?? this.id,
       url: url ?? this.url,
@@ -63,6 +75,8 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
       duration: duration ?? this.duration,
       waveform: waveform ?? this.waveform,
       mimeType: mimeType ?? this.mimeType,
+      waveformSampleRate: waveformSampleRate ?? this.waveformSampleRate,
+      kind: resolvedKind,
       profileId: profileId ?? this.profileId,
       profileName: profileName ?? this.profileName,
       profileMode: profileMode ?? this.profileMode,
@@ -77,6 +91,10 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
   /// Recreates an [MsgrAudioMessage] from a serialised map.
   factory MsgrAudioMessage.fromMap(Map<String, dynamic> map) {
     final author = MsgrAuthoredMessage.readAuthorMap(map);
+    final type = map['type'] as String?;
+    final kind = type == MsgrMessageKind.voice.name
+        ? MsgrMessageKind.voice
+        : MsgrMessageKind.audio;
     final waveform = (map['waveform'] as List?)
         ?.map((value) => (value as num).toDouble())
         .toList(growable: false);
@@ -88,6 +106,8 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
       duration: (map['duration'] as num?)?.toDouble(),
       waveform: waveform,
       mimeType: map['mimeType'] as String? ?? map['contentType'] as String?,
+      waveformSampleRate: (map['waveformSampleRate'] as num?)?.toInt(),
+      kind: kind,
       profileId: author.profileId,
       profileName: author.profileName,
       profileMode: author.profileMode,
@@ -109,6 +129,7 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
       'duration': duration,
       'waveform': waveform,
       'mimeType': mimeType,
+      'waveformSampleRate': waveformSampleRate,
       ...toAuthorMap(),
       'sentAt': MsgrMessage.encodeTimestamp(sentAt),
       'insertedAt': MsgrMessage.encodeTimestamp(insertedAt),
@@ -125,6 +146,7 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
         duration,
         waveform,
         mimeType,
+        waveformSampleRate,
       ];
 
   @override

@@ -5,6 +5,19 @@
   forskningsfil som kobler UI-mønstre til eksisterende API-er og bridge-strategi,
   og oppdatert med plan for å holde produktivitetsmoduler adskilt fra kjernchat i
   både UI og backend.
+- Secured media uploads with mandatory server-side encryption headers in presigned instructions, configurable SSE/KMS settings, tests, and updated API documentation.
+- Enhanced media upload pipeline with voice/file/thumbnail kinds, width/height/checksum metadata, retention TTLs and presigned URL helpers in the Elixir backend (new migration, config, storage helpers and tests).
+- Normalised chat media payloads (captions, thumbnails, waveform) with updated JSON views, message validations and API contract documentation.
+- Reworked Flutter chat media flow with composer previews, upload helpers, ChatBubble media rendering and refreshed unit/widget tests.
+- Hooked Flutter chat realtime flows into typing/read/reaction/pin events with
+  a richer `ChatSocket`, notifier-aware `ChatViewModel`, pinned/thread UI
+  toggles, and new integration/unit tests for realtime behaviour.
+- Added message reactions, threaded replies, pinned state, and read tracking to the
+  chat backend with PubSub broadcasts, upgraded Phoenix channel presence/typing
+  flow, and Flutter notifiers/widgets for typing indicators, reaction aggregates,
+  and pinned banners with accompanying tests.
+- Implementerte cursor-baserte historikk-APIer for meldinger og samtaler med
+  PubSub-backlog (`message:sync`) og watcher-strømmer (`conversation:watch`/`unwatch`).
 - Designet et modulært Flutter chat-UI-kit (kanalliste, trådvisning, reaksjoner, presence, tilkoblingsbanner) og integrerte det i `ChatPage` og en ny `ChannelListPage`-demo.
 - Utvidet `ChatComposer` med emoji-velger, slash-kommandoer, filvedlegg, simulert taleopptak og forbedret utkast-/feilhåndtering samt nye widgettester.
 - Implementerte hurtigbuffer for samtaler og meldinger med Hive/Sembast, offline statusbanner og integrasjonstester for fallback i `ChatViewModel`.

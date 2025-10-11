@@ -18,6 +18,8 @@ defmodule Messngr.Chat.Conversation do
       default: nil
 
     field :visibility, Ecto.Enum, values: [:private, :team], default: :private
+    field :unread_count, :integer, virtual: true, default: 0
+    field :last_message, :map, virtual: true
 
     has_many :participants, Messngr.Chat.Participant
     has_many :messages, Messngr.Chat.Message

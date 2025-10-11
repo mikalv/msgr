@@ -7,6 +7,7 @@ import 'msgr_text_message.dart';
 import 'msgr_image_message.dart';
 import 'msgr_video_message.dart';
 import 'msgr_audio_message.dart';
+import 'msgr_file_message.dart';
 
 /// Creates strongly typed message instances from dynamic map payloads.
 MsgrMessage msgrMessageFromMap(Map<String, dynamic> map) {
@@ -28,11 +29,15 @@ MsgrMessage msgrMessageFromMap(Map<String, dynamic> map) {
     case MsgrMessageKind.system:
       return MsgrSystemMessage.fromMap(map);
     case MsgrMessageKind.image:
+    case MsgrMessageKind.thumbnail:
       return MsgrImageMessage.fromMap(map);
     case MsgrMessageKind.video:
       return MsgrVideoMessage.fromMap(map);
     case MsgrMessageKind.audio:
+    case MsgrMessageKind.voice:
       return MsgrAudioMessage.fromMap(map);
+    case MsgrMessageKind.file:
+      return MsgrFileMessage.fromMap(map);
     case MsgrMessageKind.location:
       return MsgrLocationMessage.fromMap(map);
   }

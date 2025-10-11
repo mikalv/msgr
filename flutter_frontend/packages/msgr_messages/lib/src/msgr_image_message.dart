@@ -14,6 +14,7 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
     this.description,
     this.width,
     this.height,
+    MsgrMessageKind kind = MsgrMessageKind.image,
     required super.profileId,
     required super.profileName,
     required super.profileMode,
@@ -22,7 +23,9 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
     super.insertedAt,
     super.isLocal,
     super.theme,
-  }) : super(kind: MsgrMessageKind.image);
+  })  : assert(kind == MsgrMessageKind.image || kind == MsgrMessageKind.thumbnail,
+            'MsgrImageMessage supports image or thumbnail kinds'),
+        super(kind: kind);
 
   /// Full resolution image URL.
   final String url;
@@ -47,6 +50,7 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
     String? description,
     int? width,
     int? height,
+    MsgrMessageKind? kind,
     String? profileId,
     String? profileName,
     String? profileMode,
@@ -56,6 +60,9 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
     bool? isLocal,
     MsgrMessageTheme? theme,
   }) {
+    final resolvedKind = kind ?? this.kind;
+    assert(resolvedKind == MsgrMessageKind.image ||
+        resolvedKind == MsgrMessageKind.thumbnail);
     return MsgrImageMessage(
       id: id ?? this.id,
       url: url ?? this.url,
@@ -63,6 +70,7 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
       description: description ?? this.description,
       width: width ?? this.width,
       height: height ?? this.height,
+      kind: resolvedKind,
       profileId: profileId ?? this.profileId,
       profileName: profileName ?? this.profileName,
       profileMode: profileMode ?? this.profileMode,
@@ -77,13 +85,20 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
   /// Recreates an [MsgrImageMessage] from a JSON compatible map.
   factory MsgrImageMessage.fromMap(Map<String, dynamic> map) {
     final author = MsgrAuthoredMessage.readAuthorMap(map);
+    final type = map['type'] as String?;
+    final kind = type == MsgrMessageKind.thumbnail.name
+        ? MsgrMessageKind.thumbnail
+        : MsgrMessageKind.image;
+
     return MsgrImageMessage(
       id: map['id'] as String,
       url: map['url'] as String? ?? '',
       thumbnailUrl: map['thumbnailUrl'] as String? ?? map['thumbnail'] as String?,
-      description: map['description'] as String?,
+      description:
+          map['description'] as String? ?? map['caption'] as String?,
       width: (map['width'] as num?)?.toInt(),
       height: (map['height'] as num?)?.toInt(),
+      kind: kind,
       profileId: author.profileId,
       profileName: author.profileName,
       profileMode: author.profileMode,

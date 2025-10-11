@@ -26,12 +26,21 @@ enum MsgrMessageKind {
   /// Audio media content.
   audio,
 
+  /// Short form audio clip or voice memo content.
+  voice,
+
+  /// Generic file attachment content.
+  file,
+
+  /// Lightweight thumbnail reference for external content.
+  thumbnail,
+
   /// Shared location or map message.
   location,
 }
 
 /// Base class for all message variants in the chat domain.
-sealed class MsgrMessage extends Equatable {
+abstract class MsgrMessage extends Equatable {
   /// Creates a new message instance.
   const MsgrMessage({
     required this.id,
@@ -110,6 +119,7 @@ abstract class MsgrAuthoredMessage extends MsgrMessage {
     super.sentAt,
     super.insertedAt,
     super.isLocal,
+    super.theme,
   });
 
   /// Identifier of the profile that authored the message.

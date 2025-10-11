@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:messngr/features/chat/models/chat_thread.dart';
 import 'package:messngr/features/chat/state/chat_view_model.dart';
+import 'package:messngr/features/chat/state/typing_participants_notifier.dart';
 import 'package:messngr/features/chat/widgets/chat_composer.dart';
 import 'package:messngr/features/chat/widgets/chat_theme.dart';
+import 'package:messngr/features/chat/widgets/pinned_message_banner.dart';
+import 'package:messngr/features/chat/widgets/typing_indicator.dart';
 import 'package:messngr/ui/chat_kit/chat_kit.dart';
 import 'package:provider/provider.dart';
 
@@ -189,8 +192,29 @@ class _ThreadColumn extends StatelessWidget {
     final theme = Theme.of(context);
     final identity = viewModel.identity;
     final currentProfileId = identity?.profileId ?? '';
-    final threadMessages = [
-      for (final message in viewModel.messages)
+    final pinnedMessages = viewModel.pinnedNotifier.pinnedMessages;
+    final threadState = viewModel.threadViewNotifier.state;
+    final typingKey = threadState.threadId ?? 'root';
+    final typingParticipants =
+        viewModel.typingNotifier.activeByThread[typingKey] ?? const <TypingParticipant>[];
+
+    final pinnedIds = {for (final pinned in pinnedMessages) pinned.messageId};
+
+    final filteredMessages = <ChatThreadMessage>[];
+    for (final message in viewModel.messages) {
+      final includePinned = threadState.showPinned && pinnedIds.contains(message.id);
+      final includeThread =
+          !threadState.showPinned && threadState.threadId != null &&
+              (message.threadId == threadState.threadId ||
+                  message.id == threadState.rootMessageId);
+      final includeDefault =
+          !threadState.showPinned && threadState.threadId == null;
+
+      if (!(includePinned || includeThread || includeDefault)) {
+        continue;
+      }
+
+      filteredMessages.add(
         ChatThreadMessage(
           id: message.id,
           profileId: message.profileId,
@@ -200,8 +224,11 @@ class _ThreadColumn extends StatelessWidget {
           isOwn: message.profileId == currentProfileId,
           reactions: viewModel.reactionsFor(message.id),
           isOnline: !viewModel.isOffline || message.profileId == currentProfileId,
+          isEdited: message.isEdited,
+          isDeleted: message.isDeleted,
         ),
-    ];
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -254,15 +281,46 @@ class _ThreadColumn extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
+        PinnedMessageBanner(
+          pinned: pinnedMessages,
+          isActive: threadState.showPinned,
+          onTap: pinnedMessages.isEmpty
+              ? null
+              : () {
+                  final shouldShow = !threadState.showPinned;
+                  viewModel.threadViewNotifier.setPinnedView(shouldShow);
+                },
+        ),
+        if (threadState.showPinned)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => viewModel.threadViewNotifier.setPinnedView(false),
+              icon: const Icon(Icons.close),
+              label: const Text('Tilbake til samtale'),
+            ),
+          ),
+        if (threadState.threadId != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: viewModel.threadViewNotifier.closeThread,
+                icon: const Icon(Icons.forum_outlined),
+                label: const Text('Tilbake til hovedtråd'),
+              ),
+            ),
+          ),
         Expanded(
           child: ClipRRect(
             borderRadius: BorderRadius.circular(24),
             child: DecoratedBox(
               decoration: ChatTheme.timelineDecoration(theme),
               child: ChatThreadViewer(
-                messages: threadMessages,
+                messages: filteredMessages,
                 onReaction: (message, reaction) {
-                  viewModel.addReaction(message.id, reaction);
+                  viewModel.recordReaction(message.id, reaction);
                 },
                 onMessageLongPress: (_) {},
               ),
@@ -270,6 +328,8 @@ class _ThreadColumn extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
+        TypingIndicator(participants: typingParticipants),
+        const SizedBox(height: 12),
         ChatComposer(
           controller: viewModel.composerController,
           onSubmit: viewModel.submitComposer,

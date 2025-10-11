@@ -33,6 +33,7 @@ defmodule MessngrWeb.Application do
       [
         MessngrWeb.Telemetry,
         prometheus_child,
+        MessngrWeb.Presence,
         # Start a worker by calling: MessngrWeb.Worker.start_link(arg)
         # {MessngrWeb.Worker, arg},
         # Start to serve requests, typically the last entry
