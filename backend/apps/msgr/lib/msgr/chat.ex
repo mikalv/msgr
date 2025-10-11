@@ -703,6 +703,18 @@ defmodule Messngr.Chat do
     :ok
   end
 
+  @doc false
+  @spec broadcast_backlog(binary(), map()) :: :ok
+  def broadcast_backlog(conversation_id, page) when is_map(page) do
+    PubSub.broadcast(
+      Messngr.PubSub,
+      conversation_topic(conversation_id),
+      {:message_backlog, page}
+    )
+
+    :ok
+  end
+
   @spec ensure_profile!(binary(), binary()) :: Accounts.Profile.t()
   def ensure_profile!(account_id, profile_id) do
     profile = Accounts.get_profile!(profile_id)
