@@ -1,6 +1,18 @@
 # Changelog
 
 ## Unreleased
+- Routed backend logger output through StoneMQ envelopes so `Messngr.Logging.OpenObserveBackend` can forward entries to
+  OpenObserve via the `observability/logs` topic, including StoneMQ transport configuration and tests.
+- Added StoneMQ-aware OpenObserve loggers to the Go and Python bridge SDKs so daemons can emit envelopes compatible with the
+  backend pipeline, with unit test coverage.
+- Finalised the StoneMQ bridge envelope contract with typed Elixir helpers,
+  updated ServiceBridge publishing/request flows, and added envelope test
+  coverage.
+- Bootstrapped cross-language bridge SDK skeletons (Go/Python) with StoneMQ
+  queue topics, envelope parsing, telemetry hooks, credential bootstrapper
+  stubs, and unit tests.
+- Added bridge integration execution plan documenting RE rounds and candidate
+  upstream projects for Discord, Slack, Snapchat and other chat networks.
 - Added REST-støtte for kontaktimport og match i backenden med nye
   controller-tester, oppdatert API-kontrakt og Flutter `libmsgr`
   klientimplementasjon for å lagre kontakter og slå opp kjente venner.

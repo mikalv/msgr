@@ -56,14 +56,16 @@ docker compose build stonemq --build-arg STONEMQ_REF=<commit-eller-branch>
 - **OpenObserve** håndterer loggdata på `http://localhost:5080`. Standardbrukeren
   er `root@example.com` med passord `Complexpass#123`.
 
-Backenden publiserer applikasjonslogger direkte til OpenObserve via den nye
-`Messngr.Logging.OpenObserveBackend`-modulen. Konfigurasjonen styres gjennom
-miljøvariabler i `backend/config/dev.exs`, for eksempel:
+Backenden publiserer applikasjonslogger via StoneMQ-topicen `observability/logs`
+ved hjelp av `Messngr.Logging.OpenObserveBackend`. En dedikert konsument kan
+lese denne strømmen og skrive til OpenObserve. HTTP-transporten er fortsatt
+tilgjengelig for lokale tester, men du kan aktivere StoneMQ-transporten ved å
+sette miljøvariabler i `backend/config/dev.exs`, for eksempel:
 
 ```bash
 OPENOBSERVE_ENABLED=true \
-OPENOBSERVE_ENDPOINT=http://openobserve:5080 \
-OPENOBSERVE_STREAM=backend
+OPENOBSERVE_TRANSPORT=stonemq \
+OPENOBSERVE_QUEUE_TOPIC=observability/logs
 ```
 
 Metrikk-endepunktet (port 9568) og logger (OpenObserve) eksponeres kun i

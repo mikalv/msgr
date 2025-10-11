@@ -20,7 +20,12 @@ defmodule Messngr.Connectors.ServiceBridgeTest do
 
     assert [message] = QueueRecorder.published(agent)
     assert message.topic == "bridge/example/send"
-    assert message.payload == %{service: "example", action: "send", trace_id: "trace", payload: %{body: "hi"}}
+    assert message.payload.service == "example"
+    assert message.payload.action == "send"
+    assert message.payload.schema == "msgr.bridge.v1"
+    assert message.payload.trace_id == "trace"
+    assert {:ok, _datetime, 0} = DateTime.from_iso8601(message.payload.occurred_at)
+    assert message.payload.payload == %{body: "hi"}
   end
 
   test "request/4 delegates to the queue with default timeout", %{bridge: bridge, agent: agent} do
@@ -29,6 +34,7 @@ defmodule Messngr.Connectors.ServiceBridgeTest do
     assert [request] = QueueRecorder.requests(agent)
     assert request.opts[:timeout] == 5_000
     assert request.payload.trace_id == "link"
+    assert request.payload.metadata == %{}
   end
 
   test "request/4 allows overriding timeout", %{bridge: bridge, agent: agent} do
@@ -38,5 +44,10 @@ defmodule Messngr.Connectors.ServiceBridgeTest do
     assert [request] = QueueRecorder.requests(agent)
     assert request.opts[:timeout] == 1_000
     assert request.payload.trace_id == "override"
+  end
+
+  test "publish/4 returns error when envelope cannot be built", %{bridge: bridge} do
+    assert {:error, {:metadata, :not_a_map, _}} =
+             ServiceBridge.publish(bridge, :send, %{}, metadata: [:invalid])
   end
 end
