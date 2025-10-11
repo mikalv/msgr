@@ -38,7 +38,7 @@ defmodule Messngr.MixProject do
     [
       {:decibel, "~> 0.2.3"},
       {:uuid, "~> 1.1"},
-      #{:enoise, "~> 1.1"},
+      {:enoise, "~> 1.1"},
       {:telemetry, "~> 1.3"},
       {:dns_cluster, "~> 0.1.1"},
       {:phoenix_pubsub, "~> 2.1"},

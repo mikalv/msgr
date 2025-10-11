@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added Noise transport session and registry modules with NX/IK/XX handshake
+  support, session-token generation and registry TTL management, plus
+  integration/property tests for handshake, fallback and rekey flows.
 - Added account device management with migrations, CRUD helpers, Noise key
   attestation storage and auth flow integration so OTP/OIDC logins register
   and activate devices, including ExUnit coverage.
