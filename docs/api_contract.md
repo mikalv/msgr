@@ -173,6 +173,102 @@ Denne siden dokumenterer forventet kontrakt mellom msgr-backend og Flutter-klien
 }
 ```
 
+### Familier og delt kalender
+
+`GET /api/families`
+
+Returnerer alle familier den aktive profilen er medlem av.
+
+```json
+{
+  "data": [
+    {
+      "id": "family-uuid",
+      "name": "Team Berg",
+      "slug": "team-berg",
+      "time_zone": "Europe/Oslo",
+      "memberships": [
+        {
+          "id": "membership-uuid",
+          "role": "owner",
+          "profile": {
+            "id": "profile-uuid",
+            "name": "Kari",
+            "slug": "kari"
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+`POST /api/families`
+
+```json
+{
+  "family": {
+    "name": "Familien Hansen",
+    "time_zone": "Europe/Oslo"
+  }
+}
+```
+
+**Respons 201** gir samme struktur som `GET /api/families/{id}`.
+
+`GET /api/families/{family_id}` krever at profilen er medlem og returnerer familieobjektet med alle medlemmer.
+
+`GET /api/families/{family_id}/events?from=2024-10-04T00:00:00Z&to=2024-10-10T23:59:59Z`
+
+Filtrerer kalenderhendelser innenfor tidsintervallet. `from` og `to` er valgfrie og bruker ISO8601 med tidssone.
+
+```json
+{
+  "data": [
+    {
+      "id": "event-uuid",
+      "family_id": "family-uuid",
+      "title": "Foreldremøte",
+      "description": null,
+      "location": "Teams",
+      "starts_at": "2024-10-05T18:00:00Z",
+      "ends_at": "2024-10-05T19:00:00Z",
+      "all_day": false,
+      "color": "#ff8800",
+      "created_by_profile_id": "profile-uuid",
+      "updated_by_profile_id": "profile-uuid",
+      "creator": {
+        "id": "profile-uuid",
+        "name": "Kari",
+        "slug": "kari"
+      },
+      "updated_by": {
+        "id": "profile-uuid",
+        "name": "Kari",
+        "slug": "kari"
+      },
+      "inserted_at": "2024-10-04T12:00:00Z",
+      "updated_at": "2024-10-04T12:00:00Z"
+    }
+  ]
+}
+```
+
+`POST /api/families/{family_id}/events`
+
+```json
+{
+  "event": {
+    "title": "Felles middag",
+    "starts_at": "2024-10-06T16:00:00Z",
+    "ends_at": "2024-10-06T17:30:00Z",
+    "color": "#00c896"
+  }
+}
+```
+
+`PATCH /api/families/{family_id}/events/{event_id}` og `DELETE /api/families/{family_id}/events/{event_id}` krever medlemskap og oppdaterer eller fjerner hendelsen. `starts_at` og `ends_at` må være ISO8601.
+
 ### Sende melding
 
 `POST /api/conversations/{conversation_id}/messages`

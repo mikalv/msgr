@@ -5,8 +5,9 @@ defmodule Messngr do
   """
 
   alias Messngr.Accounts
-  alias Messngr.Chat
   alias Messngr.Auth
+  alias Messngr.Chat
+  alias Messngr.Family
 
   # Accounts
   defdelegate list_accounts, to: Accounts
@@ -26,4 +27,19 @@ defmodule Messngr do
   defdelegate start_auth_challenge(attrs), to: Auth, as: :start_challenge
   defdelegate verify_auth_challenge(id, code, attrs \\ %{}), to: Auth, as: :verify_challenge
   defdelegate complete_oidc(attrs), to: Auth
+
+  # Family
+  defdelegate list_families(profile_id), to: Family
+  defdelegate get_family!(id, opts \\ []), to: Family
+  defdelegate create_family(owner_profile_id, attrs), to: Family
+  defdelegate add_family_member(family_id, profile_id, role \\ :member), to: Family, as: :add_member
+  defdelegate remove_family_member(family_id, profile_id), to: Family, as: :remove_member
+  defdelegate ensure_family_membership(family_id, profile_id), to: Family, as: :ensure_membership
+  defdelegate list_family_events(family_id, opts \\ []), to: Family, as: :list_events
+  defdelegate get_family_event!(family_id, event_id), to: Family, as: :get_event!
+  defdelegate create_family_event(family_id, profile_id, attrs), to: Family, as: :create_event
+  defdelegate update_family_event(family_id, event_id, profile_id, attrs),
+              to: Family,
+              as: :update_event
+  defdelegate delete_family_event(family_id, event_id, profile_id), to: Family, as: :delete_event
 end

@@ -24,6 +24,10 @@ defmodule MessngrWeb.Router do
     post "/conversations", ConversationController, :create
     get "/conversations/:id/messages", MessageController, :index
     post "/conversations/:id/messages", MessageController, :create
+
+    resources "/families", FamilyController, only: [:index, :create, :show] do
+      resources "/events", FamilyEventController, only: [:index, :create, :show, :update, :delete]
+    end
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

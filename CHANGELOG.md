@@ -29,6 +29,8 @@
 - OpenObserve-loggflyt for Elixir-backenden med ny Logger-backend og tester.
 - Flutter-loggklient som kan sende `package:logging`-poster til OpenObserve via
   `LoggingEnvironment` og en gjenbrukbar HTTP-klient.
+- Familiegrupper med delt kalender, Ecto-modeller, REST-endepunkter, tester og
+  dokumentert kontrakt for familie- og kalenderflyt.
 
 ### Changed
 - Backend-konfigurasjon forenklet og unødvendige apper fjernet fra releaseoppsett.
