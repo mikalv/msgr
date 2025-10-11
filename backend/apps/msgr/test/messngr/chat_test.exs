@@ -108,7 +108,7 @@ defmodule Messngr.ChatTest do
     refute page.meta.has_more.after
   end
 
-  test "send_message/3 attaches audio payload", %{profile_a: profile_a, profile_b: profile_b} do
+  test "send_message/3 attaches audio payload with caption metadata", %{profile_a: profile_a, profile_b: profile_b} do
     {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
 
     {:ok, upload, _instructions} =
@@ -121,18 +121,110 @@ defmodule Messngr.ChatTest do
     assert {:ok, message} =
              Chat.send_message(conversation.id, profile_a.id, %{
                "kind" => "audio",
-               "body" => "Hør på dette",
                "media" => %{
                  "upload_id" => upload.id,
-                 "durationMs" => 1500
+                 "durationMs" => 1500,
+                 "caption" => "  Hør på dette  ",
+                 "waveform" => [0, 50, 200],
+                 "thumbnail" => %{
+                   "url" => "https://cdn/thumb.jpg",
+                   "width" => 120,
+                   "height" => 80
+                 }
                }
              })
 
     assert message.kind == :audio
+    assert message.body == "Hør på dette"
     assert message.payload["media"]["objectKey"] == upload.object_key
     assert message.payload["media"]["durationMs"] == 1500
     assert message.payload["media"]["contentType"] == "audio/mpeg"
+    assert message.payload["media"]["waveform"] == [0, 50, 100]
+    assert %{"url" => "https://cdn/thumb.jpg", "width" => 120, "height" => 80} =
+             message.payload["media"]["thumbnail"]
     assert %Upload{status: :consumed} = Repo.get!(Upload, upload.id)
+  end
+
+  test "send_message/3 validates media payload for images", %{profile_a: profile_a, profile_b: profile_b} do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+
+    {:ok, upload, _} =
+      Media.create_upload(conversation.id, profile_a.id, %{
+        "kind" => "image",
+        "content_type" => "image/png",
+        "byte_size" => 12_000
+      })
+
+    assert {:error, changeset} =
+             Chat.send_message(conversation.id, profile_a.id, %{
+               "kind" => "image",
+               "media" => %{"upload_id" => upload.id}
+             })
+
+    assert %{payload: ["missing media keys: width, height"]} = errors_on(changeset)
+
+    assert {:ok, message} =
+             Chat.send_message(conversation.id, profile_a.id, %{
+               "kind" => "image",
+               "media" => %{
+                 "upload_id" => upload.id,
+                 "caption" => "Skisse",
+                 "width" => 800,
+                 "height" => 600,
+                 "thumbnail" => %{"url" => "https://cdn/thumb.jpg", "width" => 200, "height" => 150}
+               }
+             })
+
+    assert message.kind == :image
+    assert message.body == "Skisse"
+    assert message.payload["media"]["width"] == 800
+    assert message.payload["media"]["thumbnail"]["width"] == 200
+  end
+
+  test "send_message/3 validates audio waveform samples", %{profile_a: profile_a, profile_b: profile_b} do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+
+    {:ok, upload, _} =
+      Media.create_upload(conversation.id, profile_a.id, %{
+        "kind" => "audio",
+        "content_type" => "audio/mpeg",
+        "byte_size" => 2048
+      })
+
+    assert {:error, changeset} =
+             Chat.send_message(conversation.id, profile_a.id, %{
+               "kind" => "audio",
+               "media" => %{
+                 "upload_id" => upload.id,
+                 "waveform" => [0, 50, 2000]
+               }
+             })
+
+    assert %{payload: ["waveform must be <=512 samples between 0 and 100"]} = errors_on(changeset)
+  end
+
+  test "send_message/3 validates thumbnail structure", %{profile_a: profile_a, profile_b: profile_b} do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+
+    {:ok, upload, _} =
+      Media.create_upload(conversation.id, profile_a.id, %{
+        "kind" => "image",
+        "content_type" => "image/jpeg",
+        "byte_size" => 4096
+      })
+
+    assert {:error, changeset} =
+             Chat.send_message(conversation.id, profile_a.id, %{
+               "kind" => "image",
+               "media" => %{
+                 "upload_id" => upload.id,
+                 "width" => 800,
+                 "height" => 600,
+                 "thumbnail" => %{"url" => "https://cdn/thumb.jpg", "width" => 0}
+               }
+             })
+
+    assert %{payload: ["thumbnail dimensions must be positive numbers"]} = errors_on(changeset)
   end
 
   test "list_conversations/2 includes unread counts and last message", %{profile_a: profile_a, profile_b: profile_b} do

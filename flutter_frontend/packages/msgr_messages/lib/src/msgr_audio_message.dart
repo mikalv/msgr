@@ -22,7 +22,9 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
     super.insertedAt,
     super.isLocal,
     super.theme,
-  }) : super(kind: MsgrMessageKind.audio);
+    MsgrMessageKind kind = MsgrMessageKind.audio,
+  })  : assert(kind == MsgrMessageKind.audio || kind == MsgrMessageKind.voice),
+        super(kind: kind);
 
   /// Public playback URL for the audio resource.
   final String url;
@@ -55,6 +57,7 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
     DateTime? insertedAt,
     bool? isLocal,
     MsgrMessageTheme? theme,
+    MsgrMessageKind? kind,
   }) {
     return MsgrAudioMessage(
       id: id ?? this.id,
@@ -71,21 +74,35 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
       insertedAt: insertedAt ?? this.insertedAt,
       isLocal: isLocal ?? this.isLocal,
       theme: theme ?? this.theme,
+      kind: kind ?? this.kind,
     );
   }
 
   /// Recreates an [MsgrAudioMessage] from a serialised map.
   factory MsgrAudioMessage.fromMap(Map<String, dynamic> map) {
     final author = MsgrAuthoredMessage.readAuthorMap(map);
+    final type = map['type'] as String? ?? 'audio';
+    final kind = type == 'voice' ? MsgrMessageKind.voice : MsgrMessageKind.audio;
     final waveform = (map['waveform'] as List?)
         ?.map((value) => (value as num).toDouble())
         .toList(growable: false);
+
+    final rawDuration = map['duration'];
+    double? durationSeconds;
+    if (rawDuration is num) {
+      durationSeconds = rawDuration.toDouble();
+    } else {
+      final durationMs = map['durationMs'];
+      if (durationMs is num) {
+        durationSeconds = durationMs.toDouble() / 1000;
+      }
+    }
 
     return MsgrAudioMessage(
       id: map['id'] as String,
       url: map['url'] as String? ?? '',
       caption: map['caption'] as String?,
-      duration: (map['duration'] as num?)?.toDouble(),
+      duration: durationSeconds,
       waveform: waveform,
       mimeType: map['mimeType'] as String? ?? map['contentType'] as String?,
       profileId: author.profileId,
@@ -96,6 +113,7 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
       insertedAt: author.insertedAt,
       isLocal: author.isLocal,
       theme: MsgrMessage.readTheme(map),
+      kind: kind,
     );
   }
 

@@ -1,6 +1,15 @@
 # Changelog
 
 ## Unreleased
+- Utvidet mediasystemet med nye skjema-felter (dimensjoner, SHA-256, retention),
+  nye opplastingskategorier (image, file, voice, thumbnail) og presignerte
+  URL-instruksjoner for forhåndsgenererte thumbnails.
+- Messngr.Chat validerer nå mediepayloader (captions, thumbnails, waveform),
+  normaliserer metadata og eksponerer `media`-feltet i `MessageJSON` med nye
+  ExUnit-tester for både chat- og mediastrømmen.
+- Flutter-klienten har fått ny opplastingsflyt (drag & drop, kamera, voice),
+  forhåndsvisninger i `ChatBubble`, helper for medieopplasting og oppdaterte
+  widget- og modelltester.
 - Implementerte cursor-baserte historikk-APIer for meldinger og samtaler med
   PubSub-backlog (`message:sync`) og watcher-strømmer (`conversation:watch`/`unwatch`).
 - Designet et modulært Flutter chat-UI-kit (kanalliste, trådvisning, reaksjoner, presence, tilkoblingsbanner) og integrerte det i `ChatPage` og en ny `ChannelListPage`-demo.

@@ -7,6 +7,7 @@ import 'package:messngr/features/chat/models/chat_message.dart';
 import 'package:messngr/features/chat/models/chat_thread.dart';
 import 'package:messngr/features/chat/state/chat_cache_repository.dart';
 import 'package:messngr/features/chat/widgets/chat_composer.dart';
+import 'package:messngr/features/chat/upload/chat_media_uploader.dart';
 import 'package:messngr/services/api/chat_api.dart';
 import 'package:messngr/services/api/chat_socket.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -32,6 +33,7 @@ class ChatViewModel extends ChangeNotifier {
   final Connectivity _connectivity;
   final ChatComposerController composerController;
   final _random = Random();
+  ChatMediaUploader? _mediaUploader;
 
   static const _accountIdKey = 'chat.account.id';
   static const _profileIdKey = 'chat.profile.id';
@@ -126,22 +128,108 @@ class ChatViewModel extends ChangeNotifier {
       return;
     }
 
-    if (result.command != null && result.text.isEmpty &&
-        result.attachments.isEmpty && result.voiceNote == null) {
+    final attachments = result.attachments;
+    final voiceNote = result.voiceNote;
+    var remainingText = result.text.trim();
+
+    if (result.command != null && remainingText.isEmpty &&
+        attachments.isEmpty && voiceNote == null) {
       _handleSlashCommand(result.command!);
       return;
     }
 
-    final body = _composeBodyFromResult(result);
-    if (body.trim().isEmpty && result.attachments.isEmpty && result.voiceNote == null) {
+    if (attachments.isEmpty && voiceNote == null) {
+      if (remainingText.isEmpty) {
+        return;
+      }
+      _error = null;
+      _isSending = true;
+      notifyListeners();
+      await _sendTextOnlyMessage(remainingText);
+      _isSending = false;
+      notifyListeners();
+      composerController.clear();
+      return;
+    }
+
+    if (_isOffline) {
+      _setError('Ingen nettverkstilkobling – kan ikke laste opp media.');
+      return;
+    }
+
+    _mediaUploader ??= ChatMediaUploader(api: _api, identity: _identity!);
+
+    _error = null;
+    _isSending = true;
+    notifyListeners();
+
+    try {
+      if (voiceNote != null) {
+        final caption = remainingText.isNotEmpty ? remainingText : null;
+        final payload = await _mediaUploader!.uploadVoiceNote(
+          conversationId: _thread!.id,
+          note: voiceNote,
+          caption: caption,
+        );
+        if (caption != null) {
+          remainingText = '';
+        }
+        final persisted = await _api.sendStructuredMessage(
+          current: _identity!,
+          conversationId: _thread!.id,
+          message: payload.message,
+        );
+        _mergeMessage(persisted);
+      }
+
+      for (var i = 0; i < attachments.length; i++) {
+        final attachment = attachments[i];
+        final caption = (i == 0 && remainingText.isNotEmpty) ? remainingText : null;
+        if (caption != null) {
+          remainingText = '';
+        }
+        final payload = await _mediaUploader!.uploadAttachment(
+          conversationId: _thread!.id,
+          attachment: attachment,
+          caption: caption,
+        );
+        final persisted = await _api.sendStructuredMessage(
+          current: _identity!,
+          conversationId: _thread!.id,
+          message: payload.message,
+        );
+        _mergeMessage(persisted);
+      }
+
+      if (remainingText.trim().isNotEmpty) {
+        await _sendTextOnlyMessage(remainingText);
+      }
+
+      composerController.clear();
+      await _cache.saveMessages(_thread!.id, _messages);
+    } on ApiException catch (error) {
+      debugPrint('media send failed: $error');
+      _setError('Kunne ikke sende media (${error.statusCode}).');
+    } catch (error, stack) {
+      debugPrint('media upload failed: $error\n$stack');
+      _setError('Kunne ikke sende media.');
+    } finally {
+      _isSending = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _sendTextOnlyMessage(String body) async {
+    final trimmed = body.trim();
+    if (trimmed.isEmpty || _identity == null || _thread == null) {
       return;
     }
 
     final tempId = 'local-${DateTime.now().microsecondsSinceEpoch}';
     final now = DateTime.now();
-    var localMessage = ChatMessage.text(
+    final localMessage = ChatMessage.text(
       id: tempId,
-      body: body,
+      body: trimmed,
       profileId: _identity!.profileId,
       profileName: 'Deg',
       profileMode: 'private',
@@ -152,20 +240,16 @@ class ChatViewModel extends ChangeNotifier {
     );
 
     _messages = [..._messages, localMessage];
-    _error = null;
-    _isSending = true;
     notifyListeners();
     await _cache.saveMessages(_thread!.id, _messages);
 
     if (_isOffline) {
       _setError('Ingen nettverkstilkobling – meldingen ble lagret.');
-      _isSending = false;
-      notifyListeners();
       return;
     }
 
     try {
-      final persisted = await _sendOverPreferredChannel(body);
+      final persisted = await _sendOverPreferredChannel(trimmed);
       _mergeMessage(persisted, replaceTempId: tempId);
       await _cache.saveMessages(_thread!.id, _messages);
     } on ChatSocketException catch (error, stack) {
@@ -174,7 +258,7 @@ class ChatViewModel extends ChangeNotifier {
         final persisted = await _api.sendMessage(
           current: _identity!,
           conversationId: _thread!.id,
-          body: body,
+          body: trimmed,
         );
         _mergeMessage(persisted, replaceTempId: tempId);
         await _cache.saveMessages(_thread!.id, _messages);
@@ -190,9 +274,6 @@ class ChatViewModel extends ChangeNotifier {
       _messages = _messages.where((message) => message.id != tempId).toList();
       await _cache.saveMessages(_thread!.id, _messages);
       _setError('Kunne ikke sende melding (${error.statusCode}).');
-    } finally {
-      _isSending = false;
-      notifyListeners();
     }
   }
 
@@ -272,6 +353,7 @@ class ChatViewModel extends ChangeNotifier {
     if (accountId != null && profileId != null && peerProfileId != null) {
       _identity = AccountIdentity(accountId: accountId, profileId: profileId);
       _peerProfileId = peerProfileId;
+      _mediaUploader = ChatMediaUploader(api: _api, identity: _identity!);
       return;
     }
 
@@ -286,6 +368,7 @@ class ChatViewModel extends ChangeNotifier {
 
     _identity = mainIdentity;
     _peerProfileId = buddyIdentity.profileId;
+    _mediaUploader = ChatMediaUploader(api: _api, identity: _identity!);
   }
 
   Future<void> _ensureConversation() async {
@@ -479,19 +562,7 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   String _composeBodyFromResult(ChatComposerResult result) {
-    final buffer = StringBuffer(result.text.trim());
-    if (result.attachments.isNotEmpty) {
-      final attachmentSummary = result.attachments
-          .map((attachment) => attachment.name)
-          .join(', ');
-      if (buffer.isNotEmpty) buffer.writeln();
-      buffer.writeln('Vedlegg: $attachmentSummary');
-    }
-    if (result.voiceNote != null) {
-      if (buffer.isNotEmpty) buffer.writeln();
-      buffer.write('Lydklipp ${result.voiceNote!.formattedDuration} vedlagt.');
-    }
-    return buffer.toString();
+    return result.text.trim();
   }
 
   Future<void> _saveLastThreadId(String id) async {

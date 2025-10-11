@@ -33,6 +33,7 @@ defmodule Messngr.Media do
       |> ensure_bucket()
       |> ensure_object_key(conversation_id)
       |> ensure_expires_at()
+      |> ensure_retention()
 
     %Upload{}
     |> Upload.creation_changeset(params)
@@ -98,21 +99,59 @@ defmodule Messngr.Media do
 
   defp ensure_expires_at(attrs) do
     Map.put_new_lazy(attrs, "expires_at", fn ->
-      ttl = Application.get_env(:msgr, __MODULE__, []) |> Keyword.get(:upload_ttl_seconds, 900)
+      ttl = config() |> Keyword.get(:upload_ttl_seconds, 900)
       DateTime.add(DateTime.utc_now(), ttl, :second)
     end)
   end
 
+  defp ensure_retention(attrs) do
+    Map.put_new_lazy(attrs, "retention_expires_at", fn ->
+      retention_days =
+        attrs
+        |> Map.get("retention_days")
+        |> Kernel.||(config() |> Keyword.get(:retention_days, 30))
+
+      DateTime.add(DateTime.utc_now(), retention_days * 86_400, :second)
+    end)
+  end
+
   defp build_instructions(%Upload{} = upload) do
+    signed_url = Storage.presign_upload(upload.bucket, upload.object_key, upload.expires_at)
+
     %{
       "id" => upload.id,
       "method" => "PUT",
-      "url" => Storage.upload_url(upload.bucket, upload.object_key),
+      "url" => signed_url,
       "headers" => %{"content-type" => upload.content_type},
       "bucket" => upload.bucket,
       "objectKey" => upload.object_key,
       "publicUrl" => Storage.public_url(upload.bucket, upload.object_key),
+      "expiresAt" => upload.expires_at,
+      "retentionExpiresAt" => upload.retention_expires_at,
+      "thumbnailUpload" => build_thumbnail_instructions(upload)
+    }
+    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+    |> Map.new()
+  end
+
+  defp build_thumbnail_instructions(%Upload{kind: kind} = upload) when kind in [:image, :video] do
+    object_key = Upload.thumbnail_object_key(upload.object_key)
+    signed_url = Storage.presign_upload(upload.bucket, object_key, upload.expires_at)
+
+    %{
+      "method" => "PUT",
+      "url" => signed_url,
+      "headers" => %{"content-type" => "image/jpeg"},
+      "bucket" => upload.bucket,
+      "objectKey" => object_key,
+      "publicUrl" => Storage.public_url(upload.bucket, object_key),
       "expiresAt" => upload.expires_at
     }
+  end
+
+  defp build_thumbnail_instructions(_upload), do: nil
+
+  defp config do
+    Application.get_env(:msgr, __MODULE__, [])
   end
 end

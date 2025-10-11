@@ -55,8 +55,22 @@ class ChatMessage {
       'theme': json['theme'],
     };
 
-    final payload = json['payload'];
-    if (payload is Map<String, dynamic>) {
+    final payload = <String, dynamic>{};
+    final jsonPayload = json['payload'];
+    if (jsonPayload is Map<String, dynamic>) {
+      payload.addAll(jsonPayload);
+    }
+
+    final topLevelMedia = json['media'];
+    if (topLevelMedia is Map<String, dynamic>) {
+      final merged = Map<String, dynamic>.from(
+        payload['media'] as Map<String, dynamic>? ?? const {},
+      );
+      merged.addAll(topLevelMedia);
+      payload['media'] = merged;
+    }
+
+    if (payload.isNotEmpty) {
       base.addAll(_normalisePayload(payload));
     }
 
@@ -196,6 +210,17 @@ class ChatMessage {
         insertedAt: insertedAt,
         isLocal: isLocal,
         theme: theme,
+        kind: (message as MsgrAudioMessage).kind,
+      );
+    } else if (message is MsgrFileMessage) {
+      updated = (message as MsgrFileMessage).copyWith(
+        id: id,
+        caption: body ?? (message as MsgrFileMessage).caption,
+        status: status,
+        sentAt: sentAt,
+        insertedAt: insertedAt,
+        isLocal: isLocal,
+        theme: theme,
       );
     } else if (message is MsgrLocationMessage) {
       updated = (message as MsgrLocationMessage).copyWith(
@@ -236,6 +261,10 @@ class ChatMessage {
     }
     if (message is MsgrAudioMessage) {
       return (message as MsgrAudioMessage).caption ?? '';
+    }
+    if (message is MsgrFileMessage) {
+      return (message as MsgrFileMessage).caption ??
+          (message as MsgrFileMessage).fileName;
     }
     if (message is MsgrVideoMessage) {
       return (message as MsgrVideoMessage).caption ?? '';
@@ -285,44 +314,135 @@ class ChatMessage {
 
   /// Active theme for rendering.
   MsgrMessageTheme get theme => message.theme;
+
+  /// Exposes the underlying message instance for advanced rendering.
+  MsgrMessage get data => message;
 }
 
 Map<String, dynamic> _normalisePayload(Map<String, dynamic> payload) {
-  final flattened = Map<String, dynamic>.from(payload);
+  final flattened = <String, dynamic>{};
+
+  for (final entry in payload.entries) {
+    if (entry.key != 'media') {
+      flattened[entry.key] = entry.value;
+    }
+  }
+
   final media = payload['media'];
-
   if (media is Map<String, dynamic>) {
-    final url = media['url'];
-    if (url is String) {
-      flattened['url'] = url;
+    final normalizedMedia = <String, dynamic>{};
+
+    void putString(String targetKey, dynamic value) {
+      if (value is String && value.isNotEmpty) {
+        normalizedMedia[targetKey] = value;
+      }
     }
 
+    void putInt(String targetKey, dynamic value) {
+      final parsed = _parseInt(value);
+      if (parsed != null) {
+        normalizedMedia[targetKey] = parsed;
+      }
+    }
+
+    putString('url', media['url'] ?? media['publicUrl']);
+    putString('bucket', media['bucket']);
+    putString('objectKey', media['objectKey'] ?? media['object_key']);
     final contentType = media['contentType'] ?? media['mimeType'];
+    putString('contentType', contentType);
     if (contentType is String) {
-      flattened['mimeType'] = contentType;
-      flattened['contentType'] = contentType;
+      normalizedMedia['mimeType'] = contentType;
     }
+    putString('caption', media['caption'] ?? media['description']);
+    putString('fileName', media['fileName'] ?? media['name']);
+    putInt('byteSize', media['byteSize'] ?? media['size']);
+    putInt('width', media['width']);
+    putInt('height', media['height']);
+    putString('sha256', media['sha256'] ?? media['hash']);
 
-    final caption = media['caption'];
-    if (caption is String) {
-      flattened['caption'] = caption;
+    final retention = media['retentionExpiresAt'] ?? media['retention_expires_at'];
+    if (retention is String) {
+      normalizedMedia['retentionExpiresAt'] = retention;
     }
 
     final duration = media['duration'];
     if (duration is num) {
-      flattened['duration'] = duration.toDouble();
+      normalizedMedia['duration'] = duration.toDouble();
     } else {
       final durationMs = media['durationMs'];
       if (durationMs is num) {
-        flattened['duration'] = durationMs.toDouble() / 1000;
+        normalizedMedia['duration'] = durationMs.toDouble() / 1000;
+        normalizedMedia['durationMs'] = durationMs.toInt();
       }
     }
 
-    final waveform = media['waveform'];
+    final waveform = media['waveform'] ?? media['waveForm'];
     if (waveform is List) {
-      flattened['waveform'] = waveform;
+      final samples = waveform
+          .whereType<num>()
+          .map((value) => value.toDouble())
+          .map((value) => value.clamp(0, 100).toDouble())
+          .toList(growable: false);
+      if (samples.isNotEmpty) {
+        normalizedMedia['waveform'] = samples;
+      }
     }
+
+    final rawThumbnail = media['thumbnail'] ?? media['thumbnailUrl'];
+    if (rawThumbnail is Map<String, dynamic>) {
+      final thumbnail = <String, dynamic>{};
+      final thumbUrl = rawThumbnail['url'] ?? rawThumbnail['publicUrl'];
+      if (thumbUrl is String && thumbUrl.isNotEmpty) {
+        normalizedMedia['thumbnailUrl'] = thumbUrl;
+        thumbnail['url'] = thumbUrl;
+      }
+      final thumbWidth = _parseInt(rawThumbnail['width']);
+      if (thumbWidth != null) {
+        normalizedMedia['thumbnailWidth'] = thumbWidth;
+        thumbnail['width'] = thumbWidth;
+      }
+      final thumbHeight = _parseInt(rawThumbnail['height']);
+      if (thumbHeight != null) {
+        normalizedMedia['thumbnailHeight'] = thumbHeight;
+        thumbnail['height'] = thumbHeight;
+      }
+      final thumbContentType = rawThumbnail['contentType'] ?? rawThumbnail['content_type'];
+      if (thumbContentType is String && thumbContentType.isNotEmpty) {
+        normalizedMedia['thumbnailContentType'] = thumbContentType;
+        thumbnail['contentType'] = thumbContentType;
+      }
+      final thumbObjectKey = rawThumbnail['objectKey'] ?? rawThumbnail['object_key'];
+      if (thumbObjectKey is String && thumbObjectKey.isNotEmpty) {
+        normalizedMedia['thumbnailObjectKey'] = thumbObjectKey;
+        thumbnail['objectKey'] = thumbObjectKey;
+      }
+      final thumbBucket = rawThumbnail['bucket'];
+      if (thumbBucket is String && thumbBucket.isNotEmpty) {
+        normalizedMedia['thumbnailBucket'] = thumbBucket;
+        thumbnail['bucket'] = thumbBucket;
+      }
+      if (thumbnail.isNotEmpty) {
+        normalizedMedia['thumbnail'] = thumbnail;
+      }
+    } else if (rawThumbnail is String && rawThumbnail.isNotEmpty) {
+      normalizedMedia['thumbnailUrl'] = rawThumbnail;
+    }
+
+    flattened.addAll(normalizedMedia);
+    flattened['media'] = normalizedMedia;
   }
 
   return flattened;
+}
+
+int? _parseInt(dynamic value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) {
+    final parsed = int.tryParse(value);
+    if (parsed != null) {
+      return parsed;
+    }
+  }
+  return null;
 }

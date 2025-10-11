@@ -19,9 +19,25 @@ defmodule MessngrWeb.MediaUploadJSON do
           bucket: instructions["bucket"],
           object_key: instructions["objectKey"],
           public_url: instructions["publicUrl"],
-          expires_at: instructions["expiresAt"]
+          expires_at: instructions["expiresAt"],
+          retention_expires_at: instructions["retentionExpiresAt"],
+          thumbnail_upload: encode_thumbnail(instructions["thumbnailUpload"])
         }
       }
+    }
+  end
+
+  defp encode_thumbnail(nil), do: nil
+
+  defp encode_thumbnail(%{} = thumbnail) do
+    %{
+      method: thumbnail["method"],
+      url: thumbnail["url"],
+      headers: thumbnail["headers"],
+      bucket: thumbnail["bucket"],
+      object_key: thumbnail["objectKey"],
+      public_url: thumbnail["publicUrl"],
+      expires_at: thumbnail["expiresAt"]
     }
   end
 end

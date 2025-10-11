@@ -159,19 +159,63 @@ Denne siden dokumenterer forventet kontrakt mellom msgr-backend og Flutter-klien
   "data": [
     {
       "id": "message-uuid",
-      "body": "Hei",
+      "type": "image",
+      "body": "Skisse",
       "status": "sent",
       "sent_at": "2024-10-04T12:00:00Z",
       "inserted_at": "2024-10-04T12:00:00Z",
+      "payload": {
+        "media": {
+          "bucket": "msgr-media",
+          "objectKey": "conversations/<id>/image/<uuid>.png",
+          "url": "https://cdn.msgr.no/msgr-media/conversations/<id>/image/<uuid>.png",
+          "contentType": "image/png",
+          "byteSize": 102400,
+          "width": 1920,
+          "height": 1080,
+          "caption": "Skisse",
+          "thumbnail": {
+            "url": "https://cdn.msgr.no/msgr-media/conversations/<id>/image/<uuid>-thumbnail.png",
+            "width": 320,
+            "height": 180
+          },
+          "retentionExpiresAt": "2024-11-04T12:00:00Z"
+        }
+      },
+      "media": {
+        "bucket": "msgr-media",
+        "objectKey": "conversations/<id>/image/<uuid>.png",
+        "url": "https://cdn.msgr.no/msgr-media/conversations/<id>/image/<uuid>.png",
+        "contentType": "image/png",
+        "byteSize": 102400,
+        "width": 1920,
+        "height": 1080,
+        "caption": "Skisse",
+        "thumbnail": {
+          "url": "https://cdn.msgr.no/msgr-media/conversations/<id>/image/<uuid>-thumbnail.png",
+          "width": 320,
+          "height": 180
+        },
+        "retentionExpiresAt": "2024-11-04T12:00:00Z"
+      },
       "profile": {
         "id": "profile-uuid",
         "name": "Deg",
         "mode": "private"
       }
     }
-  ]
+  ],
+  "meta": {
+    "start_cursor": "message-uuid",
+    "end_cursor": "message-uuid",
+    "has_more": {"before": false, "after": false}
+  }
 }
 ```
+
+`media`-feltet er en forhåndsnormalisert representasjon av `payload.media`. Den
+kan brukes direkte av klienter til å gjengi vedlegg uten å måtte vite alt om
+intern lagringsstruktur.
 
 ### Familie-spaces med kalender, handleliste og todo
 
@@ -422,12 +466,77 @@ Slett notater med `DELETE /api/families/{family_id}/notes/{note_id}`. Feltet `pi
 
 ### Sende melding
 
+### Opprette mediaopplasting
+
+`POST /api/conversations/{conversation_id}/uploads`
+
+```json
+{
+  "upload": {
+    "kind": "image",
+    "content_type": "image/png",
+    "byte_size": 102400,
+    "filename": "skisse.png"
+  }
+}
+```
+
+**Respons 201**
+
+```json
+{
+  "data": {
+    "id": "upload-uuid",
+    "kind": "image",
+    "status": "pending",
+    "bucket": "msgr-media",
+    "object_key": "conversations/<id>/image/<uuid>.png",
+    "content_type": "image/png",
+    "byte_size": 102400,
+    "expires_at": "2024-10-04T12:15:00Z",
+    "upload": {
+      "method": "PUT",
+      "url": "https://storage.local/msgr-media/conversations/<id>/image/<uuid>.png?...",
+      "headers": {
+        "content-type": "image/png"
+      },
+      "bucket": "msgr-media",
+      "object_key": "conversations/<id>/image/<uuid>.png",
+      "public_url": "https://cdn.msgr.no/msgr-media/conversations/<id>/image/<uuid>.png",
+      "expires_at": "2024-10-04T12:15:00Z",
+      "retention_expires_at": "2024-11-04T12:00:00Z",
+      "thumbnail_upload": {
+        "method": "PUT",
+        "url": "https://storage.local/msgr-media/conversations/<id>/image/<uuid>-thumbnail.png?...",
+        "headers": {
+          "content-type": "image/jpeg"
+        },
+        "bucket": "msgr-media",
+        "object_key": "conversations/<id>/image/<uuid>-thumbnail.png",
+        "public_url": "https://cdn.msgr.no/msgr-media/conversations/<id>/image/<uuid>-thumbnail.png",
+        "expires_at": "2024-10-04T12:15:00Z"
+      }
+    }
+  }
+}
+```
+
+Klienten laster opp originalfilen (og eventuell thumbnail) direkte til URL-ene
+før den sender meldingen med `upload_id`.
+
 `POST /api/conversations/{conversation_id}/messages`
 
 ```json
 {
   "message": {
-    "body": "Hei på deg"
+    "kind": "voice",
+    "body": "Hør på dette",
+    "media": {
+      "upload_id": "upload-uuid",
+      "durationMs": 2400,
+      "caption": "Hør på dette",
+      "waveform": [0, 10, 20]
+    }
   }
 }
 ```
@@ -438,10 +547,17 @@ Slett notater med `DELETE /api/families/{family_id}/notes/{note_id}`. Feltet `pi
 {
   "data": {
     "id": "message-uuid",
-    "body": "Hei på deg",
+    "type": "voice",
+    "body": "Hør på dette",
     "status": "sent",
     "sent_at": "2024-10-04T12:00:00Z",
     "inserted_at": "2024-10-04T12:00:00Z",
+    "media": {
+      "url": "https://cdn.msgr.no/msgr-media/conversations/<id>/voice/<uuid>.ogg",
+      "contentType": "audio/ogg",
+      "durationMs": 2400,
+      "waveform": [0, 10, 20]
+    },
     "profile": {
       "id": "profile-uuid",
       "name": "Deg",

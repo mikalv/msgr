@@ -15,7 +15,7 @@ defmodule Messngr.Chat.Message do
     field :status, Ecto.Enum, values: [:sending, :sent, :delivered, :read], default: :sent
     field :sent_at, :utc_datetime
     field :kind, Ecto.Enum,
-      values: [:text, :markdown, :code, :system, :image, :video, :audio, :location],
+      values: [:text, :markdown, :code, :system, :image, :video, :audio, :voice, :file, :location],
       default: :text
     field :payload, :map, default: %{}
 
@@ -67,11 +67,11 @@ defmodule Messngr.Chat.Message do
     payload = get_field(changeset, :payload) || %{}
 
     cond do
-      kind in [:audio, :video] ->
-        validate_media_payload(changeset, payload)
+      kind in [:audio, :video, :voice, :file] ->
+        validate_media_payload(changeset, payload, kind)
 
       kind == :image ->
-        require_payload_keys(changeset, payload, ["url"])
+        validate_media_payload(changeset, payload, kind)
 
       kind == :location ->
         require_payload_keys(changeset, payload, ["latitude", "longitude"])
@@ -81,24 +81,128 @@ defmodule Messngr.Chat.Message do
     end
   end
 
-  defp validate_media_payload(changeset, payload) do
+  defp validate_media_payload(changeset, payload, kind) do
     required = ["media"]
 
     case require_payload_keys(changeset, payload, required) do
       %Ecto.Changeset{valid?: false} = changeset -> changeset
       %Ecto.Changeset{} ->
         media = Map.get(payload, "media") || %{}
-        missing =
-          ["bucket", "objectKey", "contentType", "byteSize", "url"]
-          |> Enum.reject(&Map.has_key?(media, &1))
+        base_keys = ["bucket", "objectKey", "contentType", "byteSize", "url"]
+        missing = Enum.reject(base_keys, &Map.has_key?(media, &1))
 
-        if missing == [] do
-          changeset
-        else
-          add_error(changeset, :payload, "missing media keys: #{Enum.join(missing, ", ")}")
+        cond do
+          missing != [] ->
+            add_error(changeset, :payload, "missing media keys: #{Enum.join(missing, ", ")}")
+
+          true ->
+            changesets =
+              changeset
+              |> validate_optional_caption(media)
+              |> validate_optional_waveform(kind, media)
+              |> validate_optional_thumbnail(media)
+              |> validate_dimensions(kind, media)
+
+            changesets
         end
     end
   end
+
+  defp validate_dimensions(changeset, kind, media) when kind in [:image, :video] do
+    cond do
+      Map.has_key?(media, "width") and Map.has_key?(media, "height") ->
+        changeset
+        |> validate_number_in_map(media, "width", greater_than: 0)
+        |> validate_number_in_map(media, "height", greater_than: 0)
+
+      true ->
+        add_error(changeset, :payload, "missing media keys: width, height")
+    end
+  end
+
+  defp validate_dimensions(changeset, _kind, _media), do: changeset
+
+  defp validate_number_in_map(changeset, media, key, opts) do
+    case Map.fetch(media, key) do
+      {:ok, value} when is_integer(value) or is_float(value) ->
+        minimum = Keyword.get(opts, :greater_than)
+        if is_number(value) and (is_nil(minimum) or value > minimum) do
+          changeset
+        else
+          add_error(changeset, :payload, "invalid #{key}")
+        end
+
+      {:ok, _other} ->
+        add_error(changeset, :payload, "invalid #{key}")
+
+      :error ->
+        changeset
+    end
+  end
+
+  defp validate_optional_caption(changeset, media) do
+    case Map.get(media, "caption") do
+      nil -> changeset
+      caption when is_binary(caption) ->
+        if String.length(String.trim(caption)) <= 4_000 do
+          changeset
+        else
+          add_error(changeset, :payload, "caption is too long")
+        end
+
+      _ ->
+        add_error(changeset, :payload, "caption must be a string")
+    end
+  end
+
+  defp validate_optional_waveform(changeset, kind, media) when kind in [:audio, :voice] do
+    case Map.get(media, "waveform") do
+      nil -> changeset
+      waveform when is_list(waveform) ->
+        if Enum.all?(waveform, &valid_waveform_point?/1) and length(waveform) <= 512 do
+          changeset
+        else
+          add_error(changeset, :payload, "waveform must be <=512 samples between 0 and 100")
+        end
+
+      _ ->
+        add_error(changeset, :payload, "waveform must be a list of integers")
+    end
+  end
+
+  defp validate_optional_waveform(changeset, _kind, _media), do: changeset
+
+  defp valid_waveform_point?(value) when is_integer(value), do: value in 0..100
+  defp valid_waveform_point?(value) when is_float(value), do: value >= 0 and value <= 100
+  defp valid_waveform_point?(_), do: false
+
+  defp validate_optional_thumbnail(changeset, media) do
+    case Map.get(media, "thumbnail") do
+      nil -> changeset
+      %{} = thumb ->
+        base_keys = ["url", "width", "height"]
+        missing = Enum.reject(base_keys, &Map.has_key?(thumb, &1))
+
+        cond do
+          missing != [] ->
+            add_error(changeset, :payload, "thumbnail missing keys: #{Enum.join(missing, ", ")}")
+
+          not valid_thumbnail_dimension?(thumb["width"]) or
+              not valid_thumbnail_dimension?(thumb["height"]) ->
+            add_error(changeset, :payload, "thumbnail dimensions must be positive numbers")
+
+          true ->
+            changeset
+        end
+
+      _ ->
+        add_error(changeset, :payload, "thumbnail must be a map")
+    end
+  end
+
+  defp valid_thumbnail_dimension?(value) when is_integer(value) and value > 0, do: true
+  defp valid_thumbnail_dimension?(value) when is_float(value) and value > 0, do: true
+  defp valid_thumbnail_dimension?(_), do: false
 
   defp require_payload_keys(changeset, payload, keys) do
     missing = Enum.reject(keys, &Map.has_key?(payload, &1))

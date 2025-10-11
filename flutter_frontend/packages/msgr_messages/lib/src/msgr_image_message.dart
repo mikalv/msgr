@@ -11,6 +11,8 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
     required super.id,
     required this.url,
     this.thumbnailUrl,
+    this.thumbnailWidth,
+    this.thumbnailHeight,
     this.description,
     this.width,
     this.height,
@@ -30,6 +32,12 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
   /// Optional thumbnail preview URL.
   final String? thumbnailUrl;
 
+  /// Width of the provided thumbnail.
+  final int? thumbnailWidth;
+
+  /// Height of the provided thumbnail.
+  final int? thumbnailHeight;
+
   /// Description or alt text for accessibility.
   final String? description;
 
@@ -44,6 +52,8 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
     String? id,
     String? url,
     String? thumbnailUrl,
+    int? thumbnailWidth,
+    int? thumbnailHeight,
     String? description,
     int? width,
     int? height,
@@ -60,6 +70,8 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
       id: id ?? this.id,
       url: url ?? this.url,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      thumbnailWidth: thumbnailWidth ?? this.thumbnailWidth,
+      thumbnailHeight: thumbnailHeight ?? this.thumbnailHeight,
       description: description ?? this.description,
       width: width ?? this.width,
       height: height ?? this.height,
@@ -77,10 +89,27 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
   /// Recreates an [MsgrImageMessage] from a JSON compatible map.
   factory MsgrImageMessage.fromMap(Map<String, dynamic> map) {
     final author = MsgrAuthoredMessage.readAuthorMap(map);
+    final rawThumbnail = map['thumbnail'];
+    String? thumbnailUrl = map['thumbnailUrl'] as String?;
+    if (thumbnailUrl == null && rawThumbnail is Map<String, dynamic>) {
+      thumbnailUrl = rawThumbnail['url'] as String? ?? rawThumbnail['thumbnailUrl'] as String?;
+    } else if (thumbnailUrl == null && rawThumbnail is String) {
+      thumbnailUrl = rawThumbnail;
+    }
+
+    int? thumbnailWidth = (map['thumbnailWidth'] as num?)?.toInt();
+    int? thumbnailHeight = (map['thumbnailHeight'] as num?)?.toInt();
+    if (rawThumbnail is Map<String, dynamic>) {
+      thumbnailWidth ??= (rawThumbnail['width'] as num?)?.toInt();
+      thumbnailHeight ??= (rawThumbnail['height'] as num?)?.toInt();
+    }
+
     return MsgrImageMessage(
       id: map['id'] as String,
       url: map['url'] as String? ?? '',
-      thumbnailUrl: map['thumbnailUrl'] as String? ?? map['thumbnail'] as String?,
+      thumbnailUrl: thumbnailUrl,
+      thumbnailWidth: thumbnailWidth,
+      thumbnailHeight: thumbnailHeight,
       description: map['description'] as String?,
       width: (map['width'] as num?)?.toInt(),
       height: (map['height'] as num?)?.toInt(),
@@ -102,6 +131,8 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
       'id': id,
       'url': url,
       'thumbnailUrl': thumbnailUrl,
+      'thumbnailWidth': thumbnailWidth,
+      'thumbnailHeight': thumbnailHeight,
       'description': description,
       'width': width,
       'height': height,
@@ -118,6 +149,8 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
         ...super.props,
         url,
         thumbnailUrl,
+        thumbnailWidth,
+        thumbnailHeight,
         description,
         width,
         height,

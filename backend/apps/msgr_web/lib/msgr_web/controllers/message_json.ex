@@ -24,6 +24,9 @@ defmodule MessngrWeb.MessageJSON do
   end
 
   defp message(%Message{} = message) do
+    payload = message.payload || %{}
+    media = Map.get(payload, "media") || %{}
+
     %{
       id: message.id,
       type: message.kind |> to_string(),
@@ -31,7 +34,8 @@ defmodule MessngrWeb.MessageJSON do
       status: message.status,
       sent_at: message.sent_at,
       inserted_at: message.inserted_at,
-      payload: message.payload || %{},
+      payload: payload,
+      media: media,
       profile: profile_payload(message.profile)
     }
   end

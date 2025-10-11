@@ -74,6 +74,7 @@ dependencies:
   # It will be essential to be able to spread the app to gain a chance in world market
   share_plus: ^10.0.2
   file_picker: ^8.0.6
+  desktop_drop: ^0.4.4
 
   # Media
   video_player: ^2.2.0
@@ -83,11 +84,13 @@ dependencies:
   image_picker: ^1.1.2
   image_picker_for_web: ^3.0.6
   cached_network_image: ^3.3.1
+  image: ^4.1.7
 
   # For messages
   flutter_markdown: ^0.7.3+2
   flutter_link_previewer: ^3.2.2
   flutter_svg: ^2.0.10+1
+  mime: ^1.0.5
 
   # Misc
   meta: ^1.15.0
