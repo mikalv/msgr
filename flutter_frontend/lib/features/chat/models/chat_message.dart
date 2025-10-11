@@ -1,27 +1,18 @@
-import 'package:equatable/equatable.dart';
+import 'package:msgr_messages/msgr_messages.dart';
 
-class ChatMessage extends Equatable {
+class ChatMessage extends MsgrTextMessage {
   const ChatMessage({
-    required this.id,
-    required this.body,
-    required this.profileId,
-    required this.profileName,
-    required this.profileMode,
-    required this.status,
-    required this.sentAt,
-    required this.insertedAt,
-    this.isLocal = false,
+    required super.id,
+    required super.body,
+    required super.profileId,
+    required super.profileName,
+    required super.profileMode,
+    required super.status,
+    required super.sentAt,
+    required super.insertedAt,
+    super.isLocal,
+    super.theme,
   });
-
-  final String id;
-  final String body;
-  final String profileId;
-  final String profileName;
-  final String profileMode;
-  final String status;
-  final DateTime? sentAt;
-  final DateTime? insertedAt;
-  final bool isLocal;
 
   ChatMessage copyWith({
     String? id,
@@ -33,6 +24,7 @@ class ChatMessage extends Equatable {
     DateTime? sentAt,
     DateTime? insertedAt,
     bool? isLocal,
+    MsgrMessageTheme? theme,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -44,6 +36,7 @@ class ChatMessage extends Equatable {
       sentAt: sentAt ?? this.sentAt,
       insertedAt: insertedAt ?? this.insertedAt,
       isLocal: isLocal ?? this.isLocal,
+      theme: theme ?? this.theme,
     );
   }
 
@@ -56,44 +49,27 @@ class ChatMessage extends Equatable {
       profileName: profile?['name'] as String? ?? 'Ukjent',
       profileMode: profile?['mode'] as String? ?? 'private',
       status: json['status'] as String? ?? 'sent',
-      sentAt: _parseDate(json['sent_at']),
-      insertedAt: _parseDate(json['inserted_at']),
+      sentAt: MsgrMessage.parseTimestamp(json['sent_at']),
+      insertedAt: MsgrMessage.parseTimestamp(json['inserted_at']),
+      theme: json['theme'] is Map<String, dynamic>
+          ? MsgrMessageTheme.fromMap(json['theme'] as Map<String, dynamic>)
+          : MsgrMessageTheme.defaultTheme,
     );
   }
 
   Map<String, dynamic> toJson() {
+    final map = super.toMap();
     return {
-      'id': id,
-      'body': body,
-      'profileId': profileId,
-      'profileName': profileName,
-      'profileMode': profileMode,
-      'status': status,
-      'sentAt': sentAt?.toIso8601String(),
-      'insertedAt': insertedAt?.toIso8601String(),
+      'id': map['id'],
+      'body': map['body'],
+      'profileId': map['profileId'],
+      'profileName': map['profileName'],
+      'profileMode': map['profileMode'],
+      'status': map['status'],
+      'sentAt': map['sentAt'],
+      'insertedAt': map['insertedAt'],
+      'isLocal': map['isLocal'],
+      'theme': map['theme'],
     };
   }
-
-  static DateTime? _parseDate(dynamic value) {
-    if (value == null) {
-      return null;
-    }
-    if (value is DateTime) {
-      return value;
-    }
-    return DateTime.tryParse(value.toString());
-  }
-
-  @override
-  List<Object?> get props => [
-        id,
-        body,
-        profileId,
-        profileName,
-        profileMode,
-        status,
-        sentAt,
-        insertedAt,
-        isLocal,
-      ];
 }
