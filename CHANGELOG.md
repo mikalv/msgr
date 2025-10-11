@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Lagt ved `IMPROVE_ARCHITECTURE.md` med veikart for å modernisere Flutter-klientens struktur,
+  state-håndtering og moduloppdeling.
 - Added initial WebRTC signalling stack with in-memory call registry, Phoenix `rtc:*` channel, tests, documentation, and a dockerised coturn service for TURN/STUN.
 - Tightened direct-call support by capping participants to vert + én, utvidet testdekning og dokumentasjon av Flutter-klientplanen.
 - Introduced conversation structure types (familie, bedrift, vennegjeng, prosjekt)
