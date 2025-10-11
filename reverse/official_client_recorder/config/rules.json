@@ -1,0 +1,108 @@
+{
+  "noise": {
+    "resourceTypes": ["Image", "Media", "Font", "Stylesheet"],
+    "mimePrefixes": [
+      "image/",
+      "video/",
+      "audio/",
+      "text/css",
+      "font/",
+      "application/font",
+      "application/vnd.ms-fontobject"
+    ],
+    "urlPatterns": [
+      "\\.(png|jpg|jpeg|gif|webp|svg|ico)(\\?.*)?$",
+      "\\.(mp4|mp3|wav|ogg|avi)(\\?.*)?$",
+      "\\.(css|woff2?|ttf|otf|eot)(\\?.*)?$",
+      "/favicon\\.",
+      "static\\.xx\\.fbcdn\\.net",
+      "fbcdn\\.net/.*/images/",
+      "\\/emoji\\.php"
+    ]
+  },
+  "categories": [
+    {
+      "name": "auth",
+      "score": 7,
+      "match": {
+        "methods": ["POST"],
+        "urlContains": ["login", "auth", "token", "sso", "reauth"]
+      }
+    },
+    {
+      "name": "session",
+      "score": 5,
+      "match": {
+        "methods": ["POST", "GET"],
+        "urlContains": ["cookie", "consent", "device", "session"]
+      }
+    },
+    {
+      "name": "messaging-send",
+      "score": 8,
+      "match": {
+        "methods": ["POST", "PUT"],
+        "urlContains": ["send", "messages", "thread", "graphql"]
+      }
+    },
+    {
+      "name": "messaging-sync",
+      "score": 6,
+      "match": {
+        "urlContains": ["pull", "sync", "graphql", "thread", "fetch", "batch_fetch"]
+      }
+    },
+    {
+      "name": "presence",
+      "score": 5,
+      "match": {
+        "urlContains": ["presence", "typing", "status", "buddylist"]
+      }
+    },
+    {
+      "name": "attachments",
+      "score": 6,
+      "match": {
+        "urlContains": ["upload", "attachment", "filetransfer", "files"]
+      }
+    },
+    {
+      "name": "telemetry",
+      "score": 2,
+      "noise": true,
+      "match": {
+        "urlContains": ["logging", "telemetry", "metrics", "trace", "falco", "beacon"]
+      }
+    },
+    {
+      "name": "security",
+      "score": 5,
+      "match": {
+        "methods": ["POST"],
+        "headers": ["x-fb-lsd", "x-fb-device-group", "x-fb-friendly-name"]
+      }
+    },
+    {
+      "name": "websocket",
+      "score": 7,
+      "match": {
+        "types": ["ws-frame"]
+      }
+    }
+  ],
+  "boosts": {
+    "methods": {
+      "POST": 3,
+      "PUT": 3,
+      "DELETE": 3,
+      "PATCH": 3
+    },
+    "statusBuckets": {
+      "4xx": 3,
+      "5xx": 5
+    },
+    "wsDirections": {
+      "incoming": 2
+    }
+  }
+}
