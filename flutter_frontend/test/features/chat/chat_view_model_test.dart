@@ -42,6 +42,7 @@ class StubChatApi implements ChatApi {
     required AccountIdentity current,
     required String topic,
     required List<String> participantIds,
+    ChatStructureType structureType = ChatStructureType.friends,
   }) async {
     return thread;
   }
@@ -51,6 +52,8 @@ class StubChatApi implements ChatApi {
     required AccountIdentity current,
     required String topic,
     List<String> participantIds = const [],
+    ChatStructureType structureType = ChatStructureType.project,
+    ChatVisibility visibility = ChatVisibility.team,
   }) async {
     return thread;
   }

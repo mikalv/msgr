@@ -17,6 +17,8 @@ defmodule Messngr.ChatTest do
   test "ensure_direct_conversation/2 creates conversation", %{profile_a: profile_a, profile_b: profile_b} do
     assert {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
     assert conversation.kind == :direct
+    assert conversation.visibility == :private
+    assert conversation.structure_type == nil
     assert Enum.count(conversation.participants) == 2
   end
 
@@ -25,10 +27,15 @@ defmodule Messngr.ChatTest do
     profile_c = List.first(account_c.profiles)
 
     assert {:ok, conversation} =
-             Chat.create_group_conversation(profile_a.id, [profile_b.id, profile_c.id], %{"topic" => "Plan"})
+             Chat.create_group_conversation(profile_a.id, [profile_b.id, profile_c.id], %{
+               "topic" => "Plan",
+               "structure_type" => "family"
+             })
 
     assert conversation.kind == :group
     assert conversation.topic == "Plan"
+    assert conversation.structure_type == :family
+    assert conversation.visibility == :private
     assert Enum.count(conversation.participants) == 3
 
     owner = Enum.find(conversation.participants, &(&1.role == :owner))
@@ -44,7 +51,29 @@ defmodule Messngr.ChatTest do
 
     assert conversation.kind == :channel
     assert conversation.topic == "Announcements"
+    assert conversation.structure_type == :project
+    assert conversation.visibility == :team
     assert Enum.any?(conversation.participants, &(&1.role == :member && &1.profile.id == profile_b.id))
+  end
+
+  test "create_channel_conversation/2 supports private visibility", %{profile_a: profile_a, profile_b: profile_b} do
+    assert {:ok, conversation} =
+             Chat.create_channel_conversation(profile_a.id, %{
+               "topic" => "Secret",
+               "participant_ids" => [profile_b.id],
+               "visibility" => "private",
+               "structure_type" => "business"
+             })
+
+    assert conversation.visibility == :private
+    assert conversation.structure_type == :business
+  end
+
+  test "create_group_conversation/3 defaults structure type when missing", %{profile_a: profile_a, profile_b: profile_b} do
+    assert {:ok, conversation} =
+             Chat.create_group_conversation(profile_a.id, [profile_b.id], %{"topic" => "Afterwork"})
+
+    assert conversation.structure_type == :friends
   end
 
   test "create_channel_conversation/2 requires topic", %{profile_a: profile_a} do

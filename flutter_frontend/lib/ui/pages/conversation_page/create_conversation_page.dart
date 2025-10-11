@@ -20,6 +20,8 @@ class _CreateConversationPageState extends State<CreateConversationPage> {
   late ProfileRepository profileRepository;
   final List<Profile> selectedMembers = [];
   ChatThreadKind _selectedKind = ChatThreadKind.direct;
+  ChatStructureType _selectedStructure = ChatStructureType.friends;
+  bool _channelIsPrivate = false;
 
   @override
   void initState() {
@@ -39,6 +41,7 @@ class _CreateConversationPageState extends State<CreateConversationPage> {
   void _createConversation() {
     final membersIDs = selectedMembers.map((e) => e.id).toList();
     final topic = _topicController.text.trim();
+    final structureType = _selectedStructure;
 
     String? validationError;
 
@@ -69,8 +72,11 @@ class _CreateConversationPageState extends State<CreateConversationPage> {
       return;
     }
 
+    final visibility =
+        _selectedKind == ChatThreadKind.channel && _channelIsPrivate ? 'private' : 'team';
+
     debugPrint(
-        'Conversation create request ($_selectedKind): members=$membersIDs topic=$topic');
+        'Conversation create request ($_selectedKind): members=$membersIDs topic=$topic structure=$structureType visibility=$visibility');
 
     // TODO: Integrate conversationRepository when backend bindings are ready.
   }
@@ -101,6 +107,11 @@ class _CreateConversationPageState extends State<CreateConversationPage> {
                         if (value == null) return;
                         setState(() {
                           _selectedKind = value;
+                          _selectedStructure =
+                              value == ChatThreadKind.channel
+                                  ? ChatStructureType.project
+                                  : ChatStructureType.friends;
+                          _channelIsPrivate = false;
                         });
                       },
                       items: const [
@@ -130,6 +141,42 @@ class _CreateConversationPageState extends State<CreateConversationPage> {
                               : 'Gruppenavn',
                         ),
                       ),
+                    ),
+                  if (_selectedKind != ChatThreadKind.direct)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: DropdownButtonFormField<ChatStructureType>(
+                        value: _selectedStructure,
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() {
+                            _selectedStructure = value;
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          labelText: 'Struktur',
+                        ),
+                        items: ChatStructureType.values
+                            .map(
+                              (type) => DropdownMenuItem(
+                                value: type,
+                                child: Text(_structureLabel(type)),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                  if (_selectedKind == ChatThreadKind.channel)
+                    SwitchListTile(
+                      title: const Text('Skjul kanal for andre'),
+                      subtitle:
+                          const Text('Kun inviterte medlemmer kan se kanalen'),
+                      value: _channelIsPrivate,
+                      onChanged: (value) {
+                        setState(() {
+                          _channelIsPrivate = value;
+                        });
+                      },
                     ),
                   DropdownSearch<Profile>.multiSelection(
                     onChanged: (List<Profile> selected) {
@@ -185,5 +232,20 @@ class _CreateConversationPageState extends State<CreateConversationPage> {
 
   getData(String filter) {
     return profileRepository.listTeamProfiles();
+  }
+
+  String _structureLabel(ChatStructureType type) {
+    switch (type) {
+      case ChatStructureType.family:
+        return 'Familie';
+      case ChatStructureType.business:
+        return 'Bedrift';
+      case ChatStructureType.friends:
+        return 'Vennegjeng';
+      case ChatStructureType.project:
+        return 'Prosjekt';
+      case ChatStructureType.other:
+        return 'Annet';
+    }
   }
 }

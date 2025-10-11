@@ -30,6 +30,7 @@ defmodule Messngr.Chat do
           {:ok, Conversation.t()} | {:error, Ecto.Changeset.t()} | {:error, term()}
   def create_group_conversation(owner_profile_id, participant_ids, attrs \\ %{}) do
     participant_ids = List.wrap(participant_ids)
+    attrs = Map.put(attrs, :visibility, :private)
     create_structured_conversation(:group, owner_profile_id, participant_ids, attrs)
   end
 
@@ -206,10 +207,23 @@ defmodule Messngr.Chat do
   defp create_structured_conversation(kind, owner_profile_id, participant_ids, attrs) do
     owner_profile_id = to_string(owner_profile_id)
     topic = attrs |> Map.get("topic") |> Kernel.||(Map.get(attrs, :topic))
+    structure_type =
+      attrs
+      |> Map.get("structure_type")
+      |> Kernel.||(Map.get(attrs, :structure_type))
+      |> normalize_structure_type(default_structure_type_for(kind))
+
+    visibility =
+      attrs
+      |> Map.get("visibility")
+      |> Kernel.||(Map.get(attrs, :visibility))
+      |> normalize_visibility(default_visibility_for(kind), kind)
 
     conversation_attrs =
       %{kind: kind}
       |> maybe_put_topic(topic)
+      |> maybe_put_structure_type(structure_type)
+      |> Map.put(:visibility, visibility)
 
     member_ids = normalize_participant_ids(participant_ids, owner_profile_id)
 
@@ -251,6 +265,66 @@ defmodule Messngr.Chat do
 
   defp maybe_put_topic(attrs, nil), do: attrs
   defp maybe_put_topic(attrs, topic), do: Map.put(attrs, :topic, topic)
+
+  defp maybe_put_structure_type(attrs, nil), do: attrs
+  defp maybe_put_structure_type(attrs, structure_type), do: Map.put(attrs, :structure_type, structure_type)
+
+  defp normalize_structure_type(nil, default), do: default
+
+  defp normalize_structure_type(value, _default) when value in [:family, :business, :friends, :project, :other],
+    do: value
+
+  defp normalize_structure_type(value, default) when is_binary(value) do
+    normalized = String.downcase(value)
+
+    case normalized do
+      "family" -> :family
+      "familie" -> :family
+      "business" -> :business
+      "bedrift" -> :business
+      "friends" -> :friends
+      "venner" -> :friends
+      "vennegjeng" -> :friends
+      "project" -> :project
+      "prosjekt" -> :project
+      "other" -> :other
+      _ -> default
+    end
+  end
+
+  defp normalize_structure_type(_value, default), do: default
+
+  defp default_structure_type_for(:group), do: :friends
+  defp default_structure_type_for(:channel), do: :project
+  defp default_structure_type_for(_kind), do: :other
+
+  defp normalize_visibility(nil, default, kind), do: enforce_visibility(kind, default)
+
+  defp normalize_visibility(value, default, kind) when is_binary(value) do
+    normalized = String.downcase(value)
+
+    case normalized do
+      "private" -> enforce_visibility(kind, :private)
+      "team" -> enforce_visibility(kind, :team)
+      "hidden" -> enforce_visibility(kind, :private)
+      "public" -> enforce_visibility(kind, :team)
+      _ -> enforce_visibility(kind, default)
+    end
+  end
+
+  defp normalize_visibility(value, _default, kind) when value in [:private, :team] do
+    enforce_visibility(kind, value)
+  end
+
+  defp normalize_visibility(_value, default, kind), do: enforce_visibility(kind, default)
+
+  defp enforce_visibility(:group, _value), do: :private
+  defp enforce_visibility(:direct, _value), do: :private
+  defp enforce_visibility(_kind, value), do: value
+
+  defp default_visibility_for(:group), do: :private
+  defp default_visibility_for(:channel), do: :team
+  defp default_visibility_for(_kind), do: :private
 
   defp maybe_resolve_media(kind, conversation_id, profile_id, attrs) when kind in [:audio, :video] do
     media =

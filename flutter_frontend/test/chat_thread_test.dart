@@ -8,6 +8,8 @@ void main() {
         'id': 'abc',
         'kind': 'channel',
         'topic': '#design',
+        'structure_type': 'project',
+        'visibility': 'team',
         'participants': [
           {
             'profile': {'name': 'Kari'}
@@ -18,12 +20,15 @@ void main() {
       expect(thread.kind, ChatThreadKind.channel);
       expect(thread.topic, '#design');
       expect(thread.displayName, '#design');
+      expect(thread.structureType, ChatStructureType.project);
+      expect(thread.visibility, ChatVisibility.team);
     });
 
     test('falls back to participant names when no topic', () {
       final thread = ChatThread.fromJson({
         'id': 'def',
         'kind': 'group',
+        'structure_type': 'family',
         'participants': [
           {
             'profile': {'name': 'Per'}
@@ -36,6 +41,19 @@ void main() {
 
       expect(thread.kind, ChatThreadKind.group);
       expect(thread.displayName, 'Per, Lise');
+      expect(thread.structureType, ChatStructureType.family);
+      expect(thread.visibility, ChatVisibility.private);
+    });
+
+    test('parses hidden channel visibility aliases', () {
+      final thread = ChatThread.fromJson({
+        'id': 'ghi',
+        'kind': 'channel',
+        'topic': '#ops',
+        'visibility': 'hidden',
+      });
+
+      expect(thread.visibility, ChatVisibility.private);
     });
   });
 }

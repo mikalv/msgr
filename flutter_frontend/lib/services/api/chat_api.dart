@@ -71,6 +71,7 @@ class ChatApi {
     required AccountIdentity current,
     required String topic,
     required List<String> participantIds,
+    ChatStructureType structureType = ChatStructureType.friends,
   }) async {
     final response = await _client.post(
       backendApiUri('conversations'),
@@ -79,6 +80,7 @@ class ChatApi {
         'kind': 'group',
         'topic': topic,
         'participant_ids': participantIds,
+        'structure_type': _structureTypeToJson(structureType),
       }),
     );
 
@@ -91,6 +93,8 @@ class ChatApi {
     required AccountIdentity current,
     required String topic,
     List<String> participantIds = const [],
+    ChatStructureType structureType = ChatStructureType.project,
+    ChatVisibility visibility = ChatVisibility.team,
   }) async {
     final response = await _client.post(
       backendApiUri('conversations'),
@@ -99,6 +103,8 @@ class ChatApi {
         'kind': 'channel',
         'topic': topic,
         'participant_ids': participantIds,
+        'structure_type': _structureTypeToJson(structureType),
+        'visibility': _visibilityToJson(visibility),
       }),
     );
 
@@ -147,6 +153,30 @@ class ChatApi {
       'x-account-id': identity.accountId,
       'x-profile-id': identity.profileId,
     };
+  }
+
+  String _structureTypeToJson(ChatStructureType type) {
+    switch (type) {
+      case ChatStructureType.family:
+        return 'family';
+      case ChatStructureType.business:
+        return 'business';
+      case ChatStructureType.friends:
+        return 'friends';
+      case ChatStructureType.project:
+        return 'project';
+      case ChatStructureType.other:
+        return 'other';
+    }
+  }
+
+  String _visibilityToJson(ChatVisibility visibility) {
+    switch (visibility) {
+      case ChatVisibility.private:
+        return 'private';
+      case ChatVisibility.team:
+        return 'team';
+    }
   }
 
   Map<String, dynamic> _decodeBody(http.Response response) {

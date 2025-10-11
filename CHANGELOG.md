@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Introduced conversation structure types (familie, bedrift, vennegjeng, prosjekt)
+  with private/team visibility, backend validation, and updated Flutter UI/API for
+  creating skjulte kanaler og grupper.
 - Utvidet samtalekonseptet med støtte for `group`- og `channel`-typer i Elixir-
   backenden, nye API-endepunkter og validering av temaer.
 - Lagt til kontaktskjema, migrasjoner og REST-endepunkter for import og
