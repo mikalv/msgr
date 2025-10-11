@@ -8,6 +8,12 @@
   `mix rollout.noise_handshake`, og dokumentasjon i `docs/noise_handshake_rollout.md`
   + oppdatert API-kontrakt så klienter vet hvordan `Authorization: Noise <token>`
   skal brukes.
+- Added docker-compose backed integration test suite that boots the backend,
+  exercises the Dart CLI flow for registration/login/team creation and verifies
+  message send/receive over the public APIs via pytest.
+- Exposed an opt-in `MSGR_WEB_LEGACY_ACTOR_HEADERS` runtime flag so integration
+  tests can rely on legacy headers while Noise authentication is still rolling
+  out.
 - Replaced header-based actor resolution with a shared Noise session plug that
   validates tokens against the registry, assigns account/profile/device for
   REST and WebSocket contexts, adds feature-toggled legacy fallback, updates
