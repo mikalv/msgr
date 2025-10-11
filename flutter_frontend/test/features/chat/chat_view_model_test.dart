@@ -15,6 +15,8 @@ class StubChatApi implements ChatApi {
   final ChatThread thread = const ChatThread(
     id: 'conversation-1',
     participantNames: ['Demo', 'Buddy'],
+    kind: ChatThreadKind.direct,
+    topic: null,
   );
   int _counter = 0;
 
@@ -31,6 +33,27 @@ class StubChatApi implements ChatApi {
   Future<ChatThread> ensureDirectConversation({
     required AccountIdentity current,
     required String targetProfileId,
+  }) async {
+    return thread;
+  }
+
+  @override
+  Future<ChatThread> createGroupConversation({
+    required AccountIdentity current,
+    required String topic,
+    required List<String> participantIds,
+    ChatStructureType structureType = ChatStructureType.friends,
+  }) async {
+    return thread;
+  }
+
+  @override
+  Future<ChatThread> createChannelConversation({
+    required AccountIdentity current,
+    required String topic,
+    List<String> participantIds = const [],
+    ChatStructureType structureType = ChatStructureType.project,
+    ChatVisibility visibility = ChatVisibility.team,
   }) async {
     return thread;
   }

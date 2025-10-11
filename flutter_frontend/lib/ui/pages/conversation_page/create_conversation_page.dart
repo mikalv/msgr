@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/config/AppNavigation.dart';
+import 'package:messngr/features/chat/models/chat_thread.dart';
 import 'package:messngr/ui/widgets/dropdown_search/dropdown_search.dart';
 
 class CreateConversationPage extends StatefulWidget {
@@ -14,9 +15,13 @@ class CreateConversationPage extends StatefulWidget {
 class _CreateConversationPageState extends State<CreateConversationPage> {
   final TextEditingController _conversationMembersController =
       TextEditingController();
+  final TextEditingController _topicController = TextEditingController();
   late TeamRepositories repos;
   late ProfileRepository profileRepository;
   final List<Profile> selectedMembers = [];
+  ChatThreadKind _selectedKind = ChatThreadKind.direct;
+  ChatStructureType _selectedStructure = ChatStructureType.friends;
+  bool _channelIsPrivate = false;
 
   @override
   void initState() {
@@ -29,21 +34,51 @@ class _CreateConversationPageState extends State<CreateConversationPage> {
   @override
   void dispose() {
     _conversationMembersController.dispose();
+    _topicController.dispose();
     super.dispose();
   }
 
   void _createConversation() {
-    if (selectedMembers.isNotEmpty) {
-      final membersIDs = selectedMembers.map((e) => e.id).toList();
-      // Logic to create a new chat room
-      print('Conversation create request: $selectedMembers => $membersIDs');
-      // Navigate back or to the new chat room
-      final ConversationRepository conversationRepository =
-          repos.conversationRepository;
-    } else {
-      // Show error message
-      print('Please fill in all fields');
+    final membersIDs = selectedMembers.map((e) => e.id).toList();
+    final topic = _topicController.text.trim();
+    final structureType = _selectedStructure;
+
+    String? validationError;
+
+    switch (_selectedKind) {
+      case ChatThreadKind.direct:
+        if (membersIDs.length != 1) {
+          validationError = 'Velg én deltaker for en direkte samtale.';
+        }
+        break;
+      case ChatThreadKind.group:
+        if (membersIDs.isEmpty) {
+          validationError = 'Velg minst én annen deltaker for gruppen.';
+        } else if (topic.isEmpty) {
+          validationError = 'Sett et navn eller tema for gruppen.';
+        }
+        break;
+      case ChatThreadKind.channel:
+        if (topic.isEmpty) {
+          validationError = 'Kanaler må ha et navn eller tema.';
+        }
+        break;
     }
+
+    if (validationError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(validationError)),
+      );
+      return;
+    }
+
+    final visibility =
+        _selectedKind == ChatThreadKind.channel && _channelIsPrivate ? 'private' : 'team';
+
+    debugPrint(
+        'Conversation create request ($_selectedKind): members=$membersIDs topic=$topic structure=$structureType visibility=$visibility');
+
+    // TODO: Integrate conversationRepository when backend bindings are ready.
   }
 
   @override
@@ -64,6 +99,85 @@ class _CreateConversationPageState extends State<CreateConversationPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: DropdownButton<ChatThreadKind>(
+                      value: _selectedKind,
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() {
+                          _selectedKind = value;
+                          _selectedStructure =
+                              value == ChatThreadKind.channel
+                                  ? ChatStructureType.project
+                                  : ChatStructureType.friends;
+                          _channelIsPrivate = false;
+                        });
+                      },
+                      items: const [
+                        DropdownMenuItem(
+                          value: ChatThreadKind.direct,
+                          child: Text('Direkte (1:1)'),
+                        ),
+                        DropdownMenuItem(
+                          value: ChatThreadKind.group,
+                          child: Text('Gruppe'),
+                        ),
+                        DropdownMenuItem(
+                          value: ChatThreadKind.channel,
+                          child: Text('Kanal'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_selectedKind != ChatThreadKind.direct)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: TextField(
+                        controller: _topicController,
+                        decoration: InputDecoration(
+                          labelText: _selectedKind == ChatThreadKind.channel
+                              ? 'Kanalnavn'
+                              : 'Gruppenavn',
+                        ),
+                      ),
+                    ),
+                  if (_selectedKind != ChatThreadKind.direct)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: DropdownButtonFormField<ChatStructureType>(
+                        value: _selectedStructure,
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() {
+                            _selectedStructure = value;
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          labelText: 'Struktur',
+                        ),
+                        items: ChatStructureType.values
+                            .map(
+                              (type) => DropdownMenuItem(
+                                value: type,
+                                child: Text(_structureLabel(type)),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ),
+                  if (_selectedKind == ChatThreadKind.channel)
+                    SwitchListTile(
+                      title: const Text('Skjul kanal for andre'),
+                      subtitle:
+                          const Text('Kun inviterte medlemmer kan se kanalen'),
+                      value: _channelIsPrivate,
+                      onChanged: (value) {
+                        setState(() {
+                          _channelIsPrivate = value;
+                        });
+                      },
+                    ),
                   DropdownSearch<Profile>.multiSelection(
                     onChanged: (List<Profile> selected) {
                       selectedMembers.clear();
@@ -118,5 +232,20 @@ class _CreateConversationPageState extends State<CreateConversationPage> {
 
   getData(String filter) {
     return profileRepository.listTeamProfiles();
+  }
+
+  String _structureLabel(ChatStructureType type) {
+    switch (type) {
+      case ChatStructureType.family:
+        return 'Familie';
+      case ChatStructureType.business:
+        return 'Bedrift';
+      case ChatStructureType.friends:
+        return 'Vennegjeng';
+      case ChatStructureType.project:
+        return 'Prosjekt';
+      case ChatStructureType.other:
+        return 'Annet';
+    }
   }
 }

@@ -11,6 +11,8 @@ defmodule MessngrWeb.ConversationJSON do
       id: conversation.id,
       kind: conversation.kind,
       topic: conversation.topic,
+      structure_type: conversation.structure_type,
+      visibility: conversation.visibility,
       participants: Enum.map(conversation.participants, &participant/1)
     }
   end

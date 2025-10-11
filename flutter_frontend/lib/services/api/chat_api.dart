@@ -67,6 +67,52 @@ class ChatApi {
     return ChatThread.fromJson(data);
   }
 
+  Future<ChatThread> createGroupConversation({
+    required AccountIdentity current,
+    required String topic,
+    required List<String> participantIds,
+    ChatStructureType structureType = ChatStructureType.friends,
+  }) async {
+    final response = await _client.post(
+      backendApiUri('conversations'),
+      headers: _authHeaders(current),
+      body: jsonEncode({
+        'kind': 'group',
+        'topic': topic,
+        'participant_ids': participantIds,
+        'structure_type': _structureTypeToJson(structureType),
+      }),
+    );
+
+    final decoded = _decodeBody(response);
+    final data = decoded['data'] as Map<String, dynamic>;
+    return ChatThread.fromJson(data);
+  }
+
+  Future<ChatThread> createChannelConversation({
+    required AccountIdentity current,
+    required String topic,
+    List<String> participantIds = const [],
+    ChatStructureType structureType = ChatStructureType.project,
+    ChatVisibility visibility = ChatVisibility.team,
+  }) async {
+    final response = await _client.post(
+      backendApiUri('conversations'),
+      headers: _authHeaders(current),
+      body: jsonEncode({
+        'kind': 'channel',
+        'topic': topic,
+        'participant_ids': participantIds,
+        'structure_type': _structureTypeToJson(structureType),
+        'visibility': _visibilityToJson(visibility),
+      }),
+    );
+
+    final decoded = _decodeBody(response);
+    final data = decoded['data'] as Map<String, dynamic>;
+    return ChatThread.fromJson(data);
+  }
+
   Future<List<ChatMessage>> fetchMessages({
     required AccountIdentity current,
     required String conversationId,
@@ -107,6 +153,30 @@ class ChatApi {
       'x-account-id': identity.accountId,
       'x-profile-id': identity.profileId,
     };
+  }
+
+  String _structureTypeToJson(ChatStructureType type) {
+    switch (type) {
+      case ChatStructureType.family:
+        return 'family';
+      case ChatStructureType.business:
+        return 'business';
+      case ChatStructureType.friends:
+        return 'friends';
+      case ChatStructureType.project:
+        return 'project';
+      case ChatStructureType.other:
+        return 'other';
+    }
+  }
+
+  String _visibilityToJson(ChatVisibility visibility) {
+    switch (visibility) {
+      case ChatVisibility.private:
+        return 'private';
+      case ChatVisibility.team:
+        return 'team';
+    }
   }
 
   Map<String, dynamic> _decodeBody(http.Response response) {
