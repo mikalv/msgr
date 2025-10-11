@@ -10,6 +10,8 @@ defmodule Msgr.Connectors.ServiceBridge do
   consistent across connectors.
   """
 
+  alias Msgr.Connectors.Envelope
+
   @enforce_keys [:service, :queue]
   defstruct [:service, :queue, queue_opts: [], default_timeout: 5_000]
 
@@ -42,10 +44,10 @@ defmodule Msgr.Connectors.ServiceBridge do
   """
   @spec publish(t(), atom(), map(), keyword()) :: :ok | {:error, term()}
   def publish(%__MODULE__{} = bridge, action, payload, opts \\ []) when is_atom(action) and is_map(payload) do
-    message = build_message(bridge, action, payload, opts)
-    queue_opts = Keyword.merge(bridge.queue_opts, Keyword.drop(opts, [:trace_id]))
-
-    bridge.queue.publish(topic(bridge, action), message, queue_opts)
+    with {:ok, envelope} <- build_envelope(bridge, action, payload, opts) do
+      queue_opts = Keyword.merge(bridge.queue_opts, Keyword.drop(opts, [:trace_id, :metadata, :occurred_at, :schema]))
+      bridge.queue.publish(topic(bridge, action), Envelope.to_map(envelope), queue_opts)
+    end
   end
 
   @doc """
@@ -53,14 +55,14 @@ defmodule Msgr.Connectors.ServiceBridge do
   """
   @spec request(t(), atom(), map(), keyword()) :: {:ok, map()} | {:error, term()}
   def request(%__MODULE__{} = bridge, action, payload, opts \\ []) when is_atom(action) and is_map(payload) do
-    message = build_message(bridge, action, payload, opts)
+    with {:ok, envelope} <- build_envelope(bridge, action, payload, opts) do
+      queue_opts =
+        bridge.queue_opts
+        |> Keyword.merge(Keyword.drop(opts, [:trace_id, :metadata, :occurred_at, :schema]))
+        |> Keyword.put_new(:timeout, bridge.default_timeout)
 
-    queue_opts =
-      bridge.queue_opts
-      |> Keyword.merge(Keyword.drop(opts, [:trace_id]))
-      |> Keyword.put_new(:timeout, bridge.default_timeout)
-
-    bridge.queue.request(topic(bridge, action), message, queue_opts)
+      bridge.queue.request(topic(bridge, action), Envelope.to_map(envelope), queue_opts)
+    end
   end
 
   @doc """
@@ -71,13 +73,8 @@ defmodule Msgr.Connectors.ServiceBridge do
     "bridge/#{service}/#{action}"
   end
 
-  defp build_message(%__MODULE__{service: service}, action, payload, opts) do
-    %{
-      service: service,
-      action: Atom.to_string(action),
-      trace_id: Keyword.get_lazy(opts, :trace_id, &UUID.uuid4/0),
-      payload: payload
-    }
+  defp build_envelope(%__MODULE__{service: service}, action, payload, opts) do
+    Envelope.new(service, action, payload, opts)
   end
 
   defp normalise_service(service) when is_atom(service), do: Atom.to_string(service)

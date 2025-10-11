@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- Finalised the StoneMQ bridge envelope contract with typed Elixir helpers,
+  updated ServiceBridge publishing/request flows, and added envelope test
+  coverage.
+- Bootstrapped cross-language bridge SDK skeletons (Go/Python) with StoneMQ
+  queue topics, envelope parsing, telemetry hooks, credential bootstrapper
+  stubs, and unit tests.
 - Added bridge integration execution plan documenting RE rounds and candidate
   upstream projects for Discord, Slack, Snapchat and other chat networks.
 - Added multi-identity account linking so `Accounts.ensure_identity/1` can attach
