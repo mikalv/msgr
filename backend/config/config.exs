@@ -9,13 +9,28 @@ config :msgr, Messngr.Mailer,
 
 config :msgr, :llm_client, Messngr.AI.LlmGatewayClient
 
+media_sse_algorithm =
+  case System.get_env("MEDIA_SSE_ALGORITHM", "AES256") do
+    "" -> nil
+    value -> value
+  end
+
+media_sse_kms_key_id =
+  case System.get_env("MEDIA_SSE_KMS_KEY_ID") do
+    nil -> nil
+    "" -> nil
+    value -> value
+  end
+
 config :msgr, Messngr.Media.Storage,
   bucket: System.get_env("MEDIA_BUCKET", "msgr-media"),
   endpoint: System.get_env("MEDIA_ENDPOINT", "http://localhost:9000"),
   public_endpoint: System.get_env("MEDIA_PUBLIC_ENDPOINT"),
   signing_secret: System.get_env("MEDIA_SIGNING_SECRET", "dev-secret"),
   upload_expiry_seconds: String.to_integer(System.get_env("MEDIA_UPLOAD_EXPIRY", "600")),
-  download_expiry_seconds: String.to_integer(System.get_env("MEDIA_DOWNLOAD_EXPIRY", "1200"))
+  download_expiry_seconds: String.to_integer(System.get_env("MEDIA_DOWNLOAD_EXPIRY", "1200")),
+  server_side_encryption: media_sse_algorithm,
+  sse_kms_key_id: media_sse_kms_key_id
 
 config :msgr, Messngr.Media,
   upload_ttl_seconds: String.to_integer(System.get_env("MEDIA_UPLOAD_TTL", "900")),

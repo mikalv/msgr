@@ -2,7 +2,7 @@ defmodule Messngr.MediaTest do
   use Messngr.DataCase
 
   alias Messngr.{Accounts, Chat, Media, Repo}
-  alias Messngr.Media.Upload
+  alias Messngr.Media.{Storage, Upload}
 
   setup do
     {:ok, account_a} = Accounts.create_account(%{"display_name" => "Kari"})
@@ -33,6 +33,7 @@ defmodule Messngr.MediaTest do
     assert instructions["objectKey"] == upload.object_key
     assert %{"method" => "PUT", "url" => upload_url, "headers" => headers} = instructions["upload"]
     assert headers["content-type"] == "video/mp4"
+    assert headers["x-amz-server-side-encryption"] == "AES256"
     assert upload_url =~ "signature="
     assert %{"url" => download_url} = instructions["download"]
     assert download_url =~ upload.object_key
@@ -94,5 +95,23 @@ defmodule Messngr.MediaTest do
     changeset = Upload.creation_changeset(%Upload{}, params)
     refute changeset.valid?
     assert %{checksum: ["must be a hexadecimal digest"]} = errors_on(changeset)
+  end
+
+  test "presign_upload includes kms headers when configured" do
+    original = Application.get_env(:msgr, Storage, [])
+
+    updated =
+      original
+      |> Keyword.put(:server_side_encryption, "aws:kms")
+      |> Keyword.put(:sse_kms_key_id, "test-key-id")
+
+    Application.put_env(:msgr, Storage, updated)
+
+    on_exit(fn -> Application.put_env(:msgr, Storage, original) end)
+
+    signed = Storage.presign_upload("bucket", "object", content_type: "image/png")
+
+    assert signed.headers["x-amz-server-side-encryption"] == "aws:kms"
+    assert signed.headers["x-amz-server-side-encryption-aws-kms-key-id"] == "test-key-id"
   end
 end

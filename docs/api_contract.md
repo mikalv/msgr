@@ -207,7 +207,8 @@ Denne siden dokumenterer forventet kontrakt mellom msgr-backend og Flutter-klien
       "method": "PUT",
       "url": "https://storage.example.com/msgr-media/conversations/123/image/upload-uuid.png?signature=...",
       "headers": {
-        "content-type": "image/png"
+        "content-type": "image/png",
+        "x-amz-server-side-encryption": "AES256"
       },
       "expires_at": "2024-10-04T12:05:00Z"
     },
@@ -220,7 +221,9 @@ Denne siden dokumenterer forventet kontrakt mellom msgr-backend og Flutter-klien
 }
 ```
 
-Klienten laster opp binæren direkte til `upload.url` før `expires_at` og sender deretter en melding med `media.upload_id` og valgfri metadata (caption, waveform, dimensjoner, checksum).
+Klienten laster opp binæren direkte til `upload.url` før `expires_at` og sender deretter en melding med `media.upload_id` og valgfri metadata (caption, waveform, dimensjoner, checksum). Alle opplastinger må inkludere de signerede headerne – `content-type` og eventuelle `x-amz-server-side-encryption*`-felt – slik at objekter lagres kryptert i S3-kompatibel lagring.
+
+Backend-konfigurasjonen støtter både standard SSE-S3 (`MEDIA_SSE_ALGORITHM`, default `AES256`) og KMS-nøkler (`MEDIA_SSE_KMS_KEY_ID`). Når en KMS-nøkkel er konfigurert returneres både algoritme- og nøkkel-ID-headere i opplastingsinstruksjonene.
 
 ### Eksempel på mediamelding
 
