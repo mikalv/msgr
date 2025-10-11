@@ -7,6 +7,7 @@ defmodule Messngr do
   alias Messngr.Accounts
   alias Messngr.Chat
   alias Messngr.Auth
+  alias Messngr.Media
 
   # Accounts
   defdelegate list_accounts, to: Accounts
@@ -21,6 +22,7 @@ defmodule Messngr do
   defdelegate send_message(conversation_id, profile_id, attrs), to: Chat
   def list_messages(conversation_id, opts \\ []), do: Chat.list_messages(conversation_id, opts)
   defdelegate ensure_membership(conversation_id, profile_id), to: Chat
+  defdelegate create_media_upload(conversation_id, profile_id, attrs), to: Media, as: :create_upload
 
   # Auth
   defdelegate start_auth_challenge(attrs), to: Auth, as: :start_challenge

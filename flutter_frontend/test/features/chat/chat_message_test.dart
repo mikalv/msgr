@@ -4,7 +4,7 @@ import 'package:msgr_messages/msgr_messages.dart';
 
 void main() {
   group('ChatMessage', () {
-    final message = ChatMessage(
+    final message = ChatMessage.text(
       id: '1',
       body: 'Hei',
       profileId: 'profile',
@@ -36,10 +36,11 @@ void main() {
     test('toJson keeps backwards compatible keys', () {
       final json = message.toJson();
 
-      expect(json.containsKey('type'), isFalse);
+      expect(json['type'], equals('text'));
       expect(json['body'], equals('Hei'));
       expect(json['sentAt'], equals('2024-01-01T10:00:00.000'));
       expect(json['theme'], isA<Map<String, dynamic>>());
+      expect(json.containsKey('payload'), isFalse);
     });
 
     test('fromJson parses profile structure', () {

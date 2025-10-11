@@ -78,6 +78,19 @@ void main() {
       expect(message, isA<MsgrVideoMessage>());
     });
 
+    test('creates MsgrAudioMessage when type is audio', () {
+      final message = msgrMessageFromMap({
+        'type': 'audio',
+        'id': 'aud-1',
+        'url': 'https://example.com/audio.mp3',
+        'profileId': 'p1',
+        'profileName': 'Alice',
+        'profileMode': 'private',
+      });
+
+      expect(message, isA<MsgrAudioMessage>());
+    });
+
     test('creates MsgrLocationMessage when type is location', () {
       final message = msgrMessageFromMap({
         'type': 'location',

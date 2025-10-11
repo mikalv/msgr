@@ -80,15 +80,16 @@ class ChatViewModel extends ChangeNotifier {
     }
 
     final tempId = 'local-${DateTime.now().microsecondsSinceEpoch}';
-    final localMessage = ChatMessage(
+    final now = DateTime.now();
+    final localMessage = ChatMessage.text(
       id: tempId,
       body: trimmed,
       profileId: _identity!.profileId,
       profileName: 'Deg',
       profileMode: 'private',
       status: 'sending',
-      sentAt: DateTime.now(),
-      insertedAt: DateTime.now(),
+      sentAt: now,
+      insertedAt: now,
       isLocal: true,
     );
 

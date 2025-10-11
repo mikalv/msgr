@@ -7,6 +7,14 @@ config :msgr,
 config :msgr, Messngr.Mailer,
   adapter: Swoosh.Adapters.Local
 
+config :msgr, Messngr.Media.Storage,
+  bucket: System.get_env("MEDIA_BUCKET", "msgr-media"),
+  endpoint: System.get_env("MEDIA_ENDPOINT", "http://localhost:9000"),
+  public_endpoint: System.get_env("MEDIA_PUBLIC_ENDPOINT")
+
+config :msgr, Messngr.Media,
+  upload_ttl_seconds: String.to_integer(System.get_env("MEDIA_UPLOAD_TTL", "900"))
+
 host = System.get_env("PHX_HOST", "localhost")
 
 config :msgr_web, MessngrWeb.Endpoint,

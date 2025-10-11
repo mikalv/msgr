@@ -12,3 +12,4 @@ export 'src/msgr_bubble_style.dart';
 export 'src/msgr_image_message.dart';
 export 'src/msgr_video_message.dart';
 export 'src/msgr_location_message.dart';
+export 'src/msgr_audio_message.dart';

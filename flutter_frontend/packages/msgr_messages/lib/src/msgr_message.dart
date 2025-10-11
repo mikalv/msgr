@@ -23,6 +23,9 @@ enum MsgrMessageKind {
   /// Video media content.
   video,
 
+  /// Audio media content.
+  audio,
+
   /// Shared location or map message.
   location,
 }
