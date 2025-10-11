@@ -1,6 +1,14 @@
 # Changelog
 
 ## Unreleased
+- Replaced header-based actor resolution with a shared Noise session plug that
+  validates tokens against the registry, assigns account/profile/device for
+  REST and WebSocket contexts, adds feature-toggled legacy fallback, updates
+  channel/controller flows to rely on socket assigns, and introduces Noise
+  session fixtures/tests for both plugs and sockets.
+- Expanded Noise authentication coverage with dedicated tests for the shared
+  plug (headers, session persistence, feature flags, device edge cases) and the
+  session store helpers, improving confidence in Noise token validation.
 - Added GitHub Actions deploy workflow that runs on release tags to build the Elixir release, ship it via rsync to `msgr.no`, and restart the systemd service on Ubuntu 22.04 runners.
 - Added Noise transport session and registry modules with NX/IK/XX handshake
   support, session-token generation and registry TTL management, plus

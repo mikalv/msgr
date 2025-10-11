@@ -23,6 +23,14 @@ defmodule Messngr.Transport.Noise.Session do
   @typedoc "Session status"
   @type status :: :handshaking | :established | {:error, term()}
 
+  @typedoc "Metadata describing the authenticated actor bound to the session"
+  @type actor :: %{
+          required(:account_id) => String.t(),
+          required(:profile_id) => String.t(),
+          optional(:device_id) => String.t(),
+          optional(:device_public_key) => String.t()
+        }
+
   @typedoc "Noise role"
   @type role :: :initiator | :responder
 
@@ -51,7 +59,8 @@ defmodule Messngr.Transport.Noise.Session do
     :token_generator,
     :ephemeral_override,
     :remote_static_hint,
-    pending_patterns: []
+    pending_patterns: [],
+    actor: nil
   ]
 
   @type t :: %__MODULE__{
@@ -71,7 +80,8 @@ defmodule Messngr.Transport.Noise.Session do
           token_generator: (pos_integer() -> binary()),
           pending_patterns: [pattern()],
           ephemeral_override: term(),
-          remote_static_hint: binary() | nil
+          remote_static_hint: binary() | nil,
+          actor: actor() | nil
         }
 
   @doc """
@@ -213,6 +223,66 @@ defmodule Messngr.Transport.Noise.Session do
   """
   @spec remote_static(t()) :: binary() | nil
   def remote_static(%__MODULE__{remote_static: remote_static}), do: remote_static
+
+  @doc """
+  Attaches actor metadata to the session. The actor ties the Noise handshake to the
+  logical account/profile/device that authenticated during the handshake.
+  """
+  @spec with_actor(t(), actor() | map()) :: t()
+  def with_actor(%__MODULE__{} = session, actor) do
+    %{session | actor: normalize_actor(actor)}
+  end
+
+  @doc """
+  Returns the actor metadata stored on the session.
+  """
+  @spec actor(t()) :: {:ok, actor()} | :error
+  def actor(%__MODULE__{actor: actor}) when is_map(actor), do: {:ok, actor}
+  def actor(_), do: :error
+
+  @doc """
+  Builds an already-established session. This is primarily useful in tests or when the
+  Noise handshake is completed elsewhere and the resulting session token needs to be
+  registered with the in-memory registry.
+  """
+  @spec established_session(Keyword.t()) :: t()
+  def established_session(opts) when is_list(opts) do
+    actor =
+      opts
+      |> Keyword.fetch!(:actor)
+      |> normalize_actor()
+
+    token_bytes = Keyword.get(opts, :token_bytes, @default_token_bytes)
+    token_generator = Keyword.get(opts, :token_generator, &:crypto.strong_rand_bytes/1)
+
+    token =
+      case Keyword.get(opts, :token) do
+        nil -> token_generator.(token_bytes)
+        value when is_binary(value) -> value
+        other -> raise ArgumentError, "Noise session token must be a binary, got: #{inspect(other)}"
+      end
+
+    %__MODULE__{
+      id: Keyword.get_lazy(opts, :id, fn -> UUID.uuid4() end),
+      role: Keyword.get(opts, :role, :responder),
+      status: :established,
+      current_pattern: Keyword.get(opts, :current_pattern),
+      handshake_state: nil,
+      tx: Keyword.get(opts, :tx),
+      rx: Keyword.get(opts, :rx),
+      handshake_hash: Keyword.get(opts, :handshake_hash),
+      remote_static: Keyword.get(opts, :remote_static),
+      server_keypair: Keyword.get(opts, :server_keypair),
+      prologue: Keyword.get(opts, :prologue, <<>>),
+      token: token,
+      token_bytes: token_bytes,
+      token_generator: token_generator,
+      pending_patterns: [],
+      actor: actor,
+      ephemeral_override: Keyword.get(opts, :ephemeral_override),
+      remote_static_hint: Keyword.get(opts, :remote_static)
+    }
+  end
 
   defp init_session(patterns, opts) do
     {first_pattern, remaining} =
@@ -423,6 +493,45 @@ defmodule Messngr.Transport.Noise.Session do
       token: session.token_generator.(session.token_bytes)
     }
   end
+
+  defp normalize_actor(actor) when is_map(actor) do
+    account_id = fetch_actor_value(actor, :account_id)
+    profile_id = fetch_actor_value(actor, :profile_id)
+    device_id = optional_actor_value(actor, :device_id)
+    device_public_key = optional_actor_value(actor, :device_public_key)
+
+    %{account_id: account_id, profile_id: profile_id}
+    |> maybe_put_actor(:device_id, device_id)
+    |> maybe_put_actor(:device_public_key, device_public_key)
+  end
+
+  defp normalize_actor(other) do
+    raise ArgumentError, "Noise session actor must be a map, got: #{inspect(other)}"
+  end
+
+  defp fetch_actor_value(actor, key) do
+    actor
+    |> Map.get(key)
+    |> Kernel.||(Map.get(actor, Atom.to_string(key)))
+    |> case do
+      value when is_binary(value) and byte_size(String.trim(value)) > 0 -> String.trim(value)
+      other -> raise ArgumentError, "Noise session actor missing #{inspect(key)} (got: #{inspect(other)})"
+    end
+  end
+
+  defp optional_actor_value(actor, key) do
+    actor
+    |> Map.get(key)
+    |> Kernel.||(Map.get(actor, Atom.to_string(key)))
+    |> case do
+      nil -> nil
+      value when is_binary(value) and byte_size(String.trim(value)) > 0 -> String.trim(value)
+      _ -> nil
+    end
+  end
+
+  defp maybe_put_actor(map, _key, nil), do: map
+  defp maybe_put_actor(map, key, value), do: Map.put(map, key, value)
 
   defp extract_remote_static(nil), do: nil
 

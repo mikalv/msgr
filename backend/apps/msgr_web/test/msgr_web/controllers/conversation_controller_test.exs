@@ -10,10 +10,7 @@ defmodule MessngrWeb.ConversationControllerTest do
     current_profile = hd(current_account.profiles)
     target_profile = hd(other_account.profiles)
 
-    conn =
-      conn
-      |> put_req_header("x-account-id", current_account.id)
-      |> put_req_header("x-profile-id", current_profile.id)
+    {conn, _session} = attach_noise_session(conn, current_account, current_profile)
 
     {:ok,
      conn: conn,
@@ -69,6 +66,6 @@ defmodule MessngrWeb.ConversationControllerTest do
     conn = build_conn()
     conn = post(conn, ~p"/api/conversations", %{target_profile_id: target_profile.id})
 
-    assert conn.status == 401
+    assert json_response(conn, 401) == %{"error" => "missing or invalid noise session"}
   end
 end

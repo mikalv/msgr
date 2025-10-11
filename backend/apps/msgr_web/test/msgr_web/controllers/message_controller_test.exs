@@ -14,10 +14,7 @@ defmodule MessngrWeb.MessageControllerTest do
 
     {:ok, conversation} = Chat.ensure_direct_conversation(current_profile.id, other_profile.id)
 
-    conn =
-      conn
-      |> put_req_header("x-account-id", current_account.id)
-      |> put_req_header("x-profile-id", current_profile.id)
+    {conn, _session} = attach_noise_session(conn, current_account, current_profile)
 
     {:ok,
      conn: conn,
