@@ -13,6 +13,13 @@ defmodule Messngr do
   defdelegate create_profile(attrs), to: Accounts
   defdelegate list_profiles(account_id), to: Accounts
   defdelegate get_profile!(id), to: Accounts
+  defdelegate list_devices(account_id), to: Accounts
+  defdelegate get_device!(id), to: Accounts
+  defdelegate create_device(attrs), to: Accounts
+  defdelegate update_device(device, attrs), to: Accounts
+  defdelegate delete_device(device), to: Accounts
+  defdelegate activate_device(device), to: Accounts
+  defdelegate deactivate_device(device), to: Accounts
 
   def import_contacts(account_id, contacts_attrs, opts \\ []) do
     Accounts.import_contacts(account_id, contacts_attrs, opts)

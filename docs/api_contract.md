@@ -10,6 +10,48 @@ Denne siden dokumenterer forventet kontrakt mellom msgr-backend og Flutter-klien
 - Backend verifiserer at profilen tilhører kontoen. Mismatch gir `401 Unauthorized`.
 - WebSocket-tilkoblingen bruker de samme verdiene som join-parametre (se under).
 
+## Noise-håndtrykk og nøkkelhåndtering
+
+- Klienten fungerer alltid som **initiator**, serveren som **responder** i `Noise_NX_25519_ChaChaPoly_Blake2b`-handtrykket. Transporten er feature-togglet i backend via `NOISE_TRANSPORT_ENABLED` og lytter på en dedikert TCP-port (default `5443`).
+- Handshake-prologen er strengen `"msgr-noise/v1"` (UTF-8) og må inkluderes i begge ender for å binde protokollversjon til nøkkelen.
+- Klienten forventer at serveren presenterer en statisk Curve25519-nøkkel. Fingerprint (BLAKE2b-256 i hex) brukes til å validere nøkkelen.
+- Dersom fingerprint ikke er kjent lokalt forsøker klienten først å hente siste nøkkelmateriale fra `GET /api/noise/server-key` (beskrevet under) før den gjør et nytt handshake.
+- Hvis Noise `NX`-handshake feiler på grunn av nettverk eller tidsavvik, skal klienten falle tilbake til et `Noise_XX_25519_ChaChaPoly_Blake2b`-handtrykk. Dette gir gjensidig autentisering via ephemeral-nøkler, men klienten må da etablere ny sesjonsnøkkel og be backend om et nytt autorisasjonstoken.
+
+### Hente serverens statiske nøkkel
+
+`GET /api/noise/server-key`
+
+Tilgjengelig når Noise-transporten er aktivert.
+
+Valgfrie query-parametre:
+
+| Parameter | Beskrivelse |
+| --- | --- |
+| `fingerprint_only` | Hvis `true`, returneres kun fingerprint (nyttig for rask validering). |
+
+**Respons 200**
+
+```json
+{
+  "data": {
+    "protocol": "Noise_NX_25519_ChaChaPoly_Blake2b",
+    "prologue": "msgr-noise/v1",
+    "static_public_key": "BASE64_CURVE25519_PUB",
+    "fingerprint": "0a4f7e...",
+    "rotated_at": "2024-10-08T13:37:00Z",
+    "expires_at": null
+  }
+}
+```
+
+Når `fingerprint_only=true` blir `data` redusert til `{ "fingerprint": "..." }`.
+
+Feil:
+
+- `404 Not Found` hvis nøkkel ikke er initialisert i backend.
+- `503 Service Unavailable` hvis backend ikke kan nå Secrets Manager for å hente nøkkel.
+
 ### OTP-innlogging (e-post og mobil)
 
 1. **Start utfordring**

@@ -23,6 +23,13 @@ config :msgr, Messngr.Repo,
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
 
+config :msgr, :noise,
+  enabled: false,
+  transport_port: 5_443,
+  default_static_key: {:base64, "CI11hCvbZNQaeEW5Yt7ttmN09Sf+bNSNAXXfPn4f+vI="},
+  env_var: "NOISE_STATIC_KEY",
+  secret_field: "private"
+
 config :msgr_web, MessngrWeb.Endpoint,
   http: [ip: listen_ip, port: String.to_integer(System.get_env("PORT", "4000"))],
   check_origin: false,

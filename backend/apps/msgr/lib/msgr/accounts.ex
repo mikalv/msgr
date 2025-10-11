@@ -5,16 +5,16 @@ defmodule Messngr.Accounts do
 
   import Ecto.Query
 
-  alias Messngr.Accounts.{Account, Contact, Identity, Profile}
+  alias Messngr.Accounts.{Account, Contact, Device, Identity, Profile}
   alias Messngr.Repo
 
   @spec list_accounts() :: [Account.t()]
   def list_accounts do
-    Repo.all(from a in Account, preload: [:profiles])
+    Repo.all(from a in Account, preload: [:profiles, :devices])
   end
 
   @spec get_account!(Ecto.UUID.t()) :: Account.t()
-  def get_account!(id), do: Repo.get!(Account, id) |> Repo.preload(:profiles)
+  def get_account!(id), do: Repo.get!(Account, id) |> Repo.preload([:profiles, :devices])
 
   @spec create_account(map()) :: {:ok, Account.t()} | {:error, Ecto.Changeset.t()}
   def create_account(attrs) do
@@ -73,6 +73,74 @@ defmodule Messngr.Accounts do
 
   @spec get_profile!(Ecto.UUID.t()) :: Profile.t()
   def get_profile!(id), do: Repo.get!(Profile, id)
+
+  @spec list_devices(Ecto.UUID.t()) :: [Device.t()]
+  def list_devices(account_id) do
+    Repo.all(
+      from d in Device,
+        where: d.account_id == ^account_id,
+        order_by: [asc: d.inserted_at]
+    )
+  end
+
+  @spec get_device!(Ecto.UUID.t()) :: Device.t()
+  def get_device!(id), do: Repo.get!(Device, id) |> Repo.preload([:account, :profile])
+
+  @spec get_device_by_public_key(Ecto.UUID.t(), String.t()) :: Device.t() | nil
+  def get_device_by_public_key(account_id, device_public_key) do
+    Repo.get_by(Device, account_id: account_id, device_public_key: device_public_key)
+  end
+
+  @spec create_device(map()) :: {:ok, Device.t()} | {:error, Ecto.Changeset.t()}
+  def create_device(attrs) do
+    %Device{}
+    |> Device.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @spec update_device(Device.t(), map()) :: {:ok, Device.t()} | {:error, Ecto.Changeset.t()}
+  def update_device(%Device{} = device, attrs) do
+    device
+    |> Device.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @spec delete_device(Device.t()) :: {:ok, Device.t()} | {:error, Ecto.Changeset.t()}
+  def delete_device(%Device{} = device) do
+    Repo.delete(device)
+  end
+
+  @spec activate_device(Device.t()) :: {:ok, Device.t()} | {:error, Ecto.Changeset.t()}
+  def activate_device(%Device{} = device) do
+    update_device(device, %{enabled: true})
+  end
+
+  @spec deactivate_device(Device.t()) :: {:ok, Device.t()} | {:error, Ecto.Changeset.t()}
+  def deactivate_device(%Device{} = device) do
+    update_device(device, %{enabled: false})
+  end
+
+  @spec attach_device_for_identity(Identity.t(), map()) ::
+          {:ok, %{identity: Identity.t(), device: Device.t() | nil}} | {:error, term()}
+  def attach_device_for_identity(%Identity{} = identity, attrs \ %{}) do
+    device_public_key =
+      attrs
+      |> Map.get(:device_public_key)
+      |> Kernel.||(Map.get(attrs, "device_public_key"))
+      |> Kernel.||(Map.get(attrs, :device_id))
+      |> Kernel.||(Map.get(attrs, "device_id"))
+      |> normalize_device_public_key()
+
+    identity = maybe_preload_account(identity)
+
+    cond do
+      is_nil(device_public_key) ->
+        {:ok, %{identity: identity, device: nil}}
+
+      true ->
+        upsert_device(identity, device_public_key, attrs)
+    end
+  end
 
   @doc """
   Imports a batch of contacts for the given account. Existing contacts are
@@ -214,6 +282,129 @@ defmodule Messngr.Accounts do
     create_account(default_attrs)
   end
 
+  defp normalize_device_public_key(value) when is_binary(value) do
+    value
+    |> String.trim()
+    |> case do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp normalize_device_public_key(_), do: nil
+
+  defp preload_account_relations(%Account{} = account) do
+    Repo.preload(account, [:profiles, :devices])
+  end
+
+  defp upsert_device(identity, device_public_key, attrs) do
+    Repo.transaction(fn ->
+      account = identity.account
+      params = build_device_attrs(account, device_public_key, attrs)
+
+      case get_device_by_public_key(account.id, device_public_key) do
+        nil ->
+          with {:ok, device} <- create_device(params) do
+            account = preload_account_relations(account)
+            {%{identity | account: account}, device}
+          else
+            {:error, reason} -> Repo.rollback(reason)
+          end
+
+        %Device{} = device ->
+          update_attrs =
+            params
+            |> Map.take([:attesters, :last_handshake_at, :profile_id, :enabled])
+            |> Enum.reject(fn
+              {:attesters, value} -> value in [nil, []]
+              {:last_handshake_at, nil} -> true
+              {:profile_id, nil} -> true
+              {:enabled, nil} -> true
+              _ -> false
+            end)
+            |> Map.new()
+
+          case update_device(device, update_attrs) do
+            {:ok, device} ->
+              account = preload_account_relations(account)
+              {%{identity | account: account}, device}
+
+            {:error, reason} ->
+              Repo.rollback(reason)
+          end
+      end
+    end)
+    |> case do
+      {:ok, {identity, device}} ->
+        {:ok, %{identity: identity, device: device}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp build_device_attrs(account, device_public_key, attrs) do
+    %{
+      account_id: account.id,
+      profile_id: resolve_profile_id(account, attrs),
+      device_public_key: device_public_key,
+      attesters: attrs |> fetch_attesters(),
+      last_handshake_at:
+        Map.get(attrs, :last_handshake_at) ||
+          Map.get(attrs, "last_handshake_at") ||
+          DateTime.utc_now()
+    }
+    |> maybe_put_enabled(attrs)
+  end
+
+  defp resolve_profile_id(%Account{profiles: profiles}, attrs) when is_list(profiles) do
+    provided =
+      attrs
+      |> Map.get(:profile_id)
+      |> Kernel.||(Map.get(attrs, "profile_id"))
+
+    cond do
+      is_binary(provided) and provided != "" and
+          Enum.any?(profiles, &(&1.id == provided)) ->
+        provided
+
+      true ->
+        profiles |> List.first() |> case do
+          nil -> nil
+          profile -> profile.id
+        end
+    end
+  end
+
+  defp resolve_profile_id(_account, _attrs), do: nil
+
+  defp maybe_put_enabled(map, attrs) do
+    case Map.get(attrs, :enabled) || Map.get(attrs, "enabled") do
+      nil -> map
+      value -> Map.put(map, :enabled, value)
+    end
+  end
+
+  defp fetch_attesters(attrs) do
+    attrs
+    |> Map.get(:attesters)
+    |> Kernel.||(Map.get(attrs, "attesters"))
+    |> normalize_attesters_payload()
+  end
+
+  defp normalize_attesters_payload(nil), do: []
+
+  defp normalize_attesters_payload(value) when is_list(value) do
+    Enum.map(value, fn
+      %{} = map -> map
+      other -> %{value: to_string(other)}
+    end)
+  end
+
+  defp normalize_attesters_payload(%{} = map), do: [map]
+
+  defp normalize_attesters_payload(value), do: [%{value: to_string(value)}]
+
   defp insert_identity(account, attrs) do
     identity_attrs =
       attrs
@@ -231,8 +422,8 @@ defmodule Messngr.Accounts do
 
   defp maybe_preload_account(nil), do: nil
 
-  defp maybe_preload_account(identity) do
-    Repo.preload(identity, :account)
+  defp maybe_preload_account(%Identity{} = identity) do
+    Repo.preload(identity, account: [:profiles, :devices])
   end
 
   defp normalize_target(_kind, nil), do: nil

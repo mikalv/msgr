@@ -35,7 +35,7 @@ class DefaultChatMediaPicker implements ChatMediaPicker {
   Future<List<ChatMediaAttachment>> pickFromGallery() async {
     try {
       final files = await _imagePicker.pickMultiImage();
-      if (files == null || files.isEmpty) return const [];
+      if (files.isEmpty) return const [];
       final attachments = <ChatMediaAttachment>[];
       for (final file in files) {
         attachments.add(await ChatMediaAttachment.fromXFile(file));
