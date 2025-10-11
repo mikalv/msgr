@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:messngr/features/chat/media/chat_media_uploader.dart';
 import 'package:messngr/features/chat/models/chat_message.dart';
 import 'package:messngr/features/chat/models/chat_thread.dart';
-import 'package:messngr/features/chat/models/composer_submission.dart';
 import 'package:messngr/features/chat/models/reaction_aggregate.dart';
 import 'package:messngr/features/chat/state/chat_cache_repository.dart';
 import 'package:messngr/features/chat/state/message_editing_notifier.dart';
@@ -90,6 +89,7 @@ class ChatViewModel extends ChangeNotifier {
   Timer? _typingTimer;
   bool _typingActive = false;
   final Set<String> _acknowledgedReads = <String>{};
+  bool _suppressComposerPersistence = false;
 
   bool get isLoading => _isLoading;
   bool get isSending => _isSending;
@@ -248,10 +248,12 @@ class ChatViewModel extends ChangeNotifier {
       _error = null;
       _isSending = true;
       notifyListeners();
-      await _sendTextOnlyMessage(remainingText);
+      final success = await _sendTextOnly(remainingText);
       _isSending = false;
       notifyListeners();
-      composerController.clear();
+      if (success) {
+        composerController.clear();
+      }
       return;
     }
 
@@ -266,6 +268,7 @@ class ChatViewModel extends ChangeNotifier {
     _isSending = true;
     notifyListeners();
 
+    var shouldClearComposer = true;
     try {
       if (voiceNote != null) {
         final caption = remainingText.isNotEmpty ? remainingText : null;
@@ -305,79 +308,41 @@ class ChatViewModel extends ChangeNotifier {
       }
 
       if (remainingText.trim().isNotEmpty) {
-        await _sendTextOnlyMessage(remainingText);
+        final sent = await _sendTextOnly(remainingText);
+        if (!sent) {
+          shouldClearComposer = false;
+        }
       }
 
-      composerController.clear();
       await _cache.saveMessages(_thread!.id, _messages);
     } on ApiException catch (error) {
       debugPrint('media send failed: $error');
       _setError('Kunne ikke sende media (${error.statusCode}).');
+      shouldClearComposer = false;
     } catch (error, stack) {
       debugPrint('media upload failed: $error\n$stack');
       _setError('Kunne ikke sende media.');
+      shouldClearComposer = false;
     } finally {
       _isSending = false;
       notifyListeners();
-    }
-  }
-
-  Future<void> _sendTextOnlyMessage(String body) async {
-    final trimmed = body.trim();
-    if (trimmed.isEmpty || _identity == null || _thread == null) {
-      return;
-    }
-
-    final text = submission.text.trim();
-    final attachments = submission.attachments;
-
-    if (text.isEmpty && attachments.isEmpty) {
-      return;
-    }
-
-    _setError(null);
-    _isSending = true;
-    notifyListeners();
-
-    try {
-      if (attachments.isEmpty) {
-        if (text.isNotEmpty) {
-          await _sendTextOnly(text);
-        }
-      } else {
-        final caption = text.isNotEmpty ? text : null;
-        var isFirst = true;
-
-        for (final attachment in attachments) {
-          final message = await _mediaUploader.uploadAndSend(
-            current: _identity!,
-            conversationId: _thread!.id,
-            attachment: attachment,
-            caption: isFirst ? caption : null,
-          );
-          isFirst = false;
-          _mergeMessage(message);
-        }
+      if (shouldClearComposer) {
+        composerController.clear();
       }
-    } on ApiException catch (error) {
-      debugPrint('sendMessage failed: $error');
-      _setError('Kunne ikke sende melding (${error.statusCode}).');
-    } on ChatMediaUploadException catch (error) {
-      debugPrint('Media upload failed: $error');
-      final status = error.statusCode != null ? '${error.statusCode}' : 'ukjent';
-      _setError('Kunne ikke laste opp vedlegg ($status).');
-    } finally {
-      _isSending = false;
-      notifyListeners();
     }
   }
 
-  Future<void> _sendTextOnly(String text) async {
+  Future<bool> _sendTextOnly(String text) async {
     final tempId = 'local-${DateTime.now().microsecondsSinceEpoch}';
     final now = DateTime.now();
+    final trimmed = text.trim();
+    if (trimmed.isEmpty || _identity == null || _thread == null) {
+      return false;
+    }
+
     final localMessage = ChatMessage.text(
       id: tempId,
-      body: text,
+      body: trimmed,
       profileId: _identity!.profileId,
       profileName: 'Deg',
       profileMode: 'private',
@@ -393,40 +358,47 @@ class ChatViewModel extends ChangeNotifier {
 
     if (_isOffline) {
       _setError('Ingen nettverkstilkobling – meldingen ble lagret.');
-      return;
+      _stopTypingActivity();
+      return true;
     }
 
     try {
-      final persisted = await _sendOverPreferredChannel(text);
+      final persisted = await _sendOverPreferredChannel(trimmed);
       _mergeMessage(persisted, replaceTempId: tempId);
       await _cache.saveMessages(_thread!.id, _messages);
+      return true;
     } on ChatSocketException catch (error, stack) {
       debugPrint('Realtime send failed: $error\n$stack');
       try {
         final persisted = await _api.sendStructuredMessage(
           current: _identity!,
           conversationId: _thread!.id,
-          body: text,
+          body: trimmed,
         );
         _mergeMessage(persisted, replaceTempId: tempId);
         await _cache.saveMessages(_thread!.id, _messages);
+        return true;
       } on ApiException catch (fallbackError) {
         debugPrint('Fallback send failed: $fallbackError');
         _messages =
             _messages.where((message) => message.id != tempId).toList();
         await _cache.saveMessages(_thread!.id, _messages);
         _setError('Kunne ikke sende melding (${fallbackError.statusCode}).');
-        rethrow;
+        return false;
       }
     } on ApiException catch (error) {
       debugPrint('sendMessage failed: $error');
       _messages = _messages.where((message) => message.id != tempId).toList();
       await _cache.saveMessages(_thread!.id, _messages);
       _setError('Kunne ikke sende melding (${error.statusCode}).');
-      rethrow;
+      return false;
+    } catch (error, stack) {
+      debugPrint('sendMessage failed unexpectedly: $error\n$stack');
+      _messages = _messages.where((message) => message.id != tempId).toList();
+      await _cache.saveMessages(_thread!.id, _messages);
+      _setError('Kunne ikke sende melding.');
+      return false;
     } finally {
-      _isSending = false;
-      notifyListeners();
       _stopTypingActivity();
     }
   }
@@ -451,6 +423,9 @@ class ChatViewModel extends ChangeNotifier {
       _messages = cachedMessages;
       notifyListeners();
     }
+
+    final draft = await _cache.readDraft(thread.id);
+    _restoreComposerDraft(draft);
 
     await fetchMessages();
     await _connectRealtime();
@@ -672,6 +647,19 @@ class ChatViewModel extends ChangeNotifier {
     });
   }
 
+  void _restoreComposerDraft(String? text) {
+    _suppressComposerPersistence = true;
+    try {
+      if (text == null || text.isEmpty) {
+        composerController.clear();
+      } else {
+        composerController.setText(text);
+      }
+    } finally {
+      _suppressComposerPersistence = false;
+    }
+  }
+
   Future<void> _hydrateFromCache() async {
     final threads = await _cache.readThreads();
     if (threads.isNotEmpty) {
@@ -690,15 +678,16 @@ class ChatViewModel extends ChangeNotifier {
         _selectedThreadId = threadId;
       }
       final draft = await _cache.readDraft(threadId);
-      if (draft != null && draft.isNotEmpty) {
-        composerController.setText(draft);
-      }
+      _restoreComposerDraft(draft);
     }
 
     notifyListeners();
   }
 
   void _handleComposerChanged() {
+    if (_suppressComposerPersistence) {
+      return;
+    }
     final threadId = _thread?.id ?? _selectedThreadId;
     if (threadId != null) {
       _cache.saveDraft(threadId, composerController.value.text);

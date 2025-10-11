@@ -7,6 +7,7 @@ import 'package:messngr/features/chat/models/chat_message.dart';
 import 'package:messngr/features/chat/models/chat_thread.dart';
 import 'package:messngr/features/chat/models/composer_submission.dart';
 import 'package:messngr/features/chat/state/chat_view_model.dart';
+import 'package:messngr/features/chat/state/chat_cache_repository.dart';
 import 'package:messngr/services/api/chat_api.dart';
 import 'package:messngr/services/api/chat_realtime_event.dart';
 import 'package:messngr/services/api/chat_socket.dart';
@@ -19,6 +20,7 @@ class StubChatApi implements ChatApi {
   final List<ChatMessage> messages = [];
   final List<MediaUploadRequest> uploadRequests = [];
   MediaUploadInstructions? lastInstructions;
+  bool failNextStructuredMessage = false;
 
   final ChatThread thread = const ChatThread(
     id: 'conversation-1',
@@ -114,6 +116,10 @@ class StubChatApi implements ChatApi {
     Map<String, dynamic>? media,
     Map<String, dynamic>? payload,
   }) async {
+    if (failNextStructuredMessage) {
+      failNextStructuredMessage = false;
+      throw ApiException(500, 'stub failure');
+    }
     _messageCounter += 1;
     final now = DateTime.now().toIso8601String();
     final payloadMap = <String, dynamic>{};
@@ -418,5 +424,82 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(viewModel.messages.last, equals(incoming));
+  });
+
+  test('submitComposer retains draft when send fails', () async {
+    final api = StubChatApi();
+    final cache = InMemoryChatCacheStore();
+    final viewModel = ChatViewModel(
+      api: api,
+      realtime: StubRealtime(),
+      cache: cache,
+    );
+    await viewModel.bootstrap();
+
+    api.failNextStructuredMessage = true;
+    viewModel.composerController.setText('Feilende melding');
+
+    await viewModel.submitComposer(
+      viewModel.composerController.buildResult(),
+    );
+
+    expect(viewModel.composerController.value.text, 'Feilende melding');
+    expect(await cache.readDraft(api.thread.id), 'Feilende melding');
+    expect(viewModel.error, isNotNull);
+  });
+
+  test('submitComposer clears draft on success', () async {
+    final api = StubChatApi();
+    final cache = InMemoryChatCacheStore();
+    final viewModel = ChatViewModel(
+      api: api,
+      realtime: StubRealtime(),
+      cache: cache,
+    );
+    await viewModel.bootstrap();
+
+    viewModel.composerController.setText('Klar melding');
+
+    await viewModel.submitComposer(
+      viewModel.composerController.buildResult(),
+    );
+
+    expect(viewModel.composerController.value.text, isEmpty);
+    expect(await cache.readDraft(api.thread.id), isNull);
+    expect(viewModel.error, isNull);
+  });
+
+  test('selectThread restores per-thread drafts', () async {
+    final api = StubChatApi();
+    final cache = InMemoryChatCacheStore();
+    final viewModel = ChatViewModel(
+      api: api,
+      realtime: StubRealtime(),
+      cache: cache,
+    );
+    await viewModel.bootstrap();
+
+    viewModel.composerController.setText('Kladd A');
+    await Future<void>.delayed(Duration.zero);
+
+    const otherThread = ChatThread(
+      id: 'conversation-2',
+      participantNames: ['Demo', 'Team'],
+      kind: ChatThreadKind.channel,
+      topic: 'Prosjekt',
+    );
+
+    await viewModel.selectThread(otherThread);
+    expect(viewModel.composerController.value.text, isEmpty);
+
+    viewModel.composerController.setText('Kladd B');
+    await Future<void>.delayed(Duration.zero);
+
+    await viewModel.selectThread(api.thread);
+    expect(viewModel.composerController.value.text, 'Kladd A');
+    expect(await cache.readDraft(otherThread.id), 'Kladd B');
+
+    await viewModel.selectThread(otherThread);
+    expect(viewModel.composerController.value.text, 'Kladd B');
   });
 }
