@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:messngr/features/auth/auth_gate.dart';
 import 'package:messngr/features/chat/models/chat_thread.dart';
 import 'package:messngr/features/chat/state/chat_view_model.dart';
 import 'package:messngr/features/chat/state/typing_participants_notifier.dart';
@@ -8,15 +9,23 @@ import 'package:messngr/features/chat/widgets/pinned_message_banner.dart';
 import 'package:messngr/features/chat/widgets/typing_indicator.dart';
 import 'package:messngr/ui/chat_kit/chat_kit.dart';
 import 'package:provider/provider.dart';
+import 'package:messngr/services/api/chat_api.dart';
 
 class ChatPage extends StatelessWidget {
   const ChatPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ChatViewModel()..bootstrap(),
-      child: const _ChatView(),
+    return AuthGate(
+      child: Builder(
+        builder: (context) {
+          final identity = Provider.of<AccountIdentity>(context);
+          return ChangeNotifierProvider(
+            create: (_) => ChatViewModel(identity: identity)..bootstrap(),
+            child: const _ChatView(),
+          );
+        },
+      ),
     );
   }
 }
@@ -130,16 +139,46 @@ class _ChannelSidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final session = context.read<AuthSession>();
+    final displayName = context.read<String?>();
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Kanaler',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName ?? 'Profil',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      session.identity.profileId,
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Logg ut',
+                onPressed: () => session.signOut(),
+                icon: const Icon(Icons.logout_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: () => _showStartConversationDialog(context, viewModel),
+            icon: const Icon(Icons.chat_add_rounded),
+            label: const Text('Ny samtale'),
           ),
           const SizedBox(height: 16),
           if (viewModel.isOffline)
@@ -191,7 +230,7 @@ class _ThreadColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final identity = viewModel.identity;
-    final currentProfileId = identity?.profileId ?? '';
+    final currentProfileId = identity.profileId;
     final pinnedMessages = viewModel.pinnedNotifier.pinnedMessages;
     final threadState = viewModel.threadViewNotifier.state;
     final typingKey = threadState.threadId ?? 'root';
@@ -227,6 +266,14 @@ class _ThreadColumn extends StatelessWidget {
           isEdited: message.isEdited,
           isDeleted: message.isDeleted,
         ),
+      );
+    }
+
+    if (viewModel.thread == null) {
+      return _EmptyConversationState(
+        isLoading: viewModel.isLoading,
+        onStartConversation: () => _showStartConversationDialog(context, viewModel),
+        showInlineChannels: showInlineChannels,
       );
     }
 
@@ -364,4 +411,187 @@ class _ChatLoadingState extends StatelessWidget {
       ),
     );
   }
+}
+
+class _EmptyConversationState extends StatelessWidget {
+  const _EmptyConversationState({
+    required this.isLoading,
+    required this.onStartConversation,
+    required this.showInlineChannels,
+  });
+
+  final bool isLoading;
+  final VoidCallback onStartConversation;
+  final bool showInlineChannels;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.chat_bubble_outline_rounded,
+            size: 64,
+            color: theme.colorScheme.primary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Ingen samtale valgt',
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              showInlineChannels
+                  ? 'Opprett eller velg en samtale for å komme i gang.'
+                  : 'Velg en samtale fra sidemenyen eller start en ny for å sende meldinger.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: isLoading ? null : onStartConversation,
+            icon: const Icon(Icons.chat_add_rounded),
+            label: const Text('Start ny samtale'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> _showStartConversationDialog(BuildContext context, ChatViewModel viewModel) async {
+  final emailController = TextEditingController();
+  final profileIdController = TextEditingController();
+  String? errorMessage;
+  bool submitting = false;
+
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          Future<void> submit() async {
+            if (submitting) return;
+
+            final email = emailController.text.trim();
+            final profileIdInput = profileIdController.text.trim();
+
+            if (email.isEmpty && profileIdInput.isEmpty) {
+              setState(() {
+                errorMessage = 'Oppgi e-post eller profil-ID.';
+              });
+              return;
+            }
+
+            setState(() {
+              submitting = true;
+              errorMessage = null;
+            });
+
+            try {
+              String targetProfileId = profileIdInput;
+
+              if (targetProfileId.isEmpty && email.isNotEmpty) {
+                final match = await viewModel.lookupContactByEmail(email);
+                final profile = match?.match?.profile;
+                if (profile == null) {
+                  setState(() {
+                    errorMessage = 'Fant ingen profil for oppgitt e-post.';
+                  });
+                  return;
+                }
+                targetProfileId = profile.id;
+              }
+
+              if (targetProfileId.isEmpty) {
+                setState(() {
+                  errorMessage = 'Kunne ikke bestemme profil-ID.';
+                });
+                return;
+              }
+
+              await viewModel.startDirectConversation(targetProfileId);
+              if (Navigator.of(dialogContext).canPop()) {
+                Navigator.of(dialogContext).pop();
+              }
+            } on ApiException catch (error) {
+              setState(() {
+                errorMessage = 'Kunne ikke starte samtale (${error.statusCode}).';
+              });
+            } catch (error) {
+              setState(() {
+                errorMessage = 'Noe gikk galt: $error';
+              });
+            } finally {
+              setState(() {
+                submitting = false;
+              });
+            }
+          }
+
+          return AlertDialog(
+            title: const Text('Start ny samtale'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'E-post',
+                    hintText: 'kari@example.com',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: profileIdController,
+                  decoration: const InputDecoration(
+                    labelText: 'Profil-ID (valgfri)',
+                    helperText: 'Brukes hvis du kjenner mottakerens profil-ID',
+                  ),
+                ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      errorMessage!,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: Theme.of(context).colorScheme.error),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: submitting ? null : () => Navigator.of(dialogContext).maybePop(),
+                child: const Text('Avbryt'),
+              ),
+              FilledButton(
+                onPressed: submitting ? null : submit,
+                child: submitting
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Start'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  emailController.dispose();
+  profileIdController.dispose();
 }

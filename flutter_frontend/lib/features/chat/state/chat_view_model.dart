@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:math';
-
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:messngr/features/chat/models/chat_message.dart';
@@ -17,10 +15,12 @@ import 'package:messngr/features/chat/upload/chat_media_uploader.dart';
 import 'package:messngr/services/api/chat_api.dart';
 import 'package:messngr/services/api/chat_socket.dart';
 import 'package:messngr/services/api/chat_realtime_event.dart';
+import 'package:messngr/services/api/contact_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatViewModel extends ChangeNotifier {
   ChatViewModel({
+    required AccountIdentity identity,
     ChatApi? api,
     ChatRealtime? realtime,
     ChatCacheStore? cache,
@@ -32,17 +32,20 @@ class ChatViewModel extends ChangeNotifier {
     ThreadViewNotifier? threadView,
     MessageEditingNotifier? editing,
     ChatMediaUploader? mediaUploader,
-  })  : _api = api ?? ChatApi(),
+    ContactApi? contacts,
+  })  : _identity = identity,
+        _api = api ?? ChatApi(),
         _realtime = realtime ?? ChatSocket(),
         _cache = cache ?? HiveChatCacheStore(),
         _connectivity = connectivity ?? Connectivity(),
+        _contactApi = contacts ?? ContactApi(),
         composerController = composer ?? ChatComposerController(),
         typingNotifier = typing ?? TypingParticipantsNotifier(),
         reactionNotifier = reactions ?? ReactionAggregatorNotifier(),
         pinnedNotifier = pinned ?? PinnedMessagesNotifier(),
         threadViewNotifier = threadView ?? ThreadViewNotifier(),
-        messageEditingNotifier = editing ?? MessageEditingNotifier(),
-        _mediaUploader = mediaUploader {
+        messageEditingNotifier = editing ?? MessageEditingNotifier() {
+    _mediaUploader = mediaUploader ?? ChatMediaUploader(api: _api, identity: _identity);
     composerController.addListener(_handleComposerChanged);
   }
 
@@ -50,20 +53,18 @@ class ChatViewModel extends ChangeNotifier {
   final ChatRealtime _realtime;
   final ChatCacheStore _cache;
   final Connectivity _connectivity;
+  final ContactApi _contactApi;
   final ChatComposerController composerController;
   final TypingParticipantsNotifier typingNotifier;
   final ReactionAggregatorNotifier reactionNotifier;
   final PinnedMessagesNotifier pinnedNotifier;
   final ThreadViewNotifier threadViewNotifier;
   final MessageEditingNotifier messageEditingNotifier;
-  final _random = Random();
-  ChatMediaUploader? _mediaUploader;
+  late final ChatMediaUploader _mediaUploader;
+  final AccountIdentity _identity;
 
   static const _typingIdleDuration = Duration(seconds: 5);
 
-  static const _accountIdKey = 'chat.account.id';
-  static const _profileIdKey = 'chat.profile.id';
-  static const _peerProfileIdKey = 'chat.peer.profile.id';
   static const _lastThreadIdKey = 'chat.last.thread.id';
 
   bool _isLoading = false;
@@ -73,8 +74,6 @@ class ChatViewModel extends ChangeNotifier {
   List<ChatMessage> _messages = const [];
   ChatThread? _thread;
   List<ChatThread> _channels = const [];
-  AccountIdentity? _identity;
-  String? _peerProfileId;
   String? _selectedThreadId;
   StreamSubscription<ChatRealtimeEvent>? _realtimeSubscription;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -91,7 +90,7 @@ class ChatViewModel extends ChangeNotifier {
   List<ChatMessage> get messages => _messages;
   ChatThread? get thread => _thread;
   List<ChatThread> get channels => _channels;
-  AccountIdentity? get identity => _identity;
+  AccountIdentity get identity => _identity;
   String? get selectedThreadId => _selectedThreadId;
   List<ReactionAggregate> reactionsFor(String messageId) =>
       reactionNotifier.aggregatesFor(messageId);
@@ -109,8 +108,6 @@ class ChatViewModel extends ChangeNotifier {
       await _observeConnectivity();
       await _hydrateFromCache();
 
-      await _ensureIdentities(prefs);
-      await _ensureConversation();
       await _fetchChannels();
       await fetchMessages();
       await _connectRealtime();
@@ -125,11 +122,11 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   Future<void> fetchMessages() async {
-    if (_identity == null || _thread == null) return;
+    if (_thread == null) return;
 
     try {
       final messages = await _api.fetchMessages(
-        current: _identity!,
+        current: _identity,
         conversationId: _thread!.id,
       );
       _messages = messages;
@@ -167,7 +164,7 @@ class ChatViewModel extends ChangeNotifier {
         ReactionAggregate(
           emoji: emoji,
           count: 1,
-          profileIds: [identity?.profileId ?? 'self'],
+          profileIds: [_identity.profileId],
         ),
       );
     }
@@ -219,7 +216,7 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   Future<void> submitComposer(ChatComposerResult result) async {
-    if (_identity == null || _thread == null) {
+    if (_thread == null) {
       if (result.command != null) {
         _handleSlashCommand(result.command!);
       }
@@ -279,7 +276,7 @@ class ChatViewModel extends ChangeNotifier {
           remainingText = '';
         }
         final persisted = await _api.sendStructuredMessage(
-          current: _identity!,
+          current: _identity,
           conversationId: _thread!.id,
           message: payload.message,
         );
@@ -299,7 +296,7 @@ class ChatViewModel extends ChangeNotifier {
           caption: caption,
         );
         final persisted = await _api.sendStructuredMessage(
-          current: _identity!,
+          current: _identity,
           conversationId: _thread!.id,
           message: payload.message,
         );
@@ -331,26 +328,20 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
-  ChatMediaUploader _ensureMediaUploader() {
-    if (_identity == null) {
-      throw StateError('Kan ikke laste opp media uten innlogget identitet.');
-    }
-    return _mediaUploader ??=
-        ChatMediaUploader(api: _api, identity: _identity!);
-  }
+  ChatMediaUploader _ensureMediaUploader() => _mediaUploader;
 
   Future<bool> _sendTextOnly(String text) async {
     final tempId = 'local-${DateTime.now().microsecondsSinceEpoch}';
     final now = DateTime.now();
     final trimmed = text.trim();
-    if (trimmed.isEmpty || _identity == null || _thread == null) {
+    if (trimmed.isEmpty || _thread == null) {
       return false;
     }
 
     final localMessage = ChatMessage.text(
       id: tempId,
       body: trimmed,
-      profileId: _identity!.profileId,
+      profileId: _identity.profileId,
       profileName: 'Deg',
       profileMode: 'private',
       status: _isOffline ? 'queued' : 'sending',
@@ -378,7 +369,7 @@ class ChatViewModel extends ChangeNotifier {
       debugPrint('Realtime send failed: $error\n$stack');
       try {
         final persisted = await _api.sendStructuredMessage(
-          current: _identity!,
+          current: _identity,
           conversationId: _thread!.id,
           body: trimmed,
         );
@@ -421,7 +412,6 @@ class ChatViewModel extends ChangeNotifier {
 
     _thread = thread;
     _selectedThreadId = thread.id;
-    await _cache.saveThreads([thread]);
     await _saveLastThreadId(thread.id);
 
     final cachedMessages = await _cache.readMessages(thread.id);
@@ -439,20 +429,22 @@ class ChatViewModel extends ChangeNotifier {
 
   Future<void> createGroupConversation(
       String topic, List<String> participantIds) async {
-    if (_identity == null) return;
-
     _setLoading(true);
     _setError(null);
 
     try {
-      _thread = await _api.createGroupConversation(
-        current: _identity!,
+      final thread = await _api.createGroupConversation(
+        current: _identity,
         topic: topic,
         participantIds: participantIds,
       );
-      _selectedThreadId = _thread!.id;
-      await _fetchChannels();
-      await fetchMessages();
+      _selectedThreadId = thread.id;
+      await _fetchChannels(preselectThreadId: thread.id);
+      final resolved = _channels.firstWhere(
+        (item) => item.id == thread.id,
+        orElse: () => thread,
+      );
+      await selectThread(resolved);
     } on ApiException catch (error) {
       debugPrint('createGroupConversation failed: $error');
       _setError('Kunne ikke opprette gruppe (${error.statusCode}).');
@@ -463,20 +455,22 @@ class ChatViewModel extends ChangeNotifier {
 
   Future<void> createChannelConversation(
       String topic, List<String> participantIds) async {
-    if (_identity == null) return;
-
     _setLoading(true);
     _setError(null);
 
     try {
-      _thread = await _api.createChannelConversation(
-        current: _identity!,
+      final thread = await _api.createChannelConversation(
+        current: _identity,
         topic: topic,
         participantIds: participantIds,
       );
-      _selectedThreadId = _thread!.id;
-      await _fetchChannels();
-      await fetchMessages();
+      _selectedThreadId = thread.id;
+      await _fetchChannels(preselectThreadId: thread.id);
+      final resolved = _channels.firstWhere(
+        (item) => item.id == thread.id,
+        orElse: () => thread,
+      );
+      await selectThread(resolved);
     } on ApiException catch (error) {
       debugPrint('createChannelConversation failed: $error');
       _setError('Kunne ikke opprette kanal (${error.statusCode}).');
@@ -485,81 +479,59 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> _ensureIdentities(SharedPreferences prefs) async {
-    final accountId = prefs.getString(_accountIdKey);
-    final profileId = prefs.getString(_profileIdKey);
-    final peerProfileId = prefs.getString(_peerProfileIdKey);
+  Future<KnownContactMatch?> lookupContactByEmail(String email) async {
+    final trimmed = email.trim();
+    if (trimmed.isEmpty) return null;
 
-    if (accountId != null && profileId != null && peerProfileId != null) {
-      _identity = AccountIdentity(accountId: accountId, profileId: profileId);
-      _peerProfileId = peerProfileId;
-      _mediaUploader = ChatMediaUploader(api: _api, identity: _identity!);
+    final matches = await _contactApi.lookupKnownContacts(
+      current: _identity,
+      targets: [ContactImportEntry(email: trimmed)],
+    );
+
+    return matches.isNotEmpty ? matches.first : null;
+  }
+
+  Future<void> startDirectConversation(String targetProfileId) async {
+    final trimmed = targetProfileId.trim();
+    if (trimmed.isEmpty) {
+      _setError('Profil-ID kan ikke være tom.');
       return;
     }
 
-    final mainIdentity = await _api.createAccount('Demo ${_suffix()}',
-        email: _debugEmail('demo'));
-    final buddyIdentity = await _api.createAccount('Companion ${_suffix()}',
-        email: _debugEmail('buddy'));
-
-    await prefs.setString(_accountIdKey, mainIdentity.accountId);
-    await prefs.setString(_profileIdKey, mainIdentity.profileId);
-    await prefs.setString(_peerProfileIdKey, buddyIdentity.profileId);
-
-    _identity = mainIdentity;
-    _peerProfileId = buddyIdentity.profileId;
-    _mediaUploader = ChatMediaUploader(api: _api, identity: _identity!);
-  }
-
-  Future<void> _ensureConversation() async {
-    if (_identity == null) return;
-
-    if (_selectedThreadId != null) {
-      final cached = _channels.firstWhere(
-        (thread) => thread.id == _selectedThreadId,
-        orElse: () =>
-            _thread ??
-            const ChatThread(
-              id: '',
-              participantNames: const [],
-              kind: ChatThreadKind.direct,
-            ),
-      );
-      if (cached.id.isNotEmpty) {
-        _thread = cached;
-        _acknowledgedReads.clear();
-        return;
-      }
-    }
-
-    if (_peerProfileId == null) {
-      final prefs = await SharedPreferences.getInstance();
-      _peerProfileId = prefs.getString(_peerProfileIdKey);
-    }
-
-    if (_peerProfileId == null) return;
-
-    _thread = await _api.ensureDirectConversation(
-      current: _identity!,
-      targetProfileId: _peerProfileId!,
-    );
-    _acknowledgedReads.clear();
-    _selectedThreadId = _thread!.id;
-    await _cache.saveThreads([_thread!]);
-    await _saveLastThreadId(_thread!.id);
-  }
-
-  Future<void> _fetchChannels() async {
-    if (_identity == null) return;
+    _setLoading(true);
+    _setError(null);
 
     try {
-      final threads = await _api.listConversations(current: _identity!);
+      final thread = await _api.ensureDirectConversation(
+        current: _identity,
+        targetProfileId: trimmed,
+      );
+
+      await _fetchChannels(preselectThreadId: thread.id);
+      final resolved = _channels.firstWhere(
+        (item) => item.id == thread.id,
+        orElse: () => thread,
+      );
+      await selectThread(resolved);
+    } on ApiException catch (error) {
+      debugPrint('ensureDirectConversation failed: $error');
+      _setError('Kunne ikke starte samtale (${error.statusCode}).');
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> _fetchChannels({String? preselectThreadId}) async {
+    try {
+      final threads = await _api.listConversations(current: _identity);
+      _channels = threads;
+      await _cache.saveThreads(threads);
       if (threads.isNotEmpty) {
-        _channels = threads;
-        await _cache.saveThreads(threads);
-        if (_selectedThreadId != null) {
+        final preferredId = preselectThreadId ?? _selectedThreadId;
+        if (preferredId != null) {
           final selected = threads.firstWhere(
-            (thread) => thread.id == _selectedThreadId,
+            (thread) => thread.id == preferredId,
             orElse: () => threads.first,
           );
           _thread = selected;
@@ -567,7 +539,11 @@ class ChatViewModel extends ChangeNotifier {
           _thread = threads.first;
           _selectedThreadId = _thread!.id;
         }
+        _selectedThreadId = _thread!.id;
         await _saveLastThreadId(_selectedThreadId!);
+      } else {
+        _thread = null;
+        _selectedThreadId = null;
       }
       notifyListeners();
     } on ApiException catch (error) {
@@ -584,12 +560,12 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   Future<void> _connectRealtime() async {
-    if (_identity == null || _thread == null) return;
+    if (_thread == null) return;
 
     try {
       await _realtimeSubscription?.cancel();
       await _realtime.connect(
-        identity: _identity!,
+        identity: _identity,
         conversationId: _thread!.id,
       );
 
@@ -620,7 +596,7 @@ class ChatViewModel extends ChangeNotifier {
     }
 
     return _api.sendMessage(
-      current: _identity!,
+      current: _identity,
       conversationId: _thread!.id,
       body: body,
     );
@@ -710,7 +686,7 @@ class ChatViewModel extends ChangeNotifier {
     final systemMessage = ChatMessage.text(
       id: 'command-${now.microsecondsSinceEpoch}',
       body: 'Kommando ${command.name} registrert – ${command.description}',
-      profileId: _identity?.profileId ?? 'system',
+      profileId: _identity.profileId,
       profileName: 'Automatikk',
       profileMode: 'system',
       status: 'delivered',
@@ -823,8 +799,7 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   void _applyReadEvent(ChatReadEvent event) {
-    final identity = _identity;
-    if (identity == null || event.profileId == identity.profileId) {
+    if (event.profileId == _identity.profileId) {
       return;
     }
 
@@ -835,7 +810,7 @@ class ChatViewModel extends ChangeNotifier {
     }
 
     final message = _messages[index];
-    if (message.profileId != identity.profileId) {
+    if (message.profileId != _identity.profileId) {
       return;
     }
 
@@ -848,9 +823,7 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   void _markMessageRead(ChatMessage message) {
-    final identity = _identity;
-    if (identity == null) return;
-    if (message.profileId == identity.profileId) return;
+    if (message.profileId == _identity.profileId) return;
     if (!_realtimeConnected || !_realtime.isConnected) return;
     if (!_acknowledgedReads.add(message.id)) return;
 
@@ -864,11 +837,8 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   void _markExistingMessagesRead() {
-    final identity = _identity;
-    if (identity == null) return;
-
     for (final message in _messages) {
-      if (message.profileId != identity.profileId) {
+      if (message.profileId != _identity.profileId) {
         _markMessageRead(message);
       }
     }
@@ -949,11 +919,6 @@ class ChatViewModel extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_lastThreadIdKey, id);
   }
-
-  String _suffix() => (_random.nextInt(9000) + 1000).toString();
-
-  String _debugEmail(String label) =>
-      '$label-${DateTime.now().millisecondsSinceEpoch}@msgr.dev';
 
   void _mergeMessage(ChatMessage incoming, {String? replaceTempId}) {
     List<ChatMessage> updated;
