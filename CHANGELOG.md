@@ -4,6 +4,15 @@
 - Designet et modulært Flutter chat-UI-kit (kanalliste, trådvisning, reaksjoner, presence, tilkoblingsbanner) og integrerte det i `ChatPage` og en ny `ChannelListPage`-demo.
 - Utvidet `ChatComposer` med emoji-velger, slash-kommandoer, filvedlegg, simulert taleopptak og forbedret utkast-/feilhåndtering samt nye widgettester.
 - Implementerte hurtigbuffer for samtaler og meldinger med Hive/Sembast, offline statusbanner og integrasjonstester for fallback i `ChatViewModel`.
+- Flutter-klienten sender nå enhet- og app-informasjon til auth-backenden ved
+  oppstart via nytt device-context-bootstrapp, og reetablerer brukerøkter når
+  JWT-er har utløpt.
+- Auth-provider-backenden tar imot oppdatert enhetskontekst, lagrer app-metadata
+  og utsteder nye refresh-tokens, med tilhørende tester for API og hjelpere.
+- Startet migreringen til ny Flutter-arkitektur med modulært `app/bootstrap`,
+  ryddigere `main.dart` og første test for loggoppsettet.
+- Lagt ved `IMPROVE_ARCHITECTURE.md` med veikart for å modernisere Flutter-klientens struktur,
+  state-håndtering og moduloppdeling.
 - Added initial WebRTC signalling stack with in-memory call registry, Phoenix `rtc:*` channel, tests, documentation, and a dockerised coturn service for TURN/STUN.
 - Tightened direct-call support by capping participants to vert + én, utvidet testdekning og dokumentasjon av Flutter-klientplanen.
 - Introduced conversation structure types (familie, bedrift, vennegjeng, prosjekt)
@@ -24,6 +33,7 @@
 - Begynt å implementere lokal SQLite-cache for meldinger og kontakter i Flutter-klienten med nye DAO-er, migrasjoner og tester.
 - Added audio message support across the shared msgr domain, Flutter chat model, and parser including waveform metadata handling.
 - Built a MinIO-ready media upload API on the Elixir backend with audio/video attachment workflows, storage configuration, and test coverage.
+- Designed a reusable `MsgrSnackBar` UI component with typed snackbar messages, intent-aware theming, and widget/unit tests.
 - Replaced the Telegram/Matrix HTTP clients with queue-driven bridge facades for Telegram, Matrix, IRC, and XMPP plus a shared `ServiceBridge` helper and in-memory queue adapter tests.
 - Introduced a queue behaviour contract to standardise `bridge/<service>/<action>` envelopes with trace IDs for all connectors.
 - Updated bridge strategy, architecture, account linking, and platform research docs to focus on StoneMQ-backed daemons and MTProto-based Telegram support.
