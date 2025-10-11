@@ -1,27 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:messngr/ui/widgets/auth/auth_shell.dart';
 import 'package:messngr/ui/widgets/pinput_login_code.dart';
 
-class RegisterCodeScreen extends StatefulWidget {
+class RegisterCodeScreen extends StatelessWidget {
   const RegisterCodeScreen({super.key});
 
   @override
-  State<RegisterCodeScreen> createState() => _RegisterCodeScreenState();
-}
-
-class _RegisterCodeScreenState extends State<RegisterCodeScreen> {
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-        body: Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [PinputLoginCode()],
+    return AuthShell(
+      icon: Icons.verified_user_rounded,
+      title: 'Bekreft koden din',
+      subtitle:
+          'Skriv inn engangskoden vi sendte, så oppretter vi kontoen din på et blunk.',
+      illustrationAsset: 'assets/images/welcome/encryption.png',
+      bulletPoints: const [
+        'Koden er personlig og deles ikke med andre.',
+        'Når den er godkjent, er kontoen din klar til bruk.',
+      ],
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(height: 8),
+          PinputLoginCode(),
+        ],
       ),
-    ));
+    );
   }
 }
