@@ -2,10 +2,21 @@
 
 import 'package:flutter/material.dart';
 
+import 'backend_environment.dart';
+
 const String appName =
     'Messngr'; //app name shown evrywhere with the app where required
-const String backendBaseUrl =
-    String.fromEnvironment('MSGR_BACKEND_URL', defaultValue: 'http://localhost:4000/api');
+/// Returns the active backend base URL. Prefer using
+/// [backendApiUri] when possible so that relative paths are resolved
+/// consistently.
+String get backendBaseUrl => BackendEnvironment.instance.apiBaseUrl;
+
+/// Builds a complete API [Uri] from the configured backend base URL and the
+/// provided [relativePath].
+Uri backendApiUri(String relativePath,
+        {Map<String, dynamic>? queryParameters}) =>
+    BackendEnvironment.instance
+        .apiUri(relativePath, queryParameters: queryParameters);
 const String DEFAULT_COUNTTRYCODE_ISO =
     'NO'; //default country ISO 2 letter for login screen
 const String DEFAULT_COUNTTRYCODE_NUMBER =

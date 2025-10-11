@@ -25,6 +25,7 @@ class ConversationsListWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final theList = ListView.builder(
       shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: conversations.length,
       itemBuilder: (BuildContext context, int index) {
         final Conversation conversation = conversations[index];
