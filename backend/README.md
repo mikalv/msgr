@@ -32,6 +32,20 @@ med maskinspesifikke filer.
 En Postgres 15-instans kjøres automatisk og er tilgjengelig på port 5432. Default
 bruker/passord er `postgres`/`postgres`, og databasen heter `msgr_dev`.
 
+### StoneMQ meldingskø
+
+Compose-stacken bygger og starter også en [StoneMQ](https://github.com/jonefeewang/stonemq)
+node. Den lyttes på port 9092 og er kompatibel med Kafka-klienter (minimum versjon
+0.11). Data for journal, kø og nøkkelverdi-lager persisteres i volumet
+`stonemq_data`.
+
+Byggeargumentet `STONEMQ_REF` kan overstyres dersom du ønsker å teste en annen
+branch eller commit av StoneMQ-prosjektet:
+
+```bash
+docker compose build stonemq --build-arg STONEMQ_REF=<commit-eller-branch>
+```
+
 ### Tilpasninger
 
 - Sett `PHX_LISTEN_IP` om du ønsker å binde serveren til en annen adresse.

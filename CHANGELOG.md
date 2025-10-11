@@ -18,6 +18,8 @@
 - Konfigurerbar Flutter-backend gjennom `BackendEnvironment` med støtte for
   `--dart-define` og runtime-overstyringer samt oppdatert README for å beskrive
   bruken.
+- Docker-image og Compose-tjeneste for StoneMQ slik at meldingskøen kan startes
+  sammen med resten av utviklingsmiljøet.
 
 ### Changed
 - Backend-konfigurasjon forenklet og unødvendige apper fjernet fra releaseoppsett.

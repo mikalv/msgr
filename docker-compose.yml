@@ -26,6 +26,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      stonemq:
+        condition: service_started
     environment:
       MIX_ENV: dev
       PHX_SERVER: "true"
@@ -47,9 +49,26 @@ services:
     tty: true
     stdin_open: true
 
+  stonemq:
+    build:
+      context: .
+      dockerfile: docker/stonemq/Dockerfile
+    container_name: msgr_stonemq
+    ports:
+      - "9092:9092"
+    volumes:
+      - stonemq_data:/var/lib/stonemq
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "9092"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   elixir_deps:
   elixir_build:
   tailwind_cache:
   node_modules:
+  stonemq_data:
