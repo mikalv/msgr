@@ -26,12 +26,16 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSCameraUsageDescription</key>
-	<string>The app needs access to your camera for meetings.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>The app needs access to your microphone for meetings.</string>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
+        <key>NSCameraUsageDescription</key>
+        <string>The app needs access to your camera for meetings.</string>
+        <key>NSMicrophoneUsageDescription</key>
+        <string>The app needs access to your microphone for meetings.</string>
+        <key>NSPhotoLibraryUsageDescription</key>
+        <string>Messngr needs access to your photo library to import and store Camera Kit captures.</string>
+        <key>NSPhotoLibraryAddUsageDescription</key>
+        <string>Messngr saves photos and videos from Camera Kit to your library when requested.</string>
+        <key>UIApplicationSupportsIndirectInputEvents</key>
+        <true/>
 
     <key>CFBundleTypeRole</key>
     <string>Editor</string>

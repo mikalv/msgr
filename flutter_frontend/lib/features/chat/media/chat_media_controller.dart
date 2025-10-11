@@ -3,11 +3,13 @@ import 'package:image_picker/image_picker.dart';
 
 import 'chat_media_attachment.dart';
 import 'chat_media_picker.dart';
+import '../../../services/camera_kit/snap_camera_kit_media_picker.dart';
 
 /// Coordinates selection and lifecycle of pending chat media attachments.
 class ChatMediaController extends ChangeNotifier {
   ChatMediaController({ChatMediaPicker? picker})
-      : _picker = picker ?? DefaultChatMediaPicker();
+      : _picker =
+            picker ?? SnapCameraKitMediaPicker(fallback: DefaultChatMediaPicker());
 
   final ChatMediaPicker _picker;
   final List<ChatMediaAttachment> _attachments = [];
