@@ -16,15 +16,13 @@ defmodule MessngrWeb.ConversationChannel do
   alias MessngrWeb.{ConversationJSON, MessageJSON}
 
   @impl true
-  def join("conversation:" <> conversation_id, params, socket) do
-    with {:ok, profile} <- fetch_profile(params),
-         :ok <- authorize_membership(conversation_id, profile) do
+  def join("conversation:" <> conversation_id, _params, %{assigns: %{current_profile: profile}} = socket) do
+    with :ok <- authorize_membership(conversation_id, profile) do
       :ok = Chat.subscribe_to_conversation(conversation_id)
 
       socket =
         socket
         |> assign(:conversation_id, conversation_id)
-        |> assign(:current_profile, profile)
         |> assign(:typing_timers, %{})
         |> assign(:watcher_timer, nil)
         |> assign(:last_activity_at, System.monotonic_time(:millisecond))
@@ -38,6 +36,8 @@ defmodule MessngrWeb.ConversationChannel do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  def join(_topic, _params, _socket), do: {:error, %{reason: "unauthorized"}}
 
   @impl true
   def handle_in("message:create", payload, socket) when is_map(payload) do
@@ -356,15 +356,6 @@ defmodule MessngrWeb.ConversationChannel do
     push(socket, "conversation_watchers", ConversationJSON.watchers(%{payload: payload}))
     {:noreply, socket}
   end
-
-  defp fetch_profile(%{"account_id" => account_id, "profile_id" => profile_id}) do
-    profile = Chat.ensure_profile!(account_id, profile_id)
-    {:ok, profile}
-  rescue
-    _ -> {:error, %{reason: "unauthorized"}}
-  end
-
-  defp fetch_profile(_), do: {:error, %{reason: "unauthorized"}}
 
   defp authorize_membership(conversation_id, profile) do
     case Messngr.ensure_membership(conversation_id, profile.id) do

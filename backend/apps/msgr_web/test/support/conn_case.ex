@@ -28,11 +28,23 @@ defmodule MessngrWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import MessngrWeb.ConnCase
+      import Messngr.Noise.SessionFixtures
     end
   end
 
   setup tags do
     Messngr.DataCase.setup_sandbox(tags)
     {:ok, conn: Phoenix.ConnTest.build_conn()}
+  end
+
+  @doc """
+  Issues a Noise session token for the given account/profile and attaches it to the connection.
+  Returns a tuple `{conn, session_info}` where `session_info` contains the issued
+  token and device fixture.
+  """
+  def attach_noise_session(conn, account, profile, attrs \\ %{}) do
+    session_info = noise_session_fixture(account, profile, attrs)
+    conn = Plug.Conn.put_req_header(conn, "authorization", "Noise #{session_info.token}")
+    {conn, session_info}
   end
 end

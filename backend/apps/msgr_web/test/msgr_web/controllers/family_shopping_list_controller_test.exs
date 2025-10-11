@@ -9,10 +9,7 @@ defmodule MessngrWeb.FamilyShoppingListControllerTest do
     profile = hd(account.profiles)
     {:ok, family} = FamilySpace.create_space(profile.id, %{"name" => "Familie"})
 
-    conn =
-      conn
-      |> put_req_header("x-account-id", account.id)
-      |> put_req_header("x-profile-id", profile.id)
+    {conn, _session} = attach_noise_session(conn, account, profile)
 
     {:ok, conn: conn, profile: profile, family: family}
   end

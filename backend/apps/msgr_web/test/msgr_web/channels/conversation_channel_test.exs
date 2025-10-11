@@ -1,7 +1,6 @@
 defmodule MessngrWeb.ConversationChannelTest do
   use MessngrWeb.ChannelCase
 
-  alias Ecto.UUID
   alias Messngr.{Accounts, Chat}
   alias MessngrWeb.{ConversationChannel, UserSocket}
 
@@ -23,36 +22,37 @@ defmodule MessngrWeb.ConversationChannelTest do
   end
 
   test "join authorizes valid participants", %{account: account, profile: profile, conversation: conversation} do
-    {:ok, _, socket} =
+    {socket, _session} =
       UserSocket
       |> socket("user_id", %{})
-      |> subscribe_and_join(ConversationChannel, "conversation:#{conversation.id}", %{
-        "account_id" => account.id,
-        "profile_id" => profile.id
-      })
+      |> attach_noise_socket(account, profile)
+
+    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
 
     assert socket.assigns.conversation_id == conversation.id
     assert socket.assigns.current_profile.id == profile.id
   end
 
-  test "join rejects unknown participants", %{conversation: conversation, account: account} do
+  test "join rejects unknown participants", %{conversation: conversation} do
+    {:ok, outsider} = Accounts.create_account(%{"display_name" => "Ukjent"})
+    outsider_profile = hd(outsider.profiles)
+
+    {socket, _session} =
+      UserSocket
+      |> socket("user_id", %{})
+      |> attach_noise_socket(outsider, outsider_profile)
+
     assert {:error, %{reason: "forbidden"}} =
-             UserSocket
-             |> socket("user_id", %{})
-             |> subscribe_and_join(ConversationChannel, "conversation:#{conversation.id}", %{
-               "account_id" => account.id,
-               "profile_id" => UUID.generate()
-             })
+             subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
   end
 
   test "push message:create persists and replies", %{account: account, profile: profile, conversation: conversation} do
-    {:ok, _, socket} =
+    {socket, _session} =
       UserSocket
       |> socket("user_id", %{})
-      |> subscribe_and_join(ConversationChannel, "conversation:#{conversation.id}", %{
-        "account_id" => account.id,
-        "profile_id" => profile.id
-      })
+      |> attach_noise_socket(account, profile)
+
+    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
 
     ref = push(socket, "message:create", %{"body" => "Hei på deg"})
 
@@ -61,13 +61,12 @@ defmodule MessngrWeb.ConversationChannelTest do
   end
 
   test "peer messages are broadcast to subscribers", %{account: account, profile: profile, peer_profile: peer_profile, conversation: conversation} do
-    {:ok, _, socket} =
+    {socket, _session} =
       UserSocket
       |> socket("user_id", %{})
-      |> subscribe_and_join(ConversationChannel, "conversation:#{conversation.id}", %{
-        "account_id" => account.id,
-        "profile_id" => profile.id
-      })
+      |> attach_noise_socket(account, profile)
+
+    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
 
     {:ok, message} = Chat.send_message(conversation.id, peer_profile.id, %{"body" => "Hei"})
 
@@ -150,8 +149,18 @@ defmodule MessngrWeb.ConversationChannelTest do
       ref_unpin = push(socket, "message:unpin", %{"message_id" => message.id})
       assert_reply ref_unpin, :ok, %{"status" => "unpinned"}
       assert_push peer_socket, "message_unpinned", %{:message_id => ^message.id}
-    end
+end
+
+  defp join_conversation(account, profile, conversation) do
+    {socket, _session} =
+      UserSocket
+      |> socket("user_id", %{})
+      |> attach_noise_socket(account, profile)
+
+    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
+    socket
   end
+end
 
   test "message:sync replies with cursor data", %{account: account, profile: profile, conversation: conversation} do
     {:ok, _, socket} =

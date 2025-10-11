@@ -12,16 +12,16 @@ defmodule MessngrWeb.RTCChannel do
   alias Messngr.Calls.{CallSession, Participant}
 
   @impl true
-  def join("rtc:" <> conversation_id, params, socket) do
+  def join("rtc:" <> conversation_id, params, %{assigns: %{current_profile: profile}} = socket) do
     with {:ok, conversation_id} <- cast_uuid(conversation_id),
-         {:ok, profile_id} <- fetch_profile_id(params),
-         {:ok, call} <- ensure_call(conversation_id, profile_id, params),
-         {:ok, call, participant} <- Calls.join_call(call.id, profile_id, metadata: Map.get(params, "metadata", %{})) do
+         {:ok, call} <- ensure_call(conversation_id, profile.id, params),
+         {:ok, call, participant} <-
+           Calls.join_call(call.id, profile.id, metadata: Map.get(params, "metadata", %{})) do
       socket =
         socket
         |> assign(:call_id, call.id)
         |> assign(:conversation_id, conversation_id)
-        |> assign(:profile_id, profile_id)
+        |> assign(:profile_id, profile.id)
 
       payload = %{
         "call_id" => call.id,
@@ -31,12 +31,14 @@ defmodule MessngrWeb.RTCChannel do
         "participants" => encode_participants(call)
       }
 
-      {:ok, Map.put(payload, "participant", encode_participant(participant)), socket}
+        {:ok, Map.put(payload, "participant", encode_participant(participant)), socket}
     else
       {:error, reason} ->
         {:error, %{reason: to_string(reason)}}
     end
   end
+
+  def join(_topic, _params, _socket), do: {:error, %{reason: "unauthorized"}}
 
   @impl true
   def handle_in("signal:offer", %{"sdp" => _} = payload, socket) do
@@ -91,7 +93,7 @@ defmodule MessngrWeb.RTCChannel do
     :ok
   end
 
-  defp ensure_call(conversation_id, profile_id, %{"call_id" => call_id}) when is_binary(call_id) do
+  defp ensure_call(_conversation_id, profile_id, %{"call_id" => call_id}) when is_binary(call_id) do
     case Calls.fetch_call(call_id) do
       {:ok, call} -> {:ok, call}
       {:error, :not_found} -> {:error, :call_not_found}
@@ -135,9 +137,6 @@ defmodule MessngrWeb.RTCChannel do
       "metadata" => participant.metadata
     }
   end
-
-  defp fetch_profile_id(%{"profile_id" => profile_id}) when is_binary(profile_id), do: {:ok, profile_id}
-  defp fetch_profile_id(_), do: {:error, :invalid_profile}
 
   defp cast_uuid(value) do
     case UUID.cast(value) do

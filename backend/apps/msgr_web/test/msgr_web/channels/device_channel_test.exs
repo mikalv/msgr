@@ -1,11 +1,18 @@
 defmodule MessngrWeb.DeviceChannelTest do
   use MessngrWeb.ChannelCase
 
+  alias Messngr.Accounts
+
   setup do
-    {:ok, _, socket} =
+    {:ok, account} = Accounts.create_account(%{"display_name" => "Device Owner"})
+    profile = hd(account.profiles)
+
+    {socket, _session} =
       MessngrWeb.UserSocket
       |> socket("user_id", %{some: :assign})
-      |> subscribe_and_join(MessngrWeb.DeviceChannel, "device:lobby")
+      |> attach_noise_socket(account, profile)
+
+    {:ok, _, socket} = subscribe_and_join(socket, MessngrWeb.DeviceChannel, "device:lobby")
 
     %{socket: socket}
   end
