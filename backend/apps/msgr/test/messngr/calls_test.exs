@@ -33,6 +33,22 @@ defmodule Messngr.CallsTest do
     assert Map.has_key?(updated.participants, participant_id)
   end
 
+  test "direct calls reject more than two participants", %{conversation_id: conversation_id, host_id: host_id} do
+    assert {:ok, %CallSession{} = call} = Calls.start_call(conversation_id, host_id, kind: :direct)
+
+    first_participant = Ecto.UUID.generate()
+    second_participant = Ecto.UUID.generate()
+
+    assert {:ok, %CallSession{} = updated, %Participant{} = participant} =
+             Calls.join_call(call.id, first_participant)
+
+    assert participant.profile_id == first_participant
+    assert Map.has_key?(updated.participants, first_participant)
+
+    assert {:ok, ^updated, ^participant} = Calls.join_call(call.id, first_participant)
+    assert {:error, :direct_call_full} = Calls.join_call(call.id, second_participant)
+  end
+
   test "leave_call removes participant and ends empty call", %{conversation_id: conversation_id, host_id: host_id} do
     {:ok, call} = Calls.start_call(conversation_id, host_id)
     assert {:ok, :call_ended, nil} = Calls.leave_call(call.id, host_id)

@@ -55,14 +55,16 @@ defmodule Messngr.Calls.CallSession do
         {:ok, session, participant}
 
       :error ->
-        participant =
-          opts
-          |> Keyword.put(:profile_id, profile_id)
-          |> Keyword.put_new(:role, :participant)
-          |> Keyword.put_new(:status, :connecting)
-          |> Participant.new()
+        with :ok <- ensure_capacity(session) do
+          participant =
+            opts
+            |> Keyword.put(:profile_id, profile_id)
+            |> Keyword.put_new(:role, :participant)
+            |> Keyword.put_new(:status, :connecting)
+            |> Participant.new()
 
-        {:ok, put_in(session.participants[profile_id], participant), participant}
+          {:ok, put_in(session.participants[profile_id], participant), participant}
+        end
     end
   end
 
@@ -79,4 +81,14 @@ defmodule Messngr.Calls.CallSession do
 
   @spec empty?(t()) :: boolean()
   def empty?(%__MODULE__{} = session), do: map_size(session.participants) == 0
+
+  defp ensure_capacity(%__MODULE__{kind: :direct, participants: participants}) do
+    if map_size(participants) < 2 do
+      :ok
+    else
+      {:error, :direct_call_full}
+    end
+  end
+
+  defp ensure_capacity(_session), do: :ok
 end

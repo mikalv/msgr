@@ -6,6 +6,7 @@ Dette dokumentet beskriver første iterasjon av WebRTC-signalisering i Messngr.
 
 * **Signalisering:** Phoenix-kanalen `rtc:*` i `MessngrWeb.RTCChannel` bruker en in-memory `CallRegistry` for å holde orden på aktive samtaler.
 * **State:** Registry oppretter en `CallSession` per samtale som holder styr på deltakere, ønskede media-typer og tilhørende metadata.
+* **Kalltyper:** Samme kall-stakk støtter både gruppe- og 1–1-samtaler. Direkte samtaler (`:direct`) begrenses eksplisitt til vert + én deltaker for å speile forventningene til mobilklienten.
 * **Distribusjon:** Signalisering lever i eksisterende backend-container. Docker Compose har fått en `coturn`-tjeneste for STUN/TURN i lokal utvikling.
 
 ## Meldingsflyt
@@ -20,4 +21,5 @@ Dette dokumentet beskriver første iterasjon av WebRTC-signalisering i Messngr.
 * Persistente kall for historikk, logging og analyser.
 * Integrasjon med ende-til-ende kryptering av mediestrømmer.
 * Autentisering/autorisasjon mot profiler og tilhørende policies.
+* Flutter-klient basert på referanseprosjektet [Online Meeting and Conference (FlutterAwesome)](https://flutterawesome.com/online-meeting-and-conference-software-with-flutter/) kobles mot `rtc`-kanalen for å tilby delt skjerm, device-switching og UI for samtaler.
 * Kobling mot egen TURN/ICE-konfigurasjon for prod.

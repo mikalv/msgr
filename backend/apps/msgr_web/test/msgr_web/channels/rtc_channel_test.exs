@@ -74,4 +74,33 @@ defmodule MessngrWeb.RTCChannelTest do
     assert_reply ref, :ok
     assert_broadcast "call:ended", %{"call_id" => host_response["call_id"]}
   end
+
+  test "direct calls refuse a third participant", %{conversation: conversation, host_profile: host_profile, peer_profile: peer_profile} do
+    {:ok, host_response, _host_socket} =
+      UserSocket
+      |> socket("host", %{})
+      |> subscribe_and_join(RTCChannel, "rtc:#{conversation.id}", %{
+        "profile_id" => host_profile.id,
+        "peer_profile_id" => peer_profile.id
+      })
+
+    {:ok, _peer_response, _peer_socket} =
+      UserSocket
+      |> socket("peer", %{})
+      |> subscribe_and_join(RTCChannel, "rtc:#{conversation.id}", %{
+        "profile_id" => peer_profile.id,
+        "call_id" => host_response["call_id"]
+      })
+
+    {:ok, observer_account} = Accounts.create_account(%{"display_name" => "Lise"})
+    observer_profile = hd(observer_account.profiles)
+
+    assert {:error, %{reason: "direct_call_full"}} =
+             UserSocket
+             |> socket("observer", %{})
+             |> subscribe_and_join(RTCChannel, "rtc:#{conversation.id}", %{
+               "profile_id" => observer_profile.id,
+               "call_id" => host_response["call_id"]
+             })
+  end
 end
