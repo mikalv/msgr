@@ -60,6 +60,21 @@ messages = [
 
 For avansert bruk kan du sende `config: [base_url: ...]` for å overstyre leverandørkonfigurasjonen.
 
+## REST API i `msgr_web`
+
+Backendens API-apper eksponerer nå ferdigbygde endepunkter som bruker `Messngr.AI`
+under panseret. De forventer `x-account-id`/`x-profile-id`-headere og returnerer
+normaliserte svar:
+
+- `POST /api/ai/chat` – fri chat completion med valgfri `provider`, `temperature`, `model` etc.
+- `POST /api/ai/summarize` – oppsummerer et større tekstfelt (`text`) med støtte for `language`, `style` og egne instruksjoner.
+- `POST /api/ai/run` – kjør et ad-hoc prompt via `prompt` med optional `system_prompt`.
+- `POST /api/conversations/:id/assistant` – generer et foreslått svar basert på siste meldinger i en samtale, med `history_limit`
+  og `tone` for finjustering.
+
+Alle endepunktene forwarder leverandørvalg og credentials til `llm_gateway` og returnerer
+den første meldingen i svaret sammen med metadata (`model`, `usage`, `choices`).
+
 ## Testing
 
 Modulen bruker `Mox` for å kunne stubbe HTTP-klienten. Se `apps/llm_gateway/test/llm_gateway/provider/*_test.exs` for eksempler på forventninger som sikrer at riktige headere og payloads sendes.

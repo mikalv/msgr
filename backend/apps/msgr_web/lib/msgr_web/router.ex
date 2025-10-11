@@ -24,6 +24,10 @@ defmodule MessngrWeb.Router do
     post "/conversations", ConversationController, :create
     get "/conversations/:id/messages", MessageController, :index
     post "/conversations/:id/messages", MessageController, :create
+    post "/conversations/:id/assistant", AIController, :conversation_reply
+    post "/ai/chat", AIController, :chat
+    post "/ai/summarize", AIController, :summarize
+    post "/ai/run", AIController, :run
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

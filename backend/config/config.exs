@@ -7,6 +7,8 @@ config :msgr,
 config :msgr, Messngr.Mailer,
   adapter: Swoosh.Adapters.Local
 
+config :msgr, :llm_client, Messngr.AI.LlmGatewayClient
+
 host = System.get_env("PHX_HOST", "localhost")
 
 config :msgr_web, MessngrWeb.Endpoint,

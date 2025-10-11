@@ -8,6 +8,8 @@ config :msgr, Messngr.Repo,
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: 10
 
+config :msgr, :llm_client, Messngr.AI.LlmClientMock
+
 config :msgr_web, MessngrWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "35HSZsAA2kXtd6n2f9v+VRhNdScqD8Z+oF0dP6PbIapZF+8h9J0vXdyE3u/Bq5rC",
