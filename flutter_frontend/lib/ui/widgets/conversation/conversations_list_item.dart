@@ -69,34 +69,42 @@ class _ConversationsListItemState extends State<ConversationsListItem> {
         padding: theme.data.padding,
         decoration: theme.data.decoration,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Row(
-              children: <Widget>[
-                const SizedBox(width: 10.0),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      widget.conversation
-                          .conversationName(
-                              widget.store.state.teamState!.selectedTeam!.name)
-                          .toLowerCase(),
-                      style: theme.data.titleStyle,
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  const SizedBox(width: 10.0),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          widget.conversation
+                              .conversationName(widget
+                                  .store
+                                  .state
+                                  .teamState!
+                                  .selectedTeam!
+                                  .name)
+                              .toLowerCase(),
+                          style: theme.data.titleStyle,
+                        ),
+                        const SizedBox(height: 5.0),
+                        Text(
+                          lastMsgString,
+                          style: theme.data.messagePreviewStyle,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 5.0),
-                    SizedBox(
-                      width: MediaQuery.of(context).size.width * 0.45,
-                      child: Text(
-                        lastMsgString,
-                        style: theme.data.messagePreviewStyle,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(width: 12.0),
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: <Widget>[
