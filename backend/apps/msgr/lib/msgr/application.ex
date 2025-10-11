@@ -9,6 +9,7 @@ defmodule Messngr.Application do
   def start(_type, _args) do
     children =
       [
+        Messngr.FeatureFlags,
         Messngr.Repo,
         {DNSCluster, query: Application.get_env(:msgr, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: Messngr.PubSub},

@@ -59,6 +59,7 @@ defmodule Messngr.Transport.Noise.Session do
     :token_generator,
     :ephemeral_override,
     :remote_static_hint,
+    :started_at,
     pending_patterns: [],
     actor: nil
   ]
@@ -81,6 +82,7 @@ defmodule Messngr.Transport.Noise.Session do
           pending_patterns: [pattern()],
           ephemeral_override: term(),
           remote_static_hint: binary() | nil,
+          started_at: integer() | nil,
           actor: actor() | nil
         }
 
@@ -219,6 +221,18 @@ defmodule Messngr.Transport.Noise.Session do
   def token(%__MODULE__{token: token}), do: token
 
   @doc """
+  Returns the unique identifier assigned to the session.
+  """
+  @spec id(t()) :: String.t()
+  def id(%__MODULE__{id: id}), do: id
+
+  @doc """
+  Returns the Noise handshake hash associated with the session.
+  """
+  @spec handshake_hash(t()) :: binary() | nil
+  def handshake_hash(%__MODULE__{handshake_hash: handshake_hash}), do: handshake_hash
+
+  @doc """
   Returns the remote static public key recorded during the handshake.
   """
   @spec remote_static(t()) :: binary() | nil
@@ -302,6 +316,8 @@ defmodule Messngr.Transport.Noise.Session do
     remote_static_hint = Keyword.get(opts, :remote_static)
     remote_static_binary = maybe_binary(remote_static_hint)
 
+    started_at = System.monotonic_time()
+
     session = %__MODULE__{
       id: id,
       role: role,
@@ -319,8 +335,11 @@ defmodule Messngr.Transport.Noise.Session do
       token_generator: token_generator,
       pending_patterns: remaining,
       ephemeral_override: Keyword.get(opts, :ephemeral),
-      remote_static_hint: remote_static_binary
+      remote_static_hint: remote_static_binary,
+      started_at: started_at
     }
+
+    telemetry_start(session, first_pattern)
 
     case apply_pattern(session, first_pattern) do
       {:ok, session} ->
@@ -330,6 +349,7 @@ defmodule Messngr.Transport.Noise.Session do
         case switch_pattern(session, reason) do
           {:ok, session} -> session
           {:error, final_reason, _failed} ->
+            telemetry_exception(session, final_reason)
             raise ArgumentError, "failed to initialise Noise session: #{inspect(final_reason)}"
         end
     end
@@ -391,6 +411,7 @@ defmodule Messngr.Transport.Noise.Session do
         end
 
       {:error, final_reason, failed_session} ->
+        telemetry_exception(failed_session, final_reason)
         {:error, final_reason, %{failed_session | status: {:error, final_reason}}}
     end
   end
@@ -483,7 +504,7 @@ defmodule Messngr.Transport.Noise.Session do
     final_state = Map.get(split_state, :final_state)
     remote_static = extract_remote_static(final_state) || session.remote_static
 
-    %{session |
+    final_session = %{session |
       handshake_state: nil,
       tx: tx,
       rx: rx,
@@ -492,6 +513,10 @@ defmodule Messngr.Transport.Noise.Session do
       status: :established,
       token: session.token_generator.(session.token_bytes)
     }
+
+    telemetry_stop(final_session, :ok)
+
+    final_session
   end
 
   defp normalize_actor(actor) when is_map(actor) do
@@ -545,6 +570,54 @@ defmodule Messngr.Transport.Noise.Session do
       _ -> nil
     end
   end
+
+  defp telemetry_start(%__MODULE__{} = session, pattern) do
+    metadata =
+      session
+      |> telemetry_metadata()
+      |> Map.put(:pattern, pattern)
+
+    :telemetry.execute([:messngr, :noise, :handshake, :start], %{}, metadata)
+  end
+
+  defp telemetry_stop(%__MODULE__{} = session, status) do
+    measurements = %{duration: handshake_duration(session)}
+
+    metadata =
+      session
+      |> telemetry_metadata()
+      |> Map.put(:status, status)
+
+    :telemetry.execute([:messngr, :noise, :handshake, :stop], measurements, metadata)
+  end
+
+  defp telemetry_exception(%__MODULE__{} = session, reason) do
+    measurements = %{duration: handshake_duration(session)}
+
+    metadata =
+      session
+      |> telemetry_metadata()
+      |> Map.put(:reason, reason)
+
+    :telemetry.execute([:messngr, :noise, :handshake, :exception], measurements, metadata)
+  end
+
+  defp telemetry_metadata(%__MODULE__{} = session) do
+    %{
+      session_id: session.id,
+      role: session.role,
+      pattern: session.current_pattern,
+      status: session.status
+    }
+  end
+
+  defp handshake_duration(%__MODULE__{started_at: started_at}) when is_integer(started_at) do
+    System.monotonic_time()
+    |> Kernel.-(started_at)
+    |> System.convert_time_unit(:native, :microsecond)
+  end
+
+  defp handshake_duration(_session), do: 0
 
   defp build_keypair(secret) do
     public = KeyLoader.public_key(secret)

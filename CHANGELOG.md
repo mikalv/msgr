@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+- Enforced Noise-handshake attestasjonskrav for OTP (`/api/auth/verify`) med
+  Telemetry-instrumentering, fullstack tester (unit/integration) for happy-path,
+  feilscenarier (feil signatur, utløpt session, rekey) i både `msgr` og
+  `auth_provider`, ny ConnCase-test for API, runtime feature-flag med
+  `mix rollout.noise_handshake`, og dokumentasjon i `docs/noise_handshake_rollout.md`
+  + oppdatert API-kontrakt så klienter vet hvordan `Authorization: Noise <token>`
+  skal brukes.
 - Replaced header-based actor resolution with a shared Noise session plug that
   validates tokens against the registry, assigns account/profile/device for
   REST and WebSocket contexts, adds feature-toggled legacy fallback, updates

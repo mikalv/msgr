@@ -16,8 +16,8 @@ defmodule MessngrWeb.AuthJSON do
     end
   end
 
-  def session(%{result: %{account: account, identity: identity}}) do
-    %{
+  def session(%{result: %{account: account, identity: identity} = result}) do
+    base = %{
       account: %{
         id: account.id,
         display_name: account.display_name,
@@ -30,6 +30,13 @@ defmodule MessngrWeb.AuthJSON do
         verified_at: identity.verified_at
       }
     }
+
+    maybe_put_noise_session(base, Map.get(result, :noise_session))
+  end
+
+  defp maybe_put_noise_session(map, nil), do: map
+
+  defp maybe_put_noise_session(map, %{id: id, token: token}) do
+    Map.put(map, :noise_session, %{id: id, token: token})
   end
 end
-
