@@ -56,7 +56,21 @@ defmodule Messngr.Accounts do
   end
 
   defp fetch_profile_name(attrs) do
-    attrs |> Map.get("profile_name") || Map.get(attrs, :profile_name) || "Privat"
+    attrs
+    |> Map.get("profile_name")
+    |> Kernel.||(Map.get(attrs, :profile_name))
+    |> Kernel.||(Map.get(attrs, "display_name"))
+    |> Kernel.||(Map.get(attrs, :display_name))
+    |> case do
+      nil -> "Privat"
+      name ->
+        trimmed = String.trim(to_string(name))
+        if trimmed == "" do
+          "Privat"
+        else
+          trimmed
+        end
+    end
   end
 
   @spec create_profile(map()) :: {:ok, Profile.t()} | {:error, Ecto.Changeset.t()}

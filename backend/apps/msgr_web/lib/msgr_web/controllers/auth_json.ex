@@ -17,13 +17,22 @@ defmodule MessngrWeb.AuthJSON do
   end
 
   def session(%{result: %{account: account, identity: identity} = result}) do
-    base = %{
+    profiles =
+      account.profiles
+      |> List.wrap()
+      |> Enum.map(&profile_payload/1)
+
+    default_profile = List.first(profiles)
+
+    %{
       account: %{
         id: account.id,
         display_name: account.display_name,
         email: account.email,
-        phone_number: account.phone_number
+        phone_number: account.phone_number,
+        profiles: profiles
       },
+      profile: default_profile,
       identity: %{
         id: identity.id,
         kind: identity.kind,
@@ -39,4 +48,15 @@ defmodule MessngrWeb.AuthJSON do
   defp maybe_put_noise_session(map, %{id: id, token: token}) do
     Map.put(map, :noise_session, %{id: id, token: token})
   end
+
+  defp profile_payload(%Messngr.Accounts.Profile{} = profile) do
+    %{
+      id: profile.id,
+      name: profile.name,
+      mode: profile.mode,
+      slug: profile.slug
+    }
+  end
+
+  defp profile_payload(_), do: nil
 end

@@ -18,7 +18,14 @@ defmodule MessngrWeb.AuthControllerTest do
       conn =
         post(conn, "/api/auth/verify", %{challenge_id: challenge.id, code: code, display_name: "Verify"})
 
-      assert %{"account" => %{"display_name" => "Verify"}} = json_response(conn, 200)
+      assert %{
+               "account" => %{
+                 "display_name" => "Verify",
+                 "profiles" => [%{"name" => "Verify"} | _]
+               },
+               "profile" => %{"name" => "Verify"},
+               "identity" => %{"verified_at" => _}
+             } = json_response(conn, 200)
     end
   end
 
@@ -32,8 +39,13 @@ defmodule MessngrWeb.AuthControllerTest do
           name: "OIDC"
         })
 
-      assert %{"account" => %{"email" => "oidc@example.com"}} = json_response(conn, 200)
+      assert %{
+               "account" => %{
+                 "email" => "oidc@example.com",
+                 "profiles" => [%{"name" => "OIDC"} | _]
+               },
+               "profile" => %{"name" => "OIDC"}
+             } = json_response(conn, 200)
     end
   end
 end
-
