@@ -3,10 +3,8 @@ import 'dart:math';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
-import 'package:messngr/features/chat/media/chat_media_uploader.dart';
 import 'package:messngr/features/chat/models/chat_message.dart';
 import 'package:messngr/features/chat/models/chat_thread.dart';
-import 'package:messngr/features/chat/models/composer_submission.dart';
 import 'package:messngr/features/chat/models/reaction_aggregate.dart';
 import 'package:messngr/features/chat/state/chat_cache_repository.dart';
 import 'package:messngr/features/chat/state/message_editing_notifier.dart';
@@ -22,14 +20,6 @@ import 'package:messngr/services/api/chat_realtime_event.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatViewModel extends ChangeNotifier {
-  ChatViewModel({ChatApi? api, ChatRealtime? realtime, ChatMediaUploader? mediaUploader})
-      : _api = api ?? ChatApi(),
-        _realtime = realtime ?? ChatSocket(),
-        _mediaUploader = mediaUploader ?? ChatMediaUploader();
-
-  final ChatApi _api;
-  final ChatRealtime _realtime;
-  final ChatMediaUploader _mediaUploader;
   ChatViewModel({
     ChatApi? api,
     ChatRealtime? realtime,
@@ -41,6 +31,7 @@ class ChatViewModel extends ChangeNotifier {
     PinnedMessagesNotifier? pinned,
     ThreadViewNotifier? threadView,
     MessageEditingNotifier? editing,
+    ChatMediaUploader? mediaUploader,
   })  : _api = api ?? ChatApi(),
         _realtime = realtime ?? ChatSocket(),
         _cache = cache ?? HiveChatCacheStore(),
@@ -50,7 +41,8 @@ class ChatViewModel extends ChangeNotifier {
         reactionNotifier = reactions ?? ReactionAggregatorNotifier(),
         pinnedNotifier = pinned ?? PinnedMessagesNotifier(),
         threadViewNotifier = threadView ?? ThreadViewNotifier(),
-        messageEditingNotifier = editing ?? MessageEditingNotifier() {
+        messageEditingNotifier = editing ?? MessageEditingNotifier(),
+        _mediaUploader = mediaUploader {
     composerController.addListener(_handleComposerChanged);
   }
 
@@ -85,11 +77,12 @@ class ChatViewModel extends ChangeNotifier {
   String? _peerProfileId;
   String? _selectedThreadId;
   StreamSubscription<ChatRealtimeEvent>? _realtimeSubscription;
-  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _realtimeConnected = false;
   Timer? _typingTimer;
   bool _typingActive = false;
   final Set<String> _acknowledgedReads = <String>{};
+  bool _suppressComposerPersistence = false;
 
   bool get isLoading => _isLoading;
   bool get isSending => _isSending;
@@ -184,7 +177,8 @@ class ChatViewModel extends ChangeNotifier {
     _sendReactionCommand(messageId, emoji);
   }
 
-  void applyReactionAggregates(String messageId, List<ReactionAggregate> aggregates) {
+  void applyReactionAggregates(
+      String messageId, List<ReactionAggregate> aggregates) {
     reactionNotifier.apply(messageId, aggregates);
     notifyListeners();
   }
@@ -199,7 +193,8 @@ class ChatViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> requestPinMessage(String messageId, {Map<String, dynamic>? metadata}) async {
+  Future<void> requestPinMessage(String messageId,
+      {Map<String, dynamic>? metadata}) async {
     if (!_realtimeConnected || !_realtime.isConnected) {
       return;
     }
@@ -235,23 +230,28 @@ class ChatViewModel extends ChangeNotifier {
     final voiceNote = result.voiceNote;
     var remainingText = result.text.trim();
 
-    if (result.command != null && remainingText.isEmpty &&
-        attachments.isEmpty && voiceNote == null) {
+    if (result.command != null &&
+        remainingText.isEmpty &&
+        attachments.isEmpty &&
+        voiceNote == null) {
       _handleSlashCommand(result.command!);
       return;
     }
 
     if (attachments.isEmpty && voiceNote == null) {
-      if (remainingText.isEmpty) {
+      final trimmed = remainingText.trim();
+      if (trimmed.isEmpty) {
         return;
       }
       _error = null;
       _isSending = true;
       notifyListeners();
-      await _sendTextOnlyMessage(remainingText);
+      final success = await _sendTextOnly(trimmed);
       _isSending = false;
       notifyListeners();
-      composerController.clear();
+      if (success) {
+        composerController.clear();
+      }
       return;
     }
 
@@ -260,16 +260,17 @@ class ChatViewModel extends ChangeNotifier {
       return;
     }
 
-    _mediaUploader ??= ChatMediaUploader(api: _api, identity: _identity!);
+    final uploader = _ensureMediaUploader();
 
-    _error = null;
+    _setError(null);
     _isSending = true;
     notifyListeners();
 
+    var shouldClearComposer = true;
     try {
       if (voiceNote != null) {
         final caption = remainingText.isNotEmpty ? remainingText : null;
-        final payload = await _mediaUploader!.uploadVoiceNote(
+        final payload = await uploader.uploadVoiceNote(
           conversationId: _thread!.id,
           note: voiceNote,
           caption: caption,
@@ -287,11 +288,12 @@ class ChatViewModel extends ChangeNotifier {
 
       for (var i = 0; i < attachments.length; i++) {
         final attachment = attachments[i];
-        final caption = (i == 0 && remainingText.isNotEmpty) ? remainingText : null;
+        final caption =
+            (i == 0 && remainingText.isNotEmpty) ? remainingText : null;
         if (caption != null) {
           remainingText = '';
         }
-        final payload = await _mediaUploader!.uploadAttachment(
+        final payload = await uploader.uploadAttachment(
           conversationId: _thread!.id,
           attachment: attachment,
           caption: caption,
@@ -305,79 +307,49 @@ class ChatViewModel extends ChangeNotifier {
       }
 
       if (remainingText.trim().isNotEmpty) {
-        await _sendTextOnlyMessage(remainingText);
+        final sent = await _sendTextOnly(remainingText);
+        if (!sent) {
+          shouldClearComposer = false;
+        }
       }
 
-      composerController.clear();
       await _cache.saveMessages(_thread!.id, _messages);
     } on ApiException catch (error) {
       debugPrint('media send failed: $error');
       _setError('Kunne ikke sende media (${error.statusCode}).');
+      shouldClearComposer = false;
     } catch (error, stack) {
       debugPrint('media upload failed: $error\n$stack');
       _setError('Kunne ikke sende media.');
+      shouldClearComposer = false;
     } finally {
       _isSending = false;
       notifyListeners();
-    }
-  }
-
-  Future<void> _sendTextOnlyMessage(String body) async {
-    final trimmed = body.trim();
-    if (trimmed.isEmpty || _identity == null || _thread == null) {
-      return;
-    }
-
-    final text = submission.text.trim();
-    final attachments = submission.attachments;
-
-    if (text.isEmpty && attachments.isEmpty) {
-      return;
-    }
-
-    _setError(null);
-    _isSending = true;
-    notifyListeners();
-
-    try {
-      if (attachments.isEmpty) {
-        if (text.isNotEmpty) {
-          await _sendTextOnly(text);
-        }
-      } else {
-        final caption = text.isNotEmpty ? text : null;
-        var isFirst = true;
-
-        for (final attachment in attachments) {
-          final message = await _mediaUploader.uploadAndSend(
-            current: _identity!,
-            conversationId: _thread!.id,
-            attachment: attachment,
-            caption: isFirst ? caption : null,
-          );
-          isFirst = false;
-          _mergeMessage(message);
-        }
+      if (shouldClearComposer) {
+        composerController.clear();
       }
-    } on ApiException catch (error) {
-      debugPrint('sendMessage failed: $error');
-      _setError('Kunne ikke sende melding (${error.statusCode}).');
-    } on ChatMediaUploadException catch (error) {
-      debugPrint('Media upload failed: $error');
-      final status = error.statusCode != null ? '${error.statusCode}' : 'ukjent';
-      _setError('Kunne ikke laste opp vedlegg ($status).');
-    } finally {
-      _isSending = false;
-      notifyListeners();
     }
   }
 
-  Future<void> _sendTextOnly(String text) async {
+  ChatMediaUploader _ensureMediaUploader() {
+    if (_identity == null) {
+      throw StateError('Kan ikke laste opp media uten innlogget identitet.');
+    }
+    return _mediaUploader ??=
+        ChatMediaUploader(api: _api, identity: _identity!);
+  }
+
+  Future<bool> _sendTextOnly(String text) async {
     final tempId = 'local-${DateTime.now().microsecondsSinceEpoch}';
     final now = DateTime.now();
+    final trimmed = text.trim();
+    if (trimmed.isEmpty || _identity == null || _thread == null) {
+      return false;
+    }
+
     final localMessage = ChatMessage.text(
       id: tempId,
-      body: text,
+      body: trimmed,
       profileId: _identity!.profileId,
       profileName: 'Deg',
       profileMode: 'private',
@@ -393,40 +365,46 @@ class ChatViewModel extends ChangeNotifier {
 
     if (_isOffline) {
       _setError('Ingen nettverkstilkobling – meldingen ble lagret.');
-      return;
+      _stopTypingActivity();
+      return true;
     }
 
     try {
-      final persisted = await _sendOverPreferredChannel(text);
+      final persisted = await _sendOverPreferredChannel(trimmed);
       _mergeMessage(persisted, replaceTempId: tempId);
       await _cache.saveMessages(_thread!.id, _messages);
+      return true;
     } on ChatSocketException catch (error, stack) {
       debugPrint('Realtime send failed: $error\n$stack');
       try {
         final persisted = await _api.sendStructuredMessage(
           current: _identity!,
           conversationId: _thread!.id,
-          body: text,
+          body: trimmed,
         );
         _mergeMessage(persisted, replaceTempId: tempId);
         await _cache.saveMessages(_thread!.id, _messages);
+        return true;
       } on ApiException catch (fallbackError) {
         debugPrint('Fallback send failed: $fallbackError');
-        _messages =
-            _messages.where((message) => message.id != tempId).toList();
+        _messages = _messages.where((message) => message.id != tempId).toList();
         await _cache.saveMessages(_thread!.id, _messages);
         _setError('Kunne ikke sende melding (${fallbackError.statusCode}).');
-        rethrow;
+        return false;
       }
     } on ApiException catch (error) {
       debugPrint('sendMessage failed: $error');
       _messages = _messages.where((message) => message.id != tempId).toList();
       await _cache.saveMessages(_thread!.id, _messages);
       _setError('Kunne ikke sende melding (${error.statusCode}).');
-      rethrow;
+      return false;
+    } catch (error, stack) {
+      debugPrint('sendMessage failed unexpectedly: $error\n$stack');
+      _messages = _messages.where((message) => message.id != tempId).toList();
+      await _cache.saveMessages(_thread!.id, _messages);
+      _setError('Kunne ikke sende melding.');
+      return false;
     } finally {
-      _isSending = false;
-      notifyListeners();
       _stopTypingActivity();
     }
   }
@@ -452,11 +430,15 @@ class ChatViewModel extends ChangeNotifier {
       notifyListeners();
     }
 
+    final draft = await _cache.readDraft(thread.id);
+    _restoreComposerDraft(draft);
+
     await fetchMessages();
     await _connectRealtime();
   }
 
-  Future<void> createGroupConversation(String topic, List<String> participantIds) async {
+  Future<void> createGroupConversation(
+      String topic, List<String> participantIds) async {
     if (_identity == null) return;
 
     _setLoading(true);
@@ -479,7 +461,8 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> createChannelConversation(String topic, List<String> participantIds) async {
+  Future<void> createChannelConversation(
+      String topic, List<String> participantIds) async {
     if (_identity == null) return;
 
     _setLoading(true);
@@ -514,10 +497,10 @@ class ChatViewModel extends ChangeNotifier {
       return;
     }
 
-    final mainIdentity =
-        await _api.createAccount('Demo ${_suffix()}', email: _debugEmail('demo'));
-    final buddyIdentity =
-        await _api.createAccount('Companion ${_suffix()}', email: _debugEmail('buddy'));
+    final mainIdentity = await _api.createAccount('Demo ${_suffix()}',
+        email: _debugEmail('demo'));
+    final buddyIdentity = await _api.createAccount('Companion ${_suffix()}',
+        email: _debugEmail('buddy'));
 
     await prefs.setString(_accountIdKey, mainIdentity.accountId);
     await prefs.setString(_profileIdKey, mainIdentity.profileId);
@@ -534,11 +517,13 @@ class ChatViewModel extends ChangeNotifier {
     if (_selectedThreadId != null) {
       final cached = _channels.firstWhere(
         (thread) => thread.id == _selectedThreadId,
-        orElse: () => _thread ?? const ChatThread(
-          id: '',
-          participantNames: const [],
-          kind: ChatThreadKind.direct,
-        ),
+        orElse: () =>
+            _thread ??
+            const ChatThread(
+              id: '',
+              participantNames: const [],
+              kind: ChatThreadKind.direct,
+            ),
       );
       if (cached.id.isNotEmpty) {
         _thread = cached;
@@ -658,18 +643,31 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   Future<void> _observeConnectivity() async {
-    final result = await _connectivity.checkConnectivity();
-    _updateOffline(result == ConnectivityResult.none);
+    final results = await _connectivity.checkConnectivity();
+    _updateOffline(results.contains(ConnectivityResult.none));
     await _connectivitySubscription?.cancel();
     _connectivitySubscription =
-        _connectivity.onConnectivityChanged.listen((result) {
-      final offline = result == ConnectivityResult.none;
+        _connectivity.onConnectivityChanged.listen((results) {
+      final offline = results.contains(ConnectivityResult.none);
       final wasOffline = _isOffline;
       _updateOffline(offline);
       if (wasOffline && !offline) {
         fetchMessages();
       }
     });
+  }
+
+  void _restoreComposerDraft(String? text) {
+    _suppressComposerPersistence = true;
+    try {
+      if (text == null || text.isEmpty) {
+        composerController.clear();
+      } else {
+        composerController.setText(text);
+      }
+    } finally {
+      _suppressComposerPersistence = false;
+    }
   }
 
   Future<void> _hydrateFromCache() async {
@@ -690,15 +688,16 @@ class ChatViewModel extends ChangeNotifier {
         _selectedThreadId = threadId;
       }
       final draft = await _cache.readDraft(threadId);
-      if (draft != null && draft.isNotEmpty) {
-        composerController.setText(draft);
-      }
+      _restoreComposerDraft(draft);
     }
 
     notifyListeners();
   }
 
   void _handleComposerChanged() {
+    if (_suppressComposerPersistence) {
+      return;
+    }
     final threadId = _thread?.id ?? _selectedThreadId;
     if (threadId != null) {
       _cache.saveDraft(threadId, composerController.value.text);
@@ -802,7 +801,8 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   void _applyMessageDeleted(ChatMessageDeletedEvent event) {
-    final index = _messages.indexWhere((message) => message.id == event.messageId);
+    final index =
+        _messages.indexWhere((message) => message.id == event.messageId);
     if (index < 0) {
       return;
     }
@@ -828,7 +828,8 @@ class ChatViewModel extends ChangeNotifier {
       return;
     }
 
-    final index = _messages.indexWhere((message) => message.id == event.messageId);
+    final index =
+        _messages.indexWhere((message) => message.id == event.messageId);
     if (index < 0) {
       return;
     }
@@ -951,7 +952,8 @@ class ChatViewModel extends ChangeNotifier {
 
   String _suffix() => (_random.nextInt(9000) + 1000).toString();
 
-  String _debugEmail(String label) => '$label-${DateTime.now().millisecondsSinceEpoch}@msgr.dev';
+  String _debugEmail(String label) =>
+      '$label-${DateTime.now().millisecondsSinceEpoch}@msgr.dev';
 
   void _mergeMessage(ChatMessage incoming, {String? replaceTempId}) {
     List<ChatMessage> updated;

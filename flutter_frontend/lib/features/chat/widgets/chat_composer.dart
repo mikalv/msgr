@@ -40,7 +40,6 @@ class _ChatComposerState extends State<ChatComposer>
   late final FocusNode _focusNode;
   late final TextEditingController _textController;
   late final AnimationController _expanderController;
-  late StreamSubscription<ChatVoiceState> _voiceSubscription;
   late ChatComposerValue _value;
   StreamSubscription<ChatVoiceState>? _voiceSubscription;
   final ImagePicker _imagePicker = ImagePicker();
@@ -93,7 +92,7 @@ class _ChatComposerState extends State<ChatComposer>
 
   @override
   void dispose() {
-    _voiceSubscription.cancel();
+    _voiceSubscription?.cancel();
     widget.controller.removeListener(_handleControllerChanged);
     _textController.dispose();
     _focusNode.dispose();
@@ -119,7 +118,8 @@ class _ChatComposerState extends State<ChatComposer>
     final baseDecoration = ChatTheme.composerDecoration(theme);
     final decoration = baseDecoration.copyWith(
       border: _isDropHover
-          ? Border.all(color: theme.colorScheme.primary.withOpacity(0.35), width: 2)
+          ? Border.all(
+              color: theme.colorScheme.primary.withOpacity(0.35), width: 2)
           : baseDecoration.border,
     );
 
@@ -168,123 +168,125 @@ class _ChatComposerState extends State<ChatComposer>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [*/
-    SafeArea(
-      top: false,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (widget.errorMessage != null || _value.error != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _ErrorBanner(message: widget.errorMessage ?? _value.error!),
-            ),
-          if (attachments.isNotEmpty || voiceNote != null)
-            _AttachmentPreview(
-              attachments: attachments,
-              voiceNote: voiceNote,
-              onRemoveAttachment: _removeAttachment,
-              onRemoveVoiceNote: _clearVoiceNote,
-            ),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
-                  color: theme.shadowColor.withOpacity(0.08),
-                ),
-              ],
-            ),
-            padding: EdgeInsets.symmetric(
-              horizontal: isCompact ? 12 : 16,
-              vertical: isCompact ? 10 : 12,
-            ),
-            child: CallbackShortcuts(
-              bindings: <ShortcutActivator, VoidCallback>{
-                const SingleActivator(LogicalKeyboardKey.enter, control: true):
-                    _submit,
-                const SingleActivator(LogicalKeyboardKey.enter, meta: true):
-                    _submit,
-                const SingleActivator(LogicalKeyboardKey.escape): _handleEscape,
-                const SingleActivator(LogicalKeyboardKey.arrowDown):
-                    _selectNextCommand,
-                const SingleActivator(LogicalKeyboardKey.arrowUp):
-                    _selectPreviousCommand,
-              },
-              child: Focus(
-                autofocus: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        _ComposerIconButton(
-                          icon: Icons.emoji_emotions_outlined,
-                          tooltip: 'Emoji',
-                          isActive: _showEmoji,
-                          onTap: _toggleEmoji,
-                        ),
-                        if (!isCompact) const SizedBox(width: 8),
-                        _ComposerIconButton(
-                          icon: Icons.attach_file,
-                          tooltip: 'Legg ved fil',
-                          onTap: _pickFiles,
-                        ),
-                        const SizedBox(width: 8),
-                        _ComposerIconButton(
-                          icon: Icons.camera_alt_outlined,
-                          tooltip: 'Åpne kamera',
-                          onTap: _capturePhoto,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _ComposerTextField(
-                            controller: _textController,
-                            focusNode: _focusNode,
-                            onSubmitted: (_) => _submit(),
-                            isSending: widget.isSending,
-                            placeholder: isCompact
-                                ? 'Melding'
-                                : 'Del en oppdatering eller skriv / for kommandoer',
+      SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (widget.errorMessage != null || _value.error != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child:
+                    _ErrorBanner(message: widget.errorMessage ?? _value.error!),
+              ),
+            if (attachments.isNotEmpty || voiceNote != null)
+              _AttachmentPreview(
+                attachments: attachments,
+                voiceNote: voiceNote,
+                onRemoveAttachment: _removeAttachment,
+                onRemoveVoiceNote: _clearVoiceNote,
+              ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    blurRadius: 20,
+                    offset: const Offset(0, 6),
+                    color: theme.shadowColor.withOpacity(0.08),
+                  ),
+                ],
+              ),
+              padding: EdgeInsets.symmetric(
+                horizontal: isCompact ? 12 : 16,
+                vertical: isCompact ? 10 : 12,
+              ),
+              child: CallbackShortcuts(
+                bindings: <ShortcutActivator, VoidCallback>{
+                  const SingleActivator(LogicalKeyboardKey.enter,
+                      control: true): _submit,
+                  const SingleActivator(LogicalKeyboardKey.enter, meta: true):
+                      _submit,
+                  const SingleActivator(LogicalKeyboardKey.escape):
+                      _handleEscape,
+                  const SingleActivator(LogicalKeyboardKey.arrowDown):
+                      _selectNextCommand,
+                  const SingleActivator(LogicalKeyboardKey.arrowUp):
+                      _selectPreviousCommand,
+                },
+                child: Focus(
+                  autofocus: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _ComposerIconButton(
+                            icon: Icons.emoji_emotions_outlined,
+                            tooltip: 'Emoji',
+                            isActive: _showEmoji,
+                            onTap: _toggleEmoji,
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        _VoiceRecorderButton(
-                          isRecording: widget.voiceRecorder.isRecording,
-                          onStart: _startRecording,
-                          onStop: _stopRecording,
-                        ),
-                        const SizedBox(width: 8),
-                        _SendButton(
-                          isEnabled: _canSend,
-                          isSending: widget.isSending,
-                          onPressed: _canSend ? _submit : null,
-                        ),
-                      ],
-                    ),
-                    if (_shouldShowCommandPalette)
-                      _CommandPalette(
-                        commands: _matchedCommands,
-                        highlightedIndex: _commandSelection,
-                        onSelect: _applyCommand,
+                          if (!isCompact) const SizedBox(width: 8),
+                          _ComposerIconButton(
+                            icon: Icons.attach_file,
+                            tooltip: 'Legg ved fil',
+                            onTap: _pickFiles,
+                          ),
+                          const SizedBox(width: 8),
+                          _ComposerIconButton(
+                            icon: Icons.camera_alt_outlined,
+                            tooltip: 'Åpne kamera',
+                            onTap: _capturePhoto,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _ComposerTextField(
+                              controller: _textController,
+                              focusNode: _focusNode,
+                              onSubmitted: (_) => _submit(),
+                              isSending: widget.isSending,
+                              placeholder: isCompact
+                                  ? 'Melding'
+                                  : 'Del en oppdatering eller skriv / for kommandoer',
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          _VoiceRecorderButton(
+                            isRecording: widget.voiceRecorder.isRecording,
+                            onStart: _startRecording,
+                            onStop: _stopRecording,
+                          ),
+                          const SizedBox(width: 8),
+                          _SendButton(
+                            isEnabled: _canSend,
+                            isSending: widget.isSending,
+                            onPressed: _canSend ? _submit : null,
+                          ),
+                        ],
                       ),
-                    SizeTransition(
-                      sizeFactor: CurvedAnimation(
-                        parent: _expanderController,
-                        curve: Curves.easeOut,
+                      if (_shouldShowCommandPalette)
+                        _CommandPalette(
+                          commands: _matchedCommands,
+                          highlightedIndex: _commandSelection,
+                          onSelect: _applyCommand,
+                        ),
+                      SizeTransition(
+                        sizeFactor: CurvedAnimation(
+                          parent: _expanderController,
+                          curve: Curves.easeOut,
+                        ),
+                        axisAlignment: -1,
+                        child: _EmojiPicker(onSelect: _insertEmoji),
                       ),
-                      axisAlignment: -1,
-                      child: _EmojiPicker(onSelect: _insertEmoji),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
             ),
           ],
         ),
@@ -419,7 +421,8 @@ class _ChatComposerState extends State<ChatComposer>
     _textController
       ..text = newText
       ..selection = TextSelection.collapsed(
-        offset: selection.isValid ? selection.start + emoji.length : newText.length,
+        offset:
+            selection.isValid ? selection.start + emoji.length : newText.length,
       );
     widget.controller.setText(newText);
     _focusNode.requestFocus();
@@ -472,9 +475,7 @@ class _ChatComposerState extends State<ChatComposer>
         _shouldShowCommandPalette ? _matchedCommands[_commandSelection] : null;
     final result = widget.controller.buildResult(command: command);
     widget.onSubmit(result);
-    widget.controller.clear();
     setState(() {
-      _textController.clear();
       _showEmoji = false;
       _commandSelection = 0;
     });
@@ -677,8 +678,26 @@ class _EmojiPicker extends StatelessWidget {
   const _EmojiPicker({required this.onSelect});
 
   static const _emoji = [
-    '😀', '😁', '😂', '🤣', '😅', '😊', '😍', '🤩', '😎', '🤔',
-    '🙌', '👍', '👏', '🙏', '🔥', '🎉', '💡', '🚀', '❤️', '🤝',
+    '😀',
+    '😁',
+    '😂',
+    '🤣',
+    '😅',
+    '😊',
+    '😍',
+    '🤩',
+    '😎',
+    '🤔',
+    '🙌',
+    '👍',
+    '👏',
+    '🙏',
+    '🔥',
+    '🎉',
+    '💡',
+    '🚀',
+    '❤️',
+    '🤝',
   ];
 
   final ValueChanged<String> onSelect;
@@ -803,7 +822,8 @@ class _AttachmentChip extends StatelessWidget {
         children: [
           Text(
             attachment.name,
-            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(fontWeight: FontWeight.w600),
           ),
           Text(
             attachment.humanSize,
@@ -849,7 +869,8 @@ class _ErrorBanner extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            Icon(Icons.error_outline, color: theme.colorScheme.onErrorContainer),
+            Icon(Icons.error_outline,
+                color: theme.colorScheme.onErrorContainer),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -900,7 +921,8 @@ class ChatComposerController extends ChangeNotifier {
   void removeAttachment(ComposerAttachment attachment) {
     _update(
       _value.copyWith(
-        attachments: _value.attachments.where((a) => a.id != attachment.id).toList(),
+        attachments:
+            _value.attachments.where((a) => a.id != attachment.id).toList(),
       ),
     );
   }
@@ -976,16 +998,12 @@ class ChatComposerValue {
     SlashCommand? command,
     bool clearCommand = false,
   }) {
-    final resolvedError =
-        error == _unset ? this.error : error as String?;
-    final resolvedCommand =
-        clearCommand ? null : (command ?? this.command);
+    final resolvedError = error == _unset ? this.error : error as String?;
+    final resolvedCommand = clearCommand ? null : (command ?? this.command);
     return ChatComposerValue(
       text: text ?? this.text,
       attachments: attachments ?? this.attachments,
-      voiceNote: clearVoiceNote
-          ? null
-          : (voiceNote ?? this.voiceNote),
+      voiceNote: clearVoiceNote ? null : (voiceNote ?? this.voiceNote),
       error: resolvedError,
       command: resolvedCommand,
     );
@@ -1039,11 +1057,17 @@ class ComposerAttachment {
   });
 
   factory ComposerAttachment.fromPlatformFile(PlatformFile file) {
-    final id = file.identifier ?? '${file.name}-${DateTime.now().microsecondsSinceEpoch}';
+    final id = file.identifier ??
+        '${file.name}-${DateTime.now().microsecondsSinceEpoch}';
     final bytes = file.bytes;
     final mimeType = lookupMimeType(file.name, headerBytes: bytes);
     if (bytes == null) {
-      return ComposerAttachment(id: id, name: file.name, size: file.size, path: file.path, mimeType: mimeType);
+      return ComposerAttachment(
+          id: id,
+          name: file.name,
+          size: file.size,
+          path: file.path,
+          mimeType: mimeType);
     }
     return ComposerAttachment(
       id: id,
@@ -1213,9 +1237,38 @@ class _EmojiPicker extends StatelessWidget {
   final ValueChanged<String> onSelect;
 
   static const _emojis = [
-    '😀', '😁', '😂', '🤣', '😊', '😍', '😘', '😎', '🤩', '🥳', '🤔', '🤯', '😴', '😇',
-    '😡', '😭', '🙌', '👏', '👍', '👎', '🙏', '💡', '🔥', '🌟', '✨', '🎉', '🚀', '🎧',
-    '🍕', '☕️', '🏖️', '📎',
+    '😀',
+    '😁',
+    '😂',
+    '🤣',
+    '😊',
+    '😍',
+    '😘',
+    '😎',
+    '🤩',
+    '🥳',
+    '🤔',
+    '🤯',
+    '😴',
+    '😇',
+    '😡',
+    '😭',
+    '🙌',
+    '👏',
+    '👍',
+    '👎',
+    '🙏',
+    '💡',
+    '🔥',
+    '🌟',
+    '✨',
+    '🎉',
+    '🚀',
+    '🎧',
+    '🍕',
+    '☕️',
+    '🏖️',
+    '📎',
   ];
 
   @override
@@ -1283,7 +1336,8 @@ class _CommandPalette extends StatelessWidget {
               ),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: i == highlightedIndex
                       ? theme.colorScheme.primary.withOpacity(0.12)
@@ -1394,14 +1448,16 @@ class _AttachmentTile extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.vertical(bottom: borderRadius.bottomLeft),
+                borderRadius:
+                    BorderRadius.vertical(bottom: borderRadius.bottomLeft),
                 color: Colors.black.withOpacity(0.45),
               ),
               child: Text(
                 attachment.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall?.copyWith(color: Colors.white),
+                style:
+                    theme.textTheme.labelSmall?.copyWith(color: Colors.white),
               ),
             ),
           ),
@@ -1436,7 +1492,8 @@ class _AttachmentTile extends StatelessWidget {
                   attachment.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 Text(
                   attachment.humanSize,
@@ -1661,8 +1718,7 @@ class _ErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline,
-              color: theme.colorScheme.error, size: 18),
+          Icon(Icons.error_outline, color: theme.colorScheme.error, size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

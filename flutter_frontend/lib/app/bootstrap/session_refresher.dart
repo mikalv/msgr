@@ -1,6 +1,5 @@
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:libmsgr/libmsgr.dart';
-import 'package:libmsgr/src/registration_service.dart';
 import 'package:logging/logging.dart';
 
 typedef TokenExpiryEvaluator = bool Function(String token);
@@ -10,7 +9,7 @@ abstract class SessionRefreshClient {
 }
 
 class RegistrationServiceSessionRefreshClient implements SessionRefreshClient {
-  const RegistrationServiceSessionRefreshClient({RegistrationService? service})
+  RegistrationServiceSessionRefreshClient({RegistrationService? service})
       : _service = service ?? RegistrationService();
 
   final RegistrationService _service;
@@ -35,7 +34,7 @@ class SessionRefresher {
     SessionRefreshClient? client,
     TokenExpiryEvaluator? tokenExpiryEvaluator,
     Logger? logger,
-  })  : _client = client ?? const RegistrationServiceSessionRefreshClient(),
+  })  : _client = client ?? RegistrationServiceSessionRefreshClient(),
         _tokenExpiryEvaluator = tokenExpiryEvaluator ?? JwtDecoder.isExpired,
         _log = logger ?? Logger('SessionRefresher');
 
@@ -57,7 +56,8 @@ class SessionRefresher {
 
     final refreshed = await _client.refresh(user.refreshToken);
     if (refreshed == null) {
-      throw const SessionRefreshException('Unable to refresh session with server');
+      throw const SessionRefreshException(
+          'Unable to refresh session with server');
     }
 
     return user.copyWith(

@@ -4,6 +4,12 @@
 - Startet Slack API-umbrellaappen med reelle `conversations.*`, `chat.*`, `users.*` og `reactions.*` endepunktimplementasjoner, Slack-ID/timestamp-adaptere, header-basert autentiseringsplugg og tilhørende controller-tester.
 - Implementerte `conversations.mark` for Slack API-et slik at lesestatus lagres, og la til tester som dekker lykkestien og ugyldig timestamp-feil.
 - Lagt til plan i `docs/umbrella_slack_compat_plan.md` for Slack-kompatibel umbrella-plattform og prioritering av Telegram og Discord-integrasjoner.
+- Utvidet roadmap-dokumentet for message composer-paritet i
+  `docs/message_composer_parity_plan.md` med detaljerte faser,
+  kickoff-sjekkliste og risikovurdering.
+- Added account device management with migrations, CRUD helpers, Noise key
+  attestation storage and auth flow integration so OTP/OIDC logins register
+  and activate devices, including ExUnit coverage.
 - Documented Noise handshake expectations with new server-key endpoint contract, configured backend runtime to load static Noise keys from env/Secrets Manager, added rotation mix task with tests, and updated README guidance.
 - Added a feature toggle and dedicated port configuration for the Noise transport so static keys only load when explicitly enabled.
 - Utvidet mediasystemet med nye skjema-felter (dimensjoner, SHA-256, retention),
@@ -39,6 +45,7 @@
   PubSub-backlog (`message:sync`) og watcher-strømmer (`conversation:watch`/`unwatch`).
 - Designet et modulært Flutter chat-UI-kit (kanalliste, trådvisning, reaksjoner, presence, tilkoblingsbanner) og integrerte det i `ChatPage` og en ny `ChannelListPage`-demo.
 - Utvidet `ChatComposer` med emoji-velger, slash-kommandoer, filvedlegg, simulert taleopptak og forbedret utkast-/feilhåndtering samt nye widgettester og demo-widget.
+- Forsterket chat-komponisten med pålitelig tekstutsending, per-tråd-utkast og nye view-model-tester for sendefeil og kladd-restaurering.
 - Implementerte hurtigbuffer for samtaler og meldinger med Hive/Sembast, offline statusbanner og integrasjonstester for fallback i `ChatViewModel`.
 - Flutter-klienten sender nå enhet- og app-informasjon til auth-backenden ved
   oppstart via nytt device-context-bootstrapp, og reetablerer brukerøkter når

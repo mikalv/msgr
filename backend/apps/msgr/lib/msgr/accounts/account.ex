@@ -20,6 +20,7 @@ defmodule Messngr.Accounts.Account do
     field :time_zone, :string, default: "Europe/Oslo"
 
     has_many :profiles, Messngr.Accounts.Profile
+    has_many :devices, Messngr.Accounts.Device
 
     timestamps(type: :utc_datetime)
   end
