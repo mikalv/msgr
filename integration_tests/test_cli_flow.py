@@ -110,7 +110,13 @@ def _run_cli_flow(env: Dict[str, str]) -> Dict[str, Any]:
     subprocess.run(["dart", "pub", "get"], check=True, cwd=LIBMSGR_PACKAGE_DIR, env=env)
 
     process = subprocess.run(
-        ["dart", "run", "tool/integration_flow.dart"],
+        [
+            "dart",
+            "run",
+            "tool/msgr_cli.dart",
+            "integration-flow",
+            "--json",
+        ],
         check=True,
         cwd=LIBMSGR_PACKAGE_DIR,
         env=env,
@@ -119,12 +125,12 @@ def _run_cli_flow(env: Dict[str, str]) -> Dict[str, Any]:
         text=True,
     )
 
-    stdout = process.stdout.strip().splitlines()
-    if not stdout:
-        raise AssertionError("integration_flow.dart produced no output")
+    stdout_lines = process.stdout.strip().splitlines()
+    if not stdout_lines:
+        raise AssertionError("msgr_cli.dart produced no output")
 
     try:
-        return json.loads(stdout[-1])
+        return json.loads(stdout_lines[-1])
     except json.JSONDecodeError as exc:  # pragma: no cover - defensive
         raise AssertionError(
             "Failed to parse integration flow output as JSON."
