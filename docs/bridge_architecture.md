@@ -1,42 +1,42 @@
 # Bridge Architecture Overview
 
 ## Component Map
-- **Connector Microservices**: One per external platform, written in language best suited for that ecosystem (e.g., Go for Slack/Discord gateway, Rust for MTProto). They implement a common interface: `connect()`, `subscribe()`, `sendMessage()`, `syncState()`.
-- **Message Bus**: NATS or Kafka topic namespace bridging connectors with the core Msgr backend. Topics segregated by tenant/workspace and platform to enforce isolation.
-- **Normalization Service**: Translates platform-specific payloads into Msgr's canonical message/event schema and persists them in Postgres.
-- **Impersonation Service**: Holds outbound routing logic, selects correct connector, enforces permission scopes, and signs requests with stored credentials.
-- **Credential Vault**: Hardware-backed (HSM/YubiHSM or cloud KMS) store for OAuth tokens, cookies, session secrets. Exposes short-lived signing tokens to connectors.
-- **Compliance & Audit Layer**: Centralized logging pipeline (OpenTelemetry) with append-only audit store.
+- **Connector Daemons**: One per external platform, implemented in the language that best matches the reverse-engineered stack (GramJS for Telegram, mautrix for Matrix, plain IRC/XMPP libraries). Each daemon exposes queue handlers for `bridge/<service>/<action>` topics and translates intents to native protocol calls.
+- **Elixir Connector Facade**: The Msgr backend uses `ServiceBridge` helpers to build deterministic envelopes and publish them to the queue. Incoming events are normalised and persisted in Postgres before fanning out to clients.
+- **Message Fabric**: StoneMQ (or a compatible broker) provides pub/sub plus request/response semantics. We reserve namespaces per tenant and service to guarantee isolation and allow selective replay.
+- **Impersonation & Policy Layer**: Holds outbound routing logic, resolves which linked identity to impersonate, injects credentials, and enforces workspace policy before publishing intents.
+- **Credential Vault**: Hardware-backed store (HSM/YubiHSM or cloud KMS) for OAuth tokens, MTProto keys, Matrix access tokens, IRC SASL secrets, etc. The Elixir app checks out short-lived session material that the daemons can refresh when needed.
+- **Compliance & Audit**: Centralised OpenTelemetry pipeline with append-only audit store capturing the original queue envelope, trace IDs, and daemon responses.
 
 ## Data Flow
 1. **Inbound Messages**
-   - Connector receives webhook/event stream → publishes to Message Bus.
-   - Normalization service consumes, transforms, stores, and triggers notifications to Msgr clients.
+   - Daemon receives network traffic → emits canonical events to `bridge/<service>/inbound_event` (or service-specific topics).
+   - Elixir subscribers normalise the payload, persist it, and schedule ack messages such as `ack_update`, `ack_sync`, or `ack_offset`.
 2. **Outbound Messages**
-   - Msgr client sends message → core backend writes to queue → Impersonation service retrieves user credentials, applies policy, forwards to connector.
-   - Connector translates to platform API call, handles ack/ retry, publishes delivery status events.
-3. **State Synchronization**
-   - Periodic sync jobs pull history, membership changes, reactions.
-   - Diff engine merges states and resolves conflicts (e.g., deleted messages, edits) before updating Msgr.
+   - Clients send a message → backend records intent → publishes an outbound envelope (`outbound_message`, `outbound_event`, etc.).
+   - Daemon delivers the message using the platform protocol, then emits delivery status or errors referencing the original `trace_id`.
+3. **State Synchronisation**
+   - Workers trigger periodic sync actions (`request_history`, `refresh_roster`) over the queue.
+   - Daemons stream results and update tokens; Elixir writes checkpoints and notifies subscribers.
 
 ## Security Layers
-- Per-connector sandbox (container isolation, AppArmor/seccomp) to contain reverse-engineered code.
-- Mandatory TLS mutual auth between connectors and core backend.
-- Fine-grained access tokens for Msgr users, scoped to connector capabilities.
-- Policy engine to enforce DLP, workspace rules before impersonated send.
+- Per-daemon containers with AppArmor/seccomp profiles to contain native libraries and reverse-engineered code.
+- Mutual TLS (or Noise handshakes) between daemons and StoneMQ plus signed envelopes verified by the Elixir core.
+- Scoped credentials per workspace identity; queue consumers require explicit capability grants (send, sync, admin).
+- Policy enforcement before publishing outbound intents to guard against DLP violations and cross-tenant leakage.
 
 ## Scalability Considerations
-- Horizontal scaling of connectors per workspace using Kubernetes deployments.
-- Rate limiting and burst control based on platform limits, enforced via leaky-bucket counters in Redis.
-- Idempotent event processing using external message IDs and dedupe tables.
-- Fallback queues for temporary platform outages, with exponential backoff and operator alerts.
+- Horizontal scale by spinning up daemon shards per workspace or region; shards subscribe to the same topics with competing consumers.
+- Rate limiting implemented at the daemon level to respect platform-specific quotas, with back-pressure fed to Elixir through `throttle` events.
+- Idempotent processing using platform message IDs combined with Msgr `trace_id`s to deduplicate retries.
+- Replay buffers (StoneMQ durable topics) allow catch-up after outages without losing handshake state.
 
 ## Observability
-- Metrics: message throughput, latency per platform, error categories.
-- Tracing: distributed traces correlating inbound/outbound events across services.
-- Alerting: threshold-based alerts for failure rates, lag in sync jobs, credential expiry warnings.
+- Metrics: queue depth, daemon reconnect counts, latency per action, handshake success/failure tallies.
+- Tracing: propagate the queue `trace_id` into daemon spans so distributed traces cover Elixir + external protocol hops.
+- Alerting: thresholds on sync lag, credential expiry windows, abnormal rejection rates on outbound intents.
 
 ## Developer Experience
-- Provide mock servers for Slack, Telegram, Discord, Matrix, XMPP to run integration tests offline.
-- Contract tests validating canonical schema compatibility per connector.
-- Feature flags to enable connectors gradually per user cohort.
+- Provide local StoneMQ docker-compose stack with fake daemons that echo payloads for contract testing.
+- Contract tests validate canonical schema compatibility per service (Telegram, Matrix, IRC, XMPP) using the `ServiceBridge` envelope definitions.
+- Feature flags gate platform rollout so operators can enable connectors per workspace gradually.
