@@ -20,6 +20,7 @@ defmodule Messngr.Accounts.Profile do
     field :security_policy, :map, default: %{"requires_pin" => false}
 
     belongs_to :account, Messngr.Accounts.Account
+    has_many :devices, Messngr.Accounts.Device
 
     timestamps(type: :utc_datetime)
   end

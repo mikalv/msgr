@@ -32,8 +32,8 @@ defmodule Messngr.Auth do
            :ok <- compare_code(challenge, code),
            {:ok, identity} <- upsert_identity_from_challenge(challenge, attrs),
            {:ok, _} <- mark_challenge_consumed(challenge),
-           {:ok, identity} <- Accounts.verify_identity(identity, %{last_challenged_at: challenge.inserted_at}) do
-        identity = Repo.preload(identity, :account)
+           {:ok, identity} <- Accounts.verify_identity(identity, %{last_challenged_at: challenge.inserted_at}),
+           {:ok, %{identity: identity}} <- Accounts.attach_device_for_identity(identity, device_attrs_from(challenge, attrs)) do
         %{account: identity.account, identity: identity}
       else
         {:error, reason} -> Repo.rollback(reason)
@@ -53,10 +53,30 @@ defmodule Messngr.Auth do
            email: Map.get(attrs, "email"),
            display_name: Map.get(attrs, "name")
          }),
-         {:ok, identity} <- Accounts.verify_identity(identity, %{}) do
-      identity = Repo.preload(identity, :account)
+         {:ok, identity} <- Accounts.verify_identity(identity, %{}),
+         {:ok, %{identity: identity}} <- Accounts.attach_device_for_identity(identity, device_attrs_from(nil, attrs)) do
       {:ok, %{account: identity.account, identity: identity}}
     end
+  end
+
+  defp device_attrs_from(%Challenge{} = challenge, attrs) do
+    %{
+      device_public_key: challenge.issued_for,
+      attesters: Map.get(attrs, "attesters"),
+      last_handshake_at: Map.get(attrs, "last_handshake_at"),
+      profile_id: Map.get(attrs, "profile_id")
+    }
+  end
+
+  defp device_attrs_from(nil, attrs) do
+    %{
+      device_public_key:
+        Map.get(attrs, "device_public_key") ||
+          Map.get(attrs, "device_id"),
+      attesters: Map.get(attrs, "attesters"),
+      last_handshake_at: Map.get(attrs, "last_handshake_at"),
+      profile_id: Map.get(attrs, "profile_id")
+    }
   end
 
   defp persist_challenge(channel, target, attrs) do
