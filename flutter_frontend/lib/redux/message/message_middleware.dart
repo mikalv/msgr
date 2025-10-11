@@ -23,16 +23,32 @@ void Function(
       final repos = LibMsgr()
           .repositoryFactory
           .getRepositories(store.state.authState.currentTeamName!);
-      repos.messageRepository
-          .sendMessageToRoom(action.msg)
-          .future
-          .then((value) {
+      final push = repos.messageRepository.sendMessageToRoom(action.msg);
+      if (push == null) {
+        const error = 'Failed to enqueue message.';
+        action.completer.completeError(error);
+        store.dispatch(
+          OnSendMessageFailureAction(msg: action.msg, serverResponse: error),
+        );
+        return;
+      }
+
+      push.future.then((value) {
         action.completer.complete();
         store.dispatch(
-            OnSendMessageSuccessAction(msg: action.msg, serverResponse: value));
+          OnSendMessageSuccessAction(
+            msg: action.msg,
+            serverResponse: value,
+          ),
+        );
       }).catchError((e) {
-        store.dispatch(OnSendMessageFailureAction(
-            msg: action.msg, serverResponse: e.toString()));
+        action.completer.completeError(e);
+        store.dispatch(
+          OnSendMessageFailureAction(
+            msg: action.msg,
+            serverResponse: e.toString(),
+          ),
+        );
       });
     } catch (e) {
       _log.severe('Error sending message: ${e.toString()}');

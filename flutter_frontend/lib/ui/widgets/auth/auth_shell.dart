@@ -139,7 +139,7 @@ class AuthShell extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: const [
-                  Icon(Icons.shield_lock_rounded, color: Colors.white, size: 20),
+                  Icon(Icons.security, color: Colors.white, size: 20),
                   SizedBox(width: 8),
                   Text(
                     'messngr secure',
