@@ -31,6 +31,14 @@ Bygge en norsk meldingsplattform der én konto kan ha flere profiler og moduser 
    - Auth: midlertidig `x-user-id` header; bytt til OIDC/Noise senere.
    - Testing: ExUnit for kontomodell, meldingsstrøm, kanalbroadcast.
 
+   - Cursor-basert historikk:
+     - Implementere `after_id`, `around_id` og `has_more` helpers i `Messngr.Chat`.
+     - Utvide `list_conversations/2` med `unread_count`, `last_message` og cursor-felter.
+     - Eksponere `conversation:watch`/`conversation:unwatch` og `message:sync` via Channel.
+     - Skrive ExUnit-tester for paginering og PubSub-backlog.
+     - Flutter: ny `ChannelListViewModel` og refaktorert `ChatViewModel` med lazy loading.
+     - Dokumentasjon: oppdatere `docs/bridge_architecture.md` med historikkstrømming og watcher-flyt.
+
 2. **Flutter**
    - Feature-mappe `lib/features/chat` med modeller, API-klient, view-model, widgets.
    - Chat UI: timeline med bobler, sticky dag-separator, typing-indikator, tilpasningsdyktig composer (emoji, vedlegg, voice stub).

@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Dokumenterte neste steg for cursor-basert historikkstrømming og watcher-flyt i `docs/historikk_streaming.md` og oppdatert prosjektplan.
 - Designet et modulært Flutter chat-UI-kit (kanalliste, trådvisning, reaksjoner, presence, tilkoblingsbanner) og integrerte det i `ChatPage` og en ny `ChannelListPage`-demo.
 - Utvidet `ChatComposer` med emoji-velger, slash-kommandoer, filvedlegg, simulert taleopptak og forbedret utkast-/feilhåndtering samt nye widgettester.
 - Implementerte hurtigbuffer for samtaler og meldinger med Hive/Sembast, offline statusbanner og integrasjonstester for fallback i `ChatViewModel`.
