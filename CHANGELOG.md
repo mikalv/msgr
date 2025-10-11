@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added REST-støtte for kontaktimport og match i backenden med nye
+  controller-tester, oppdatert API-kontrakt og Flutter `libmsgr`
+  klientimplementasjon for å lagre kontakter og slå opp kjente venner.
 - Documented the `libmsgr` API surface, added a dedicated CLI entry point for
   the registration flow (`tool/msgr_cli.dart`), and updated the integration test
   suite to use the new command for provisioning accounts.

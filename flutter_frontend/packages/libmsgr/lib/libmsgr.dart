@@ -25,6 +25,7 @@ export 'src/models/message.dart';
 export 'src/models/auth_challenge.dart';
 
 export 'src/registration_service.dart';
+export 'src/services/contact_api.dart';
 
 export 'src/lib_constants.dart';
 
@@ -36,7 +37,7 @@ export 'src/platform_support/none.dart'
     if (dart.library.io) 'src/platform_support/io_platform.dart'
     if (dart.library.js_interop) 'src/platform_support/web_platform.dart';
 
-const String libmsgrVersion = '0.1.1';
+const String libmsgrVersion = '0.1.2';
 
 /*
 Here's what that code does:
