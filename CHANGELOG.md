@@ -20,6 +20,7 @@
 - REST-endepunktene `/api/auth/challenge`, `/api/auth/verify` og `/api/auth/oidc` med JSON-svar og tester.
 - OTP- og OIDC-dokumentasjon i `docs/api_contract.md` samt database-migrasjoner for identiteter og utfordringer.
 - Flutter-støtte for OTP-flyt med `AuthChallenge`-modell, redux-tilstand og forbedret kodevisning.
+- AuthShell-layout og delte inputdekorasjoner for autentiseringsskjermene med tilhørende widgettest.
 - Docker-basert utviklingsmiljø for Elixir-backenden med Postgres og Phoenix-server.
 - Konfigurerbar Flutter-backend gjennom `BackendEnvironment` med støtte for
   `--dart-define` og runtime-overstyringer samt oppdatert README for å beskrive
@@ -38,6 +39,7 @@
 - Chat-opplevelsen i Flutter har fått en modernisert visuell profil med felles tema, oppgradert tidslinje og raffinert komponist.
 - ChatViewModel benytter nå sanntidsstrømmer og WebSocket-sending med HTTP-fallback.
 - Innloggingsopplevelsen i Flutter er redesignet med glass-effekt, segmentert kanalvalg og OIDC-knapp.
+- Flutter-skjermene for innlogging, registrering og kodeverifisering har fått en helhetlig profesjonell stil med gradientbakgrunner, bullet-highlights og oppdatert PIN-inntasting.
 - `RegistrationService` bruker nå de nye auth-endepunktene og returnerer strømlinjeformede brukersvar.
 
 ### Fixed
