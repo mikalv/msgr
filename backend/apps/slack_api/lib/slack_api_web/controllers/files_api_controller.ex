@@ -1,52 +1,28 @@
 defmodule SlackApiWeb.Controllers.FilesApiController do
   use SlackApiWeb, :controller
+
   require Logger
 
-  def info() do
-    #
+  alias SlackApi.SlackResponse
+
+  def init(opts \\ []) do
+    Logger.info("Started FilesApiController with options #{inspect(opts)}")
   end
 
-  def list() do
-    #
-  end
+  def info(conn, _params), do: render_not_implemented(conn)
+  def list(conn, _params), do: render_not_implemented(conn)
+  def upload(conn, _params), do: render_not_implemented(conn)
+  def delete(conn, _params), do: render_not_implemented(conn)
+  def sharedPublicURL(conn, _params), do: render_not_implemented(conn)
+  def revokePublicURL(conn, _params), do: render_not_implemented(conn)
+  def remote_add(conn, _params), do: render_not_implemented(conn)
+  def remote_info(conn, _params), do: render_not_implemented(conn)
+  def remote_list(conn, _params), do: render_not_implemented(conn)
+  def remote_remove(conn, _params), do: render_not_implemented(conn)
+  def remote_share(conn, _params), do: render_not_implemented(conn)
+  def remote_update(conn, _params), do: render_not_implemented(conn)
 
-  def upload() do
-    #
-  end
-
-  def delete() do
-    #
-  end
-
-  def sharedPublicURL() do
-    #
-  end
-
-  def revokePublicURL() do
-    #
-  end
-
-  def remote_add() do
-    #
-  end
-
-  def remote_info() do
-    #
-  end
-
-  def remote_list() do
-    #
-  end
-
-  def remote_remove() do
-    #
-  end
-
-  def remote_share() do
-    #
-  end
-
-  def remote_update() do
-    #
+  defp render_not_implemented(conn) do
+    json(conn, SlackResponse.error(:not_implemented))
   end
 end

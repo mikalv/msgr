@@ -3,10 +3,9 @@ defmodule SlackApiWeb.Controllers.ApiController do
   require Logger
 
   def init(opts \\ []) do
-    Logger.info("Started ApiController with options #{inspect opts}")
+    Logger.info("Started ApiController with options #{inspect(opts)}")
     :ok
   end
-
 
   def status_test(conn, _params) do
     conn
