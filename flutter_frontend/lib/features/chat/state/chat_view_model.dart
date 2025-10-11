@@ -15,6 +15,7 @@ import 'package:messngr/features/chat/state/reaction_aggregator_notifier.dart';
 import 'package:messngr/features/chat/state/thread_view_notifier.dart';
 import 'package:messngr/features/chat/state/typing_participants_notifier.dart';
 import 'package:messngr/features/chat/widgets/chat_composer.dart';
+import 'package:messngr/features/chat/upload/chat_media_uploader.dart';
 import 'package:messngr/services/api/chat_api.dart';
 import 'package:messngr/services/api/chat_socket.dart';
 import 'package:messngr/services/api/chat_realtime_event.dart';
@@ -64,6 +65,7 @@ class ChatViewModel extends ChangeNotifier {
   final ThreadViewNotifier threadViewNotifier;
   final MessageEditingNotifier messageEditingNotifier;
   final _random = Random();
+  ChatMediaUploader? _mediaUploader;
 
   static const _typingIdleDuration = Duration(seconds: 5);
 
@@ -229,14 +231,100 @@ class ChatViewModel extends ChangeNotifier {
       return;
     }
 
-    if (result.command != null && result.text.isEmpty &&
-        result.attachments.isEmpty && result.voiceNote == null) {
+    final attachments = result.attachments;
+    final voiceNote = result.voiceNote;
+    var remainingText = result.text.trim();
+
+    if (result.command != null && remainingText.isEmpty &&
+        attachments.isEmpty && voiceNote == null) {
       _handleSlashCommand(result.command!);
       return;
     }
 
-    final body = _composeBodyFromResult(result);
-    if (body.trim().isEmpty && result.attachments.isEmpty && result.voiceNote == null) {
+    if (attachments.isEmpty && voiceNote == null) {
+      if (remainingText.isEmpty) {
+        return;
+      }
+      _error = null;
+      _isSending = true;
+      notifyListeners();
+      await _sendTextOnlyMessage(remainingText);
+      _isSending = false;
+      notifyListeners();
+      composerController.clear();
+      return;
+    }
+
+    if (_isOffline) {
+      _setError('Ingen nettverkstilkobling – kan ikke laste opp media.');
+      return;
+    }
+
+    _mediaUploader ??= ChatMediaUploader(api: _api, identity: _identity!);
+
+    _error = null;
+    _isSending = true;
+    notifyListeners();
+
+    try {
+      if (voiceNote != null) {
+        final caption = remainingText.isNotEmpty ? remainingText : null;
+        final payload = await _mediaUploader!.uploadVoiceNote(
+          conversationId: _thread!.id,
+          note: voiceNote,
+          caption: caption,
+        );
+        if (caption != null) {
+          remainingText = '';
+        }
+        final persisted = await _api.sendStructuredMessage(
+          current: _identity!,
+          conversationId: _thread!.id,
+          message: payload.message,
+        );
+        _mergeMessage(persisted);
+      }
+
+      for (var i = 0; i < attachments.length; i++) {
+        final attachment = attachments[i];
+        final caption = (i == 0 && remainingText.isNotEmpty) ? remainingText : null;
+        if (caption != null) {
+          remainingText = '';
+        }
+        final payload = await _mediaUploader!.uploadAttachment(
+          conversationId: _thread!.id,
+          attachment: attachment,
+          caption: caption,
+        );
+        final persisted = await _api.sendStructuredMessage(
+          current: _identity!,
+          conversationId: _thread!.id,
+          message: payload.message,
+        );
+        _mergeMessage(persisted);
+      }
+
+      if (remainingText.trim().isNotEmpty) {
+        await _sendTextOnlyMessage(remainingText);
+      }
+
+      composerController.clear();
+      await _cache.saveMessages(_thread!.id, _messages);
+    } on ApiException catch (error) {
+      debugPrint('media send failed: $error');
+      _setError('Kunne ikke sende media (${error.statusCode}).');
+    } catch (error, stack) {
+      debugPrint('media upload failed: $error\n$stack');
+      _setError('Kunne ikke sende media.');
+    } finally {
+      _isSending = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _sendTextOnlyMessage(String body) async {
+    final trimmed = body.trim();
+    if (trimmed.isEmpty || _identity == null || _thread == null) {
       return;
     }
 
@@ -287,7 +375,7 @@ class ChatViewModel extends ChangeNotifier {
   Future<void> _sendTextOnly(String text) async {
     final tempId = 'local-${DateTime.now().microsecondsSinceEpoch}';
     final now = DateTime.now();
-    var localMessage = ChatMessage.text(
+    final localMessage = ChatMessage.text(
       id: tempId,
       body: text,
       profileId: _identity!.profileId,
@@ -305,8 +393,6 @@ class ChatViewModel extends ChangeNotifier {
 
     if (_isOffline) {
       _setError('Ingen nettverkstilkobling – meldingen ble lagret.');
-      _isSending = false;
-      notifyListeners();
       return;
     }
 
@@ -424,6 +510,7 @@ class ChatViewModel extends ChangeNotifier {
     if (accountId != null && profileId != null && peerProfileId != null) {
       _identity = AccountIdentity(accountId: accountId, profileId: profileId);
       _peerProfileId = peerProfileId;
+      _mediaUploader = ChatMediaUploader(api: _api, identity: _identity!);
       return;
     }
 
@@ -438,6 +525,7 @@ class ChatViewModel extends ChangeNotifier {
 
     _identity = mainIdentity;
     _peerProfileId = buddyIdentity.profileId;
+    _mediaUploader = ChatMediaUploader(api: _api, identity: _identity!);
   }
 
   Future<void> _ensureConversation() async {
@@ -636,19 +724,7 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   String _composeBodyFromResult(ChatComposerResult result) {
-    final buffer = StringBuffer(result.text.trim());
-    if (result.attachments.isNotEmpty) {
-      final attachmentSummary = result.attachments
-          .map((attachment) => attachment.name)
-          .join(', ');
-      if (buffer.isNotEmpty) buffer.writeln();
-      buffer.writeln('Vedlegg: $attachmentSummary');
-    }
-    if (result.voiceNote != null) {
-      if (buffer.isNotEmpty) buffer.writeln();
-      buffer.write('Lydklipp ${result.voiceNote!.formattedDuration} vedlagt.');
-    }
-    return buffer.toString();
+    return result.text.trim();
   }
 
   void _sendReactionCommand(String messageId, String emoji) {

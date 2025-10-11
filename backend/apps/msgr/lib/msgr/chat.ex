@@ -1100,11 +1100,15 @@ defmodule Messngr.Chat do
 
       case Media.consume_upload(upload_id, conversation_id, profile_id, metadata) do
         {:ok, payload} ->
+          normalized_payload = normalize_media_payload(kind, payload)
+          caption = get_in(normalized_payload, ["media", "caption"])
+
           sanitized =
             attrs
-            |> Map.drop(["media", "upload_id", "uploadId"])
+            |> Map.drop(["media", :media, "upload_id", :upload_id, "uploadId", :uploadId])
+            |> maybe_put_caption_body(caption)
 
-          {payload, sanitized}
+          {normalized_payload, sanitized}
 
         {:error, reason} -> Repo.rollback(reason)
       end
@@ -1114,6 +1118,115 @@ defmodule Messngr.Chat do
   end
 
   defp maybe_resolve_media(_kind, _conversation_id, _profile_id, attrs), do: {nil, attrs}
+
+  defp normalize_media_payload(kind, payload) do
+    media = Map.get(payload, "media") || %{}
+
+    normalized_caption =
+      media
+      |> Map.get("caption")
+      |> Kernel.||(media["description"])
+      |> case do
+        nil -> nil
+        value when is_binary(value) -> String.trim(value)
+        _ -> nil
+      end
+
+    normalized_thumbnail = normalize_thumbnail(media)
+    normalized_waveform = normalize_waveform(media)
+
+    media =
+      media
+      |> Map.drop(["description", "waveForm", "thumbnailUrl"])
+      |> maybe_put_string("caption", normalized_caption)
+      |> maybe_put_map("thumbnail", normalized_thumbnail)
+      |> maybe_put_waveform(normalized_waveform)
+
+    %{"media" => media}
+    |> Map.merge(Map.drop(payload, ["media", :media]))
+    |> maybe_put_media_body(kind, normalized_caption)
+  end
+
+  defp normalize_thumbnail(media) do
+    thumb = media["thumbnail"] || media["thumbnailUrl"]
+
+    cond do
+      is_map(thumb) ->
+        normalized = Map.new(thumb, fn {k, v} -> {to_string(k), v} end)
+        object_key = normalized["objectKey"] || normalized["object_key"]
+        content_type = normalized["contentType"] || normalized["content_type"]
+
+        normalized
+        |> Map.drop(["object_key", "content_type"])
+        |> maybe_put_string("objectKey", object_key)
+        |> maybe_put_string("bucket", normalized["bucket"])
+        |> maybe_put_string("contentType", content_type)
+
+      is_binary(thumb) ->
+        %{"url" => thumb, "width" => media["width"], "height" => media["height"]}
+
+      true ->
+        nil
+    end
+  end
+
+  defp normalize_waveform(media) do
+    wave = media["waveform"] || media["waveForm"]
+
+    cond do
+      is_list(wave) -> Enum.map(wave, &normalize_waveform_point/1)
+      true -> nil
+    end
+  end
+
+  defp normalize_waveform_point(value) when is_number(value), do: clamp(round(value), 0, 100)
+
+  defp normalize_waveform_point(_), do: nil
+
+  defp maybe_put_waveform(media, nil), do: Map.delete(media, "waveform")
+
+  defp maybe_put_waveform(media, waveform) do
+    clean =
+      waveform
+      |> Enum.filter(&is_integer/1)
+      |> Enum.take(512)
+    if clean == [] do
+      Map.delete(media, "waveform")
+    else
+      Map.put(media, "waveform", clean)
+    end
+  end
+
+  defp maybe_put_string(map, _key, nil), do: map
+  defp maybe_put_string(map, key, value) when is_binary(value) and value != "" do
+    Map.put(map, key, value)
+  end
+  defp maybe_put_string(map, key, _value), do: Map.delete(map, key)
+
+  defp maybe_put_map(map, _key, nil), do: map
+  defp maybe_put_map(map, key, value) when is_map(value), do: Map.put(map, key, value)
+  defp maybe_put_map(map, key, _), do: Map.delete(map, key)
+
+  defp maybe_put_media_body(payload, kind, caption) when kind in [:image, :video, :audio, :voice, :file] do
+    if caption && caption != "" do
+      Map.put(payload, "body", caption)
+    else
+      payload
+    end
+  end
+
+  defp maybe_put_media_body(payload, _kind, _caption), do: payload
+
+  defp maybe_put_caption_body(attrs, caption) do
+    cond do
+      is_map(attrs) and is_binary(caption) and caption != "" -> Map.put(attrs, "body", caption)
+      true -> attrs
+    end
+  end
+
+  defp clamp(value, min, max) when value < min, do: min
+  defp clamp(value, min, max) when value > max, do: max
+  defp clamp(value, _min, _max), do: value
 
   defp merge_payload(base, nil), do: base || %{}
 

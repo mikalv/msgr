@@ -1,6 +1,15 @@
 # Changelog
 
 ## Unreleased
+- Utvidet mediasystemet med nye skjema-felter (dimensjoner, SHA-256, retention),
+  nye opplastingskategorier (image, file, voice, thumbnail) og presignerte
+  URL-instruksjoner for forhåndsgenererte thumbnails.
+- Messngr.Chat validerer nå mediepayloader (captions, thumbnails, waveform),
+  normaliserer metadata og eksponerer `media`-feltet i `MessageJSON` med nye
+  ExUnit-tester for både chat- og mediastrømmen.
+- Flutter-klienten har fått ny opplastingsflyt (drag & drop, kamera, voice),
+  forhåndsvisninger i `ChatBubble`, helper for medieopplasting og oppdaterte
+  widget- og modelltester.
 - Reintroduced the chat backlog broadcast helper so `message:sync` emits shared
   cursor pages over PubSub again, with backend regression tests.
 - Added configurable TTL cleanup for conversation watcher lists so inactive

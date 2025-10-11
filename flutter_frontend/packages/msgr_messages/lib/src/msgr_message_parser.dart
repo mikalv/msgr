@@ -36,6 +36,8 @@ MsgrMessage msgrMessageFromMap(Map<String, dynamic> map) {
     case MsgrMessageKind.audio:
     case MsgrMessageKind.voice:
       return MsgrAudioMessage.fromMap(map);
+    case MsgrMessageKind.voice:
+      return MsgrAudioMessage.fromMap(map);
     case MsgrMessageKind.file:
       return MsgrFileMessage.fromMap(map);
     case MsgrMessageKind.location:

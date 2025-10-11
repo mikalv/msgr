@@ -32,7 +32,13 @@ defmodule MessngrWeb.MessageControllerTest do
 
     assert %{
              "data" => [
-               %{"body" => "Hei", "type" => "text", "payload" => %{}, "id" => message_id}
+               %{
+                 "body" => "Hei",
+                 "type" => "text",
+                 "payload" => %{},
+                 "media" => %{},
+                 "id" => message_id
+               }
              ],
              "meta" => %{
                "start_cursor" => ^message_id,
@@ -62,8 +68,10 @@ defmodule MessngrWeb.MessageControllerTest do
       })
 
     %{"data" => %{"id" => upload_id, "upload" => upload_info}} = json_response(conn_upload, 201)
-    assert upload_info["upload"]["method"] == "PUT"
-    assert upload_info["objectKey"]
+    assert upload_info["method"] == "PUT"
+    assert upload_info["object_key"]
+    assert upload_info["retention_expires_at"]
+    assert upload_info["thumbnail_upload"] == nil
 
     conn_message =
       post(conn, ~p"/api/conversations/#{conversation.id}/messages", %{
@@ -72,17 +80,21 @@ defmodule MessngrWeb.MessageControllerTest do
           body: "Hør på dette",
           media: %{
             upload_id: upload_id,
-            durationMs: 1200
+            durationMs: 1200,
+            caption: "Hør på dette",
+            waveform: [0, 10, 20]
           }
         }
       })
 
-    assert %{"data" => %{"type" => "audio", "payload" => %{"media" => media}}} =
+    assert %{"data" => %{"type" => "audio", "payload" => %{"media" => media}, "media" => media_view}} =
              json_response(conn_message, 201)
 
     assert media["durationMs"] == 1200
-    assert media["url"] =~ upload_info["objectKey"]
+    assert media["url"] =~ upload_info["object_key"]
     assert media["retention"]["expiresAt"]
+    assert media["waveform"] == [0, 10, 20]
+    assert media_view == media
     assert Media.consume_upload(upload_id, conversation.id, profile.id, %{}) == {:error, :already_consumed}
   end
 end

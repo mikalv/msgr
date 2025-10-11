@@ -124,7 +124,7 @@ void main() {
 
     expect(find.textContaining('fil.txt'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.cancel));
+    await tester.tap(find.byIcon(Icons.close).first);
     await tester.pumpAndSettle();
 
     expect(find.textContaining('fil.txt'), findsNothing);

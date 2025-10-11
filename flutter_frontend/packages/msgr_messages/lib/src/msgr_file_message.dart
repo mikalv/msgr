@@ -26,6 +26,43 @@ class MsgrFileMessage extends MsgrAuthoredMessage {
     super.theme,
   }) : super(kind: MsgrMessageKind.file);
 
+  /// Public URL used to download the file attachment.
+  final String url;
+
+  /// Name of the file presented to the user.
+  final String fileName;
+
+  /// Optional MIME type reported by the backend.
+  final String? mimeType;
+
+  /// File size in bytes.
+  final int? byteSize;
+
+  /// Optional caption supplied by the author.
+  final String? caption;
+
+  /// Recreates a [MsgrFileMessage] from a serialised map.
+  factory MsgrFileMessage.fromMap(Map<String, dynamic> map) {
+    final author = MsgrAuthoredMessage.readAuthorMap(map);
+    return MsgrFileMessage(
+      id: map['id'] as String,
+      url: map['url'] as String? ?? '',
+      fileName: map['fileName'] as String? ?? map['name'] as String? ?? '',
+      mimeType: map['mimeType'] as String? ?? map['contentType'] as String?,
+      byteSize: (map['byteSize'] as num?)?.toInt(),
+      caption: map['caption'] as String?,
+      profileId: author.profileId,
+      profileName: author.profileName,
+      profileMode: author.profileMode,
+      status: author.status,
+      sentAt: author.sentAt,
+      insertedAt: author.insertedAt,
+      isLocal: author.isLocal,
+      theme: MsgrMessage.readTheme(map),
+    );
+  }
+
+  /// Creates a copy with the provided overrides.
   /// Download URL for the file resource.
   final String url;
 
@@ -52,6 +89,9 @@ class MsgrFileMessage extends MsgrAuthoredMessage {
     String? id,
     String? url,
     String? fileName,
+    String? mimeType,
+    int? byteSize,
+    String? caption,
     int? byteSize,
     String? mimeType,
     String? caption,
