@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added configurable TTL cleanup for conversation watcher lists so inactive
+  viewers fall out of the PubSub feed automatically, with backend tests and
+  refreshed documentation.
 - Dokumentert Taskku-produktivitetsappen som referanse for bedriftsmodus med ny
   forskningsfil som kobler UI-mønstre til eksisterende API-er og bridge-strategi,
   og oppdatert med plan for å holde produktivitetsmoduler adskilt fra kjernchat i

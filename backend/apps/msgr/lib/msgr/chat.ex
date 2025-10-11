@@ -620,7 +620,9 @@ defmodule Messngr.Chat do
     ensure_participant!(conversation_id, profile_id)
 
     table = ensure_watcher_table!()
-    :ets.insert(table, {conversation_id, profile_id})
+    purge_expired_watchers(conversation_id)
+    :ets.match_delete(table, {conversation_id, profile_id, :_})
+    :ets.insert(table, {conversation_id, profile_id, current_time_ms()})
 
     payload = watcher_payload(conversation_id)
     broadcast_watchers(conversation_id, payload)
@@ -629,7 +631,7 @@ defmodule Messngr.Chat do
 
   def unwatch_conversation(conversation_id, profile_id) do
     table = ensure_watcher_table!()
-    :ets.delete_object(table, {conversation_id, profile_id})
+    :ets.match_delete(table, {conversation_id, profile_id, :_})
 
     payload = watcher_payload(conversation_id)
     broadcast_watchers(conversation_id, payload)
@@ -830,6 +832,7 @@ defmodule Messngr.Chat do
   end
 
   defp watcher_payload(conversation_id) do
+    purge_expired_watchers(conversation_id)
     profiles = conversation_watcher_profiles(conversation_id)
 
     watchers = Enum.map(profiles, &watcher_profile_payload/1)
@@ -845,11 +848,25 @@ defmodule Messngr.Chat do
   end
 
   defp watcher_ids(conversation_id) do
-    ensure_watcher_table!()
+    table = ensure_watcher_table!()
+
+    now = current_time_ms()
+    ttl = watcher_ttl_ms()
 
     conversation_id
-    |> :ets.lookup(@watcher_table)
-    |> Enum.map(fn {^conversation_id, profile_id} -> profile_id end)
+    |> :ets.lookup(table)
+    |> Enum.reduce([], fn
+      {^conversation_id, profile_id, inserted_at}, acc ->
+        if expired_watcher?(inserted_at, now, ttl) do
+          :ets.delete_object(table, {conversation_id, profile_id, inserted_at})
+          acc
+        else
+          [profile_id | acc]
+        end
+
+      _other, acc ->
+        acc
+    end)
     |> Enum.uniq()
   end
 
@@ -872,6 +889,44 @@ defmodule Messngr.Chat do
     )
 
     :ok
+  end
+
+  defp purge_expired_watchers(conversation_id) do
+    table = ensure_watcher_table!()
+    ttl = watcher_ttl_ms()
+    now = current_time_ms()
+
+    :ets.lookup(table, conversation_id)
+    |> Enum.each(fn
+      {^conversation_id, profile_id, inserted_at} when expired_watcher?(inserted_at, now, ttl) ->
+        :ets.delete_object(table, {conversation_id, profile_id, inserted_at})
+
+      _ ->
+        :ok
+    end)
+
+    :ok
+  end
+
+  defp expired_watcher?(inserted_at, now, ttl) when is_integer(ttl) do
+    now - inserted_at > ttl
+  end
+
+  defp watcher_ttl_ms do
+    case Application.get_env(:msgr, :conversation_watcher_ttl_ms, 30_000) do
+      value when is_integer(value) and value >= 0 -> value
+      value when is_binary(value) ->
+        case Integer.parse(value) do
+          {int, _} when int >= 0 -> int
+          _ -> 30_000
+        end
+
+      _ -> 30_000
+    end
+  end
+
+  defp current_time_ms do
+    System.system_time(:millisecond)
   end
 
 

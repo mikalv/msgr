@@ -308,4 +308,28 @@ defmodule Messngr.ChatTest do
     assert unwatch_payload.count == 1
     refute Enum.any?(unwatch_payload.watchers, &(&1.id == profile_a.id))
   end
+
+  test "watchers expire after ttl", %{profile_a: profile_a, profile_b: profile_b} do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+
+    previous = Application.get_env(:msgr, :conversation_watcher_ttl_ms)
+    Application.put_env(:msgr, :conversation_watcher_ttl_ms, 10)
+
+    on_exit(fn ->
+      if is_nil(previous) do
+        Application.delete_env(:msgr, :conversation_watcher_ttl_ms)
+      else
+        Application.put_env(:msgr, :conversation_watcher_ttl_ms, previous)
+      end
+    end)
+
+    {:ok, payload} = Chat.watch_conversation(conversation.id, profile_a.id)
+    assert payload.count == 1
+
+    Process.sleep(30)
+
+    payload = Chat.list_watchers(conversation.id)
+    assert payload.count == 0
+    assert payload.watchers == []
+  end
 end
