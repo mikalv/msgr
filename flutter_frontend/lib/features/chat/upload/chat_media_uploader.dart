@@ -110,7 +110,8 @@ class ChatMediaUploader {
 
     final message = <String, dynamic>{
       'kind': kind,
-      if (trimmedCaption != null && trimmedCaption.isNotEmpty) 'body': trimmedCaption,
+      if (trimmedCaption != null && trimmedCaption.isNotEmpty)
+        'body': trimmedCaption,
       'media': metadata,
     };
 
@@ -151,7 +152,8 @@ class ChatMediaUploader {
 
     final message = <String, dynamic>{
       'kind': 'voice',
-      if (trimmedCaption != null && trimmedCaption.isNotEmpty) 'body': trimmedCaption,
+      if (trimmedCaption != null && trimmedCaption.isNotEmpty)
+        'body': trimmedCaption,
       'media': metadata,
     };
 
@@ -201,7 +203,8 @@ class ChatMediaUploader {
     }
   }
 
-  Future<_ThumbnailData?> _generateVideoThumbnail(ComposerAttachment attachment) async {
+  Future<_ThumbnailData?> _generateVideoThumbnail(
+      ComposerAttachment attachment) async {
     try {
       if (attachment.path == null) {
         return null;
@@ -221,15 +224,18 @@ class ChatMediaUploader {
   }
 
   Future<void> _putObject(PresignedUploadInfo info, Uint8List bytes) async {
-    final response = await _http.put(info.url, headers: info.headers, body: bytes);
+    final response =
+        await _http.put(info.url, headers: info.headers, body: bytes);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return;
     }
     throw ApiException(response.statusCode, response.body);
   }
 
-  Future<void> _putObjectWithBytes(ThumbnailUploadInfo info, Uint8List bytes) async {
-    final response = await _http.put(info.url, headers: info.headers, body: bytes);
+  Future<void> _putObjectWithBytes(
+      ThumbnailUploadInfo info, Uint8List bytes) async {
+    final response =
+        await _http.put(info.url, headers: info.headers, body: bytes);
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return;
     }

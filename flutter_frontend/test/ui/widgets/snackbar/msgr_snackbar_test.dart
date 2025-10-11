@@ -5,8 +5,9 @@ import 'package:msgr_messages/msgr_messages.dart';
 
 void main() {
   group('MsgrSnackBar', () {
-    testWidgets('renders title, body and action with default theme', (tester) async {
-      const message = MsgrSnackbarMessage(
+    testWidgets('renders title, body and action with default theme',
+        (tester) async {
+      final message = MsgrSnackbarMessage(
         id: 'success',
         title: 'Alt lagret!',
         body: 'Vi synkroniserte meldingen med alle enheter.',
@@ -60,7 +61,7 @@ void main() {
         },
       );
 
-      const message = MsgrSnackbarMessage(
+      final message = MsgrSnackbarMessage(
         id: 'error',
         title: 'Kunne ikke lagre',
         intent: MsgrSnackbarIntent.error,
@@ -95,7 +96,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       final snackBarFinder = find.byWidgetPredicate(
-        (widget) => widget is SnackBar && widget.margin == const EdgeInsets.all(24),
+        (widget) =>
+            widget is SnackBar && widget.margin == const EdgeInsets.all(24),
       );
       expect(snackBarFinder, findsOneWidget);
       expect(find.byIcon(Icons.close_rounded), findsOneWidget);
