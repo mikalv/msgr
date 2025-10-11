@@ -1,6 +1,13 @@
 # Changelog
 
 ## Unreleased
+- Hooked Flutter chat realtime flows into typing/read/reaction/pin events with
+  a richer `ChatSocket`, notifier-aware `ChatViewModel`, pinned/thread UI
+  toggles, and new integration/unit tests for realtime behaviour.
+- Added message reactions, threaded replies, pinned state, and read tracking to the
+  chat backend with PubSub broadcasts, upgraded Phoenix channel presence/typing
+  flow, and Flutter notifiers/widgets for typing indicators, reaction aggregates,
+  and pinned banners with accompanying tests.
 - Designet et modulært Flutter chat-UI-kit (kanalliste, trådvisning, reaksjoner, presence, tilkoblingsbanner) og integrerte det i `ChatPage` og en ny `ChannelListPage`-demo.
 - Utvidet `ChatComposer` med emoji-velger, slash-kommandoer, filvedlegg, simulert taleopptak og forbedret utkast-/feilhåndtering samt nye widgettester.
 - Implementerte hurtigbuffer for samtaler og meldinger med Hive/Sembast, offline statusbanner og integrasjonstester for fallback i `ChatViewModel`.

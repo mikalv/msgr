@@ -17,6 +17,10 @@ Denne notatfilen beskriver hvordan den nye responsive hjemmeskjermen i Flutter-a
 - `_HomeActionStrip` tilbyr raske snarveier (meny, innstillinger, invitasjon, nytt rom, ny samtale).
 - `_HomeChatPanel` legger inn `ChatPage` i et kort med avrundede hjørner og skygge på større skjermer.
 - `ChatPage` bruker det modulære chat-UI-kitet med kanalpanel, trådvisning og tilkoblingsbanner. På smale skjermer rendres kanallisten over tråden.
+- Trådvisningen viser typing-indikator, reaksjonsaggregat og festede meldinger
+  gjennom dedikerte notifiers (`TypingParticipantsNotifier`,
+  `ReactionAggregatorNotifier`, `PinnedMessagesNotifier`) og widgetene
+  `TypingIndicator` og `PinnedMessageBanner`.
 
 ## Tester
 

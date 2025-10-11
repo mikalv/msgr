@@ -8,7 +8,14 @@ defmodule Messngr.Chat do
   alias Phoenix.PubSub
 
   alias Messngr.{Accounts, Media, Repo}
-  alias Messngr.Chat.{Conversation, Message, Participant}
+  alias Messngr.Chat.{
+    Conversation,
+    Message,
+    MessageReaction,
+    MessageThread,
+    Participant,
+    PinnedMessage
+  }
 
   @conversation_topic_prefix "conversation"
 
@@ -82,10 +89,242 @@ defmodule Messngr.Chat do
       end
     end)
     |> case do
+        {:ok, message} ->
+          broadcast_message(message)
+          {:ok, message}
+        {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @spec react_to_message(binary(), binary(), binary(), String.t(), map()) ::
+          {:ok, MessageReaction.t()} | {:error, term()}
+  def react_to_message(conversation_id, profile_id, message_id, emoji, opts \\ %{}) do
+    Repo.transaction(fn ->
+      _participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+
+      attrs = %{
+        message_id: message.id,
+        profile_id: profile_id,
+        emoji: normalize_emoji(emoji),
+        metadata: normalize_metadata(opts[:metadata] || Map.get(opts, "metadata"))
+      }
+
+      %MessageReaction{}
+      |> MessageReaction.changeset(attrs)
+      |> Repo.insert(
+        conflict_target: [:message_id, :profile_id, :emoji],
+        on_conflict: {:replace, [:metadata, :updated_at]}
+      )
+      |> case do
+        {:ok, reaction} -> Repo.preload(reaction, :profile)
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, reaction} ->
+        broadcast_reaction_added(conversation_id, reaction)
+        {:ok, reaction}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec remove_reaction(binary(), binary(), binary(), String.t()) ::
+          {:ok, :removed | :noop} | {:error, term()}
+  def remove_reaction(conversation_id, profile_id, message_id, emoji) do
+    Repo.transaction(fn ->
+      _participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+      normalized = normalize_emoji(emoji)
+
+      case Repo.get_by(MessageReaction,
+             message_id: message.id,
+             profile_id: profile_id,
+             emoji: normalized
+           ) do
+        nil ->
+          :noop
+
+        %MessageReaction{} = reaction ->
+          {:ok, _} = Repo.delete(reaction)
+          {:removed, reaction}
+      end
+    end)
+    |> case do
+      {:ok, {:removed, reaction}} ->
+        broadcast_reaction_removed(conversation_id, reaction)
+        {:ok, :removed}
+
+      {:ok, :noop} ->
+        {:ok, :noop}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec pin_message(binary(), binary(), binary(), map()) ::
+          {:ok, PinnedMessage.t()} | {:error, term()}
+  def pin_message(conversation_id, profile_id, message_id, opts \\ %{}) do
+    Repo.transaction(fn ->
+      _participant = ensure_participant!(conversation_id, profile_id)
+      _message = fetch_message!(conversation_id, message_id)
+
+      attrs = %{
+        conversation_id: conversation_id,
+        message_id: message_id,
+        pinned_by_id: profile_id,
+        pinned_at: opts[:pinned_at] || Map.get(opts, "pinned_at") || DateTime.utc_now(),
+        metadata: normalize_metadata(opts[:metadata] || Map.get(opts, "metadata"))
+      }
+
+      %PinnedMessage{}
+      |> PinnedMessage.changeset(attrs)
+      |> Repo.insert(
+        conflict_target: [:conversation_id, :message_id],
+        on_conflict: {:replace, [:pinned_by_id, :pinned_at, :metadata, :updated_at]}
+      )
+      |> case do
+        {:ok, pinned} -> Repo.preload(pinned, [:message, :pinned_by])
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, pinned} ->
+        broadcast_message_pinned(conversation_id, pinned)
+        {:ok, pinned}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec unpin_message(binary(), binary(), binary()) :: {:ok, :unpinned | :noop} | {:error, term()}
+  def unpin_message(conversation_id, profile_id, message_id) do
+    Repo.transaction(fn ->
+      _participant = ensure_participant!(conversation_id, profile_id)
+      _message = fetch_message!(conversation_id, message_id)
+
+      case Repo.get_by(PinnedMessage,
+             conversation_id: conversation_id,
+             message_id: message_id
+           ) do
+        nil ->
+          :noop
+
+        %PinnedMessage{} = pinned ->
+          {:ok, _} = Repo.delete(pinned)
+          {:unpinned, pinned}
+      end
+    end)
+    |> case do
+      {:ok, {:unpinned, pinned}} ->
+        broadcast_message_unpinned(conversation_id, pinned)
+        {:ok, :unpinned}
+
+      {:ok, :noop} ->
+        {:ok, :noop}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec mark_message_read(binary(), binary(), binary()) ::
+          {:ok, Participant.t()} | {:error, term()}
+  def mark_message_read(conversation_id, profile_id, message_id) do
+    Repo.transaction(fn ->
+      participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+
+      read_at = DateTime.utc_now()
+      attrs = %{last_read_at: read_at}
+
+      participant
+      |> Participant.changeset(attrs)
+      |> Repo.update()
+      |> case do
+        {:ok, updated} -> {updated, message, read_at}
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, {participant, message, read_at}} ->
+        broadcast_message_read(conversation_id, participant.profile_id, message.id, read_at)
+        {:ok, participant}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec update_message(binary(), binary(), binary(), map()) ::
+          {:ok, Message.t()} | {:error, term()}
+  def update_message(conversation_id, profile_id, message_id, attrs) do
+    Repo.transaction(fn ->
+      participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+
+      if message.profile_id != participant.profile_id do
+        Repo.rollback(:forbidden)
+      end
+
+      update_attrs =
+        attrs
+        |> take_permitted_attrs([:body, :payload, :metadata])
+        |> maybe_normalize_metadata()
+        |> Map.put(:edited_at, DateTime.utc_now())
+
+      message
+      |> Message.changeset(update_attrs)
+      |> Repo.update()
+      |> case do
+        {:ok, updated} -> Repo.preload(updated, :profile)
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
       {:ok, message} ->
-        broadcast_message(message)
+        broadcast_message_updated(message)
         {:ok, message}
-      {:error, reason} -> {:error, reason}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec delete_message(binary(), binary(), binary(), map()) ::
+          {:ok, Message.t()} | {:error, term()}
+  def delete_message(conversation_id, profile_id, message_id, opts \\ %{}) do
+    Repo.transaction(fn ->
+      participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+
+      if message.profile_id != participant.profile_id do
+        Repo.rollback(:forbidden)
+      end
+
+      delete_attrs =
+        %{deleted_at: DateTime.utc_now()}
+        |> maybe_put_delete_metadata(opts)
+
+      message
+      |> Message.changeset(delete_attrs)
+      |> Repo.update()
+      |> case do
+        {:ok, deleted} -> Repo.preload(deleted, :profile)
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, message} ->
+        broadcast_message_deleted(message)
+        {:ok, message}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -160,6 +399,28 @@ defmodule Messngr.Chat do
       Messngr.PubSub,
       conversation_topic(message.conversation_id),
       {:message_created, message}
+    )
+
+    :ok
+  end
+
+  @doc false
+  def broadcast_message_updated(%Message{} = message) do
+    PubSub.broadcast(
+      Messngr.PubSub,
+      conversation_topic(message.conversation_id),
+      {:message_updated, message}
+    )
+
+    :ok
+  end
+
+  @doc false
+  def broadcast_message_deleted(%Message{} = message) do
+    PubSub.broadcast(
+      Messngr.PubSub,
+      conversation_topic(message.conversation_id),
+      {:message_deleted, %{message_id: message.id, deleted_at: message.deleted_at}}
     )
 
     :ok
@@ -369,5 +630,152 @@ defmodule Messngr.Chat do
           incoming
       end
     end)
+  end
+
+  defp fetch_message!(conversation_id, message_id) do
+    case Repo.get_by(Message, id: message_id, conversation_id: conversation_id) do
+      %Message{deleted_at: nil} = message -> message
+      %Message{deleted_at: _} -> Repo.rollback(:message_deleted)
+      nil -> Repo.rollback(:message_not_found)
+    end
+  end
+
+  defp normalize_emoji(nil), do: Repo.rollback(:invalid_emoji)
+
+  defp normalize_emoji(emoji) when is_binary(emoji) do
+    value = emoji |> String.trim()
+
+    if value == "" do
+      Repo.rollback(:invalid_emoji)
+    else
+      value
+    end
+  end
+
+  defp normalize_emoji(_emoji), do: Repo.rollback(:invalid_emoji)
+
+  defp normalize_metadata(nil), do: %{}
+  defp normalize_metadata(metadata) when is_map(metadata), do: metadata
+  defp normalize_metadata(_metadata), do: Repo.rollback(:invalid_metadata)
+
+  defp broadcast_reaction_added(conversation_id, %MessageReaction{} = reaction) do
+    broadcast_conversation_event(conversation_id, {:reaction_added, reaction_payload(reaction)})
+  end
+
+  defp broadcast_reaction_removed(conversation_id, %MessageReaction{} = reaction) do
+    broadcast_conversation_event(conversation_id, {:reaction_removed, reaction_payload(reaction)})
+  end
+
+  defp broadcast_message_pinned(conversation_id, %PinnedMessage{} = pinned) do
+    broadcast_conversation_event(conversation_id, {:message_pinned, pinned_payload(pinned)})
+  end
+
+  defp broadcast_message_unpinned(conversation_id, %PinnedMessage{} = pinned) do
+    broadcast_conversation_event(conversation_id, {:message_unpinned, pinned_payload(pinned)})
+  end
+
+  defp broadcast_message_read(conversation_id, profile_id, message_id, read_at) do
+    broadcast_conversation_event(conversation_id, {:message_read, %{
+      profile_id: profile_id,
+      message_id: message_id,
+      read_at: read_at
+    }})
+  end
+
+  defp broadcast_conversation_event(conversation_id, event) do
+    payload =
+      case event do
+        {:reaction_added, reaction} ->
+          {:reaction_added, enrich_reaction_event(reaction)}
+
+        {:reaction_removed, reaction} ->
+          {:reaction_removed, enrich_reaction_event(reaction)}
+
+        {:message_pinned, pinned} ->
+          {:message_pinned, pinned}
+
+        {:message_unpinned, pinned} ->
+          {:message_unpinned, pinned}
+
+        {:message_read, attrs} ->
+          {:message_read, attrs}
+
+        other ->
+          other
+      end
+
+    PubSub.broadcast(Messngr.PubSub, conversation_topic(conversation_id), payload)
+    :ok
+  end
+
+  defp enrich_reaction_event(reaction) do
+    message_id = Map.fetch!(reaction, :message_id)
+    Map.put(reaction, :aggregates, reaction_aggregates(message_id))
+  end
+
+  defp reaction_payload(%MessageReaction{} = reaction) do
+    %{
+      id: reaction.id,
+      message_id: reaction.message_id,
+      profile_id: reaction.profile_id,
+      emoji: reaction.emoji,
+      metadata: reaction.metadata,
+      inserted_at: reaction.inserted_at,
+      updated_at: reaction.updated_at
+    }
+  end
+
+  defp pinned_payload(%PinnedMessage{} = pinned) do
+    %{
+      id: pinned.id,
+      conversation_id: pinned.conversation_id,
+      message_id: pinned.message_id,
+      pinned_by_id: pinned.pinned_by_id,
+      pinned_at: pinned.pinned_at,
+      metadata: pinned.metadata
+    }
+  end
+
+  defp reaction_aggregates(message_id) do
+    MessageReaction
+    |> where([r], r.message_id == ^message_id)
+    |> Repo.all()
+    |> Enum.group_by(& &1.emoji)
+    |> Enum.map(fn {emoji, reactions} ->
+      %{
+        emoji: emoji,
+        count: Enum.count(reactions),
+        profile_ids: reactions |> Enum.map(& &1.profile_id) |> Enum.uniq()
+      }
+    end)
+  end
+
+  defp take_permitted_attrs(attrs, keys) do
+    Enum.reduce(keys, %{}, fn key, acc ->
+      value = Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key))
+
+      if is_nil(value) do
+        acc
+      else
+        Map.put(acc, key, value)
+      end
+    end)
+  end
+
+  defp maybe_normalize_metadata(attrs) do
+    case Map.fetch(attrs, :metadata) do
+      {:ok, metadata} -> Map.put(attrs, :metadata, normalize_metadata(metadata))
+      :error -> attrs
+    end
+  end
+
+  defp maybe_put_delete_metadata(map, opts) do
+    metadata = opts[:metadata] || Map.get(opts, "metadata")
+
+    if is_nil(metadata) do
+      map
+    else
+      Map.put(map, :metadata, normalize_metadata(metadata))
+    end
   end
 end

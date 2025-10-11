@@ -130,4 +130,140 @@ defmodule Messngr.ChatTest do
     assert message.payload["media"]["contentType"] == "audio/mpeg"
     assert %Upload{status: :consumed} = Repo.get!(Upload, upload.id)
   end
+
+  describe "message interactions" do
+    setup %{profile_a: profile_a, profile_b: profile_b} do
+      {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+      {:ok, message} = Chat.send_message(conversation.id, profile_a.id, %{"body" => "Hei"})
+
+      {:ok,
+       %{
+         conversation: conversation,
+         message: message,
+         author: profile_a,
+         other: profile_b
+       }}
+    end
+
+    test "react_to_message/5 persists reaction and broadcasts", %{
+      conversation: conversation,
+      message: message,
+      author: author
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      assert {:ok, reaction} =
+               Chat.react_to_message(conversation.id, author.id, message.id, "👍")
+
+      assert reaction.emoji == "👍"
+      assert reaction.profile_id == author.id
+
+      assert_receive {:reaction_added, payload}
+      assert payload[:emoji] == "👍"
+
+      aggregate = Enum.find(payload[:aggregates], &(&1[:emoji] == "👍"))
+      assert aggregate[:count] == 1
+      assert author.id in aggregate[:profile_ids]
+    end
+
+    test "remove_reaction/4 removes reaction and broadcasts", %{
+      conversation: conversation,
+      message: message,
+      author: author
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      {:ok, _} = Chat.react_to_message(conversation.id, author.id, message.id, "❤️")
+
+      assert {:ok, :removed} =
+               Chat.remove_reaction(conversation.id, author.id, message.id, "❤️")
+
+      assert_receive {:reaction_removed, payload}
+      assert payload[:emoji] == "❤️"
+      refute Enum.any?(payload[:aggregates], &(&1[:emoji] == "❤️" && &1[:count] > 0))
+    end
+
+    test "pin_message/4 stores pin and broadcasts", %{
+      conversation: conversation,
+      message: message,
+      author: author
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      assert {:ok, pinned} =
+               Chat.pin_message(conversation.id, author.id, message.id, %{"metadata" => %{"section" => "important"}})
+
+      assert pinned.pinned_by_id == author.id
+      assert pinned.metadata == %{"section" => "important"}
+
+      assert_receive {:message_pinned, payload}
+      assert payload[:message_id] == message.id
+      assert payload[:pinned_by_id] == author.id
+    end
+
+    test "unpin_message/3 broadcasts removal", %{
+      conversation: conversation,
+      message: message,
+      author: author
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+      {:ok, _} = Chat.pin_message(conversation.id, author.id, message.id)
+
+      assert {:ok, :unpinned} = Chat.unpin_message(conversation.id, author.id, message.id)
+
+      assert_receive {:message_unpinned, payload}
+      assert payload[:message_id] == message.id
+    end
+
+    test "mark_message_read/3 updates participant and broadcasts", %{
+      conversation: conversation,
+      message: message,
+      other: other
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      assert {:ok, participant} =
+               Chat.mark_message_read(conversation.id, other.id, message.id)
+
+      assert participant.last_read_at
+
+      assert_receive {:message_read, payload}
+      assert payload[:profile_id] == other.id
+      assert payload[:message_id] == message.id
+    end
+
+    test "update_message/4 updates body and broadcasts", %{
+      conversation: conversation,
+      message: message,
+      author: author
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      assert {:ok, updated} =
+               Chat.update_message(conversation.id, author.id, message.id, %{"body" => "Oppdatert"})
+
+      assert updated.body == "Oppdatert"
+      assert updated.edited_at
+
+      assert_receive {:message_updated, broadcasted}
+      assert broadcasted.body == "Oppdatert"
+    end
+
+    test "delete_message/4 marks message deleted and broadcasts", %{
+      conversation: conversation,
+      message: message,
+      author: author
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      assert {:ok, deleted} =
+               Chat.delete_message(conversation.id, author.id, message.id)
+
+      assert deleted.deleted_at
+
+      assert_receive {:message_deleted, payload}
+      assert payload[:message_id] == message.id
+      assert payload[:deleted_at]
+    end
+  end
 end
