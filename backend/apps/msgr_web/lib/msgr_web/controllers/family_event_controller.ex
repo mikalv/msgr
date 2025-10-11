@@ -1,16 +1,16 @@
 defmodule MessngrWeb.FamilyEventController do
   use MessngrWeb, :controller
 
-  alias Messngr
+  alias FamilySpace
 
   action_fallback MessngrWeb.FallbackController
 
   def index(conn, %{"family_id" => family_id} = params) do
     current_profile = conn.assigns.current_profile
 
-    with _membership <- Messngr.ensure_family_membership(family_id, current_profile.id),
+    with _membership <- FamilySpace.ensure_membership(family_id, current_profile.id),
          {:ok, filters} <- build_filters(params) do
-      events = Messngr.list_family_events(family_id, filters)
+      events = FamilySpace.list_events(family_id, filters)
       render(conn, :index, events: events)
     end
   rescue
@@ -21,7 +21,7 @@ defmodule MessngrWeb.FamilyEventController do
     current_profile = conn.assigns.current_profile
 
     with {:ok, attrs} <- normalize_event_params(event_params, required: [:starts_at, :title]),
-         {:ok, event} <- Messngr.create_family_event(family_id, current_profile.id, attrs) do
+         {:ok, event} <- FamilySpace.create_event(family_id, current_profile.id, attrs) do
       conn
       |> put_status(:created)
       |> render(:show, event: event)
@@ -33,8 +33,8 @@ defmodule MessngrWeb.FamilyEventController do
   def show(conn, %{"family_id" => family_id, "id" => event_id}) do
     current_profile = conn.assigns.current_profile
 
-    with _membership <- Messngr.ensure_family_membership(family_id, current_profile.id),
-         event <- Messngr.get_family_event!(family_id, event_id) do
+    with _membership <- FamilySpace.ensure_membership(family_id, current_profile.id),
+         event <- FamilySpace.get_event!(family_id, event_id) do
       render(conn, :show, event: event)
     end
   rescue
@@ -45,7 +45,7 @@ defmodule MessngrWeb.FamilyEventController do
     current_profile = conn.assigns.current_profile
 
     with {:ok, attrs} <- normalize_event_params(event_params),
-         {:ok, event} <- Messngr.update_family_event(family_id, event_id, current_profile.id, attrs) do
+         {:ok, event} <- FamilySpace.update_event(family_id, event_id, current_profile.id, attrs) do
       render(conn, :show, event: event)
     end
   rescue
@@ -55,7 +55,7 @@ defmodule MessngrWeb.FamilyEventController do
   def delete(conn, %{"family_id" => family_id, "id" => event_id}) do
     current_profile = conn.assigns.current_profile
 
-    with {:ok, _} <- Messngr.delete_family_event(family_id, event_id, current_profile.id) do
+    with {:ok, _} <- FamilySpace.delete_event(family_id, event_id, current_profile.id) do
       send_resp(conn, :no_content, "")
     end
   rescue

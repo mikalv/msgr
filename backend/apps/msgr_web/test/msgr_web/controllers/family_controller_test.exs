@@ -2,7 +2,7 @@ defmodule MessngrWeb.FamilyControllerTest do
   use MessngrWeb.ConnCase, async: true
 
   alias Messngr.Accounts
-  alias Messngr
+  alias FamilySpace
 
   setup %{conn: conn} do
     {:ok, account} = Accounts.create_account(%{"display_name" => "Forelder"})
@@ -23,7 +23,7 @@ defmodule MessngrWeb.FamilyControllerTest do
   end
 
   test "lists families for current profile", %{conn: conn, profile: profile} do
-    {:ok, family} = Messngr.create_family(profile.id, %{"name" => "Familien"})
+    {:ok, family} = FamilySpace.create_space(profile.id, %{"name" => "Familien", "kind" => "family"})
 
     conn = get(conn, ~p"/api/families")
 
@@ -31,7 +31,7 @@ defmodule MessngrWeb.FamilyControllerTest do
   end
 
   test "manages events", %{conn: conn, profile: profile} do
-    {:ok, family} = Messngr.create_family(profile.id, %{"name" => "Familie"})
+    {:ok, family} = FamilySpace.create_space(profile.id, %{"name" => "Familie", "kind" => "family"})
     starts_at = DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
 
     conn =
@@ -39,7 +39,7 @@ defmodule MessngrWeb.FamilyControllerTest do
         event: %{title: "Middag", starts_at: starts_at}
       })
 
-    assert %{"data" => %{"title" => "Middag", "family_id" => ^family.id}} = json_response(conn, 201)
+    assert %{"data" => %{"title" => "Middag", "space_id" => ^family.id}} = json_response(conn, 201)
 
     conn = get(conn, ~p"/api/families/#{family.id}/events")
     assert %{"data" => [%{"title" => "Middag"}]} = json_response(conn, 200)

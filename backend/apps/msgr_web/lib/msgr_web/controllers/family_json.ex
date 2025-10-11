@@ -1,6 +1,6 @@
 defmodule MessngrWeb.FamilyJSON do
   alias Messngr.Accounts.Profile
-  alias Messngr.Family.{Family, Membership}
+  alias FamilySpace.{Membership, Space}
 
   def index(%{families: families}) do
     %{data: Enum.map(families, &family/1)}
@@ -10,11 +10,12 @@ defmodule MessngrWeb.FamilyJSON do
     %{data: family(family)}
   end
 
-  defp family(%Family{} = family) do
+  defp family(%Space{} = family) do
     %{
       id: family.id,
       name: family.name,
       slug: family.slug,
+      kind: family.kind,
       time_zone: family.time_zone,
       memberships: Enum.map(family.memberships, &membership/1)
     }

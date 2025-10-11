@@ -1,13 +1,13 @@
 defmodule MessngrWeb.FamilyController do
   use MessngrWeb, :controller
 
-  alias Messngr
+  alias FamilySpace
 
   action_fallback MessngrWeb.FallbackController
 
   def index(conn, _params) do
     current_profile = conn.assigns.current_profile
-    families = Messngr.list_families(current_profile.id)
+    families = FamilySpace.list_spaces(current_profile.id, kind: :family)
 
     render(conn, :index, families: families)
   end
@@ -15,7 +15,9 @@ defmodule MessngrWeb.FamilyController do
   def create(conn, %{"family" => family_params}) do
     current_profile = conn.assigns.current_profile
 
-    with {:ok, family} <- Messngr.create_family(current_profile.id, family_params) do
+    attrs = Map.put_new(family_params, :kind, :family)
+
+    with {:ok, family} <- FamilySpace.create_space(current_profile.id, attrs) do
       conn
       |> put_status(:created)
       |> render(:show, family: family)
@@ -25,8 +27,8 @@ defmodule MessngrWeb.FamilyController do
   def show(conn, %{"id" => family_id}) do
     current_profile = conn.assigns.current_profile
 
-    with _membership <- Messngr.ensure_family_membership(family_id, current_profile.id),
-         family <- Messngr.get_family!(family_id) do
+    with _membership <- FamilySpace.ensure_membership(family_id, current_profile.id),
+         family <- FamilySpace.get_space!(family_id) do
       render(conn, :show, family: family)
     end
   rescue

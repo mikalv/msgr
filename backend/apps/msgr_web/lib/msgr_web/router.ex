@@ -27,6 +27,15 @@ defmodule MessngrWeb.Router do
 
     resources "/families", FamilyController, only: [:index, :create, :show] do
       resources "/events", FamilyEventController, only: [:index, :create, :show, :update, :delete]
+
+      resources "/shopping_lists", FamilyShoppingListController,
+        only: [:index, :create, :show, :update, :delete] do
+        resources "/items", FamilyShoppingItemController, only: [:index, :create, :update, :delete]
+      end
+
+      resources "/todo_lists", FamilyTodoListController, only: [:index, :create, :show, :update, :delete] do
+        resources "/items", FamilyTodoItemController, only: [:index, :create, :update, :delete]
+      end
     end
   end
 

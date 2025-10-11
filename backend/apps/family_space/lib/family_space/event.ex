@@ -1,18 +1,18 @@
-defmodule Messngr.Family.Event do
+defmodule FamilySpace.Event do
   @moduledoc """
-  Hendelse i familiens delte kalender.
+  Calendar event attached to a collaborative space.
   """
 
   use Ecto.Schema
   import Ecto.Changeset
 
   alias Messngr.Accounts.Profile
-  alias Messngr.Family.Family
+
+  @type t :: %__MODULE__{}
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
-
-  schema "family_events" do
+  schema "space_events" do
     field :title, :string
     field :description, :string
     field :location, :string
@@ -21,7 +21,7 @@ defmodule Messngr.Family.Event do
     field :all_day, :boolean, default: false
     field :color, :string
 
-    belongs_to :family, Family
+    belongs_to :space, FamilySpace.Space
     belongs_to :creator, Profile, foreign_key: :created_by_profile_id
     belongs_to :updated_by, Profile, foreign_key: :updated_by_profile_id
 
@@ -32,7 +32,7 @@ defmodule Messngr.Family.Event do
   def changeset(event, attrs) do
     event
     |> cast(attrs, [
-      :family_id,
+      :space_id,
       :created_by_profile_id,
       :updated_by_profile_id,
       :title,
@@ -43,20 +43,18 @@ defmodule Messngr.Family.Event do
       :all_day,
       :color
     ])
-    |> validate_required([:family_id, :created_by_profile_id, :title, :starts_at, :ends_at])
-    |> validate_length(:title, max: 120)
-    |> validate_ends_after_start()
-    |> validate_format(:color, ~r/^#[0-9a-fA-F]{6}$/, message: "must be a hex color", allow_nil: true)
-  end
-
-  defp validate_ends_after_start(changeset) do
-    starts_at = get_field(changeset, :starts_at)
-    ends_at = get_field(changeset, :ends_at)
-
-    cond do
-      is_nil(starts_at) or is_nil(ends_at) -> changeset
-      DateTime.compare(ends_at, starts_at) in [:gt, :eq] -> changeset
-      true -> add_error(changeset, :ends_at, "must be after start")
-    end
+    |> validate_required([
+      :space_id,
+      :created_by_profile_id,
+      :updated_by_profile_id,
+      :title,
+      :starts_at,
+      :ends_at
+    ])
+    |> validate_length(:title, min: 1, max: 140)
+    |> validate_inclusion(:all_day, [true, false])
+    |> foreign_key_constraint(:space_id)
+    |> foreign_key_constraint(:created_by_profile_id)
+    |> foreign_key_constraint(:updated_by_profile_id)
   end
 end

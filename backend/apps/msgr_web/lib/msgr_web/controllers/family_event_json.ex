@@ -1,5 +1,5 @@
 defmodule MessngrWeb.FamilyEventJSON do
-  alias Messngr.Family.Event
+  alias FamilySpace.Event
 
   def index(%{events: events}) do
     %{data: Enum.map(events, &event/1)}
@@ -12,7 +12,8 @@ defmodule MessngrWeb.FamilyEventJSON do
   defp event(%Event{} = event) do
     %{
       id: event.id,
-      family_id: event.family_id,
+      space_id: event.space_id,
+      family_id: event.space_id,
       title: event.title,
       description: event.description,
       location: event.location,

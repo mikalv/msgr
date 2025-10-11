@@ -173,7 +173,7 @@ Denne siden dokumenterer forventet kontrakt mellom msgr-backend og Flutter-klien
 }
 ```
 
-### Familier og delt kalender
+### Familie-spaces med kalender, handleliste og todo
 
 `GET /api/families`
 
@@ -186,6 +186,7 @@ Returnerer alle familier den aktive profilen er medlem av.
       "id": "family-uuid",
       "name": "Team Berg",
       "slug": "team-berg",
+      "kind": "family",
       "time_zone": "Europe/Oslo",
       "memberships": [
         {
@@ -227,6 +228,7 @@ Filtrerer kalenderhendelser innenfor tidsintervallet. `from` og `to` er valgfrie
   "data": [
     {
       "id": "event-uuid",
+      "space_id": "family-uuid",
       "family_id": "family-uuid",
       "title": "Foreldremøte",
       "description": null,
@@ -268,6 +270,108 @@ Filtrerer kalenderhendelser innenfor tidsintervallet. `from` og `to` er valgfrie
 ```
 
 `PATCH /api/families/{family_id}/events/{event_id}` og `DELETE /api/families/{family_id}/events/{event_id}` krever medlemskap og oppdaterer eller fjerner hendelsen. `starts_at` og `ends_at` må være ISO8601.
+
+#### Handlelister
+
+`GET /api/families/{family_id}/shopping_lists`
+
+Returnerer aktive handlelister. Bruk query-parameteren `include_archived=true` for å inkludere arkiverte lister.
+
+```json
+{
+  "data": [
+    {
+      "id": "list-uuid",
+      "space_id": "family-uuid",
+      "name": "Helg",
+      "status": "active",
+      "items": [
+        {
+          "id": "item-uuid",
+          "name": "Melk",
+          "quantity": "2",
+          "checked": false
+        }
+      ]
+    }
+  ]
+}
+```
+
+`POST /api/families/{family_id}/shopping_lists`
+
+```json
+{
+  "list": {
+    "name": "Hverdager"
+  }
+}
+```
+
+`POST /api/families/{family_id}/shopping_lists/{list_id}/items`
+
+```json
+{
+  "item": {
+    "name": "Egg",
+    "quantity": "12",
+    "checked": false
+  }
+}
+```
+
+Elementer kan oppdateres med `PUT /api/families/{family_id}/shopping_lists/{list_id}/items/{item_id}` (f.eks. `{"item": {"checked": true}}`) og slettes med `DELETE` på samme sti.
+
+#### Generelle todo-lister
+
+`GET /api/families/{family_id}/todo_lists`
+
+Returnerer alle todolister og deres oppgaver. Listen kan arkiveres ved å sette `status` til `archived` via `PUT`.
+
+```json
+{
+  "data": [
+    {
+      "id": "todo-list-uuid",
+      "space_id": "family-uuid",
+      "name": "Oppgaver",
+      "status": "active",
+      "items": [
+        {
+          "id": "todo-item-uuid",
+          "content": "Støvsug stua",
+          "status": "pending",
+          "assignee_profile_id": "profile-uuid"
+        }
+      ]
+    }
+  ]
+}
+```
+
+`POST /api/families/{family_id}/todo_lists`
+
+```json
+{
+  "list": {
+    "name": "Ukeplan"
+  }
+}
+```
+
+`POST /api/families/{family_id}/todo_lists/{list_id}/items`
+
+```json
+{
+  "item": {
+    "content": "Bestille mat",
+    "assignee_profile_id": "profile-uuid",
+    "due_at": "2024-10-07T10:00:00Z"
+  }
+}
+```
+
+Oppdater status med `PUT /api/families/{family_id}/todo_lists/{list_id}/items/{item_id}` (`{"item": {"status": "done"}}`). Når `status` settes til `done` registreres automatisk hvem som fullførte oppgaven.
 
 ### Sende melding
 
