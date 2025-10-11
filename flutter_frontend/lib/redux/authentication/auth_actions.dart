@@ -100,39 +100,42 @@ class OnListMyTeamsResponseAction extends AuthActions {
 }
 
 class ServerRequestCodeFromUserAction extends AuthActions {
-  final String type;
+  final String channel;
+  final AuthChallenge challenge;
 
-  ServerRequestCodeFromUserAction({required this.type});
+  ServerRequestCodeFromUserAction({required this.channel, required this.challenge});
 
   @override
   String toString() {
-    return 'ServerRequestCodeFromUserAction{type: $type}';
+    return 'ServerRequestCodeFromUserAction{channel: $channel, challenge: ${challenge.id}}';
   }
 }
 
 class RequestCodeMsisdnAction extends AuthActions {
   final String msisdn;
+  final String? displayName;
   final Completer completer;
 
-  RequestCodeMsisdnAction({required this.msisdn, required Completer completer})
+  RequestCodeMsisdnAction({required this.msisdn, this.displayName, required Completer completer})
       : completer = completer ?? Completer();
 
   @override
   String toString() {
-    return 'RequestCodeMsisdnAction{msisdn: $msisdn}';
+    return 'RequestCodeMsisdnAction{msisdn: $msisdn, displayName: $displayName}';
   }
 }
 
 class RequestCodeEmailAction extends AuthActions {
   final String email;
+  final String? displayName;
   final Completer completer;
 
-  RequestCodeEmailAction({required this.email, required Completer completer})
+  RequestCodeEmailAction({required this.email, this.displayName, required Completer completer})
       : completer = completer ?? Completer();
 
   @override
   String toString() {
-    return 'RequestCodeEmailAction{email: $email}';
+    return 'RequestCodeEmailAction{email: $email, displayName: $displayName}';
   }
 }
 

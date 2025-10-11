@@ -3,7 +3,7 @@ import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/redux/app_state.dart';
 import 'package:messngr/redux/navigation/navigation_actions.dart';
 import 'package:messngr/ui/widgets/CategorySelector.dart';
-import 'package:messngr/ui/widgets/RecentChats.dart';
+import 'package:messngr/features/chat/chat_page.dart';
 import 'package:messngr/utils/flutter_redux.dart';
 
 class HomePage extends StatefulWidget {
@@ -72,7 +72,7 @@ class HomePageState extends State<HomePage> {
                     ),
                   ],
                 ),
-                const RecentChats(),
+                const Expanded(child: ChatPage()),
               ],
             ),
           ),

@@ -13,7 +13,11 @@ defmodule MessngrWeb.ErrorJSON do
   end
 
   def render("400.json", details) do
-    %{errors: %{detail: "Client Error: #{inspect details}"}}
+    %{errors: %{detail: "Client Error", meta: details}}
+  end
+
+  def render("422.json", %{changeset: changeset}) do
+    %{errors: translate_errors(changeset)}
   end
 
   # By default, Phoenix returns the status message from
@@ -21,5 +25,13 @@ defmodule MessngrWeb.ErrorJSON do
   # "Not Found".
   def render(template, _assigns) do
     %{errors: %{detail: Phoenix.Controller.status_message_from_template(template)}}
+  end
+
+  defp translate_errors(changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+      Enum.reduce(opts, msg, fn {key, value}, acc ->
+        String.replace(acc, "%{#{key}}", to_string(value))
+      end)
+    end)
   end
 end

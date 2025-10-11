@@ -22,7 +22,16 @@ AppState _onCreatedProfileReducer(
       currentTeamName: state.authState.currentTeamName,
       teamAccessToken: state.authState.teamAccessToken,
       teams: state.authState.teams,
-      isLoading: state.authState.isLoading);
+      isLoading: state.authState.isLoading,
+      pendingEmail: state.authState.pendingEmail,
+      pendingMsisdn: state.authState.pendingMsisdn,
+      pendingTeam: state.authState.pendingTeam,
+      pendingChallengeId: state.authState.pendingChallengeId,
+      pendingChannel: state.authState.pendingChannel,
+      pendingTargetHint: state.authState.pendingTargetHint,
+      pendingDebugCode: state.authState.pendingDebugCode,
+      pendingChallengeExpiresAt:
+          state.authState.pendingChallengeExpiresAt);
   return AppState(
       authState: auth,
       teamState: state.teamState,

@@ -1,6 +1,6 @@
 [submodule "phoenix_socket"]
-	path = packages/phoenix_socket
+	path = flutter_frontend/packages/phoenix_socket
 	url = https://github.com/braverhealth/phoenix-socket-dart
 [submodule "async_redux"]
-  path = packages/async_redux
+  path = flutter_frontend/packages/async_redux
   url = https://github.com/marcglasberg/async_redux.git

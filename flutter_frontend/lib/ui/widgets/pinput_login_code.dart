@@ -74,6 +74,11 @@ class _PinputLoginCodeState extends State<PinputLoginCode> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = StoreProvider.of<AppState>(context).state.authState;
+    final targetHint =
+        authState.pendingTargetHint ?? authState.pendingEmail ?? authState.pendingMsisdn;
+    final debugCode = authState.pendingDebugCode;
+
     const focusedBorderColor = Color.fromRGBO(23, 171, 144, 1);
     const fillColor = Color.fromRGBO(243, 246, 249, 0);
     const borderColor = Color.fromRGBO(23, 171, 144, 0.4);
@@ -97,6 +102,31 @@ class _PinputLoginCodeState extends State<PinputLoginCode> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          if (targetHint != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(
+                children: [
+                  const Text(
+                    'Skriv inn engangskoden vi nettopp sendte deg',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    targetHint,
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                  if (debugCode != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Kode (kun utvikling): $debugCode',
+                        style: const TextStyle(fontSize: 12, color: Colors.orange),
+                      ),
+                    )
+                ],
+              ),
+            ),
           Directionality(
             // Specify direction if desired
             textDirection: TextDirection.ltr,

@@ -1,29 +1,29 @@
 defmodule MessngrWeb.Router do
   use MessngrWeb, :router
 
-  pipeline :browser do
-    plug :accepts, ["html"]
-    plug :fetch_session
-    plug :fetch_live_flash
-    plug :put_root_layout, html: {MessngrWeb.Layouts, :root}
-    plug :protect_from_forgery
-    plug :put_secure_browser_headers
-  end
-
   pipeline :api do
     plug :accepts, ["json"]
   end
 
-  scope "/", MessngrWeb do
-    pipe_through :browser
-
-    get "/", PageController, :home
+  pipeline :actor do
+    plug MessngrWeb.Plugs.CurrentActor
   end
 
-  # Other scopes may use custom stacks.
   scope "/api", MessngrWeb do
     pipe_through :api
 
+    post "/auth/challenge", AuthController, :challenge
+    post "/auth/verify", AuthController, :verify
+    post "/auth/oidc", AuthController, :oidc
+    resources "/users", AccountController, only: [:index, :create]
+  end
+
+  scope "/api", MessngrWeb do
+    pipe_through [:api, :actor]
+
+    post "/conversations", ConversationController, :create
+    get "/conversations/:id/messages", MessageController, :index
+    post "/conversations/:id/messages", MessageController, :create
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

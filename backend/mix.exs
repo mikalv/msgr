@@ -12,24 +12,13 @@ defmodule Messngr.Umbrella.MixProject do
         chatd: [
           applications: [
             msgr: :permanent,
-            msgr_web: :permanent,
-            teams: :permanent,
-            slack_api: :permanent,
-            edge_router: :permanent,
-          ]
+            msgr_web: :permanent
+          ],
+          include_executables_for: [:unix]
         ]
       ]
     ]
   end
-
-  defp releases do
-  [
-    chatd: [
-      include_executables_for: [:unix],
-      steps: [&Forecastle.pre_assemble/1, :assemble, &Forecastle.post_assemble/1, :tar]
-    ]
-  ]
-end
 
   # Dependencies can be Hex packages:
   #

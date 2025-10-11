@@ -39,8 +39,7 @@ defmodule MessngrWeb do
   def controller do
     quote do
       use Phoenix.Controller,
-        formats: [:html, :json],
-        layouts: [html: MessngrWeb.Layouts]
+        formats: [:json]
 
       import Plug.Conn
       import MessngrWeb.Gettext

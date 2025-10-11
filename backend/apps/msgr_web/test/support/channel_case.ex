@@ -29,7 +29,7 @@ defmodule MessngrWeb.ChannelCase do
   end
 
   setup tags do
-    MessngrWeb.DataCase.setup_sandbox(tags)
+    Messngr.DataCase.setup_sandbox(tags)
     :ok
   end
 end

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 const String appName =
     'Messngr'; //app name shown evrywhere with the app where required
+const String backendBaseUrl =
+    String.fromEnvironment('MSGR_BACKEND_URL', defaultValue: 'http://localhost:4000/api');
 const String DEFAULT_COUNTTRYCODE_ISO =
     'NO'; //default country ISO 2 letter for login screen
 const String DEFAULT_COUNTTRYCODE_NUMBER =
