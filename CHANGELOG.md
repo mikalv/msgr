@@ -1,6 +1,15 @@
 # Changelog
 
 ## Unreleased
+- Flutter-klienten sender nå enhet- og app-informasjon til auth-backenden ved
+  oppstart via nytt device-context-bootstrapp, og reetablerer brukerøkter når
+  JWT-er har utløpt.
+- Auth-provider-backenden tar imot oppdatert enhetskontekst, lagrer app-metadata
+  og utsteder nye refresh-tokens, med tilhørende tester for API og hjelpere.
+- Startet migreringen til ny Flutter-arkitektur med modulært `app/bootstrap`,
+  ryddigere `main.dart` og første test for loggoppsettet.
+- Lagt ved `IMPROVE_ARCHITECTURE.md` med veikart for å modernisere Flutter-klientens struktur,
+  state-håndtering og moduloppdeling.
 - Added initial WebRTC signalling stack with in-memory call registry, Phoenix `rtc:*` channel, tests, documentation, and a dockerised coturn service for TURN/STUN.
 - Tightened direct-call support by capping participants to vert + én, utvidet testdekning og dokumentasjon av Flutter-klientplanen.
 - Introduced conversation structure types (familie, bedrift, vennegjeng, prosjekt)

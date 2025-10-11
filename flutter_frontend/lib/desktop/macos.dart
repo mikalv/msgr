@@ -60,6 +60,7 @@ class _MacOSAppState extends State<MacOSApp>
     windowManager.setPreventClose(true);
     super.initState();
     reduxStore.then((store) {
+      store.dispatch(VerifyAuthStateAction());
       store.dispatch(OpenWebsocketIfNotAlready());
     });
     getLocale().then((locale) {
