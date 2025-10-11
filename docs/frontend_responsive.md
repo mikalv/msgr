@@ -21,6 +21,9 @@ Denne notatfilen beskriver hvordan den nye responsive hjemmeskjermen i Flutter-a
   gjennom dedikerte notifiers (`TypingParticipantsNotifier`,
   `ReactionAggregatorNotifier`, `PinnedMessagesNotifier`) og widgetene
   `TypingIndicator` og `PinnedMessageBanner`.
+- Watcher-panelet lytter på `conversation_watchers`-strømmen og skjuler
+  inaktive seere etter den konfigurerte TTL-en via
+  `Chat.watch_conversation`-notifieren.
 
 ## Tester
 

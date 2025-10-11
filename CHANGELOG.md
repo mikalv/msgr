@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added configurable TTL cleanup for conversation watcher lists so inactive
+  viewers fall out of the PubSub feed automatically, with backend tests and
+  refreshed documentation.
 - Secured media uploads with mandatory server-side encryption headers in presigned instructions, configurable SSE/KMS settings, tests, and updated API documentation.
 - Enhanced media upload pipeline with voice/file/thumbnail kinds, width/height/checksum metadata, retention TTLs and presigned URL helpers in the Elixir backend (new migration, config, storage helpers and tests).
 - Normalised chat media payloads (captions, thumbnails, waveform) with updated JSON views, message validations and API contract documentation.

@@ -306,7 +306,19 @@ Backenden normaliserer også lydmeldinger (`type: "audio"` eller `"voice"`) med 
   - `message_pinned` / `message_unpinned`: `{ "message_id": "uuid", "pinned_by_id": "profile", "pinned_at": "2024-10-04T12:15:00Z", "metadata": {} }`
   - `message_read`: `{ "profile_id": "profile-uuid", "message_id": "message-uuid", "read_at": "2024-10-04T12:12:00Z" }`
   - `typing_started` / `typing_stopped`: `{ "profile_id": "profile-uuid", "profile_name": "Kari", "thread_id": null, "expires_at": "2024-10-04T12:05:05Z" }`
+  - `conversation_watchers`: `{ "count": 2, "watchers": [{ "id": "profile-uuid", "name": "Kari", "mode": "private" }] }`
   - Presence diff/stat er levert via Phoenix `presence_state` og `presence_diff` events.
+
+- **Client events**:
+  - `typing:start` / `typing:stop` (payload `{ "thread_id": "optional-thread" }`)
+  - `message:read`, `reaction:add`, `reaction:remove`, `message:update`, `message:delete`
+  - `message:pin`, `message:unpin`
+  - `conversation:watch`, `conversation:unwatch`
+
+`conversation:watch` holder en profiler-liste aktiv i maks 30 sekunder per invitasjon
+(`conversation_watcher_ttl_ms` kan overstyres i konfig). Når tiden utløper vil
+backenden automatisk droppe profilen fra `conversation_watchers`-strømmen og
+returnere en tom liste ved neste `list_watchers`-kall.
 
 ### Familie-spaces med kalender, handleliste og todo
 
