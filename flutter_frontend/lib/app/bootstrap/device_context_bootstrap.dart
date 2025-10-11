@@ -61,7 +61,7 @@ abstract class DeviceContextRegistrar {
 
 class RegistrationServiceDeviceContextRegistrar
     implements DeviceContextRegistrar {
-  const RegistrationServiceDeviceContextRegistrar({RegistrationService? service})
+  RegistrationServiceDeviceContextRegistrar({RegistrationService? service})
       : _service = service ?? RegistrationService();
 
   final RegistrationService _service;
@@ -101,7 +101,7 @@ class DeviceContextBootstrapper {
     return DeviceContextBootstrapper(
       deviceInfo: LibMsgr().deviceInfo,
       appInfoProvider: const PackageInfoAppInfoProvider(),
-      registrar: const RegistrationServiceDeviceContextRegistrar(),
+      registrar: RegistrationServiceDeviceContextRegistrar(),
     );
   }
 

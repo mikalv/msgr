@@ -46,7 +46,12 @@ class ChatMediaAttachment {
     ChatMediaType? forcedType,
   }) async {
     final data = await file.readAsBytes();
-    final mime = file.mimeType ?? lookupMimeType(file.name) ?? 'application/octet-stream';
+    final headerLength = data.length > 12 ? 12 : data.length;
+    final mime = lookupMimeType(
+          file.name,
+          headerBytes: headerLength > 0 ? data.sublist(0, headerLength) : null,
+        ) ??
+        'application/octet-stream';
     final type = forcedType ?? _inferType(mime);
     final dimensions = await _resolveDimensionsIfNeeded(type, data);
     final waveform = type == ChatMediaType.audio || type == ChatMediaType.voice
@@ -75,7 +80,12 @@ class ChatMediaAttachment {
     }
 
     data ??= Uint8List(0);
-    final mime = file.mimeType ?? lookupMimeType(file.name) ?? 'application/octet-stream';
+    final headerLength = data.length > 12 ? 12 : data.length;
+    final mime = lookupMimeType(
+          file.name,
+          headerBytes: headerLength > 0 ? data.sublist(0, headerLength) : null,
+        ) ??
+        'application/octet-stream';
     final type = forcedType ?? _inferType(mime);
     final dimensions = await _resolveDimensionsIfNeeded(type, data);
     final waveform = type == ChatMediaType.audio || type == ChatMediaType.voice
@@ -130,10 +140,10 @@ class ChatMediaAttachment {
 
     try {
       final completer = Completer<ui.Image>();
-      ui.decodeImageFromList(data, (image) => completer.complete(image),
-          onError: (Object error, StackTrace? stackTrace) {
-        completer.completeError(error, stackTrace);
-      });
+      ui.decodeImageFromList(
+        data,
+        (image) => completer.complete(image),
+      );
       final image = await completer.future;
       return (image.width, image.height);
     } catch (_) {
@@ -149,7 +159,9 @@ class ChatMediaAttachment {
     const sampleCount = 64;
     final step = max(1, data.length ~/ sampleCount);
     final samples = <double>[];
-    for (var i = 0; i < data.length && samples.length < sampleCount; i += step) {
+    for (var i = 0;
+        i < data.length && samples.length < sampleCount;
+        i += step) {
       final value = data[i] / 255.0;
       samples.add(value.clamp(0, 1));
     }

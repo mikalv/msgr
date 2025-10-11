@@ -180,7 +180,7 @@ class ChatMediaUploader {
   Future<_ImageDimensions?> _decodeImageDimensions(Uint8List bytes) async {
     try {
       final completer = Completer<ui.Image>();
-      ui.decodeImageFromList(bytes, completer.complete, onError: completer.completeError);
+      ui.decodeImageFromList(bytes, completer.complete);
       final image = await completer.future;
       return _ImageDimensions(image.width, image.height);
     } catch (_) {
