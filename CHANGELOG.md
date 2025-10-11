@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Lagt til roadmap-dokument for message composer-paritet i
+  `docs/message_composer_parity_plan.md`.
 - Utvidet mediasystemet med nye skjema-felter (dimensjoner, SHA-256, retention),
   nye opplastingskategorier (image, file, voice, thumbnail) og presignerte
   URL-instruksjoner for forhåndsgenererte thumbnails.
