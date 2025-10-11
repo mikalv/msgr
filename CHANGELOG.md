@@ -115,6 +115,8 @@
 - Enriched the shared msgr message domain with bubble styling, curated theme palettes, and runtime theme switching helpers for every message variant.
 - Redesignet Flutter-hjemmeskjermen med et responsivt oppsett for mobil, nettbrett og desktop, komplett med gradient-sidefelt, innboks-panel og handlingslinje.
 - La til widgettester for brytepunktene og dokumenterte strukturen i `docs/frontend_responsive.md`.
+- La til Cupertino-inspirerte kontaktvisninger i Flutter-klienten (liste, detalj og redigering),
+  systemkontakt-import via `flutter_contacts` og nye widgettester for flyten.
 ## [Unreleased]
 ### Added
 - Konsolidert produktplan og forskningsoppsummering med fokus på chat-MVP, identitet og arkitektur.
