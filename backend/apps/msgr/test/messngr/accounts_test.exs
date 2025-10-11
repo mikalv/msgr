@@ -61,6 +61,47 @@ defmodule Messngr.AccountsTest do
       assert identity.account_id == same_identity.account_id
       assert same_identity.account.display_name == "Mobil"
     end
+
+    test "links additional oidc identity to an existing account" do
+      {:ok, email_identity} =
+        Accounts.ensure_identity(%{kind: :email, value: "mikal@example.com", display_name: "Mikal"})
+
+      {:ok, oidc_identity} =
+        Accounts.ensure_identity(%{
+          kind: :oidc,
+          provider: "github",
+          subject: "123",
+          account_id: email_identity.account_id,
+          display_name: "Mikal GitHub"
+        })
+
+      assert oidc_identity.account_id == email_identity.account_id
+      assert oidc_identity.provider == "github"
+      assert oidc_identity.subject == "123"
+    end
+
+    test "prevents linking an existing identity to a different account" do
+      {:ok, first_identity} =
+        Accounts.ensure_identity(%{
+          kind: :oidc,
+          provider: "google",
+          subject: "abc",
+          display_name: "Google User"
+        })
+
+      {:ok, other_identity} =
+        Accounts.ensure_identity(%{kind: :email, value: "other@example.com", display_name: "Other"})
+
+      assert {:error, :identity_already_linked} =
+               Accounts.ensure_identity(%{
+                 kind: :oidc,
+                 provider: "google",
+                 subject: "abc",
+                 account_id: other_identity.account_id
+               })
+
+      assert first_identity.account_id != other_identity.account_id
+    end
   end
 
   describe "import_contacts/3" do

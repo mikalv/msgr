@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Added multi-identity account linking so `Accounts.ensure_identity/1` can attach
+  new email/phone/OIDC credentials to an existing account via `account_id`, with
+  safeguards against cross-account hijacking, refreshed docs and regression
+  tests for linking flows.
 - Enforced Noise-handshake attestasjonskrav for OTP (`/api/auth/verify`) med
   Telemetry-instrumentering, fullstack tester (unit/integration) for happy-path,
   feilscenarier (feil signatur, utløpt session, rekey) i både `msgr` og

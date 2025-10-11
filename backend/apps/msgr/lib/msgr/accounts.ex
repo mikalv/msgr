@@ -208,13 +208,12 @@ defmodule Messngr.Accounts do
   @spec ensure_identity(map()) :: {:ok, Identity.t()} | {:error, term()}
   def ensure_identity(%{kind: :oidc} = attrs) do
     Repo.transaction(fn ->
-      case Repo.get_by(Identity,
-             kind: :oidc,
-             provider: Map.get(attrs, :provider) || Map.get(attrs, "provider"),
-             subject: Map.get(attrs, :subject) || Map.get(attrs, "subject")
-           ) do
+      provider = get_attr(attrs, :provider)
+      subject = get_attr(attrs, :subject)
+
+      case Repo.get_by(Identity, kind: :oidc, provider: provider, subject: subject) do
         nil ->
-          with {:ok, account} <- ensure_account(attrs),
+          with {:ok, account} <- resolve_account(attrs),
                {:ok, identity} <- insert_identity(account, attrs) do
             maybe_preload_account(identity)
           else
@@ -222,7 +221,11 @@ defmodule Messngr.Accounts do
           end
 
         identity ->
-          maybe_preload_account(identity)
+          with :ok <- ensure_same_account(identity, attrs) do
+            maybe_preload_account(identity)
+          else
+            {:error, reason} -> Repo.rollback(reason)
+          end
       end
     end)
   end
@@ -234,15 +237,21 @@ defmodule Messngr.Accounts do
 
       case Repo.get_by(Identity, kind: kind, value: normalized) do
         nil ->
-          with {:ok, account} <- ensure_account(Map.put(attrs, :value, normalized)),
-               {:ok, identity} <- insert_identity(account, Map.put(attrs, :value, normalized)) do
+          attrs_with_value = Map.put(attrs, :value, normalized)
+
+          with {:ok, account} <- resolve_account(attrs_with_value),
+               {:ok, identity} <- insert_identity(account, attrs_with_value) do
             maybe_preload_account(identity)
           else
             {:error, reason} -> Repo.rollback(reason)
           end
 
         identity ->
-          maybe_preload_account(identity)
+          with :ok <- ensure_same_account(identity, attrs) do
+            maybe_preload_account(identity)
+          else
+            {:error, reason} -> Repo.rollback(reason)
+          end
       end
     end)
   end
@@ -280,6 +289,47 @@ defmodule Messngr.Accounts do
       |> Enum.into(%{})
 
     create_account(default_attrs)
+  end
+
+  defp resolve_account(attrs) do
+    cond do
+      match?(%Account{}, Map.get(attrs, :account)) ->
+        {:ok, Map.get(attrs, :account)}
+
+      account_id = get_attr(attrs, :account_id) ->
+        case Repo.get(Account, account_id) do
+          nil -> {:error, :account_not_found}
+          %Account{} = account -> {:ok, account}
+        end
+
+      true ->
+        ensure_account(attrs)
+    end
+  end
+
+  defp ensure_same_account(%Identity{} = identity, attrs) do
+    cond do
+      match?(%Account{}, Map.get(attrs, :account)) ->
+        if identity.account_id == Map.get(attrs, :account).id do
+          :ok
+        else
+          {:error, :identity_already_linked}
+        end
+
+      account_id = get_attr(attrs, :account_id) ->
+        if identity.account_id == account_id do
+          :ok
+        else
+          {:error, :identity_already_linked}
+        end
+
+      true ->
+        :ok
+    end
+  end
+
+  defp get_attr(attrs, key) do
+    Map.get(attrs, key) || Map.get(attrs, to_string(key))
   end
 
   defp normalize_device_public_key(value) when is_binary(value) do
