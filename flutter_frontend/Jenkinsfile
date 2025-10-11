@@ -1,0 +1,136 @@
+pipeline {
+  agent none
+
+  //parameters {
+  //  choice(name: 'PLATFORM_FILTER', choices: ['all', 'linux', 'windows', 'mac'], description: 'Run on specific platform')
+  //}
+  options {
+    buildDiscarder(
+        logRotator(
+            // number of build logs to keep
+            numToKeepStr:'5',
+            // history to keep in days
+            daysToKeepStr: '14',
+            // artifacts are kept for days
+            artifactDaysToKeepStr: '14',
+            // number of builds have their artifacts kept
+            artifactNumToKeepStr: '10'
+        )
+    )
+  }
+  stages {
+    stage('Parallel Stage') {
+      when {
+        branch "main"
+      }
+      failFast true
+      parallel {
+        stage('Build - MacOS') {
+          environment {
+            MEEH_BUILT_FOR='macos'
+          }
+          agent {
+            node {
+              label 'macos'
+            }
+          }
+          steps {
+            //sh "git submodule sync; git submodule update --init"
+            sh "/Users/mikalv/.local/flutter/bin/flutter pub get"
+            sh "/Users/mikalv/.local/flutter/bin/flutter build macos --debug"
+            stash name: 'Pods', includes: "macos/Pods/**/*"
+            stash name: 'build', includes: "build/**/*"
+          }
+        }
+        stage('Build - iOS') {
+          environment {
+            MEEH_BUILT_FOR='ios'
+          }
+          agent {
+            node {
+              label 'ios'
+            }
+          }
+          steps {
+            //sh "git submodule sync; git submodule update --init"
+            sh "/Users/mikalv/.local/flutter/bin/flutter pub get"
+            sh "/Users/mikalv/.local/flutter/bin/flutter build ios --debug"
+            stash name: 'Pods', includes: "ios/Pods/**/*"
+            stash name: 'build', includes: "build/**/*"
+          }
+        }
+        stage('Build - Android') {
+          environment {
+            MEEH_BUILT_FOR='android'
+          }
+          agent {
+            node {
+              label 'android'
+            }
+          }
+          steps {
+            //sh "git submodule sync; git submodule update --init"
+            sh "/Users/mikalv/.local/flutter/bin/flutter pub get"
+            sh "/Users/mikalv/.local/flutter/bin/flutter build apk --debug"
+            stash name: 'build', includes: "build/**/*"
+          }
+        }
+        stage('Build - Web') {
+          environment {
+            MEEH_BUILT_FOR='web'
+          }
+          agent {
+            node {
+              label 'macos'
+            }
+          }
+          steps {
+            //sh "git submodule sync; git submodule update --init"
+            sh "/Users/mikalv/.local/flutter/bin/flutter pub get"
+            sh "/Users/mikalv/.local/flutter/bin/flutter build web --release --web-renderer auto --base-href /"
+            stash name: 'build', includes: "build/**/*"
+          }
+        }
+      }
+    }
+
+    stage('Verify') {
+      parallel {
+        stage('Test') {
+          agent {
+            node {
+              label 'macos'
+            }
+          }
+          environment {
+            MEEH_BUILT_FOR='macos'
+          }
+          steps {
+            unstash name: 'Pods'
+            unstash name: 'build'
+            script {
+              sh "/Users/mikalv/.local/flutter/bin/flutter pub get"
+              sh '/Users/mikalv/.local/flutter/bin/flutter test'
+            }
+          }
+        }
+      }
+    }
+
+    stage('Package') {
+      when { anyOf { buildingTag(); branch "main" } }
+      agent { label 'linux' }
+      environment {
+        CURRENT_HASH = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+      }
+      steps {
+        script {
+          sh 'echo "${BRANCH_NAME}:${CURRENT_HASH}" > ./assets/version.txt'
+        }
+      }
+    }
+
+    //stage('Publish') {}
+
+  }
+}

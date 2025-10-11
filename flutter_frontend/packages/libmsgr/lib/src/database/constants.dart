@@ -1,0 +1,21 @@
+const conversationsTable = 'Conversations';
+const messagesTable = 'Messages';
+const rosterTable = 'RosterItems';
+const mediaTable = 'SharedMedia';
+const preferenceTable = 'Preferences';
+const xmppStateTable = 'XmppState';
+const contactsTable = 'Contacts';
+
+const subscriptionsTable = 'SubscriptionRequests';
+const fileMetadataTable = 'FileMetadata';
+const fileMetadataHashesTable = 'FileMetadataHashes';
+const reactionsTable = 'Reactions';
+
+const omemoDevicesTable = 'OmemoDevices';
+const omemoDeviceListTable = 'OmemoDeviceList';
+const omemoRatchetsTable = 'OmemoRatchets';
+const omemoTrustTable = 'OmemoTrustTable';
+
+const notificationsTable = 'Notifications';
+const groupchatTable = 'Groupchat';
+const groupchatMembersTable = 'GroupchatMembers';
