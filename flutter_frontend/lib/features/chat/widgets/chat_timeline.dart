@@ -30,7 +30,7 @@ class _ChatTimelineState extends State<ChatTimeline> {
         if (!_controller.hasClients) return;
         _controller.animateTo(
           _controller.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 320),
           curve: Curves.easeOutCubic,
         );
       });
@@ -43,29 +43,51 @@ class _ChatTimelineState extends State<ChatTimeline> {
       return const _EmptyState();
     }
 
-    return ListView.builder(
-      controller: _controller,
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-      itemCount: widget.messages.length,
-      itemBuilder: (context, index) {
-        final message = widget.messages[index];
-        final previous = index > 0 ? widget.messages[index - 1] : null;
-        final showDayDivider = _shouldShowDivider(message, previous);
-        final isMine = message.profileId == widget.currentProfileId;
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+      child: Stack(
+        children: [
+          ListView.builder(
+            controller: _controller,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+            itemCount: widget.messages.length,
+            itemBuilder: (context, index) {
+              final message = widget.messages[index];
+              final previous = index > 0 ? widget.messages[index - 1] : null;
+              final showDayDivider = _shouldShowDivider(message, previous);
+              final isMine = message.profileId == widget.currentProfileId;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (showDayDivider)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: _DayDivider(date: message.insertedAt ?? DateTime.now()),
-              ),
-            ChatBubble(message: message, isMine: isMine),
-          ],
-        );
-      },
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (showDayDivider)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: _DayDivider(
+                        date: message.insertedAt ?? DateTime.now(),
+                      ),
+                    ),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.9, end: 1),
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutBack,
+                    builder: (context, value, child) => Transform.scale(
+                      scale: value,
+                      alignment:
+                          isMine ? Alignment.centerRight : Alignment.centerLeft,
+                      child: child,
+                    ),
+                    child: ChatBubble(message: message, isMine: isMine),
+                  ),
+                ],
+              );
+            },
+          ),
+          const _EdgeFade(alignment: Alignment.topCenter),
+          const _EdgeFade(alignment: Alignment.bottomCenter),
+        ],
+      ),
     );
   }
 
@@ -100,8 +122,11 @@ class _DayDivider extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceVariant,
+            color: theme.colorScheme.surface.withOpacity(0.9),
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: theme.colorScheme.outlineVariant.withOpacity(0.3),
+            ),
           ),
           child: Text(
             formatted,
@@ -124,25 +149,82 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.message_rounded,
-              size: 48, color: theme.colorScheme.primary.withOpacity(0.6)),
-          const SizedBox(height: 12),
-          Text(
-            'Si hei til kontaktpersonen din!',
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Skriv din første melding i feltet under.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    theme.colorScheme.primary.withOpacity(0.18),
+                    theme.colorScheme.primary.withOpacity(0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Icon(
+                Icons.auto_awesome,
+                size: 42,
+                color: theme.colorScheme.primary,
+              ),
             ),
-            textAlign: TextAlign.center,
+            const SizedBox(height: 20),
+            Text(
+              'Si hei til kontaktpersonen din!',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Du er først i samtalen. Start dialogen med en vennlig melding.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EdgeFade extends StatelessWidget {
+  const _EdgeFade({required this.alignment});
+
+  final Alignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return IgnorePointer(
+      child: Align(
+        alignment: alignment,
+        child: Container(
+          height: 36,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: alignment == Alignment.topCenter
+                  ? Alignment.topCenter
+                  : Alignment.bottomCenter,
+              end: alignment == Alignment.topCenter
+                  ? Alignment.bottomCenter
+                  : Alignment.topCenter,
+              colors: [
+                theme.colorScheme.surface.withOpacity(0.92),
+                theme.colorScheme.surface.withOpacity(0.0),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }

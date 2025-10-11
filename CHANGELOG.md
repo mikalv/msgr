@@ -7,10 +7,12 @@
 - Sanntidsklar Flutter-chatopplevelse med ny `ChatPage`, timeline, og rik tekstkomponist.
 - API-klient, view-model og tester for chatflyt i Flutter.
 - CHANGELOG innført for å følge endringer.
+- Widgettester for chat-komponisten for å sikre interaksjonene rundt sendeknappen.
 
 ### Changed
 - Backend-konfigurasjon forenklet og unødvendige apper fjernet fra releaseoppsett.
 - HomePage viser nå ny chatopplevelse i stedet for gamle lister.
+- Chat-opplevelsen i Flutter har fått en modernisert visuell profil med felles tema, oppgradert tidslinje og raffinert komponist.
 
 ### Fixed
 - `mix` og Flutter-konfigurasjon oppryddet for å matche den nye strukturen.

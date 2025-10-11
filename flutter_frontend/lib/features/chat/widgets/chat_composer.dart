@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:messngr/features/chat/widgets/chat_theme.dart';
 
 class ChatComposer extends StatefulWidget {
   const ChatComposer({
@@ -20,6 +21,8 @@ class _ChatComposerState extends State<ChatComposer>
     with SingleTickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  final ValueNotifier<bool> _hasText = ValueNotifier<bool>(false);
+
   bool _showToolbar = false;
   late final AnimationController _toolbarController;
 
@@ -28,148 +31,116 @@ class _ChatComposerState extends State<ChatComposer>
     super.initState();
     _toolbarController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 250),
+      duration: const Duration(milliseconds: 220),
     );
+    _controller.addListener(_handleTextChanged);
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _controller
+      ..removeListener(_handleTextChanged)
+      ..dispose();
     _focusNode.dispose();
     _toolbarController.dispose();
+    _hasText.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final sendEnabled = _controller.text.trim().isNotEmpty && !widget.isSending;
 
     return SafeArea(
       top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (widget.errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (widget.errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _ErrorBanner(message: widget.errorMessage!),
+            ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            decoration: ChatTheme.composerDecoration(theme),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Icon(Icons.error_outline,
-                        color: theme.colorScheme.error, size: 18),
-                    const SizedBox(width: 8),
+                    _ComposerIconButton(
+                      icon: Icons.add,
+                      tooltip: 'Vis hurtigmeny',
+                      isActive: _showToolbar,
+                      onTap: _toggleToolbar,
+                    ),
+                    const SizedBox(width: 4),
                     Expanded(
-                      child: Text(
-                        widget.errorMessage!,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.error),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 220),
+                        child: TextField(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          textCapitalization: TextCapitalization.sentences,
+                          textInputAction: TextInputAction.send,
+                          minLines: 1,
+                          maxLines: 6,
+                          onSubmitted: (_) => _handleSend(),
+                          decoration: InputDecoration(
+                            hintText: 'Skriv noe strålende …',
+                            border: InputBorder.none,
+                            hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                              color:
+                                  theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                            ),
+                          ),
+                        ),
                       ),
+                    ),
+                    const SizedBox(width: 12),
+                    _ComposerIconButton(
+                      icon: Icons.mic_none_rounded,
+                      tooltip: 'Spill inn lydklipp',
+                      onTap: () {},
+                    ),
+                    const SizedBox(width: 4),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _hasText,
+                      builder: (context, hasText, _) {
+                        final enabled = hasText && !widget.isSending;
+                        return _SendButton(
+                          isEnabled: enabled,
+                          isSending: widget.isSending,
+                          onPressed: enabled ? _handleSend : null,
+                        );
+                      },
                     ),
                   ],
                 ),
-              ),
-            Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: theme.colorScheme.outlineVariant.withOpacity(0.4),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
+                SizeTransition(
+                  sizeFactor: CurvedAnimation(
+                    parent: _toolbarController,
+                    curve: Curves.easeOut,
                   ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      _ComposerIconButton(
-                        icon: Icons.add_circle_outline,
-                        tooltip: 'Flere valg',
-                        onPressed: _toggleToolbar,
-                        isActive: _showToolbar,
-                      ),
-                      Expanded(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 200),
-                          child: TextField(
-                            controller: _controller,
-                            focusNode: _focusNode,
-                            textCapitalization: TextCapitalization.sentences,
-                            minLines: 1,
-                            maxLines: 6,
-                            onChanged: (_) => setState(() {}),
-                            decoration: const InputDecoration(
-                              hintText: 'Skriv en melding…',
-                              border: InputBorder.none,
-                              contentPadding:
-                                  EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                            ),
-                          ),
-                        ),
-                      ),
-                      _ComposerIconButton(
-                        icon: Icons.mic_none_rounded,
-                        tooltip: 'Ta opp lyd',
-                        onPressed: () {},
-                      ),
-                      const SizedBox(width: 6),
-                      Padding(
-                        padding: const EdgeInsets.only(right: 10, bottom: 10),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                theme.colorScheme.primary,
-                                theme.colorScheme.primaryContainer,
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: IconButton(
-                            iconSize: 22,
-                            padding: const EdgeInsets.all(12),
-                            icon: widget.isSending
-                                ? SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        theme.colorScheme.onPrimary,
-                                      ),
-                                    ),
-                                  )
-                                : const Icon(Icons.send_rounded),
-                            color: theme.colorScheme.onPrimary,
-                            onPressed: sendEnabled ? _handleSend : null,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizeTransition(
-                    sizeFactor: CurvedAnimation(
-                      parent: _toolbarController,
-                      curve: Curves.easeOut,
-                    ),
-                    axisAlignment: -1,
+                  axisAlignment: -1,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12),
                     child: _ComposerToolbar(onSelect: _handleToolbarAction),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+
+  void _handleTextChanged() {
+    _hasText.value = _controller.text.trim().isNotEmpty;
   }
 
   void _toggleToolbar() {
@@ -186,21 +157,18 @@ class _ChatComposerState extends State<ChatComposer>
 
   void _handleSend() {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || widget.isSending) return;
     widget.onSend(text);
     _controller.clear();
-    setState(() {});
+    _focusNode.requestFocus();
   }
 
   void _handleToolbarAction(_ComposerAction action) {
+    // Actions are placeholders for future rich input options.
     switch (action) {
       case _ComposerAction.attachFile:
-        // TODO: implement attachments
-        break;
       case _ComposerAction.addPhoto:
-        break;
       case _ComposerAction.insertEmoji:
-        break;
       case _ComposerAction.schedule:
         break;
     }
@@ -208,45 +176,86 @@ class _ChatComposerState extends State<ChatComposer>
   }
 }
 
+class _SendButton extends StatelessWidget {
+  const _SendButton({
+    required this.isEnabled,
+    required this.isSending,
+    this.onPressed,
+  });
+
+  final bool isEnabled;
+  final bool isSending;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AnimatedScale(
+      scale: isEnabled || isSending ? 1 : 0.92,
+      duration: const Duration(milliseconds: 180),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: ChatTheme.selfBubbleGradient(theme),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: IconButton(
+          iconSize: 22,
+          padding: const EdgeInsets.all(12),
+          icon: isSending
+              ? SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                )
+              : const Icon(Icons.send_rounded),
+          color: theme.colorScheme.onPrimaryContainer,
+          onPressed: isEnabled ? onPressed : null,
+        ),
+      ),
+    );
+  }
+}
+
 class _ComposerIconButton extends StatelessWidget {
   const _ComposerIconButton({
     required this.icon,
     required this.tooltip,
-    this.onPressed,
+    this.onTap,
     this.isActive = false,
   });
 
   final IconData icon;
   final String tooltip;
-  final VoidCallback? onPressed;
+  final VoidCallback? onTap;
   final bool isActive;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(left: 6, bottom: 6),
-      child: Tooltip(
-        message: tooltip,
-        child: Material(
-          color: Colors.transparent,
-          child: InkResponse(
-            radius: 24,
-            onTap: onPressed,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isActive
-                    ? theme.colorScheme.primary.withOpacity(0.12)
-                    : Colors.transparent,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon,
-                  color: isActive
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.onSurfaceVariant),
+    final color = isActive
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkResponse(
+          onTap: onTap,
+          radius: 24,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isActive
+                  ? theme.colorScheme.primary.withOpacity(0.14)
+                  : theme.colorScheme.surfaceVariant.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(16),
             ),
+            child: Icon(icon, color: color),
           ),
         ),
       ),
@@ -264,10 +273,10 @@ class _ComposerToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    const actions = _ComposerAction.values;
+    final actions = _ComposerAction.values;
     final labels = {
       _ComposerAction.attachFile: 'Legg ved fil',
-      _ComposerAction.addPhoto: 'Bilde',
+      _ComposerAction.addPhoto: 'Del bilde',
       _ComposerAction.insertEmoji: 'Emoji',
       _ComposerAction.schedule: 'Planlegg',
     };
@@ -279,20 +288,14 @@ class _ComposerToolbar extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.surfaceVariant,
-            theme.colorScheme.surface.withOpacity(0.9),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        borderRadius: BorderRadius.circular(22),
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
       ),
       child: Wrap(
-        spacing: 12,
+        spacing: 10,
+        runSpacing: 8,
         children: [
           for (final action in actions)
             _ToolbarChip(
@@ -320,30 +323,65 @@ class _ToolbarChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = theme.colorScheme.primary;
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color: color.withOpacity(0.12),
+          color: theme.colorScheme.surface.withOpacity(0.9),
+          border: Border.all(
+            color: theme.colorScheme.primary.withOpacity(0.2),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color),
+            Icon(icon, size: 18, color: theme.colorScheme.primary),
             const SizedBox(width: 8),
             Text(
               label,
               style: theme.textTheme.labelMedium?.copyWith(
-                color: color,
+                color: theme.colorScheme.primary,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.error.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.error.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline,
+              color: theme.colorScheme.error, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
