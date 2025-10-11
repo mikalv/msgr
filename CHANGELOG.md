@@ -23,6 +23,10 @@
   new email/phone/OIDC credentials to an existing account via `account_id`, with
   safeguards against cross-account hijacking, refreshed docs and regression
   tests for linking flows.
+- Added Snapchat Camera Kit capture pipeline to the Flutter chat composer with
+  environment-based configuration, Android/iOS method-channel bridges,
+  fallbacks for unsupported platforms, native dependency wiring, unit tests and
+  documentation describing setup requirements.
 - Enforced Noise-handshake attestasjonskrav for OTP (`/api/auth/verify`) med
   Telemetry-instrumentering, fullstack tester (unit/integration) for happy-path,
   feilscenarier (feil signatur, utløpt session, rekey) i både `msgr` og

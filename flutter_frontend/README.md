@@ -72,3 +72,38 @@ flutter run \
 Standardverdiene matcher docker-compose-oppsettet (`root@example.com` /
 `Complexpass#123`). Under kjøring kan du endre strømmen eller deaktivere logging
 med `LoggingEnvironment.instance.override(enabled: false);`.
+
+## Snapchat Camera Kit
+
+Messngr kan bruke [Snapchat Camera Kit](https://developer.snap.com/docs/camera-kit/)
+for å tilby linser når brukere tar bilder eller video i chatte-komponisten.
+Funksjonen er som standard deaktivert og må konfigureres med Snapchat-nøkler
+via `--dart-define`.
+
+Tilgjengelige parametere:
+
+```
+MSGR_CAMERA_KIT_ENABLED=true
+MSGR_CAMERA_KIT_APPLICATION_ID=<Snapchat application id>
+MSGR_CAMERA_KIT_API_TOKEN=<Camera Kit API token>
+MSGR_CAMERA_KIT_LENS_GROUP_IDS=<kommaseparert liste med lens-grupper>
+```
+
+Eksempel på oppstart med Camera Kit aktivert:
+
+```
+flutter run \
+  --dart-define=MSGR_CAMERA_KIT_ENABLED=true \
+  --dart-define=MSGR_CAMERA_KIT_APPLICATION_ID=com.example.myapp \
+  --dart-define=MSGR_CAMERA_KIT_API_TOKEN=sn-xxxxxxxx \
+  --dart-define=MSGR_CAMERA_KIT_LENS_GROUP_IDS=abcd1234,efgh5678
+```
+
+### Native oppsett
+
+- **Android:** avhenger av `com.snap.camerakit:support-camera-activity`. Legg inn
+  Camera Kit API token og lens-grupper via miljøvariablene ovenfor.
+- **iOS:** Pod-avhengighetene `SCSDKCameraKit` og `SCSDKCameraKitReferenceUI`
+  må installeres. Kjør `pod install` i `ios/` etter at hemmelighetene er lagt
+  inn. Sørg også for at `Info.plist` inneholder oppdaterte beskrivelser for
+  kamera-, mikrofon- og bildebibliotekstilgang.

@@ -1,3 +1,7 @@
+ext {
+    cameraKitVersion = '1.26.0'
+}
+
 allprojects {
     repositories {
         google()
