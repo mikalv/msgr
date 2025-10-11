@@ -55,6 +55,7 @@ defmodule MessngrWeb.MixProject do
        depth: 1},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
+      {:telemetry_metrics_prometheus, "~> 1.1"},
       {:gettext, "~> 0.20"},
       {:msgr, in_umbrella: true},
       {:jason, "~> 1.2"},

@@ -45,6 +45,25 @@ config :logger, :console,
   format: "[$level] $message",
   metadata: [:request_id]
 
+config :logger, backends: [:console]
+
+config :msgr_web, :prometheus,
+  enabled: false,
+  port: 9568,
+  name: :prometheus_metrics
+
+config :logger, Messngr.Logging.OpenObserveBackend,
+  enabled: false,
+  endpoint: "http://localhost:5080",
+  org: "default",
+  stream: "backend",
+  dataset: "_json",
+  username: "root@example.com",
+  password: "Complexpass#123",
+  metadata: [:application, :module, :function, :line, :request_id, :pid],
+  level: :info,
+  service: "msgr_backend"
+
 config :phoenix, :stacktrace_depth, 20
 
 config :phoenix, :plug_init_mode, :runtime

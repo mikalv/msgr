@@ -48,5 +48,25 @@ config :msgr_web, :expose_otp_codes, true
 
 config :logger, :console, format: "[$level] $message\n"
 
+config :logger,
+  backends: [:console, {Messngr.Logging.OpenObserveBackend, :openobserve_dev}]
+
+config :logger, {Messngr.Logging.OpenObserveBackend, :openobserve_dev},
+  enabled: System.get_env("OPENOBSERVE_ENABLED", "true") == "true",
+  endpoint: System.get_env("OPENOBSERVE_ENDPOINT", "http://openobserve:5080"),
+  org: System.get_env("OPENOBSERVE_ORG", "default"),
+  stream: System.get_env("OPENOBSERVE_STREAM", "backend"),
+  dataset: System.get_env("OPENOBSERVE_DATASET", "_json"),
+  username: System.get_env("OPENOBSERVE_USERNAME", "root@example.com"),
+  password: System.get_env("OPENOBSERVE_PASSWORD", "Complexpass#123"),
+  metadata: [:application, :module, :function, :line, :request_id, :pid],
+  level: :debug,
+  service: System.get_env("OPENOBSERVE_SERVICE", "msgr_backend_dev")
+
+config :msgr_web, :prometheus,
+  enabled: true,
+  port: String.to_integer(System.get_env("PROMETHEUS_PORT", "9568")),
+  name: :prometheus_metrics_dev
+
 config :phoenix, :stacktrace_depth, 20
 config :phoenix, :plug_init_mode, :runtime

@@ -49,6 +49,48 @@ services:
     tty: true
     stdin_open: true
 
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: msgr_prometheus
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      backend:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: msgr_grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      prometheus:
+        condition: service_started
+
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    container_name: msgr_openobserve
+    environment:
+      ZO_ROOT_USER_EMAIL: root@example.com
+      ZO_ROOT_USER_PASSWORD: Complexpass#123
+      ZO_DATA_DIR: /data
+      ZO_TELEMETRY: "false"
+    volumes:
+      - openobserve_data:/data
+    ports:
+      - "5080:5080"
+    restart: unless-stopped
+
   stonemq:
     build:
       context: .
@@ -72,3 +114,6 @@ volumes:
   tailwind_cache:
   node_modules:
   stonemq_data:
+  prometheus_data:
+  grafana_data:
+  openobserve_data:

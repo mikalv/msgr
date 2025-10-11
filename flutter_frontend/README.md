@@ -54,3 +54,21 @@ flutter run -d chrome
 
 Se også `lib/config/backend_environment.dart` for flere detaljer rundt
 konfigurasjonen av backendtilkoblingen.
+
+## Loggstrømming til OpenObserve
+
+Klienten kan sende `package:logging`-meldinger direkte til OpenObserve når
+Docker-miljøet er startet. Aktivér funksjonen med `--dart-define`-flaggene:
+
+```bash
+flutter run \
+  --dart-define=MSGR_LOG_ENABLED=true \
+  --dart-define=MSGR_LOG_ENDPOINT=http://localhost:5080 \
+  --dart-define=MSGR_LOG_STREAM=flutter \
+  --dart-define=MSGR_LOG_USERNAME=root@example.com \
+  --dart-define=MSGR_LOG_PASSWORD=Complexpass#123
+```
+
+Standardverdiene matcher docker-compose-oppsettet (`root@example.com` /
+`Complexpass#123`). Under kjøring kan du endre strømmen eller deaktivere logging
+med `LoggingEnvironment.instance.override(enabled: false);`.

@@ -20,6 +20,11 @@
   bruken.
 - Docker-image og Compose-tjeneste for StoneMQ slik at meldingskøen kan startes
   sammen med resten av utviklingsmiljøet.
+- Prometheus-eksport fra backenden med ferdig Prometheus- og Grafana-tjenester i
+  docker-compose.
+- OpenObserve-loggflyt for Elixir-backenden med ny Logger-backend og tester.
+- Flutter-loggklient som kan sende `package:logging`-poster til OpenObserve via
+  `LoggingEnvironment` og en gjenbrukbar HTTP-klient.
 
 ### Changed
 - Backend-konfigurasjon forenklet og unødvendige apper fjernet fra releaseoppsett.
