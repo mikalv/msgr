@@ -5,10 +5,17 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:messngr/features/chat/models/chat_message.dart';
 import 'package:messngr/features/chat/models/chat_thread.dart';
+import 'package:messngr/features/chat/models/reaction_aggregate.dart';
 import 'package:messngr/features/chat/state/chat_cache_repository.dart';
+import 'package:messngr/features/chat/state/message_editing_notifier.dart';
+import 'package:messngr/features/chat/state/pinned_messages_notifier.dart';
+import 'package:messngr/features/chat/state/reaction_aggregator_notifier.dart';
+import 'package:messngr/features/chat/state/thread_view_notifier.dart';
+import 'package:messngr/features/chat/state/typing_participants_notifier.dart';
 import 'package:messngr/features/chat/widgets/chat_composer.dart';
 import 'package:messngr/services/api/chat_api.dart';
 import 'package:messngr/services/api/chat_socket.dart';
+import 'package:messngr/services/api/chat_realtime_event.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatViewModel extends ChangeNotifier {
@@ -18,11 +25,21 @@ class ChatViewModel extends ChangeNotifier {
     ChatCacheStore? cache,
     Connectivity? connectivity,
     ChatComposerController? composer,
+    TypingParticipantsNotifier? typing,
+    ReactionAggregatorNotifier? reactions,
+    PinnedMessagesNotifier? pinned,
+    ThreadViewNotifier? threadView,
+    MessageEditingNotifier? editing,
   })  : _api = api ?? ChatApi(),
         _realtime = realtime ?? ChatSocket(),
         _cache = cache ?? HiveChatCacheStore(),
         _connectivity = connectivity ?? Connectivity(),
-        composerController = composer ?? ChatComposerController() {
+        composerController = composer ?? ChatComposerController(),
+        typingNotifier = typing ?? TypingParticipantsNotifier(),
+        reactionNotifier = reactions ?? ReactionAggregatorNotifier(),
+        pinnedNotifier = pinned ?? PinnedMessagesNotifier(),
+        threadViewNotifier = threadView ?? ThreadViewNotifier(),
+        messageEditingNotifier = editing ?? MessageEditingNotifier() {
     composerController.addListener(_handleComposerChanged);
   }
 
@@ -31,7 +48,14 @@ class ChatViewModel extends ChangeNotifier {
   final ChatCacheStore _cache;
   final Connectivity _connectivity;
   final ChatComposerController composerController;
+  final TypingParticipantsNotifier typingNotifier;
+  final ReactionAggregatorNotifier reactionNotifier;
+  final PinnedMessagesNotifier pinnedNotifier;
+  final ThreadViewNotifier threadViewNotifier;
+  final MessageEditingNotifier messageEditingNotifier;
   final _random = Random();
+
+  static const _typingIdleDuration = Duration(seconds: 5);
 
   static const _accountIdKey = 'chat.account.id';
   static const _profileIdKey = 'chat.profile.id';
@@ -48,10 +72,12 @@ class ChatViewModel extends ChangeNotifier {
   AccountIdentity? _identity;
   String? _peerProfileId;
   String? _selectedThreadId;
-  final Map<String, Map<String, int>> _messageReactions = {};
-  StreamSubscription<ChatMessage>? _realtimeSubscription;
+  StreamSubscription<ChatRealtimeEvent>? _realtimeSubscription;
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
   bool _realtimeConnected = false;
+  Timer? _typingTimer;
+  bool _typingActive = false;
+  final Set<String> _acknowledgedReads = <String>{};
 
   bool get isLoading => _isLoading;
   bool get isSending => _isSending;
@@ -62,8 +88,8 @@ class ChatViewModel extends ChangeNotifier {
   List<ChatThread> get channels => _channels;
   AccountIdentity? get identity => _identity;
   String? get selectedThreadId => _selectedThreadId;
-  Map<String, int> reactionsFor(String messageId) =>
-      _messageReactions[messageId] ?? const {};
+  List<ReactionAggregate> reactionsFor(String messageId) =>
+      reactionNotifier.aggregatesFor(messageId);
 
   Future<void> bootstrap() async {
     if (_isLoading) return;
@@ -102,6 +128,13 @@ class ChatViewModel extends ChangeNotifier {
         conversationId: _thread!.id,
       );
       _messages = messages;
+      for (final message in messages) {
+        if (message.isDeleted) {
+          messageEditingNotifier.markDeleted(message.id);
+        } else {
+          messageEditingNotifier.restore(message.id);
+        }
+      }
       await _cache.saveMessages(_thread!.id, messages);
       _updateOffline(false);
       notifyListeners();
@@ -115,6 +148,66 @@ class ChatViewModel extends ChangeNotifier {
       } else {
         _setError('Kunne ikke hente meldinger (${error.statusCode}).');
       }
+    }
+  }
+
+  void recordReaction(String messageId, String emoji) {
+    final existing = reactionsFor(messageId).toList();
+    final index = existing.indexWhere((aggregate) => aggregate.emoji == emoji);
+    if (index >= 0) {
+      final aggregate = existing[index];
+      existing[index] = aggregate.copyWith(count: aggregate.count + 1);
+    } else {
+      existing.add(
+        ReactionAggregate(
+          emoji: emoji,
+          count: 1,
+          profileIds: [identity?.profileId ?? 'self'],
+        ),
+      );
+    }
+    reactionNotifier.apply(messageId, existing);
+    notifyListeners();
+
+    _sendReactionCommand(messageId, emoji);
+  }
+
+  void applyReactionAggregates(String messageId, List<ReactionAggregate> aggregates) {
+    reactionNotifier.apply(messageId, aggregates);
+    notifyListeners();
+  }
+
+  void pinMessage(PinnedMessageInfo info) {
+    pinnedNotifier.pin(info);
+    notifyListeners();
+  }
+
+  void unpinMessage(String messageId) {
+    pinnedNotifier.unpin(messageId);
+    notifyListeners();
+  }
+
+  Future<void> requestPinMessage(String messageId, {Map<String, dynamic>? metadata}) async {
+    if (!_realtimeConnected || !_realtime.isConnected) {
+      return;
+    }
+
+    try {
+      await _realtime.pinMessage(messageId, metadata: metadata);
+    } catch (error, stack) {
+      debugPrint('Failed to pin message: $error\n$stack');
+    }
+  }
+
+  Future<void> requestUnpinMessage(String messageId) async {
+    if (!_realtimeConnected || !_realtime.isConnected) {
+      return;
+    }
+
+    try {
+      await _realtime.unpinMessage(messageId);
+    } catch (error, stack) {
+      debugPrint('Failed to unpin message: $error\n$stack');
     }
   }
 
@@ -193,10 +286,20 @@ class ChatViewModel extends ChangeNotifier {
     } finally {
       _isSending = false;
       notifyListeners();
+      _stopTypingActivity();
     }
   }
 
   Future<void> selectThread(ChatThread thread) async {
+    reactionNotifier.clear();
+    pinnedNotifier.clear();
+    typingNotifier.clear();
+    threadViewNotifier.closeThread();
+    threadViewNotifier.setPinnedView(false);
+    _acknowledgedReads.clear();
+    _stopTypingActivity();
+    notifyListeners();
+
     _thread = thread;
     _selectedThreadId = thread.id;
     await _cache.saveThreads([thread]);
@@ -210,12 +313,6 @@ class ChatViewModel extends ChangeNotifier {
 
     await fetchMessages();
     await _connectRealtime();
-  }
-
-  void addReaction(String messageId, String reaction) {
-    final map = _messageReactions.putIfAbsent(messageId, () => {});
-    map[reaction] = (map[reaction] ?? 0) + 1;
-    notifyListeners();
   }
 
   Future<void> createGroupConversation(String topic, List<String> participantIds) async {
@@ -302,6 +399,7 @@ class ChatViewModel extends ChangeNotifier {
       );
       if (cached.id.isNotEmpty) {
         _thread = cached;
+        _acknowledgedReads.clear();
         return;
       }
     }
@@ -317,6 +415,7 @@ class ChatViewModel extends ChangeNotifier {
       current: _identity!,
       targetProfileId: _peerProfileId!,
     );
+    _acknowledgedReads.clear();
     _selectedThreadId = _thread!.id;
     await _cache.saveThreads([_thread!]);
     await _saveLastThreadId(_thread!.id);
@@ -367,21 +466,23 @@ class ChatViewModel extends ChangeNotifier {
       );
 
       _realtimeConnected = true;
-      _realtimeSubscription = _realtime.messages.listen(
-        (message) {
-          _mergeMessage(message);
-          _cache.saveMessages(_thread!.id, _messages);
-        },
+      _realtimeSubscription = _realtime.events.listen(
+        _handleRealtimeEvent,
         onError: (error) {
           debugPrint('Realtime stream error: $error');
+          _realtimeConnected = false;
+          _stopTypingActivity();
         },
       );
+      _markExistingMessagesRead();
     } on ChatSocketException catch (error, stack) {
       debugPrint('Failed to connect realtime: $error\n$stack');
       _realtimeConnected = false;
+      _stopTypingActivity();
     } catch (error, stack) {
       debugPrint('Unexpected realtime error: $error\n$stack');
       _realtimeConnected = false;
+      _stopTypingActivity();
     }
   }
 
@@ -459,6 +560,7 @@ class ChatViewModel extends ChangeNotifier {
     if (threadId != null) {
       _cache.saveDraft(threadId, composerController.value.text);
     }
+    _updateTypingState(composerController.value.text.trim().isNotEmpty);
   }
 
   void _handleSlashCommand(SlashCommand command) {
@@ -492,6 +594,223 @@ class ChatViewModel extends ChangeNotifier {
       buffer.write('Lydklipp ${result.voiceNote!.formattedDuration} vedlagt.');
     }
     return buffer.toString();
+  }
+
+  void _sendReactionCommand(String messageId, String emoji) {
+    if (!_realtimeConnected || !_realtime.isConnected) {
+      return;
+    }
+
+    () async {
+      try {
+        await _realtime.addReaction(messageId, emoji);
+      } catch (error, stack) {
+        debugPrint('Failed to send reaction: $error\n$stack');
+      }
+    }();
+  }
+
+  void _handleRealtimeEvent(ChatRealtimeEvent event) {
+    if (_thread == null) return;
+
+    if (event is ChatMessageEvent) {
+      _mergeMessage(event.message);
+      _persistMessages();
+      _markMessageRead(event.message);
+      return;
+    }
+
+    if (event is ChatMessageDeletedEvent) {
+      _applyMessageDeleted(event);
+      return;
+    }
+
+    if (event is ChatReactionEvent) {
+      reactionNotifier.apply(event.messageId, event.aggregates);
+      notifyListeners();
+      return;
+    }
+
+    if (event is ChatPinnedEvent) {
+      if (event.isPinned) {
+        pinMessage(
+          PinnedMessageInfo(
+            messageId: event.messageId,
+            pinnedById: event.pinnedById,
+            pinnedAt: event.pinnedAt.toLocal(),
+            metadata: event.metadata,
+          ),
+        );
+      } else {
+        unpinMessage(event.messageId);
+      }
+      return;
+    }
+
+    if (event is ChatTypingEvent) {
+      if (event.isTyping) {
+        typingNotifier.setTyping(
+          profileId: event.profileId,
+          profileName: event.profileName,
+          threadId: event.threadId,
+          expiresAt: event.expiresAt?.toLocal(),
+        );
+      } else {
+        typingNotifier.stopTyping(
+          profileId: event.profileId,
+          threadId: event.threadId,
+        );
+      }
+      notifyListeners();
+      return;
+    }
+
+    if (event is ChatReadEvent) {
+      _applyReadEvent(event);
+    }
+  }
+
+  void _applyMessageDeleted(ChatMessageDeletedEvent event) {
+    final index = _messages.indexWhere((message) => message.id == event.messageId);
+    if (index < 0) {
+      return;
+    }
+
+    final deletedAt = event.deletedAt ?? DateTime.now().toUtc();
+    final message = _messages[index].copyWith(
+      body: '',
+      status: 'deleted',
+      deletedAt: deletedAt,
+    );
+
+    final updated = [..._messages];
+    updated[index] = message;
+    _messages = updated;
+    messageEditingNotifier.markDeleted(message.id);
+    notifyListeners();
+    _persistMessages();
+  }
+
+  void _applyReadEvent(ChatReadEvent event) {
+    final identity = _identity;
+    if (identity == null || event.profileId == identity.profileId) {
+      return;
+    }
+
+    final index = _messages.indexWhere((message) => message.id == event.messageId);
+    if (index < 0) {
+      return;
+    }
+
+    final message = _messages[index];
+    if (message.profileId != identity.profileId) {
+      return;
+    }
+
+    final updatedMessage = message.copyWith(status: 'read');
+    final updated = [..._messages];
+    updated[index] = updatedMessage;
+    _messages = updated;
+    notifyListeners();
+    _persistMessages();
+  }
+
+  void _markMessageRead(ChatMessage message) {
+    final identity = _identity;
+    if (identity == null) return;
+    if (message.profileId == identity.profileId) return;
+    if (!_realtimeConnected || !_realtime.isConnected) return;
+    if (!_acknowledgedReads.add(message.id)) return;
+
+    () async {
+      try {
+        await _realtime.markRead(message.id);
+      } catch (error, stack) {
+        debugPrint('Failed to mark message read: $error\n$stack');
+      }
+    }();
+  }
+
+  void _markExistingMessagesRead() {
+    final identity = _identity;
+    if (identity == null) return;
+
+    for (final message in _messages) {
+      if (message.profileId != identity.profileId) {
+        _markMessageRead(message);
+      }
+    }
+  }
+
+  void _persistMessages() {
+    final threadId = _thread?.id;
+    if (threadId == null) {
+      return;
+    }
+
+    () async {
+      try {
+        await _cache.saveMessages(threadId, _messages);
+      } catch (error, stack) {
+        debugPrint('Failed to persist chat cache: $error\n$stack');
+      }
+    }();
+  }
+
+  void _updateTypingState(bool hasContent) {
+    if (!_realtimeConnected || !_realtime.isConnected) {
+      return;
+    }
+
+    if (hasContent) {
+      if (!_typingActive) {
+        _typingActive = true;
+        _sendTypingCommand(start: true);
+      }
+
+      _typingTimer?.cancel();
+      _typingTimer = Timer(_typingIdleDuration, () {
+        _typingActive = false;
+        _sendTypingCommand(start: false);
+      });
+    } else {
+      if (_typingActive) {
+        _typingActive = false;
+        _sendTypingCommand(start: false);
+      }
+      _typingTimer?.cancel();
+      _typingTimer = null;
+    }
+  }
+
+  void _sendTypingCommand({required bool start}) {
+    if (!_realtimeConnected || !_realtime.isConnected) {
+      return;
+    }
+
+    final threadId = threadViewNotifier.state.threadId;
+
+    () async {
+      try {
+        if (start) {
+          await _realtime.startTyping(threadId: threadId);
+        } else {
+          await _realtime.stopTyping(threadId: threadId);
+        }
+      } catch (error, stack) {
+        debugPrint('Failed to send typing state: $error\n$stack');
+      }
+    }();
+  }
+
+  void _stopTypingActivity() {
+    _typingTimer?.cancel();
+    _typingTimer = null;
+    if (!_typingActive) {
+      return;
+    }
+    _typingActive = false;
+    _sendTypingCommand(start: false);
   }
 
   Future<void> _saveLastThreadId(String id) async {
@@ -529,6 +848,11 @@ class ChatViewModel extends ChangeNotifier {
     }
 
     _messages = updated;
+    if (incoming.isDeleted) {
+      messageEditingNotifier.markDeleted(incoming.id);
+    } else {
+      messageEditingNotifier.restore(incoming.id);
+    }
     notifyListeners();
   }
 
@@ -554,7 +878,12 @@ class ChatViewModel extends ChangeNotifier {
     composerController.removeListener(_handleComposerChanged);
     _realtimeSubscription?.cancel();
     _connectivitySubscription?.cancel();
+    _stopTypingActivity();
     _realtime.dispose();
+    typingNotifier.clear();
+    reactionNotifier.clear();
+    pinnedNotifier.clear();
+    messageEditingNotifier.clear();
     super.dispose();
   }
 }

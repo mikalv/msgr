@@ -5,6 +5,7 @@ import 'package:messngr/features/chat/models/chat_message.dart';
 import 'package:messngr/features/chat/models/chat_thread.dart';
 import 'package:messngr/features/chat/state/chat_view_model.dart';
 import 'package:messngr/services/api/chat_api.dart';
+import 'package:messngr/services/api/chat_realtime_event.dart';
 import 'package:messngr/services/api/chat_socket.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -89,8 +90,8 @@ class StubChatApi implements ChatApi {
 }
 
 class StubRealtime implements ChatRealtime {
-  final StreamController<ChatMessage> _controller =
-      StreamController<ChatMessage>.broadcast();
+  final StreamController<ChatRealtimeEvent> _events =
+      StreamController<ChatRealtimeEvent>.broadcast();
 
   bool wasConnected = false;
   bool _isConnected = false;
@@ -99,7 +100,11 @@ class StubRealtime implements ChatRealtime {
   final List<String> sentBodies = [];
 
   @override
-  Stream<ChatMessage> get messages => _controller.stream;
+  Stream<ChatRealtimeEvent> get events => _events.stream;
+
+  @override
+  Stream<ChatMessage> get messages =>
+      _events.stream.whereType<ChatMessageEvent>().map((event) => event.message);
 
   @override
   bool get isConnected => _isConnected;
@@ -122,7 +127,7 @@ class StubRealtime implements ChatRealtime {
 
   @override
   Future<void> dispose() async {
-    await _controller.close();
+    await _events.close();
   }
 
   @override
@@ -140,18 +145,39 @@ class StubRealtime implements ChatRealtime {
       insertedAt: DateTime.now(),
     );
 
-    if (!_controller.isClosed) {
-      _controller.add(message);
+    if (!_events.isClosed) {
+      _events.add(ChatMessageEvent(message));
     }
 
     return message;
   }
 
   void emit(ChatMessage message) {
-    if (!_controller.isClosed) {
-      _controller.add(message);
+    if (!_events.isClosed) {
+      _events.add(ChatMessageEvent(message));
     }
   }
+
+  @override
+  Future<void> startTyping({String? threadId}) async {}
+
+  @override
+  Future<void> stopTyping({String? threadId}) async {}
+
+  @override
+  Future<void> markRead(String messageId) async {}
+
+  @override
+  Future<void> addReaction(String messageId, String emoji, {Map<String, dynamic>? metadata}) async {}
+
+  @override
+  Future<void> removeReaction(String messageId, String emoji) async {}
+
+  @override
+  Future<void> pinMessage(String messageId, {Map<String, dynamic>? metadata}) async {}
+
+  @override
+  Future<void> unpinMessage(String messageId) async {}
 }
 
 void main() {

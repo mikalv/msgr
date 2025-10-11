@@ -18,9 +18,15 @@ defmodule Messngr.Chat.Message do
       values: [:text, :markdown, :code, :system, :image, :video, :audio, :location],
       default: :text
     field :payload, :map, default: %{}
+    field :metadata, :map, default: %{}
+    field :edited_at, :utc_datetime
+    field :deleted_at, :utc_datetime
 
     belongs_to :conversation, Messngr.Chat.Conversation
     belongs_to :profile, Messngr.Accounts.Profile
+    belongs_to :thread, Messngr.Chat.MessageThread
+
+    has_many :reactions, Messngr.Chat.MessageReaction
 
     timestamps(type: :utc_datetime)
   end
@@ -28,9 +34,22 @@ defmodule Messngr.Chat.Message do
   @doc false
   def changeset(message, attrs) do
     message
-    |> cast(attrs, [:body, :status, :conversation_id, :profile_id, :sent_at, :kind, :payload])
+    |> cast(attrs, [
+      :body,
+      :status,
+      :conversation_id,
+      :profile_id,
+      :sent_at,
+      :kind,
+      :payload,
+      :metadata,
+      :edited_at,
+      :deleted_at,
+      :thread_id
+    ])
     |> validate_required([:conversation_id, :profile_id, :kind])
     |> put_default_payload()
+    |> put_default_metadata()
     |> validate_body_for_kind()
     |> validate_payload_for_kind()
   end
@@ -40,6 +59,14 @@ defmodule Messngr.Chat.Message do
       nil -> put_change(changeset, :payload, %{})
       %{} = payload -> put_change(changeset, :payload, payload)
       _ -> add_error(changeset, :payload, "must be a map")
+    end
+  end
+
+  defp put_default_metadata(%Ecto.Changeset{} = changeset) do
+    case get_field(changeset, :metadata) do
+      nil -> put_change(changeset, :metadata, %{})
+      %{} = metadata -> put_change(changeset, :metadata, metadata)
+      _ -> add_error(changeset, :metadata, "must be a map")
     end
   end
 
