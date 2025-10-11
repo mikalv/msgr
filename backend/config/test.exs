@@ -18,3 +18,8 @@ config :logger, level: :warning
 config :msgr_web, :expose_otp_codes, true
 
 config :phoenix, :plug_init_mode, :runtime
+
+config :llm_gateway,
+  http_client: LlmGateway.HTTPClientMock,
+  team_resolver: {LlmGateway.TestTeamResolver, []},
+  system_credentials: %{}
