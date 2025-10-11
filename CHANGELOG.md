@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Designet et modulært Flutter chat-UI-kit (kanalliste, trådvisning, reaksjoner, presence, tilkoblingsbanner) og integrerte det i `ChatPage` og en ny `ChannelListPage`-demo.
+- Utvidet `ChatComposer` med emoji-velger, slash-kommandoer, filvedlegg, simulert taleopptak og forbedret utkast-/feilhåndtering samt nye widgettester.
+- Implementerte hurtigbuffer for samtaler og meldinger med Hive/Sembast, offline statusbanner og integrasjonstester for fallback i `ChatViewModel`.
 - Flutter-klienten sender nå enhet- og app-informasjon til auth-backenden ved
   oppstart via nytt device-context-bootstrapp, og reetablerer brukerøkter når
   JWT-er har utløpt.

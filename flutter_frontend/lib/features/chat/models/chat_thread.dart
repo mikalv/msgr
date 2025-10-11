@@ -107,6 +107,22 @@ class ChatThread extends Equatable {
     }
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'kind': kind.name,
+      'topic': topic,
+      'structure_type': structureType?.name,
+      'visibility': visibility.name,
+      'participants': [
+        for (final name in participantNames)
+          {
+            'profile': {'name': name},
+          }
+      ],
+    };
+  }
+
   @override
   List<Object?> get props => [id, participantNames, kind, topic, structureType, visibility];
 }
