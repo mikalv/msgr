@@ -88,9 +88,15 @@ Feil:
    {
      "challenge_id": "challenge-uuid",
      "code": "123456",
-     "display_name": "Kari Nordmann"
+     "display_name": "Kari Nordmann",
+     "noise_session_id": "session-uuid",
+     "noise_signature": "base64url-hmac",
+     "last_handshake_at": "2024-10-05T08:45:32Z"
    }
    ```
+
+   Se også `docs/noise_handshake_rollout.md` for handshake-detaljer og hvordan
+   signaturen genereres.
 
    **Respons 200**
 
@@ -106,6 +112,10 @@ Feil:
        "id": "identity-uuid",
        "kind": "email",
        "verified_at": "2024-10-04T12:01:00Z"
+     },
+     "noise_session": {
+       "id": "session-uuid",
+       "token": "NoiseEncodedToken"
      }
    }
    ```

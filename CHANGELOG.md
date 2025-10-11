@@ -5,6 +5,28 @@
   new email/phone/OIDC credentials to an existing account via `account_id`, with
   safeguards against cross-account hijacking, refreshed docs and regression
   tests for linking flows.
+- Enforced Noise-handshake attestasjonskrav for OTP (`/api/auth/verify`) med
+  Telemetry-instrumentering, fullstack tester (unit/integration) for happy-path,
+  feilscenarier (feil signatur, utløpt session, rekey) i både `msgr` og
+  `auth_provider`, ny ConnCase-test for API, runtime feature-flag med
+  `mix rollout.noise_handshake`, og dokumentasjon i `docs/noise_handshake_rollout.md`
+  + oppdatert API-kontrakt så klienter vet hvordan `Authorization: Noise <token>`
+  skal brukes.
+- Added docker-compose backed integration test suite that boots the backend,
+  exercises the Dart CLI flow for registration/login/team creation and verifies
+  message send/receive over the public APIs via pytest.
+- Exposed an opt-in `MSGR_WEB_LEGACY_ACTOR_HEADERS` runtime flag so integration
+  tests can rely on legacy headers while Noise authentication is still rolling
+  out.
+- Replaced header-based actor resolution with a shared Noise session plug that
+  validates tokens against the registry, assigns account/profile/device for
+  REST and WebSocket contexts, adds feature-toggled legacy fallback, updates
+  channel/controller flows to rely on socket assigns, and introduces Noise
+  session fixtures/tests for both plugs and sockets.
+- Expanded Noise authentication coverage with dedicated tests for the shared
+  plug (headers, session persistence, feature flags, device edge cases) and the
+  session store helpers, improving confidence in Noise token validation.
+- Added GitHub Actions deploy workflow that runs on release tags to build the Elixir release, ship it via rsync to `msgr.no`, and restart the systemd service on Ubuntu 22.04 runners.
 - Added Noise transport session and registry modules with NX/IK/XX handshake
   support, session-token generation and registry TTL management, plus
   integration/property tests for handshake, fallback and rekey flows.

@@ -25,4 +25,20 @@ defmodule MessngrWeb.FallbackController do
     |> put_status(:bad_request)
     |> json(%{error: "bad_request"})
   end
+
+  def call(conn, {:error, {:noise_handshake, reason}}) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "noise_handshake", reason: reason_to_string(reason)})
+  end
+
+  def call(conn, {:error, reason}) when is_atom(reason) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: Atom.to_string(reason)})
+  end
+
+  defp reason_to_string({:missing, key}) when is_atom(key), do: "missing_#{key}"
+  defp reason_to_string(reason) when is_atom(reason), do: Atom.to_string(reason)
+  defp reason_to_string(reason), do: inspect(reason)
 end

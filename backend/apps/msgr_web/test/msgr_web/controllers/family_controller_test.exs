@@ -8,10 +8,7 @@ defmodule MessngrWeb.FamilyControllerTest do
     {:ok, account} = Accounts.create_account(%{"display_name" => "Forelder"})
     profile = hd(account.profiles)
 
-    conn =
-      conn
-      |> put_req_header("x-account-id", account.id)
-      |> put_req_header("x-profile-id", profile.id)
+    {conn, _session} = attach_noise_session(conn, account, profile)
 
     {:ok, conn: conn, profile: profile}
   end

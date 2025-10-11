@@ -4,8 +4,9 @@ config :msgr,
   ecto_repos: [Messngr.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]
 
-config :msgr, Messngr.Mailer,
-  adapter: Swoosh.Adapters.Local
+config :msgr, :feature_flags, noise_handshake_required: false
+
+config :msgr, Messngr.Mailer, adapter: Swoosh.Adapters.Local
 
 config :msgr, :llm_client, Messngr.AI.LlmGatewayClient
 
@@ -62,7 +63,8 @@ config :esbuild,
 config :tailwind,
   version: "3.4.3",
   msgr_web: [
-    args: ~w(--config=tailwind.config.js --input=css/app.css --output=../priv/static/assets/app.css),
+    args:
+      ~w(--config=tailwind.config.js --input=css/app.css --output=../priv/static/assets/app.css),
     cd: Path.expand("../apps/msgr_web/assets", __DIR__)
   ]
 
@@ -112,7 +114,8 @@ config :llm_gateway,
     ],
     azure_openai: [
       module: LlmGateway.Provider.AzureOpenAI,
-      endpoint: System.get_env("AZURE_OPENAI_ENDPOINT", "https://example-resource.openai.azure.com"),
+      endpoint:
+        System.get_env("AZURE_OPENAI_ENDPOINT", "https://example-resource.openai.azure.com"),
       deployment: System.get_env("AZURE_OPENAI_DEPLOYMENT", "gpt-4o"),
       api_version: System.get_env("AZURE_OPENAI_API_VERSION", "2024-05-01-preview"),
       required_credentials: [:api_key]

@@ -1,6 +1,7 @@
 defmodule MessngrWeb.UserSocket do
   use Phoenix.Socket
   require Logger
+  alias MessngrWeb.Plugs.NoiseSession
 
   # A Socket handler
   #
@@ -36,9 +37,33 @@ defmodule MessngrWeb.UserSocket do
   # See `Phoenix.Token` documentation for examples in
   # performing token verification on connect.
   @impl true
-  def connect(_params, socket, _connect_info) do
-    Logger.debug "New socket connection!"
-    {:ok, socket}
+  def connect(params, socket, connect_info) do
+    case resolve_token(params, connect_info) do
+      {:ok, token} ->
+        case NoiseSession.verify_token(token) do
+          {:ok, actor} ->
+            Logger.debug("WebSocket authenticated via Noise session",
+              account_id: actor.account.id,
+              profile_id: actor.profile.id
+            )
+
+            {:ok,
+             socket
+             |> assign(:current_account, actor.account)
+             |> assign(:current_profile, actor.profile)
+             |> maybe_assign_device(actor.device)
+             |> assign(:noise_session_token, actor.encoded_token)
+             |> assign(:noise_session, actor.session)}
+
+          {:error, reason} ->
+            Logger.warning("Noise session verification failed", reason: inspect(reason))
+            :error
+        end
+
+      :error ->
+        Logger.warning("Missing Noise session token for websocket connection")
+        :error
+    end
   end
 
   channel "msgr:device", MessngrWeb.DeviceChannel
@@ -57,4 +82,24 @@ defmodule MessngrWeb.UserSocket do
   # Returning `nil` makes this socket anonymous.
   @impl true
   def id(_socket), do: nil
+
+  defp resolve_token(params, connect_info) do
+    with :error <- normalize_token(Map.get(params, "noise_session")),
+         :error <- normalize_token(Map.get(params, "token")),
+         :error <- normalize_token(connect_info |> Map.get(:session, %{}) |> Map.get("noise_session_token")) do
+      :error
+    else
+      {:ok, token} -> {:ok, token}
+    end
+  end
+
+  defp normalize_token(token) when is_binary(token) do
+    trimmed = String.trim(token)
+    if trimmed == "", do: :error, else: {:ok, trimmed}
+  end
+
+  defp normalize_token(_), do: :error
+
+  defp maybe_assign_device(socket, nil), do: socket
+  defp maybe_assign_device(socket, device), do: assign(socket, :current_device, device)
 end
