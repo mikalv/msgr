@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Startet Slack API-umbrellaappen med reelle `conversations.*`, `chat.*`, `users.*` og `reactions.*` endepunktimplementasjoner, Slack-ID/timestamp-adaptere, header-basert autentiseringsplugg og tilhørende controller-tester.
+- Implementerte `conversations.mark` for Slack API-et slik at lesestatus lagres, og la til tester som dekker lykkestien og ugyldig timestamp-feil.
 - Lagt til plan i `docs/umbrella_slack_compat_plan.md` for Slack-kompatibel umbrella-plattform og prioritering av Telegram og Discord-integrasjoner.
 - Documented Noise handshake expectations with new server-key endpoint contract, configured backend runtime to load static Noise keys from env/Secrets Manager, added rotation mix task with tests, and updated README guidance.
 - Added a feature toggle and dedicated port configuration for the Noise transport so static keys only load when explicitly enabled.
