@@ -55,7 +55,7 @@ defmodule Messngr.Chat do
   end
 
   @spec send_message(binary(), binary(), map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()} | {:error, term()}
-  @message_kinds [:text, :markdown, :code, :system, :image, :video, :audio, :location]
+  @message_kinds [:text, :markdown, :code, :system, :image, :video, :audio, :voice, :file, :thumbnail, :location]
 
   def send_message(conversation_id, profile_id, attrs) do
     Repo.transaction(fn ->
@@ -326,7 +326,8 @@ defmodule Messngr.Chat do
   defp default_visibility_for(:channel), do: :team
   defp default_visibility_for(_kind), do: :private
 
-  defp maybe_resolve_media(kind, conversation_id, profile_id, attrs) when kind in [:audio, :video] do
+  defp maybe_resolve_media(kind, conversation_id, profile_id, attrs)
+       when kind in [:audio, :video, :image, :voice, :file, :thumbnail] do
     media =
       case Map.get(attrs, "media") || Map.get(attrs, :media) do
         %{} = map -> map
@@ -338,7 +339,7 @@ defmodule Messngr.Chat do
         attrs["upload_id"] || attrs["uploadId"] || attrs[:upload_id] || attrs[:uploadId]
 
     if is_binary(upload_id) do
-      metadata = Map.drop(media, ["upload_id", "uploadId"])
+      metadata = build_media_metadata(kind, media)
 
       case Media.consume_upload(upload_id, conversation_id, profile_id, metadata) do
         {:ok, payload} ->
@@ -370,4 +371,291 @@ defmodule Messngr.Chat do
       end
     end)
   end
+
+  defp build_media_metadata(kind, media) do
+    media_map =
+      media
+      |> Map.drop(["upload_id", "uploadId", :upload_id, :uploadId])
+      |> normalize_media_map(kind)
+
+    if Enum.empty?(media_map) do
+      %{}
+    else
+      %{"media" => media_map}
+    end
+  end
+
+  defp normalize_media_map(media, kind) do
+    media
+    |> Enum.reduce(%{}, fn {key, value}, acc ->
+      case normalize_media_entry(kind, key, value) do
+        {normalized_key, normalized_value} -> Map.put(acc, normalized_key, normalized_value)
+        :skip -> acc
+      end
+    end)
+    |> maybe_attach_dimensions(media)
+  end
+
+  defp maybe_attach_dimensions(map, media) do
+    case fetch_dimensions(media) do
+      {nil, nil} -> map
+      {width, height} ->
+        map
+        |> Map.put_new("width", width)
+        |> Map.put_new("height", height)
+    end
+  end
+
+  defp fetch_dimensions(media) do
+    direct_width = normalize_positive_integer(Map.get(media, "width") || Map.get(media, :width))
+    direct_height = normalize_positive_integer(Map.get(media, "height") || Map.get(media, :height))
+
+    case Map.get(media, "dimensions") || Map.get(media, :dimensions) do
+      %{} = dims ->
+        width = direct_width || normalize_positive_integer(Map.get(dims, "width") || Map.get(dims, :width))
+        height = direct_height || normalize_positive_integer(Map.get(dims, "height") || Map.get(dims, :height))
+        {width, height}
+
+      _ ->
+        {direct_width, direct_height}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["caption", :caption] do
+    case normalize_string(value, 0, 2000) do
+      nil -> :skip
+      caption -> {"caption", caption}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["checksum", :checksum, "hash", :hash] do
+    case normalize_checksum(value) do
+      nil -> :skip
+      checksum -> {"checksum", checksum}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["duration", :duration] do
+    case normalize_duration(value) do
+      nil -> :skip
+      duration -> {"duration", duration}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["durationMs", :durationMs, "duration_ms", :duration_ms] do
+    case normalize_duration_ms(value) do
+      nil -> :skip
+      duration_ms -> {"durationMs", duration_ms}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["waveform", :waveform] do
+    case normalize_waveform(value) do
+      nil -> :skip
+      waveform -> {"waveform", waveform}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["thumbnail", :thumbnail] do
+    case normalize_thumbnail(value) do
+      nil -> :skip
+      thumbnail -> {"thumbnail", thumbnail}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["waveformSampleRate", :waveformSampleRate] do
+    case normalize_positive_integer(value) do
+      nil -> :skip
+      rate -> {"waveformSampleRate", rate}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["metadata", :metadata] do
+    case value do
+      %{} = metadata ->
+        nested =
+          metadata
+          |> Enum.reduce(%{}, fn {nested_key, nested_value}, acc ->
+            if is_binary(nested_key) do
+              Map.put(acc, nested_key, nested_value)
+            else
+              acc
+            end
+          end)
+
+        if map_size(nested) == 0, do: :skip, else: {"metadata", nested}
+
+      _ ->
+        :skip
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["width", :width, "height", :height] do
+    # Dimensions handled separately to support nested maps.
+    case normalize_positive_integer(value) do
+      nil -> :skip
+      normalized -> {Atom.to_string(key), normalized}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["mimeType", :mimeType] do
+    case normalize_string(value, 3, 256) do
+      nil -> :skip
+      mime -> {"mimeType", mime}
+    end
+  end
+
+  defp normalize_media_entry(_kind, key, value) when key in ["contentType", :contentType] do
+    case normalize_string(value, 3, 256) do
+      nil -> :skip
+      mime -> {"contentType", mime}
+    end
+  end
+
+  defp normalize_media_entry(_kind, _key, _value), do: :skip
+
+  defp normalize_duration(value) when is_binary(value) do
+    case Float.parse(value) do
+      {number, _} -> normalize_duration(number)
+      :error -> nil
+    end
+  end
+
+  defp normalize_duration(value) when is_number(value) do
+    cond do
+      value <= 0 -> nil
+      true -> Float.round(value * 1.0, 3)
+    end
+  end
+
+  defp normalize_duration(_), do: nil
+
+  defp normalize_duration_ms(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {number, _} -> normalize_duration_ms(number)
+      :error -> nil
+    end
+  end
+
+  defp normalize_duration_ms(value) when is_integer(value) and value > 0, do: value
+  defp normalize_duration_ms(value) when is_float(value) and value > 0, do: trunc(Float.round(value))
+  defp normalize_duration_ms(_), do: nil
+
+  defp normalize_checksum(value) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    if Regex.match?(~r/\A[A-Fa-f0-9]{32,128}\z/, trimmed) do
+      String.downcase(trimmed)
+    else
+      nil
+    end
+  end
+
+  defp normalize_checksum(_), do: nil
+
+  defp normalize_waveform(value) when is_list(value) do
+    normalized =
+      value
+      |> Enum.map(fn point ->
+        cond do
+          is_number(point) ->
+            point
+            |> Kernel./(1.0)
+            |> max(0.0)
+            |> min(1.0)
+
+          true ->
+            nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.take(512)
+
+    if normalized == [], do: nil, else: normalized
+  end
+
+  defp normalize_waveform(_), do: nil
+
+  defp normalize_thumbnail(%{} = value) do
+    normalized =
+      value
+      |> Enum.reduce(%{}, fn {key, val}, acc ->
+        case normalize_thumbnail_entry(key, val) do
+          {normalized_key, normalized_value} -> Map.put(acc, normalized_key, normalized_value)
+          :skip -> acc
+        end
+      end)
+
+    if map_size(normalized) == 0 do
+      nil
+    else
+      normalized
+    end
+  end
+
+  defp normalize_thumbnail(_), do: nil
+
+  defp normalize_thumbnail_entry(key, value) when key in ["bucket", :bucket, "bucketName", :bucketName] do
+    case normalize_string(value, 1, 200) do
+      nil -> :skip
+      bucket -> {"bucket", bucket}
+    end
+  end
+
+  defp normalize_thumbnail_entry(key, value) when key in ["objectKey", :objectKey, "object_key", :object_key] do
+    case normalize_string(value, 1, 500) do
+      nil -> :skip
+      object_key -> {"objectKey", object_key}
+    end
+  end
+
+  defp normalize_thumbnail_entry(key, value) when key in ["width", :width, "height", :height] do
+    case normalize_positive_integer(value) do
+      nil -> :skip
+      normalized -> {Atom.to_string(key), normalized}
+    end
+  end
+
+  defp normalize_thumbnail_entry(key, value) when key in ["url", :url] do
+    case normalize_string(value, 5, 2048) do
+      nil -> :skip
+      url -> {"url", url}
+    end
+  end
+
+  defp normalize_thumbnail_entry(key, value) when key in ["contentType", :contentType, "mimeType", :mimeType] do
+    case normalize_string(value, 3, 256) do
+      nil -> :skip
+      mime -> {"contentType", mime}
+    end
+  end
+
+  defp normalize_thumbnail_entry(_key, _value), do: :skip
+
+  defp normalize_string(value, min, max) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    if String.length(trimmed) in min..max do
+      trimmed
+    else
+      nil
+    end
+  end
+
+  defp normalize_string(_, _, _), do: nil
+
+  defp normalize_positive_integer(value) when is_integer(value) and value > 0, do: value
+
+  defp normalize_positive_integer(value) when is_float(value) and value > 0 do
+    trunc(Float.round(value))
+  end
+
+  defp normalize_positive_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {number, _} when number > 0 -> number
+      _ -> nil
+    end
+  end
+
+  defp normalize_positive_integer(_), do: nil
 end

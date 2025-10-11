@@ -173,6 +173,112 @@ Denne siden dokumenterer forventet kontrakt mellom msgr-backend og Flutter-klien
 }
 ```
 
+### Forberede mediaopplasting
+
+`POST /api/conversations/{conversation_id}/uploads`
+
+```json
+{
+  "upload": {
+    "kind": "image",
+    "content_type": "image/png",
+    "byte_size": 48123,
+    "filename": "ferie.png"
+  }
+}
+```
+
+**Respons 201**
+
+```json
+{
+  "data": {
+    "id": "upload-uuid",
+    "kind": "image",
+    "status": "pending",
+    "bucket": "msgr-media",
+    "object_key": "conversations/123/image/upload-uuid.png",
+    "content_type": "image/png",
+    "byte_size": 48123,
+    "expires_at": "2024-10-04T12:15:00Z",
+    "public_url": "https://cdn.example.com/msgr-media/conversations/123/image/upload-uuid.png",
+    "retention_until": "2024-10-11T12:15:00Z",
+    "upload": {
+      "method": "PUT",
+      "url": "https://storage.example.com/msgr-media/conversations/123/image/upload-uuid.png?signature=...",
+      "headers": {
+        "content-type": "image/png"
+      },
+      "expires_at": "2024-10-04T12:05:00Z"
+    },
+    "download": {
+      "method": "GET",
+      "url": "https://cdn.example.com/msgr-media/conversations/123/image/upload-uuid.png?signature=...",
+      "expires_at": "2024-10-04T12:25:00Z"
+    }
+  }
+}
+```
+
+Klienten laster opp binæren direkte til `upload.url` før `expires_at` og sender deretter en melding med `media.upload_id` og valgfri metadata (caption, waveform, dimensjoner, checksum).
+
+### Eksempel på mediamelding
+
+```json
+{
+  "message": {
+    "kind": "image",
+    "media": {
+      "upload_id": "upload-uuid",
+      "caption": "Ferie!",
+      "width": 1280,
+      "height": 720,
+      "checksum": "d41d8cd98f00b204e9800998ecf8427e"
+    }
+  }
+}
+```
+
+**Respons 201**
+
+```json
+{
+  "data": {
+    "id": "message-uuid",
+    "type": "image",
+    "status": "sent",
+    "sent_at": "2024-10-04T12:16:00Z",
+    "inserted_at": "2024-10-04T12:16:00Z",
+    "profile": {
+      "id": "profile-uuid",
+      "name": "Deg",
+      "mode": "private"
+    },
+    "payload": {
+      "media": {
+        "url": "https://cdn.example.com/msgr-media/conversations/123/image/upload-uuid.png?signature=...",
+        "contentType": "image/png",
+        "byteSize": 48123,
+        "checksum": "d41d8cd98f00b204e9800998ecf8427e",
+        "width": 1280,
+        "height": 720,
+        "caption": "Ferie!",
+        "retention": {
+          "expiresAt": "2024-10-11T12:15:00Z"
+        },
+        "thumbnail": {
+          "url": "https://cdn.example.com/msgr-media/conversations/123/image/upload-uuid.png?thumb=1",
+          "width": 320,
+          "height": 180
+        }
+      }
+    }
+  }
+}
+```
+
+Backenden normaliserer også lydmeldinger (`type: "audio"` eller `"voice"`) med `waveform` og `duration`, samt generiske filer (`type: "file"`) som eksponerer `fileName`, `byteSize`, `checksum` og valgfritt `thumbnail`.
+
 ### Familie-spaces med kalender, handleliste og todo
 
 `GET /api/families`

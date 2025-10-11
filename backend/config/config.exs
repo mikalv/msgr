@@ -12,10 +12,14 @@ config :msgr, :llm_client, Messngr.AI.LlmGatewayClient
 config :msgr, Messngr.Media.Storage,
   bucket: System.get_env("MEDIA_BUCKET", "msgr-media"),
   endpoint: System.get_env("MEDIA_ENDPOINT", "http://localhost:9000"),
-  public_endpoint: System.get_env("MEDIA_PUBLIC_ENDPOINT")
+  public_endpoint: System.get_env("MEDIA_PUBLIC_ENDPOINT"),
+  signing_secret: System.get_env("MEDIA_SIGNING_SECRET", "dev-secret"),
+  upload_expiry_seconds: String.to_integer(System.get_env("MEDIA_UPLOAD_EXPIRY", "600")),
+  download_expiry_seconds: String.to_integer(System.get_env("MEDIA_DOWNLOAD_EXPIRY", "1200"))
 
 config :msgr, Messngr.Media,
-  upload_ttl_seconds: String.to_integer(System.get_env("MEDIA_UPLOAD_TTL", "900"))
+  upload_ttl_seconds: String.to_integer(System.get_env("MEDIA_UPLOAD_TTL", "900")),
+  retention_ttl_seconds: String.to_integer(System.get_env("MEDIA_RETENTION_TTL", "604800"))
 
 host = System.get_env("PHX_HOST", "localhost")
 

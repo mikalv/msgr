@@ -2,19 +2,23 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:messngr/features/chat/media/chat_media_uploader.dart';
 import 'package:messngr/features/chat/models/chat_message.dart';
 import 'package:messngr/features/chat/models/chat_thread.dart';
+import 'package:messngr/features/chat/models/composer_submission.dart';
 import 'package:messngr/services/api/chat_api.dart';
 import 'package:messngr/services/api/chat_socket.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatViewModel extends ChangeNotifier {
-  ChatViewModel({ChatApi? api, ChatRealtime? realtime})
+  ChatViewModel({ChatApi? api, ChatRealtime? realtime, ChatMediaUploader? mediaUploader})
       : _api = api ?? ChatApi(),
-        _realtime = realtime ?? ChatSocket();
+        _realtime = realtime ?? ChatSocket(),
+        _mediaUploader = mediaUploader ?? ChatMediaUploader();
 
   final ChatApi _api;
   final ChatRealtime _realtime;
+  final ChatMediaUploader _mediaUploader;
   final _random = Random();
 
   static const _accountIdKey = 'chat.account.id';
@@ -117,17 +121,61 @@ class ChatViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> sendMessage(String text) async {
-    final trimmed = text.trim();
-    if (trimmed.isEmpty || _identity == null || _thread == null) {
+  Future<void> sendMessage(ComposerSubmission submission) async {
+    if (_identity == null || _thread == null) {
       return;
     }
 
+    final text = submission.text.trim();
+    final attachments = submission.attachments;
+
+    if (text.isEmpty && attachments.isEmpty) {
+      return;
+    }
+
+    _setError(null);
+    _isSending = true;
+    notifyListeners();
+
+    try {
+      if (attachments.isEmpty) {
+        if (text.isNotEmpty) {
+          await _sendTextOnly(text);
+        }
+      } else {
+        final caption = text.isNotEmpty ? text : null;
+        var isFirst = true;
+
+        for (final attachment in attachments) {
+          final message = await _mediaUploader.uploadAndSend(
+            current: _identity!,
+            conversationId: _thread!.id,
+            attachment: attachment,
+            caption: isFirst ? caption : null,
+          );
+          isFirst = false;
+          _mergeMessage(message);
+        }
+      }
+    } on ApiException catch (error) {
+      debugPrint('sendMessage failed: $error');
+      _setError('Kunne ikke sende melding (${error.statusCode}).');
+    } on ChatMediaUploadException catch (error) {
+      debugPrint('Media upload failed: $error');
+      final status = error.statusCode != null ? '${error.statusCode}' : 'ukjent';
+      _setError('Kunne ikke laste opp vedlegg ($status).');
+    } finally {
+      _isSending = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _sendTextOnly(String text) async {
     final tempId = 'local-${DateTime.now().microsecondsSinceEpoch}';
     final now = DateTime.now();
     final localMessage = ChatMessage.text(
       id: tempId,
-      body: trimmed,
+      body: text,
       profileId: _identity!.profileId,
       profileName: 'Deg',
       profileMode: 'private',
@@ -138,21 +186,19 @@ class ChatViewModel extends ChangeNotifier {
     );
 
     _messages = [..._messages, localMessage];
-    _error = null;
-    _isSending = true;
     notifyListeners();
 
     try {
-      final persisted = await _sendOverPreferredChannel(trimmed);
+      final persisted = await _sendOverPreferredChannel(text);
       _mergeMessage(persisted, replaceTempId: tempId);
     } on ChatSocketException catch (error, stack) {
       debugPrint('Realtime send failed: $error\n$stack');
 
       try {
-        final persisted = await _api.sendMessage(
+        final persisted = await _api.sendStructuredMessage(
           current: _identity!,
           conversationId: _thread!.id,
-          body: trimmed,
+          body: text,
         );
         _mergeMessage(persisted, replaceTempId: tempId);
       } on ApiException catch (fallbackError) {
@@ -160,14 +206,13 @@ class ChatViewModel extends ChangeNotifier {
         _messages =
             _messages.where((message) => message.id != tempId).toList();
         _setError('Kunne ikke sende melding (${fallbackError.statusCode}).');
+        rethrow;
       }
     } on ApiException catch (error) {
       debugPrint('sendMessage failed: $error');
       _messages = _messages.where((message) => message.id != tempId).toList();
       _setError('Kunne ikke sende melding (${error.statusCode}).');
-    } finally {
-      _isSending = false;
-      notifyListeners();
+      rethrow;
     }
   }
 

@@ -26,6 +26,15 @@ enum MsgrMessageKind {
   /// Audio media content.
   audio,
 
+  /// Short form audio clip or voice memo content.
+  voice,
+
+  /// Generic file attachment content.
+  file,
+
+  /// Lightweight thumbnail reference for external content.
+  thumbnail,
+
   /// Shared location or map message.
   location,
 }

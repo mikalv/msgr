@@ -29,15 +29,70 @@ defmodule Messngr.MediaTest do
 
     assert upload.kind == :video
     assert upload.status == :pending
-    assert instructions["method"] == "PUT"
     assert instructions["bucket"] == upload.bucket
     assert instructions["objectKey"] == upload.object_key
+    assert %{"method" => "PUT", "url" => upload_url, "headers" => headers} = instructions["upload"]
+    assert headers["content-type"] == "video/mp4"
+    assert upload_url =~ "signature="
+    assert %{"url" => download_url} = instructions["download"]
+    assert download_url =~ upload.object_key
+    assert %DateTime{} = instructions["retentionUntil"]
 
     {:ok, payload} =
-      Media.consume_upload(upload.id, conversation.id, profile.id, %{"duration" => 12.5})
+      Media.consume_upload(upload.id, conversation.id, profile.id, %{
+        "media" => %{
+          "duration" => 12.5,
+          "checksum" => String.duplicate("a", 64),
+          "width" => 1920,
+          "height" => 1080,
+          "thumbnail" => %{
+            "bucket" => upload.bucket,
+            "objectKey" => upload.object_key <> "/thumbnail"
+          }
+        }
+      })
 
-    assert payload["media"]["duration"] == 12.5
-    assert payload["media"]["url"] =~ upload.object_key
+    media_payload = payload["media"]
+    assert media_payload["duration"] == 12.5
+    assert media_payload["checksum"] == String.duplicate("a", 64)
+    assert media_payload["width"] == 1920
+    assert media_payload["height"] == 1080
+    assert media_payload["url"] =~ upload.object_key
+    assert %{"expiresAt" => _} = media_payload["retention"]
+    assert %{"url" => thumb_url} = media_payload["thumbnail"]
+    assert thumb_url =~ "thumbnail"
     assert %Upload{status: :consumed} = Repo.get!(Upload, upload.id)
+  end
+
+  test "consume_upload rejects invalid checksum", %{profile: profile, conversation: conversation} do
+    {:ok, upload, _instructions} =
+      Media.create_upload(conversation.id, profile.id, %{
+        "kind" => "audio",
+        "content_type" => "audio/mpeg",
+        "byte_size" => 2_000
+      })
+
+    assert {:error, :checksum_invalid} =
+             Media.consume_upload(upload.id, conversation.id, profile.id, %{
+               "media" => %{"checksum" => "not_hex"}
+             })
+  end
+
+  test "creation_changeset validates checksum format", %{profile: profile, conversation: conversation} do
+    params = %{
+      "kind" => "image",
+      "bucket" => "media",
+      "object_key" => "conversations/#{conversation.id}/image/test.png",
+      "content_type" => "image/png",
+      "byte_size" => 1024,
+      "expires_at" => DateTime.utc_now(),
+      "conversation_id" => conversation.id,
+      "profile_id" => profile.id,
+      "checksum" => "invalid"
+    }
+
+    changeset = Upload.creation_changeset(%Upload{}, params)
+    refute changeset.valid?
+    assert %{checksum: ["must be a hexadecimal digest"]} = errors_on(changeset)
   end
 end

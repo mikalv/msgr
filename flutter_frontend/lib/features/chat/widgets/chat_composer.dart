@@ -1,4 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:messngr/features/chat/media/chat_media_attachment.dart';
+import 'package:messngr/features/chat/media/chat_media_controller.dart';
+import 'package:messngr/features/chat/media/chat_media_picker.dart';
+import 'package:messngr/features/chat/models/composer_submission.dart';
 import 'package:messngr/features/chat/widgets/chat_theme.dart';
 
 class ChatComposer extends StatefulWidget {
@@ -7,11 +14,15 @@ class ChatComposer extends StatefulWidget {
     required this.onSend,
     required this.isSending,
     this.errorMessage,
+    this.mediaController,
+    this.mediaPicker,
   });
 
-  final ValueChanged<String> onSend;
+  final ValueChanged<ComposerSubmission> onSend;
   final bool isSending;
   final String? errorMessage;
+  final ChatMediaController? mediaController;
+  final ChatMediaPicker? mediaPicker;
 
   @override
   State<ChatComposer> createState() => _ChatComposerState();
@@ -19,21 +30,29 @@ class ChatComposer extends StatefulWidget {
 
 class _ChatComposerState extends State<ChatComposer>
     with SingleTickerProviderStateMixin {
-  final TextEditingController _controller = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
-  final ValueNotifier<bool> _hasText = ValueNotifier<bool>(false);
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  late final ValueNotifier<bool> _hasText;
+  late final AnimationController _toolbarController;
+  late final ChatMediaController _mediaController;
+  late final bool _ownsMediaController;
 
   bool _showToolbar = false;
-  late final AnimationController _toolbarController;
 
   @override
   void initState() {
     super.initState();
+    _controller = TextEditingController();
+    _focusNode = FocusNode();
+    _hasText = ValueNotifier<bool>(false);
     _toolbarController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
     );
     _controller.addListener(_handleTextChanged);
+    _ownsMediaController = widget.mediaController == null;
+    _mediaController = widget.mediaController ?? ChatMediaController(picker: widget.mediaPicker);
+    _mediaController.addListener(_handleMediaChanged);
   }
 
   @override
@@ -44,7 +63,21 @@ class _ChatComposerState extends State<ChatComposer>
     _focusNode.dispose();
     _toolbarController.dispose();
     _hasText.dispose();
+    _mediaController.removeListener(_handleMediaChanged);
+    if (_ownsMediaController) {
+      _mediaController.dispose();
+    }
     super.dispose();
+  }
+
+  void _handleTextChanged() {
+    _hasText.value = _controller.text.trim().isNotEmpty;
+  }
+
+  void _handleMediaChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -61,86 +94,104 @@ class _ChatComposerState extends State<ChatComposer>
               padding: const EdgeInsets.only(bottom: 10),
               child: _ErrorBanner(message: widget.errorMessage!),
             ),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            decoration: ChatTheme.composerDecoration(theme),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+          DragTarget<List<XFile>>(
+            onWillAccept: (_) => true,
+            onAccept: (files) => _mediaController.addDropItems(files),
+            builder: (context, candidateData, rejectedData) {
+              final attachments = _mediaController.attachments;
+              final hasAttachments = attachments.isNotEmpty;
+
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                decoration: ChatTheme.composerDecoration(theme).copyWith(
+                  border: candidateData.isNotEmpty
+                      ? Border.all(color: theme.colorScheme.primary, width: 2)
+                      : null,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    _ComposerIconButton(
-                      icon: Icons.add,
-                      tooltip: 'Vis hurtigmeny',
-                      isActive: _showToolbar,
-                      onTap: _toggleToolbar,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxHeight: 220),
-                        child: TextField(
-                          controller: _controller,
-                          focusNode: _focusNode,
-                          textCapitalization: TextCapitalization.sentences,
-                          textInputAction: TextInputAction.send,
-                          minLines: 1,
-                          maxLines: 6,
-                          onSubmitted: (_) => _handleSend(),
-                          decoration: InputDecoration(
-                            hintText: 'Skriv noe strålende …',
-                            border: InputBorder.none,
-                            hintStyle: theme.textTheme.bodyLarge?.copyWith(
-                              color:
-                                  theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                    if (hasAttachments)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _AttachmentPreviewStrip(
+                          attachments: attachments,
+                          onRemove: (id) => _mediaController.removeAttachment(id),
+                        ),
+                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        _ComposerIconButton(
+                          icon: Icons.add,
+                          tooltip: 'Vis hurtigmeny',
+                          isActive: _showToolbar,
+                          onTap: _toggleToolbar,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 220),
+                            child: TextField(
+                              controller: _controller,
+                              focusNode: _focusNode,
+                              textCapitalization: TextCapitalization.sentences,
+                              textInputAction: TextInputAction.send,
+                              minLines: 1,
+                              maxLines: 6,
+                              onSubmitted: (_) => _handleSend(),
+                              decoration: InputDecoration(
+                                hintText: hasAttachments
+                                    ? 'Legg til en bildetekst …'
+                                    : 'Skriv noe strålende …',
+                                border: InputBorder.none,
+                                hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                                ),
+                              ),
                             ),
                           ),
                         ),
+                        const SizedBox(width: 12),
+                        _ComposerIconButton(
+                          icon: Icons.mic_none_rounded,
+                          tooltip: 'Legg til stemmeklipp',
+                          onTap: () => _mediaController.pickAudio(voiceMemo: true),
+                        ),
+                        const SizedBox(width: 4),
+                        ValueListenableBuilder<bool>(
+                          valueListenable: _hasText,
+                          builder: (context, hasText, _) {
+                            final enabled = (hasText || hasAttachments) && !widget.isSending;
+                            return _SendButton(
+                              isEnabled: enabled,
+                              isSending: widget.isSending,
+                              onPressed: enabled ? _handleSend : null,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    SizeTransition(
+                      sizeFactor: CurvedAnimation(
+                        parent: _toolbarController,
+                        curve: Curves.easeOut,
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    _ComposerIconButton(
-                      icon: Icons.mic_none_rounded,
-                      tooltip: 'Spill inn lydklipp',
-                      onTap: () {},
-                    ),
-                    const SizedBox(width: 4),
-                    ValueListenableBuilder<bool>(
-                      valueListenable: _hasText,
-                      builder: (context, hasText, _) {
-                        final enabled = hasText && !widget.isSending;
-                        return _SendButton(
-                          isEnabled: enabled,
-                          isSending: widget.isSending,
-                          onPressed: enabled ? _handleSend : null,
-                        );
-                      },
+                      axisAlignment: -1,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: _ComposerToolbar(onSelect: _handleToolbarAction),
+                      ),
                     ),
                   ],
                 ),
-                SizeTransition(
-                  sizeFactor: CurvedAnimation(
-                    parent: _toolbarController,
-                    curve: Curves.easeOut,
-                  ),
-                  axisAlignment: -1,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: _ComposerToolbar(onSelect: _handleToolbarAction),
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         ],
       ),
     );
-  }
-
-  void _handleTextChanged() {
-    _hasText.value = _controller.text.trim().isNotEmpty;
   }
 
   void _toggleToolbar() {
@@ -155,24 +206,259 @@ class _ChatComposerState extends State<ChatComposer>
     });
   }
 
-  void _handleSend() {
-    final text = _controller.text.trim();
-    if (text.isEmpty || widget.isSending) return;
-    widget.onSend(text);
-    _controller.clear();
-    _focusNode.requestFocus();
-  }
-
-  void _handleToolbarAction(_ComposerAction action) {
-    // Actions are placeholders for future rich input options.
+  void _handleToolbarAction(_ComposerAction action) async {
     switch (action) {
       case _ComposerAction.attachFile:
+        await _mediaController.pickFiles();
+        break;
       case _ComposerAction.addPhoto:
-      case _ComposerAction.insertEmoji:
-      case _ComposerAction.schedule:
+        await _mediaController.pickFromGallery();
+        break;
+      case _ComposerAction.capturePhoto:
+        await _mediaController.pickFromCamera();
+        break;
+      case _ComposerAction.pickAudio:
+        await _mediaController.pickAudio(voiceMemo: false);
         break;
     }
-    _toggleToolbar();
+    if (mounted) {
+      setState(() {
+        _showToolbar = false;
+      });
+      _toolbarController.reverse();
+    }
+  }
+
+  void _handleSend() {
+    final text = _controller.text.trim();
+    if ((text.isEmpty && !_mediaController.hasAttachments) || widget.isSending) {
+      return;
+    }
+
+    final submission = ComposerSubmission(
+      text: text,
+      attachments: List<ChatMediaAttachment>.from(_mediaController.attachments),
+    );
+
+    widget.onSend(submission);
+    _controller.clear();
+    _hasText.value = false;
+    _mediaController.clear();
+    _focusNode.requestFocus();
+  }
+}
+
+class _AttachmentPreviewStrip extends StatelessWidget {
+  const _AttachmentPreviewStrip({
+    required this.attachments,
+    required this.onRemove,
+  });
+
+  final List<ChatMediaAttachment> attachments;
+  final ValueChanged<String> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 96,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: attachments.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final attachment = attachments[index];
+          return _AttachmentPreviewTile(
+            attachment: attachment,
+            onRemove: () => onRemove(attachment.id),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AttachmentPreviewTile extends StatelessWidget {
+  const _AttachmentPreviewTile({
+    required this.attachment,
+    required this.onRemove,
+  });
+
+  final ChatMediaAttachment attachment;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    Widget preview;
+
+    switch (attachment.type) {
+      case ChatMediaType.image:
+        preview = ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Image.memory(
+            attachment.bytes,
+            fit: BoxFit.cover,
+            width: 96,
+            height: 96,
+          ),
+        );
+        break;
+      case ChatMediaType.video:
+        preview = _PlaceholderPreview(
+          icon: Icons.play_circle_outline,
+          label: attachment.fileName,
+          color: theme.colorScheme.primary,
+        );
+        break;
+      case ChatMediaType.audio:
+      case ChatMediaType.voice:
+        preview = _AudioPreview(attachment: attachment);
+        break;
+      case ChatMediaType.file:
+        preview = _PlaceholderPreview(
+          icon: Icons.insert_drive_file,
+          label: attachment.fileName,
+          color: theme.colorScheme.tertiary,
+        );
+        break;
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: 96,
+          height: 96,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: theme.colorScheme.outline.withOpacity(0.2)),
+          ),
+          child: preview,
+        ),
+        Positioned(
+          top: -6,
+          right: -6,
+          child: Material(
+            color: theme.colorScheme.surface,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onRemove,
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: Icon(
+                  Icons.close,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlaceholderPreview extends StatelessWidget {
+  const _PlaceholderPreview({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AudioPreview extends StatelessWidget {
+  const _AudioPreview({required this.attachment});
+
+  final ChatMediaAttachment attachment;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final icon = attachment.type == ChatMediaType.voice ? Icons.mic : Icons.audiotrack;
+    final waveform = attachment.waveform ?? const [];
+    final bars = waveform.isEmpty
+        ? const <double>[0.2, 0.5, 0.3, 0.6, 0.4]
+        : waveform.take(24).toList(growable: false);
+
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: theme.colorScheme.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  attachment.fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (final sample in bars)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 1.5),
+                        child: Container(
+                          height: math.max(12, 40 * sample),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primary.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -263,7 +549,7 @@ class _ComposerIconButton extends StatelessWidget {
   }
 }
 
-enum _ComposerAction { attachFile, addPhoto, insertEmoji, schedule }
+enum _ComposerAction { attachFile, addPhoto, capturePhoto, pickAudio }
 
 class _ComposerToolbar extends StatelessWidget {
   const _ComposerToolbar({required this.onSelect});
@@ -273,18 +559,17 @@ class _ComposerToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final actions = _ComposerAction.values;
     final labels = {
       _ComposerAction.attachFile: 'Legg ved fil',
-      _ComposerAction.addPhoto: 'Del bilde',
-      _ComposerAction.insertEmoji: 'Emoji',
-      _ComposerAction.schedule: 'Planlegg',
+      _ComposerAction.addPhoto: 'Velg bilder',
+      _ComposerAction.capturePhoto: 'Ta bilde',
+      _ComposerAction.pickAudio: 'Velg lyd',
     };
     final icons = {
       _ComposerAction.attachFile: Icons.attach_file,
       _ComposerAction.addPhoto: Icons.photo_outlined,
-      _ComposerAction.insertEmoji: Icons.emoji_emotions_outlined,
-      _ComposerAction.schedule: Icons.schedule_send,
+      _ComposerAction.capturePhoto: Icons.camera_alt_outlined,
+      _ComposerAction.pickAudio: Icons.music_note,
     };
 
     return Container(
@@ -297,7 +582,7 @@ class _ComposerToolbar extends StatelessWidget {
         spacing: 10,
         runSpacing: 8,
         children: [
-          for (final action in actions)
+          for (final action in _ComposerAction.values)
             _ToolbarChip(
               icon: icons[action]!,
               label: labels[action]!,

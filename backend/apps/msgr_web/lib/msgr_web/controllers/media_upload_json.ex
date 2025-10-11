@@ -13,14 +13,18 @@ defmodule MessngrWeb.MediaUploadJSON do
         byte_size: upload.byte_size,
         expires_at: upload.expires_at,
         upload: %{
-          method: instructions["method"],
-          url: instructions["url"],
-          headers: instructions["headers"],
-          bucket: instructions["bucket"],
-          object_key: instructions["objectKey"],
-          public_url: instructions["publicUrl"],
-          expires_at: instructions["expiresAt"]
-        }
+          method: instructions["upload"]["method"],
+          url: instructions["upload"]["url"],
+          headers: instructions["upload"]["headers"],
+          expires_at: instructions["upload"]["expiresAt"]
+        },
+        download: %{
+          method: instructions["download"]["method"],
+          url: instructions["download"]["url"],
+          expires_at: instructions["download"]["expiresAt"]
+        },
+        public_url: instructions["publicUrl"],
+        retention_until: instructions["retentionUntil"]
       }
     }
   end
