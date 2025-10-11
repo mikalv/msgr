@@ -1,0 +1,95 @@
+name: Deploy
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  MIX_ENV: prod
+  UBUNTU_VERSION: ubuntu-20.04
+  DEPLOY_PATH: /var/www/hello.yellowduck.be
+  DEPLOY_APP_NAME: hello
+  DEPLOY_DAEMON_NAME: hello-yellowduck-be
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Elixir
+      uses: erlef/setup-beam@v1
+      with:
+        version-file: .tool-versions
+        version-type: strict
+
+    - name: Cache deps
+      id: cache-deps
+      uses: actions/cache@v4
+      env:
+        cache-name: cache-elixir-deps
+      with:
+        path: deps
+        key: ${{ env.UBUNTU_VERSION }}-mix-${{ env.cache-name }}-${{ hashFiles('**/mix.lock') }}-${{ hashFiles('**/.tool-versions') }}
+        restore-keys: |
+          ${{ env.UBUNTU_VERSION }}-mix-${{ env.cache-name }}-
+
+    - name: Cache compiled build
+      id: cache-build
+      uses: actions/cache@v4
+      env:
+        cache-name: cache-compiled-build
+      with:
+        path: _build
+        key: ${{ env.UBUNTU_VERSION }}-mix-${{ env.cache-name }}-${{ hashFiles('**/mix.lock') }}-${{ hashFiles('**/.tool-versions') }}
+        restore-keys: |
+          ${{ env.UBUNTU_VERSION }}-mix-${{ env.cache-name }}-
+          ${{ env.UBUNTU_VERSION }}-mix-
+
+    - name: Clean to rule out incremental build as a source of flakiness
+      if: github.run_attempt != '1'
+      run: |
+        mix deps.clean --all
+        mix clean
+      shell: sh
+
+    - name: Install dependencies
+      run: mix deps.get --only-prod
+
+    - name: Compile
+      run: mix compile
+
+    - name: Compile assets
+      run: mix assets.deploy
+
+    - name: Compile release
+      run: mix release --overwrite
+
+    - name: Install SSH key
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: ${{ secrets.SSH_KEY }}
+        known_hosts: 'to be defined on next step'
+
+    - name: Add Known Hosts
+      run: ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+    - name: Deploy Release with rsync
+      run: rsync --delete -avz ./_build ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.DEPLOY_PATH }}
+
+    - name: Restart Application
+      uses: appleboy/ssh-action@v1.2.0
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          export $(cat ${{ env.DEPLOY_PATH }}/.env | xargs) && ${{ env.DEPLOY_PATH }}/_build/${{ env.MIX_ENV }}/rel/${{ env.DEPLOY_APP_NAME }}/bin/migrate
+          systemctl daemon-reload
+          systemctl restart ${{ env.DEPLOY_DAEMON_NAME }}
