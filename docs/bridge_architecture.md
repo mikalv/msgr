@@ -19,6 +19,12 @@
    - Workers trigger periodic sync actions (`request_history`, `refresh_roster`) over the queue.
    - Daemons stream results and update tokens; Elixir writes checkpoints and notifies subscribers.
 
+## Conversation History Streaming
+- Clients request historical windows by pushing `message:sync` on the Phoenix conversation channel.
+- The backend serves cursor-based pages (before/after/around IDs) and rebroadcasts the backlog via PubSub so every watcher receives the same slice.
+- REST controllers expose the same pagination contract, including `unread_count`, `last_message`, and watcher counts per conversation.
+- `conversation:watch` / `conversation:unwatch` maintain lightweight ETS-backed presence lists that surface active viewers to all subscribers.
+
 ## Security Layers
 - Per-daemon containers with AppArmor/seccomp profiles to contain native libraries and reverse-engineered code.
 - Mutual TLS (or Noise handshakes) between daemons and StoneMQ plus signed envelopes verified by the Elixir core.
