@@ -475,9 +475,7 @@ class _ChatComposerState extends State<ChatComposer>
         _shouldShowCommandPalette ? _matchedCommands[_commandSelection] : null;
     final result = widget.controller.buildResult(command: command);
     widget.onSubmit(result);
-    widget.controller.clear();
     setState(() {
-      _textController.clear();
       _showEmoji = false;
       _commandSelection = 0;
     });

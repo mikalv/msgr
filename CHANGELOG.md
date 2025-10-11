@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Utvidet roadmap-dokumentet for message composer-paritet i
+  `docs/message_composer_parity_plan.md` med detaljerte faser,
+  kickoff-sjekkliste og risikovurdering.
 - Added account device management with migrations, CRUD helpers, Noise key
   attestation storage and auth flow integration so OTP/OIDC logins register
   and activate devices, including ExUnit coverage.
@@ -39,6 +42,7 @@
   PubSub-backlog (`message:sync`) og watcher-strømmer (`conversation:watch`/`unwatch`).
 - Designet et modulært Flutter chat-UI-kit (kanalliste, trådvisning, reaksjoner, presence, tilkoblingsbanner) og integrerte det i `ChatPage` og en ny `ChannelListPage`-demo.
 - Utvidet `ChatComposer` med emoji-velger, slash-kommandoer, filvedlegg, simulert taleopptak og forbedret utkast-/feilhåndtering samt nye widgettester og demo-widget.
+- Forsterket chat-komponisten med pålitelig tekstutsending, per-tråd-utkast og nye view-model-tester for sendefeil og kladd-restaurering.
 - Implementerte hurtigbuffer for samtaler og meldinger med Hive/Sembast, offline statusbanner og integrasjonstester for fallback i `ChatViewModel`.
 - Flutter-klienten sender nå enhet- og app-informasjon til auth-backenden ved
   oppstart via nytt device-context-bootstrapp, og reetablerer brukerøkter når
