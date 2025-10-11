@@ -5,6 +5,13 @@ defmodule MessngrWeb.ConversationController do
 
   action_fallback MessngrWeb.FallbackController
 
+  def index(conn, params) do
+    current_profile = conn.assigns.current_profile
+    page = Messngr.list_conversations(current_profile.id, build_list_opts(params))
+
+    render(conn, :index, page: page)
+  end
+
   def create(conn, %{"target_profile_id" => target_profile_id}) do
     current_profile = conn.assigns.current_profile
 
@@ -50,6 +57,37 @@ defmodule MessngrWeb.ConversationController do
 
   def create(_conn, _params), do: {:error, :bad_request}
 
+  def watch(conn, %{"id" => conversation_id}) do
+    current_profile = conn.assigns.current_profile
+
+    with {:ok, payload} <- Messngr.watch_conversation(conversation_id, current_profile.id) do
+      render(conn, :watchers, payload: payload)
+    end
+  rescue
+    Ecto.NoResultsError -> {:error, :forbidden}
+  end
+
+  def unwatch(conn, %{"id" => conversation_id}) do
+    current_profile = conn.assigns.current_profile
+
+    with {:ok, payload} <- Messngr.unwatch_conversation(conversation_id, current_profile.id) do
+      render(conn, :watchers, payload: payload)
+    end
+  rescue
+    Ecto.NoResultsError -> {:error, :forbidden}
+  end
+
+  def watchers(conn, %{"id" => conversation_id}) do
+    current_profile = conn.assigns.current_profile
+
+    with _ <- Messngr.ensure_membership(conversation_id, current_profile.id) do
+      payload = Messngr.list_watchers(conversation_id)
+      render(conn, :watchers, payload: payload)
+    end
+  rescue
+    Ecto.NoResultsError -> {:error, :forbidden}
+  end
+
   defp parse_participant_ids(params) do
     params
     |> Map.get("participant_ids")
@@ -70,6 +108,22 @@ defmodule MessngrWeb.ConversationController do
     |> Kernel.||(Map.get(params, "access"))
     |> Kernel.||(Map.get(params, "hidden") |> hidden_to_visibility())
   end
+
+  defp build_list_opts(params) do
+    []
+    |> maybe_put(:limit, params["limit"])
+    |> maybe_put(:after_id, params["after_id"])
+  end
+
+  defp maybe_put(opts, _key, nil), do: opts
+  defp maybe_put(opts, :limit, value) do
+    case Integer.parse(to_string(value)) do
+      {int, _} when int > 0 and int <= 200 -> Keyword.put(opts, :limit, int)
+      _ -> opts
+    end
+  end
+
+  defp maybe_put(opts, :after_id, value), do: Keyword.put(opts, :after_id, value)
 
   defp hidden_to_visibility(nil), do: nil
   defp hidden_to_visibility(value) when value in [true, "true", 1, "1"], do: "private"

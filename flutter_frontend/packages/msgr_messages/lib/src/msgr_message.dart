@@ -31,7 +31,7 @@ enum MsgrMessageKind {
 }
 
 /// Base class for all message variants in the chat domain.
-sealed class MsgrMessage extends Equatable {
+abstract class MsgrMessage extends Equatable {
   /// Creates a new message instance.
   const MsgrMessage({
     required this.id,
@@ -110,6 +110,7 @@ abstract class MsgrAuthoredMessage extends MsgrMessage {
     super.sentAt,
     super.insertedAt,
     super.isLocal,
+    super.theme,
   });
 
   /// Identifier of the profile that authored the message.

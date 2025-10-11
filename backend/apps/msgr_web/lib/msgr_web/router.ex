@@ -21,10 +21,14 @@ defmodule MessngrWeb.Router do
   scope "/api", MessngrWeb do
     pipe_through [:api, :actor]
 
+    get "/conversations", ConversationController, :index
     post "/conversations", ConversationController, :create
     post "/conversations/:id/uploads", MediaUploadController, :create
     get "/conversations/:id/messages", MessageController, :index
     post "/conversations/:id/messages", MessageController, :create
+    post "/conversations/:id/watch", ConversationController, :watch
+    delete "/conversations/:id/watch", ConversationController, :unwatch
+    get "/conversations/:id/watchers", ConversationController, :watchers
 
     resources "/families", FamilyController, only: [:index, :create, :show] do
       resources "/events", FamilyEventController, only: [:index, :create, :show, :update, :delete]

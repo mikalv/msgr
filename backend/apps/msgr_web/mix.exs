@@ -53,7 +53,7 @@ defmodule MessngrWeb.MixProject do
        app: false,
        compile: false,
        depth: 1},
-      {:telemetry_metrics, "~> 1.0"},
+      {:telemetry_metrics, ">= 0.6.0 and < 2.0.0"},
       {:telemetry_poller, "~> 1.0"},
       {:telemetry_metrics_prometheus, "~> 1.1"},
       {:gettext, "~> 0.20"},

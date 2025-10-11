@@ -7,16 +7,15 @@ void main() {
   testWidgets('MessageWidget displays message content',
       (WidgetTester tester) async {
     // Mock data
-    final MMessage message = MMessage(
+    final message = MMessage.raw(
       fromProfileID: '123',
       content: 'Hello, world!',
-      createdAt: '2023-10-01',
-      id: '',
-      conversationID: '',
-      roomID: '',
-      updatedAt: '',
+      conversationID: 'conversation',
+      roomID: 'room',
+      createdAt: DateTime.parse('2023-10-01T12:00:00Z'),
+      updatedAt: DateTime.parse('2023-10-01T12:05:00Z'),
       kIsSystemMsg: false,
-      inReplyToMsgID: '',
+      inReplyToMsgID: null,
     );
 
     // Build the widget
@@ -33,22 +32,21 @@ void main() {
 
     // Verify the message content is displayed
     expect(find.text('Hello, world!'), findsOneWidget);
-    expect(find.text('2023-10-01'), findsOneWidget);
+    expect(find.text('2023-10-01T12:00:00.000Z'), findsOneWidget);
   });
 
   testWidgets('MessageWidget displays reaction icon',
       (WidgetTester tester) async {
     // Mock data
-    final MMessage message = MMessage(
+    final message = MMessage.raw(
       fromProfileID: '123',
       content: 'Hello, world!',
-      createdAt: '2023-10-01',
-      id: '',
-      conversationID: '',
-      roomID: '',
-      updatedAt: '',
+      conversationID: 'conversation',
+      roomID: 'room',
+      createdAt: DateTime.parse('2023-10-01T12:00:00Z'),
+      updatedAt: DateTime.parse('2023-10-01T12:05:00Z'),
       kIsSystemMsg: false,
-      inReplyToMsgID: '',
+      inReplyToMsgID: null,
     );
 
     // Build the widget
@@ -70,16 +68,15 @@ void main() {
   testWidgets('MessageWidget displays no reaction icon',
       (WidgetTester tester) async {
     // Mock data
-    final MMessage message = MMessage(
+    final message = MMessage.raw(
       fromProfileID: '123',
       content: 'Hello, world!',
-      createdAt: '2023-10-01',
-      id: '',
-      conversationID: '',
-      roomID: '',
-      updatedAt: '',
+      conversationID: 'conversation',
+      roomID: 'room',
+      createdAt: DateTime.parse('2023-10-01T12:00:00Z'),
+      updatedAt: DateTime.parse('2023-10-01T12:05:00Z'),
       kIsSystemMsg: false,
-      inReplyToMsgID: '',
+      inReplyToMsgID: null,
     );
 
     // Build the widget

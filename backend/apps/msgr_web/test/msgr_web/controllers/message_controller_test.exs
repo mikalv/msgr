@@ -30,8 +30,16 @@ defmodule MessngrWeb.MessageControllerTest do
 
     conn = get(conn, ~p"/api/conversations/#{conversation.id}/messages")
 
-    assert %{"data" => [%{"body" => "Hei", "type" => "text", "payload" => %{}}]} =
-             json_response(conn, 200)
+    assert %{
+             "data" => [
+               %{"body" => "Hei", "type" => "text", "payload" => %{}, "id" => message_id}
+             ],
+             "meta" => %{
+               "start_cursor" => ^message_id,
+               "end_cursor" => ^message_id,
+               "has_more" => %{"before" => false, "after" => false}
+             }
+           } = json_response(conn, 200)
   end
 
   test "creates message", %{conn: conn, conversation: conversation} do
