@@ -13,6 +13,12 @@
   stubs, and unit tests.
 - Added bridge integration execution plan documenting RE rounds and candidate
   upstream projects for Discord, Slack, Snapchat and other chat networks.
+- Added REST-støtte for kontaktimport og match i backenden med nye
+  controller-tester, oppdatert API-kontrakt og Flutter `libmsgr`
+  klientimplementasjon for å lagre kontakter og slå opp kjente venner.
+- Documented the `libmsgr` API surface, added a dedicated CLI entry point for
+  the registration flow (`tool/msgr_cli.dart`), and updated the integration test
+  suite to use the new command for provisioning accounts.
 - Added multi-identity account linking so `Accounts.ensure_identity/1` can attach
   new email/phone/OIDC credentials to an existing account via `account_id`, with
   safeguards against cross-account hijacking, refreshed docs and regression
@@ -127,6 +133,8 @@
 - Enriched the shared msgr message domain with bubble styling, curated theme palettes, and runtime theme switching helpers for every message variant.
 - Redesignet Flutter-hjemmeskjermen med et responsivt oppsett for mobil, nettbrett og desktop, komplett med gradient-sidefelt, innboks-panel og handlingslinje.
 - La til widgettester for brytepunktene og dokumenterte strukturen i `docs/frontend_responsive.md`.
+- La til Cupertino-inspirerte kontaktvisninger i Flutter-klienten (liste, detalj og redigering),
+  systemkontakt-import via `flutter_contacts` og nye widgettester for flyten.
 ## [Unreleased]
 ### Added
 - Konsolidert produktplan og forskningsoppsummering med fokus på chat-MVP, identitet og arkitektur.

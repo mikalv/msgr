@@ -1,6 +1,6 @@
 name: libmsgr
 description: A starting point for Dart libraries or applications.
-version: 0.1.1
+version: 0.1.2
 repository: https://github.com/msgr-no/flutter_client
 
 environment:

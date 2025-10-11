@@ -1,39 +1,57 @@
-<!-- 
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# libmsgr
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages). 
-
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages). 
--->
-
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+`libmsgr` is the shared Dart library that powers the Flutter client and our
+command line tooling. It provides repositories, models and helper services for
+interacting with the msgr backend from multiple front-ends.
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+- Bootstrapping helpers through the `LibMsgr` singleton which wires up secure
+  storage, device information and the encrypted local database.
+- `RegistrationService` and `AuthRepository` that implement the OTP based sign
+  in flow used by the native clients.
+- Repositories for rooms, conversations, profiles and messages backed by Drift
+  and HTTP APIs.
+- Data models for all messaging domain entities with `fromJson` factories.
+- Lightweight CLI that can exercise the registration flow for manual smoke tests
+  and integration testing.
 
 ## Getting started
 
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
-
-## Usage
-
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder. 
+Include the package and initialise the singleton before accessing any
+repositories:
 
 ```dart
-const like = 'sample';
+final lib = LibMsgr();
+lib.secureStorage = MySecureStorage();
+lib.sharedPreferences = MySharedPreferences();
+lib.deviceInfoInstance = MyDeviceInfo();
+await lib.bootstrapLibrary();
 ```
+
+For more background on the public API see [`docs/libmsgr_api.md`](../../docs/libmsgr_api.md).
+
+## CLI usage
+
+The package ships with an executable that makes it easier to perform a full
+registration flow from a terminal. This is helpful when smoke testing the
+backend or when running integration tests locally.
+
+```bash
+cd flutter_frontend/packages/libmsgr
+dart pub get
+dart run tool/msgr_cli.dart integration-flow
+```
+
+Pass `--json` (or `-j`) to emit machine readable output that includes the team
+host, access token and identifiers for the created resources. Use `--help` to
+inspect the available options.
+
+The integration test suite (`integration_tests/test_cli_flow.py`) exercises the
+same command with `--json` to provision fresh accounts on demand.
 
 ## Additional information
 
-TODO: Tell users more about the package: where to find more information, how to 
-contribute to the package, how to file issues, what response they can expect 
-from the package authors, and more.
+- Repository: https://github.com/msgr-no/flutter_client
+- License: MIT (see repository root)
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md)
