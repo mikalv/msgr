@@ -30,6 +30,8 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Hei der');
     await tester.pumpAndSettle();
 
+    expect(find.text('Endringer ikke lagret ennå'), findsOneWidget);
+
     await tester.tap(find.byIcon(Icons.send_rounded));
     await tester.pumpAndSettle();
 
@@ -37,6 +39,35 @@ void main() {
     expect(submitted!.text, 'Hei der');
     expect(submitted!.attachments, isEmpty);
     expect(submitted!.mentions, isEmpty);
+  });
+
+  testWidgets('autosave status reacts to controller updates', (tester) async {
+    final controller = ChatComposerController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            onSubmit: (_) {},
+            isSending: false,
+          ),
+        ),
+      ),
+    );
+
+    controller.markAutosaveInProgress();
+    await tester.pump();
+    expect(find.text('Lagrer utkast …'), findsOneWidget);
+
+    final timestamp = DateTime(2024, 1, 1, 12, 30);
+    controller.markAutosaveSuccess(timestamp);
+    await tester.pump();
+    expect(find.textContaining('Utkast lagret'), findsOneWidget);
+
+    controller.markAutosaveFailure();
+    await tester.pump();
+    expect(find.text('Kunne ikke lagre utkast'), findsOneWidget);
   });
 
   testWidgets('emoji picker inserts emoji at caret', (tester) async {

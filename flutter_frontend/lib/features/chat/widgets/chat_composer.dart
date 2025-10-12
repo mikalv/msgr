@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -17,4 +18,5 @@ part 'chat_composer/composer_palettes.dart';
 part 'chat_composer/composer_attachments.dart';
 part 'chat_composer/composer_controller.dart';
 part 'chat_composer/composer_models.dart';
+part 'chat_composer/composer_draft_snapshot.dart';
 part 'chat_composer/composer_voice_recorder.dart';

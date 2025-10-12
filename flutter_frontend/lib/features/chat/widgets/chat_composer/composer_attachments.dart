@@ -94,33 +94,54 @@ class _VoiceNoteChip extends StatelessWidget {
 }
 
 class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
+  const _ErrorBanner({
+    required this.message,
+    this.icon = Icons.error_outline,
+    this.actionLabel,
+    this.onAction,
+    this.backgroundColor,
+    this.foregroundColor,
+  });
 
   final String message;
+  final IconData icon;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bg = backgroundColor ?? theme.colorScheme.errorContainer;
+    final fg = foregroundColor ?? theme.colorScheme.onErrorContainer;
+    final action = actionLabel;
+    final callback = onAction;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer,
+        color: bg,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            Icon(Icons.error_outline,
-                color: theme.colorScheme.onErrorContainer),
+            Icon(icon, color: fg),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 message,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onErrorContainer,
-                ),
+                style: theme.textTheme.bodyMedium?.copyWith(color: fg),
               ),
             ),
+            if (action != null && callback != null) ...[
+              const SizedBox(width: 12),
+              TextButton(
+                onPressed: callback,
+                style: TextButton.styleFrom(foregroundColor: fg),
+                child: Text(action),
+              ),
+            ],
           ],
         ),
       ),

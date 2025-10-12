@@ -39,18 +39,18 @@
 
 ## 4. Faseplan med detaljerte aktiviteter
 ### Fase A – Research & opplevelseskartlegging (uke 1–2)
-- Gjennomfør funksjonsrevisjon av Slack composer (web/desktop) for å liste opp flows, mikrointeraksjoner og tilhørende states.
-- Intervju interne brukere for pain points med eksisterende composer og forventninger til pålitelighet.
-- Kartlegg tekniske gap: rik tekst, formatert forhåndsvisning, link-unfurling, multi-utkast, trådsvar, tasks og interaksjon med `ChatMediaAttachment`.
-- Oppdater designbrief med states (default, skriving, vedlegg, feilsituasjon, offline) og definér UX-prinsipper.
-- Dokumenter funn og anbefalinger i en utvidelse av [Research.md](../Research.md) for å sikre sporbarhet.
+* [x] - Gjennomfør funksjonsrevisjon av Slack composer (web/desktop) for å liste opp flows, mikrointeraksjoner og tilhørende states.
+* [x] - Intervju interne brukere for pain points med eksisterende composer og forventninger til pålitelighet.
+* [x] - Kartlegg tekniske gap: rik tekst, formatert forhåndsvisning, link-unfurling, multi-utkast, trådsvar, tasks og interaksjon med `ChatMediaAttachment`.
+* [x] - Oppdater designbrief med states (default, skriving, vedlegg, feilsituasjon, offline) og definér UX-prinsipper.
+* [x] - Dokumenter funn og anbefalinger i en utvidelse av [Research.md](../Research.md) for å sikre sporbarhet.
 
 ### Fase B – Robusthet og driftssikkerhet (uke 2–4)
-- Harden autosave: skriv end-to-end tester for krasj/refresh-scenarier og valider at `_cache.saveDraft` dekker flere samtidige tråder.
-- Legg inn pessimistic UI states (sending, retry) i composerens controller og UI, og design fallback for API-feil og offline-modus.
-- Implementer periodic background sync av drafts/attachments (med konfliktoppløsning) og loggfør status i observability-pipelines.
-- Gjør performance-profilering; optimaliser rebuilds og input-lag ved å splitte `ChatComposer` i mikrowidgets eller `InheritedNotifier`.
-- Innfør focus- og accessibility-tests: skjermleserbaner, tastaturnavigasjon, high-contrast theme og kontrastkrav i designsystemet.
+* [x] - Harden autosave: skriv end-to-end tester for krasj/refresh-scenarier og valider at `_cache.saveDraft` dekker flere samtidige tråder.
+* [x] - Legg inn pessimistic UI states (sending, retry) i composerens controller og UI, og design fallback for API-feil og offline-modus.
+* [x] - Implementer periodic background sync av drafts/attachments (med konfliktoppløsning) og loggfør status i observability-pipelines.
+* [ ] - Gjør performance-profilering; optimaliser rebuilds og input-lag ved å splitte `ChatComposer` i mikrowidgets eller `InheritedNotifier`.
+* [x] - Innfør focus- og accessibility-tests: skjermleserbaner, tastaturnavigasjon, high-contrast theme og kontrastkrav i designsystemet.
 
 ### Fase C – Funksjonsparitet og opplevelse (uke 4–8)
 - Bygg rik tekst-editor med inline toolbar (bold, italics, lenker, code-blocks) og tastatursnarveier; sørg for rent Markdown/HTML-output og kompatibilitet med `msgr_messages`.

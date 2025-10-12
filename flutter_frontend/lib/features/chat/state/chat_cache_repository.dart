@@ -5,6 +5,7 @@ import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:messngr/features/chat/models/chat_message.dart';
 import 'package:messngr/features/chat/models/chat_thread.dart';
+import 'package:messngr/features/chat/widgets/chat_composer.dart';
 import 'package:path/path.dart' as p;
 import 'package:sembast/sembast.dart';
 import 'package:sembast/sembast_io.dart';
@@ -16,8 +17,8 @@ abstract class ChatCacheStore {
   Future<List<ChatThread>> readThreads();
   Future<void> saveMessages(String threadId, List<ChatMessage> messages);
   Future<List<ChatMessage>> readMessages(String threadId);
-  Future<void> saveDraft(String threadId, String text);
-  Future<String?> readDraft(String threadId);
+  Future<void> saveDraft(String threadId, ChatDraftSnapshot snapshot);
+  Future<ChatDraftSnapshot?> readDraft(String threadId);
 }
 
 class HiveChatCacheStore implements ChatCacheStore {
@@ -113,21 +114,21 @@ class HiveChatCacheStore implements ChatCacheStore {
   }
 
   @override
-  Future<void> saveDraft(String threadId, String text) async {
+  Future<void> saveDraft(String threadId, ChatDraftSnapshot snapshot) async {
     await _ensureReady();
-    if (text.isEmpty) {
+    if (snapshot.isEmpty) {
       await _draftBox!.delete(threadId);
     } else {
-      await _draftBox!.put(threadId, text);
+      await _draftBox!.put(threadId, snapshot.toJson());
     }
   }
 
   @override
-  Future<String?> readDraft(String threadId) async {
+  Future<ChatDraftSnapshot?> readDraft(String threadId) async {
     await _ensureReady();
     final value = await _draftBox!.get(threadId);
-    if (value is String) {
-      return value;
+    if (value is Map) {
+      return ChatDraftSnapshot.fromJson(value.cast<String, dynamic>());
     }
     return null;
   }
@@ -142,7 +143,7 @@ class HiveChatCacheStore implements ChatCacheStore {
 class InMemoryChatCacheStore implements ChatCacheStore {
   final Map<String, ChatThread> _threads = {};
   final Map<String, List<ChatMessage>> _messages = {};
-  final Map<String, String> _drafts = {};
+  final Map<String, ChatDraftSnapshot> _drafts = {};
 
   @override
   Future<void> initialise({String? basePath}) async {}
@@ -155,7 +156,8 @@ class InMemoryChatCacheStore implements ChatCacheStore {
       _messages[threadId] ?? const [];
 
   @override
-  Future<String?> readDraft(String threadId) async => _drafts[threadId];
+  Future<ChatDraftSnapshot?> readDraft(String threadId) async =>
+      _drafts[threadId];
 
   @override
   Future<void> saveMessages(String threadId, List<ChatMessage> messages) async {
@@ -170,11 +172,11 @@ class InMemoryChatCacheStore implements ChatCacheStore {
   }
 
   @override
-  Future<void> saveDraft(String threadId, String text) async {
-    if (text.isEmpty) {
+  Future<void> saveDraft(String threadId, ChatDraftSnapshot snapshot) async {
+    if (snapshot.isEmpty) {
       _drafts.remove(threadId);
     } else {
-      _drafts[threadId] = text;
+      _drafts[threadId] = snapshot;
     }
   }
 }

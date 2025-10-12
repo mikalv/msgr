@@ -112,6 +112,20 @@ class _ChatComposerState extends State<ChatComposer>
     final showFormatting =
         _focusNode.hasFocus || _textController.text.trim().isNotEmpty;
 
+    final sendState = _value.sendState;
+    final autosaveStatus = _value.autosaveStatus;
+    final isBusy = _isComposerBusy;
+    final composerError = widget.errorMessage ?? _value.error;
+    final isRetryable =
+        sendState == ComposerSendState.failed && _value.error != null;
+    final isQueuedOffline = sendState == ComposerSendState.queuedOffline;
+    final errorIcon =
+        isQueuedOffline ? Icons.cloud_upload_outlined : Icons.error_outline;
+    final Color? errorBackground =
+        isQueuedOffline ? theme.colorScheme.surfaceVariant : null;
+    final Color? errorForeground =
+        isQueuedOffline ? theme.colorScheme.onSurface : null;
+
     if (_showEmoji) {
       _expanderController.forward();
     } else {
@@ -136,11 +150,17 @@ class _ChatComposerState extends State<ChatComposer>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (widget.errorMessage != null || _value.error != null)
+            if (composerError != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child:
-                    _ErrorBanner(message: widget.errorMessage ?? _value.error!),
+                child: _ErrorBanner(
+                  message: composerError,
+                  icon: errorIcon,
+                  backgroundColor: errorBackground,
+                  foregroundColor: errorForeground,
+                  actionLabel: isRetryable ? 'Prøv igjen' : null,
+                  onAction: isRetryable ? _retrySend : null,
+                ),
               ),
             if (attachments.isNotEmpty || voiceNote != null)
               _AttachmentPreview(
@@ -169,11 +189,13 @@ class _ChatComposerState extends State<ChatComposer>
                   const SingleActivator(LogicalKeyboardKey.arrowUp):
                       _selectPreviousCommand,
                 },
-                child: Focus(
-                  autofocus: false,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+                child: FocusTraversalGroup(
+                  policy: WidgetOrderTraversalPolicy(),
+                  child: Focus(
+                    autofocus: false,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -181,19 +203,19 @@ class _ChatComposerState extends State<ChatComposer>
                             icon: Icons.emoji_emotions_outlined,
                             tooltip: 'Emoji',
                             isActive: _showEmoji,
-                            onTap: _toggleEmoji,
+                            onTap: isBusy ? null : _toggleEmoji,
                           ),
                           if (!isCompact) const SizedBox(width: 8),
                           _ComposerIconButton(
                             icon: Icons.attach_file,
                             tooltip: 'Legg ved fil',
-                            onTap: _pickFiles,
+                            onTap: isBusy ? null : _pickFiles,
                           ),
                           const SizedBox(width: 8),
                           _ComposerIconButton(
                             icon: Icons.camera_alt_outlined,
                             tooltip: 'Åpne kamera',
-                            onTap: _capturePhoto,
+                            onTap: isBusy ? null : _capturePhoto,
                           ),
                           const SizedBox(width: 8),
                           Expanded(
@@ -201,7 +223,7 @@ class _ChatComposerState extends State<ChatComposer>
                               controller: _textController,
                               focusNode: _focusNode,
                               onSubmitted: (_) => _submit(),
-                              isSending: widget.isSending,
+                              isSending: isBusy,
                               placeholder: isCompact
                                   ? 'Melding'
                                   : 'Del en oppdatering eller skriv / for kommandoer',
@@ -212,16 +234,28 @@ class _ChatComposerState extends State<ChatComposer>
                             isRecording: widget.voiceRecorder.isRecording,
                             onStart: _startRecording,
                             onStop: _stopRecording,
+                            isEnabled: !isBusy,
                           ),
                           const SizedBox(width: 8),
                           _SendButton(
                             isEnabled: _canSend,
-                            isSending: widget.isSending,
+                            isSending: isBusy,
                             onPressed:
                                 _canSend ? () => _submit(forceSend: true) : null,
                           ),
                         ],
                       ),
+                      if (autosaveStatus != ComposerAutosaveStatus.idle)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: _AutosaveStatusLabel(
+                              status: autosaveStatus,
+                              timestamp: _value.lastAutosave,
+                            ),
+                          ),
+                        ),
                       if (showFormatting)
                         Padding(
                           padding: const EdgeInsets.only(top: 12),
@@ -306,8 +340,11 @@ class _ChatComposerState extends State<ChatComposer>
     );
   }
 
+  bool get _isComposerBusy =>
+      widget.isSending || _value.sendState == ComposerSendState.sending;
+
   bool get _canSend {
-    if (widget.isSending) return false;
+    if (_isComposerBusy) return false;
     return _textController.text.trim().isNotEmpty ||
         _value.attachments.isNotEmpty ||
         _value.voiceNote != null;
@@ -326,6 +363,7 @@ class _ChatComposerState extends State<ChatComposer>
   }
 
   Future<void> _pickFiles() async {
+    if (_isComposerBusy) return;
     try {
       final picker = widget.filePicker ?? FilePicker.platform;
       final result = await picker.pickFiles(allowMultiple: true);
@@ -343,6 +381,7 @@ class _ChatComposerState extends State<ChatComposer>
 
   Future<void> _handleDrop(DropDoneDetails details) async {
     setState(() => _isDropHover = false);
+    if (_isComposerBusy) return;
     if (details.files.isEmpty) return;
 
     try {
@@ -363,6 +402,7 @@ class _ChatComposerState extends State<ChatComposer>
   }
 
   Future<void> _capturePhoto() async {
+    if (_isComposerBusy) return;
     try {
       final file = await _imagePicker.pickImage(
         source: ImageSource.camera,
@@ -381,6 +421,7 @@ class _ChatComposerState extends State<ChatComposer>
   }
 
   Future<void> _startRecording() async {
+    if (_isComposerBusy) return;
     await widget.voiceRecorder.start();
   }
 
@@ -399,6 +440,12 @@ class _ChatComposerState extends State<ChatComposer>
 
   void _clearVoiceNote() {
     widget.controller.clearVoiceNote();
+  }
+
+  void _retrySend() {
+    if (_isComposerBusy) return;
+    final result = widget.controller.buildResult();
+    widget.onSubmit(result);
   }
 
   void _handleDraftChanged() {
@@ -718,5 +765,88 @@ class _ChatComposerState extends State<ChatComposer>
       _clearMentionPalette();
     });
     _focusNode.requestFocus();
+  }
+}
+
+class _AutosaveStatusLabel extends StatelessWidget {
+  const _AutosaveStatusLabel({
+    required this.status,
+    this.timestamp,
+  });
+
+  final ComposerAutosaveStatus status;
+  final DateTime? timestamp;
+
+  @override
+  Widget build(BuildContext context) {
+    if (status == ComposerAutosaveStatus.idle) {
+      return const SizedBox.shrink();
+    }
+
+    final theme = Theme.of(context);
+    Color color;
+    switch (status) {
+      case ComposerAutosaveStatus.failed:
+        color = theme.colorScheme.error;
+        break;
+      case ComposerAutosaveStatus.saving:
+        color = theme.colorScheme.primary;
+        break;
+      default:
+        color = theme.colorScheme.onSurfaceVariant;
+    }
+
+    Widget? indicator;
+    String text;
+
+    switch (status) {
+      case ComposerAutosaveStatus.saving:
+        text = 'Lagrer utkast …';
+        indicator = SizedBox(
+          width: 12,
+          height: 12,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+          ),
+        );
+        break;
+      case ComposerAutosaveStatus.saved:
+        final stamp = timestamp != null
+            ? TimeOfDay.fromDateTime(timestamp!).format(context)
+            : null;
+        text = stamp == null ? 'Utkast lagret' : 'Utkast lagret $stamp';
+        break;
+      case ComposerAutosaveStatus.failed:
+        text = 'Kunne ikke lagre utkast';
+        break;
+      case ComposerAutosaveStatus.dirty:
+        text = 'Endringer ikke lagret ennå';
+        break;
+      case ComposerAutosaveStatus.idle:
+        text = '';
+        break;
+    }
+
+    return Semantics(
+      liveRegion: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          if (indicator != null) ...[
+            indicator,
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(color: color),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

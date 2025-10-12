@@ -1,5 +1,9 @@
 part of 'package:messngr/features/chat/widgets/chat_composer.dart';
 
+enum ComposerSendState { idle, sending, queuedOffline, failed }
+
+enum ComposerAutosaveStatus { idle, dirty, saving, saved, failed }
+
 class ChatComposerValue {
   const ChatComposerValue({
     required this.text,
@@ -8,6 +12,9 @@ class ChatComposerValue {
     required this.mentions,
     this.error,
     this.command,
+    this.sendState = ComposerSendState.idle,
+    this.autosaveStatus = ComposerAutosaveStatus.idle,
+    this.lastAutosave,
   });
 
   static const _unset = Object();
@@ -18,6 +25,9 @@ class ChatComposerValue {
   final List<ComposerMention> mentions;
   final String? error;
   final SlashCommand? command;
+  final ComposerSendState sendState;
+  final ComposerAutosaveStatus autosaveStatus;
+  final DateTime? lastAutosave;
 
   factory ChatComposerValue.empty() => const ChatComposerValue(
         text: '',
@@ -26,6 +36,9 @@ class ChatComposerValue {
         mentions: [],
         error: null,
         command: null,
+        sendState: ComposerSendState.idle,
+        autosaveStatus: ComposerAutosaveStatus.idle,
+        lastAutosave: null,
       );
 
   ChatComposerValue copyWith({
@@ -38,11 +51,17 @@ class ChatComposerValue {
     bool clearCommand = false,
     List<ComposerMention>? mentions,
     bool clearMentions = false,
+    ComposerSendState? sendState,
+    ComposerAutosaveStatus? autosaveStatus,
+    DateTime? lastAutosave,
+    bool clearLastAutosave = false,
   }) {
     final resolvedError = error == _unset ? this.error : error as String?;
     final resolvedCommand = clearCommand ? null : (command ?? this.command);
     final resolvedMentions =
         clearMentions ? <ComposerMention>[] : (mentions ?? this.mentions);
+    final resolvedLastAutosave =
+        clearLastAutosave ? null : (lastAutosave ?? this.lastAutosave);
     return ChatComposerValue(
       text: text ?? this.text,
       attachments: attachments ?? this.attachments,
@@ -50,6 +69,9 @@ class ChatComposerValue {
       mentions: resolvedMentions,
       error: resolvedError,
       command: resolvedCommand,
+      sendState: sendState ?? this.sendState,
+      autosaveStatus: autosaveStatus ?? this.autosaveStatus,
+      lastAutosave: resolvedLastAutosave,
     );
   }
 
@@ -62,7 +84,10 @@ class ChatComposerValue {
         other.voiceNote == voiceNote &&
         listEquals(other.mentions, mentions) &&
         other.error == error &&
-        other.command == command;
+        other.command == command &&
+        other.sendState == sendState &&
+        other.autosaveStatus == autosaveStatus &&
+        other.lastAutosave == lastAutosave;
   }
 
   @override
@@ -73,6 +98,9 @@ class ChatComposerValue {
         Object.hashAll(mentions),
         error,
         command,
+        sendState,
+        autosaveStatus,
+        lastAutosave?.millisecondsSinceEpoch,
       );
 }
 

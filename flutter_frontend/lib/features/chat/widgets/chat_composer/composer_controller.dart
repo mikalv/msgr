@@ -14,6 +14,8 @@ class ChatComposerController extends ChangeNotifier {
       _value.copyWith(
         text: text,
         clearCommand: shouldClearCommand,
+        autosaveStatus: ComposerAutosaveStatus.dirty,
+        clearLastAutosave: true,
       ),
     );
   }
@@ -27,6 +29,8 @@ class ChatComposerController extends ChangeNotifier {
       _value.copyWith(
         attachments: [..._value.attachments, ...attachments],
         error: null,
+        autosaveStatus: ComposerAutosaveStatus.dirty,
+        clearLastAutosave: true,
       ),
     );
   }
@@ -36,16 +40,30 @@ class ChatComposerController extends ChangeNotifier {
       _value.copyWith(
         attachments:
             _value.attachments.where((a) => a.id != attachment.id).toList(),
+        autosaveStatus: ComposerAutosaveStatus.dirty,
+        clearLastAutosave: true,
       ),
     );
   }
 
   void clearVoiceNote() {
-    _update(_value.copyWith(clearVoiceNote: true));
+    _update(
+      _value.copyWith(
+        clearVoiceNote: true,
+        autosaveStatus: ComposerAutosaveStatus.dirty,
+        clearLastAutosave: true,
+      ),
+    );
   }
 
   void setVoiceNote(ComposerVoiceNote note) {
-    _update(_value.copyWith(voiceNote: note));
+    _update(
+      _value.copyWith(
+        voiceNote: note,
+        autosaveStatus: ComposerAutosaveStatus.dirty,
+        clearLastAutosave: true,
+      ),
+    );
   }
 
   void setCommand(SlashCommand? command) {
@@ -53,6 +71,8 @@ class ChatComposerController extends ChangeNotifier {
       _value.copyWith(
         command: command,
         clearCommand: command == null,
+        autosaveStatus: ComposerAutosaveStatus.dirty,
+        clearLastAutosave: true,
       ),
     );
   }
@@ -63,7 +83,13 @@ class ChatComposerController extends ChangeNotifier {
       return;
     }
     mentions.add(mention);
-    _update(_value.copyWith(mentions: mentions));
+    _update(
+      _value.copyWith(
+        mentions: mentions,
+        autosaveStatus: ComposerAutosaveStatus.dirty,
+        clearLastAutosave: true,
+      ),
+    );
   }
 
   void syncMentionsWithText(String text) {
@@ -76,6 +102,66 @@ class ChatComposerController extends ChangeNotifier {
     if (!listEquals(active, _value.mentions)) {
       _update(_value.copyWith(mentions: active));
     }
+  }
+
+  void setSendState(ComposerSendState state, {String? error}) {
+    final resolvedError =
+        state == ComposerSendState.failed ? error ?? _value.error : null;
+    _update(
+      _value.copyWith(
+        sendState: state,
+        error: resolvedError,
+      ),
+    );
+  }
+
+  void markAutosaveInProgress() {
+    if (_value.autosaveStatus == ComposerAutosaveStatus.saving) {
+      return;
+    }
+    _update(
+      _value.copyWith(
+        autosaveStatus: ComposerAutosaveStatus.saving,
+      ),
+    );
+  }
+
+  void markAutosaveSuccess(DateTime timestamp) {
+    _update(
+      _value.copyWith(
+        autosaveStatus: ComposerAutosaveStatus.saved,
+        lastAutosave: timestamp,
+      ),
+    );
+  }
+
+  void markAutosaveFailure() {
+    _update(
+      _value.copyWith(
+        autosaveStatus: ComposerAutosaveStatus.failed,
+      ),
+    );
+  }
+
+  void markAutosaveDirty() {
+    if (_value.autosaveStatus == ComposerAutosaveStatus.dirty &&
+        _value.lastAutosave == null) {
+      return;
+    }
+    _update(
+      _value.copyWith(
+        autosaveStatus: ComposerAutosaveStatus.dirty,
+        clearLastAutosave: true,
+      ),
+    );
+  }
+
+  void restoreSnapshot(ChatDraftSnapshot snapshot) {
+    _update(snapshot.applyTo(_value));
+  }
+
+  ChatDraftSnapshot snapshot() {
+    return ChatDraftSnapshot.fromComposerValue(_value);
   }
 
   ChatComposerResult buildResult({SlashCommand? command}) {
