@@ -61,6 +61,18 @@ defmodule MessngrWeb.Router do
     post "/ai/chat", AIController, :chat
     post "/ai/summarize", AIController, :summarize
     post "/ai/run", AIController, :run
+    get "/bridges/catalog", BridgeCatalogController, :index
+    post "/bridges/:bridge_id/sessions", BridgeAuthSessionController, :create
+    get "/bridges/sessions/:id", BridgeAuthSessionController, :show
+    post "/bridges/:bridge_id/sessions/:id/credentials", BridgeAuthSessionController, :submit_credentials
+    delete "/bridges/:bridge_id", BridgeAccountController, :delete
+  end
+
+  scope "/auth/bridge", MessngrWeb do
+    pipe_through :browser
+
+    get "/:session_id/start", BridgeAuthBrowserController, :start
+    get "/:session_id/callback", BridgeAuthBrowserController, :callback
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development

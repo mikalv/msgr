@@ -134,6 +134,28 @@ defmodule Messngr.BridgesTest do
     end
   end
 
+  describe "unlink_account/2" do
+    setup do
+      %{account: insert_account!("Unlink Owner")}
+    end
+
+    test "removes bridge account and cascades related data", %{account: account} do
+      assert {:ok, linked} =
+               Bridges.sync_linked_identity(account.id, :telegram, %{external_id: "unlink-me"})
+
+      assert {:ok, link} =
+               Bridges.create_share_link(linked.id, :file, %{payload: %{"url" => "https://example"}})
+
+      assert {:ok, _deleted} = Bridges.unlink_account(account.id, :telegram)
+      assert Bridges.get_account(account.id, :telegram) == nil
+      assert Repo.get(ShareLinks.ShareLink, link.id) == nil
+    end
+
+    test "returns error when bridge is not linked", %{account: account} do
+      assert {:error, :not_found} = Bridges.unlink_account(account.id, :matrix)
+    end
+  end
+
   test "get_account/2 returns persisted identity" do
     account =
       %Account{}

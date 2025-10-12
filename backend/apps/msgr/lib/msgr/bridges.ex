@@ -11,6 +11,7 @@ defmodule Messngr.Bridges do
   import Ecto.Query, warn: false
 
   alias Ecto.Changeset
+  alias Messngr.Accounts.Account
   alias Messngr.Accounts.Contact, as: MsgrContact
   alias Messngr.Bridges.{BridgeAccount, Channel, Contact, ContactProfile, ContactProfileKey, ProfileLink}
   alias Messngr.ShareLinks
@@ -30,6 +31,16 @@ defmodule Messngr.Bridges do
   end
 
   @doc """
+  Lists all bridge accounts currently linked to the supplied Msgr account.
+  """
+  @spec list_accounts(account_id()) :: [BridgeAccount.t()]
+  def list_accounts(account_id) when is_binary(account_id) do
+    Repo.all(from account in BridgeAccount, where: account.account_id == ^account_id)
+  end
+
+  def list_accounts(_account_id), do: []
+
+  @doc """
   Creates a share link tied to a bridge account so binary payloads can be
   shared with low-capability networks (e.g. IRC).
   """
@@ -41,6 +52,24 @@ defmodule Messngr.Bridges do
       %BridgeAccount{} = bridge_account -> ShareLinks.create_bridge_link(bridge_account, kind, attrs)
     end
   end
+
+  @doc """
+  Unlinks a previously connected bridge account and cascades associated state.
+  Returns `{:error, :not_found}` when the service has not been linked.
+  """
+  @spec unlink_account(account_id() | Account.t(), service()) :: {:ok, BridgeAccount.t()} | {:error, term()}
+  def unlink_account(%Account{id: account_id}, service), do: unlink_account(account_id, service)
+
+  def unlink_account(account_id, service) when is_binary(account_id) do
+    service = normalise_service(service)
+
+    case Repo.get_by(BridgeAccount, account_id: account_id, service: service) do
+      nil -> {:error, :not_found}
+      %BridgeAccount{} = account -> Repo.delete(account)
+    end
+  end
+
+  def unlink_account(_account_id, _service), do: {:error, :invalid_account}
 
   @doc """
   Fetches an active share link by token, returning an error if it has expired or
