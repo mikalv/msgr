@@ -17,7 +17,7 @@ defmodule Messngr.Chat do
     Participant,
     PinnedMessage
   }
-  alias Messngr.Accounts.{Device, Profile}
+  alias Messngr.Accounts.{Account, Device, Profile}
 
   @conversation_topic_prefix "conversation"
 
@@ -53,6 +53,18 @@ defmodule Messngr.Chat do
       |> List.wrap()
 
     create_structured_conversation(:channel, owner_profile_id, participant_ids, attrs)
+  end
+
+  @spec update_conversation(binary(), map()) :: {:ok, Conversation.t()} | {:error, term()}
+  def update_conversation(conversation_id, attrs) when is_map(attrs) do
+    Repo.transaction(fn ->
+      conversation = Repo.get!(Conversation, conversation_id)
+
+      case Conversation.changeset(conversation, attrs) |> Repo.update() do
+        {:ok, updated} -> preload_conversation(updated.id)
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
   end
 
   @spec add_participant(Conversation.t(), binary(), :member | :owner) ::
@@ -247,17 +259,24 @@ defmodule Messngr.Chat do
       attrs = %{last_read_at: read_at}
 
       device = resolve_receipt_device(participant, opts)
+      allow_receipts? = read_receipts_allowed?(participant)
 
       case Participant.changeset(participant, attrs) |> Repo.update() do
         {:ok, updated} ->
-          {receipt, message_info} = mark_receipt_read(message, participant, read_at, device)
-          {updated, message, read_at, receipt, message_info}
+          {receipt, message_info} =
+            if allow_receipts? do
+              mark_receipt_read(message, participant, read_at, device)
+            else
+              {nil, nil}
+            end
+
+          {updated, message, read_at, receipt, message_info, allow_receipts?}
 
         {:error, reason} -> Repo.rollback(reason)
       end
     end)
     |> case do
-      {:ok, {participant, message, read_at, receipt, message_info}} ->
+      {:ok, {participant, message, read_at, receipt, message_info, true}} ->
         broadcast_message_read(
           conversation_id,
           participant.profile_id,
@@ -267,6 +286,9 @@ defmodule Messngr.Chat do
         )
 
         maybe_broadcast_message_status(message_info)
+        {:ok, participant}
+
+      {:ok, {participant, _message, _read_at, _receipt, _message_info, false}} ->
         {:ok, participant}
 
       {:error, reason} ->
@@ -1034,11 +1056,18 @@ defmodule Messngr.Chat do
       |> Kernel.||(Map.get(attrs, :visibility))
       |> normalize_visibility(default_visibility_for(kind), kind)
 
+    read_receipts_enabled =
+      attrs
+      |> Map.get("read_receipts_enabled")
+      |> Kernel.||(Map.get(attrs, :read_receipts_enabled))
+      |> normalize_boolean(true)
+
     conversation_attrs =
       %{kind: kind}
       |> maybe_put_topic(topic)
       |> maybe_put_structure_type(structure_type)
       |> Map.put(:visibility, visibility)
+      |> Map.put(:read_receipts_enabled, read_receipts_enabled)
 
     member_ids = normalize_participant_ids(participant_ids, owner_profile_id)
 
@@ -1132,6 +1161,24 @@ defmodule Messngr.Chat do
   end
 
   defp normalize_visibility(_value, default, kind), do: enforce_visibility(kind, default)
+
+  defp normalize_boolean(nil, default), do: default
+
+  defp normalize_boolean(value, _default) when value in [true, false], do: value
+
+  defp normalize_boolean(value, default) when is_binary(value) do
+    case String.downcase(String.trim(value)) do
+      "true" -> true
+      "1" -> true
+      "false" -> false
+      "0" -> false
+      _ -> default
+    end
+  end
+
+  defp normalize_boolean(value, _default) when value in [1, "1"], do: true
+  defp normalize_boolean(value, _default) when value in [0, "0"], do: false
+  defp normalize_boolean(_value, default), do: default
 
   defp enforce_visibility(:group, _value), do: :private
   defp enforce_visibility(:direct, _value), do: :private
@@ -1669,6 +1716,24 @@ defmodule Messngr.Chat do
       %Device{} = device -> ensure_device_owner(device, participant)
       nil -> Repo.rollback(:device_not_found)
     end
+  end
+
+  defp read_receipts_allowed?(%Participant{} = participant) do
+    participant = Repo.preload(participant, [:conversation, profile: :account])
+
+    conversation_allowed? =
+      case participant.conversation do
+        %Conversation{read_receipts_enabled: false} -> false
+        _ -> true
+      end
+
+    account_allowed? =
+      case participant.profile do
+        %Profile{account: %Account{read_receipts_enabled: false}} -> false
+        _ -> true
+      end
+
+    conversation_allowed? and account_allowed?
   end
 
   defp mark_receipt_read(%Message{} = message, %Participant{} = participant, read_at, device) do

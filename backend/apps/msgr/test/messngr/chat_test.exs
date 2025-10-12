@@ -384,6 +384,63 @@ defmodule Messngr.ChatTest do
       assert updated_message.status == :read
     end
 
+    test "mark_message_read respects account preference for read receipts", %{
+      conversation: conversation,
+      message: message,
+      other: other
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      account = Accounts.get_account!(other.account_id)
+      {:ok, _} = Accounts.update_account(account, %{read_receipts_enabled: false})
+      {:ok, _} = Chat.acknowledge_message_delivery(conversation.id, other.id, message.id)
+
+      assert {:ok, participant} = Chat.mark_message_read(conversation.id, other.id, message.id)
+      assert participant.last_read_at
+
+      refute_receive {:message_read, _}
+
+      receipt =
+        Repo.get_by!(MessageReceipt,
+          message_id: message.id,
+          recipient_id: other.id
+        )
+
+      assert receipt.status == :delivered
+      assert is_nil(receipt.read_at)
+
+      updated_message = Repo.get!(Messngr.Chat.Message, message.id)
+      assert updated_message.status == :delivered
+    end
+
+    test "mark_message_read respects conversation preference for read receipts", %{
+      conversation: conversation,
+      message: message,
+      other: other
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      {:ok, _} = Chat.update_conversation(conversation.id, %{read_receipts_enabled: false})
+      {:ok, _} = Chat.acknowledge_message_delivery(conversation.id, other.id, message.id)
+
+      assert {:ok, participant} = Chat.mark_message_read(conversation.id, other.id, message.id)
+      assert participant.last_read_at
+
+      refute_receive {:message_read, _}
+
+      receipt =
+        Repo.get_by!(MessageReceipt,
+          message_id: message.id,
+          recipient_id: other.id
+        )
+
+      assert receipt.status == :delivered
+      assert is_nil(receipt.read_at)
+
+      updated_message = Repo.get!(Messngr.Chat.Message, message.id)
+      assert updated_message.status == :delivered
+    end
+
     test "update_message/4 updates body and broadcasts", %{
       conversation: conversation,
       message: message,

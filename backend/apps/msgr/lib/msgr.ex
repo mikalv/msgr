@@ -38,6 +38,7 @@ defmodule Messngr do
   def create_channel_conversation(owner_profile_id, attrs \\ %{}) do
     Chat.create_channel_conversation(owner_profile_id, attrs)
   end
+  def update_conversation(conversation_id, attrs), do: Chat.update_conversation(conversation_id, attrs)
   defdelegate send_message(conversation_id, profile_id, attrs), to: Chat
   def list_messages(conversation_id, opts \\ []), do: Chat.list_messages(conversation_id, opts)
   def react_to_message(conversation_id, profile_id, message_id, emoji, opts \\ %{}) do

@@ -18,6 +18,7 @@ defmodule Messngr.Accounts.Account do
     field :handle, :string
     field :locale, :string, default: "nb_NO"
     field :time_zone, :string, default: "Europe/Oslo"
+    field :read_receipts_enabled, :boolean, default: true
 
     has_many :profiles, Messngr.Accounts.Profile
     has_many :devices, Messngr.Accounts.Device
@@ -28,7 +29,15 @@ defmodule Messngr.Accounts.Account do
   @doc false
   def changeset(account, attrs) do
     account
-    |> cast(attrs, [:email, :phone_number, :display_name, :handle, :locale, :time_zone])
+    |> cast(attrs, [
+      :email,
+      :phone_number,
+      :display_name,
+      :handle,
+      :locale,
+      :time_zone,
+      :read_receipts_enabled
+    ])
     |> put_default_display_name()
     |> validate_required([:display_name])
     |> validate_length(:display_name, min: 2, max: 120)
