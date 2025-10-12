@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- Implemented a Matrix bridge daemon with disk-backed session management, queue handlers for
+  linking, outbound messaging, and update acknowledgements plus fake Matrix client support so the
+  SDK can talk to homeservers once real protocol adapters land.
+- Added Matrix bridge unit tests that exercise account linking, outbound message relays, inbound
+  update publication, and acknowledgement tracking through the StoneMQ client transport.
 - Documented the current bridge implementation gaps in `docs/bridge_status.md` so we know which
   services still need real protocol clients before the deployments can run.
 - Implemented a Signal bridge daemon skeleton with device-link queue handlers, disk-backed session
