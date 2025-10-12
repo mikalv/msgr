@@ -22,6 +22,7 @@ defmodule MessngrWeb.ConversationJSON do
       topic: conversation.topic,
       structure_type: conversation.structure_type,
       visibility: conversation.visibility,
+      read_receipts_enabled: conversation.read_receipts_enabled,
       participants: Enum.map(conversation.participants, &participant/1),
       unread_count: conversation.unread_count || 0,
       last_message: encode_last_message(conversation.last_message)

@@ -18,6 +18,7 @@ defmodule Messngr.Chat.Conversation do
       default: nil
 
     field :visibility, Ecto.Enum, values: [:private, :team], default: :private
+    field :read_receipts_enabled, :boolean, default: true
     field :unread_count, :integer, virtual: true, default: 0
     field :last_message, :map, virtual: true
 
@@ -30,7 +31,7 @@ defmodule Messngr.Chat.Conversation do
   @doc false
   def changeset(conversation, attrs) do
     conversation
-    |> cast(attrs, [:topic, :kind, :structure_type, :visibility])
+    |> cast(attrs, [:topic, :kind, :structure_type, :visibility, :read_receipts_enabled])
     |> validate_required([:kind, :visibility])
     |> maybe_require_topic()
     |> maybe_require_structure_type()

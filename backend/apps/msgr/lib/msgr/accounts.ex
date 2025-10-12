@@ -32,6 +32,13 @@ defmodule Messngr.Accounts do
     end
   end
 
+  @spec update_account(Account.t(), map()) :: {:ok, Account.t()} | {:error, Ecto.Changeset.t()}
+  def update_account(%Account{} = account, attrs) when is_map(attrs) do
+    account
+    |> Account.changeset(attrs)
+    |> Repo.update()
+  end
+
   defp do_create_account(attrs) do
     %Account{}
     |> Account.changeset(attrs)

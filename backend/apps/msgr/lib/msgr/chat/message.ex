@@ -27,6 +27,7 @@ defmodule Messngr.Chat.Message do
     belongs_to :thread, Messngr.Chat.MessageThread
 
     has_many :reactions, Messngr.Chat.MessageReaction
+    has_many :receipts, Messngr.Chat.MessageReceipt
 
     timestamps(type: :utc_datetime)
   end

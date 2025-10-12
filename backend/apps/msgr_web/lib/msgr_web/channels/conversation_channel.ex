@@ -103,9 +103,27 @@ defmodule MessngrWeb.ConversationChannel do
            Messngr.mark_message_read(
              socket.assigns.conversation_id,
              socket.assigns.current_profile.id,
-             message_id
+             message_id,
+             %{device: socket.assigns[:current_device]}
            ) do
       {:reply, {:ok, %{status: "read"}}, socket}
+    else
+      {:error, reason} -> reply_reason_error(socket, reason)
+    end
+  end
+
+  def handle_in("message:deliver", payload, socket) when is_map(payload) do
+    socket = touch_activity(socket)
+
+    with {:ok, message_id} <- require_message_id(payload),
+         {:ok, _receipt} <-
+           Messngr.acknowledge_message_delivery(
+             socket.assigns.conversation_id,
+             socket.assigns.current_profile.id,
+             message_id,
+             %{device: socket.assigns[:current_device]}
+           ) do
+      {:reply, {:ok, %{status: "delivered"}}, socket}
     else
       {:error, reason} -> reply_reason_error(socket, reason)
     end
@@ -342,6 +360,11 @@ defmodule MessngrWeb.ConversationChannel do
 
   def handle_info({:message_unpinned, payload}, socket) do
     push(socket, "message_unpinned", format_pinned_event(payload))
+    {:noreply, socket}
+  end
+
+  def handle_info({:message_delivered, payload}, socket) do
+    push(socket, "message_delivered", format_message_delivered(payload))
     {:noreply, socket}
   end
 
@@ -616,6 +639,11 @@ defmodule MessngrWeb.ConversationChannel do
   defp format_message_read(payload) do
     payload
     |> Map.update(:read_at, nil, &encode_datetime/1)
+  end
+
+  defp format_message_delivered(payload) do
+    payload
+    |> Map.update(:delivered_at, nil, &encode_datetime/1)
   end
 
   defp format_message_deleted(%{message_id: message_id} = payload) do
