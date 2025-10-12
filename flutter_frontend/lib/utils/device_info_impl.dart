@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:libmsgr/libmsgr.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class Dbkeys {
   //------- device info
@@ -93,5 +94,17 @@ class DeviceInfoImpl implements ADeviceInfo {
       }
     }
     return mapDeviceInfo;
+  }
+
+  @override
+  Future<Map<String, dynamic>> appInfo() async {
+    final info = await PackageInfo.fromPlatform();
+    return {
+      'appName': info.appName,
+      'packageName': info.packageName,
+      'version': info.version,
+      'buildNumber': info.buildNumber,
+      if (info.buildSignature.isNotEmpty) 'buildSignature': info.buildSignature,
+    };
   }
 }

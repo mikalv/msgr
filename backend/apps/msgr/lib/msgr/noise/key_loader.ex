@@ -79,7 +79,13 @@ defmodule Messngr.Noise.KeyLoader do
   @spec public_key(binary()) :: binary()
   def public_key(private_key) when is_binary(private_key) do
     validate_size!(private_key)
-    :enacl.crypto_scalarmult_base(private_key)
+
+    with :error <- derive_public_with_crypto(private_key),
+         :error <- derive_public_with_enacl(private_key) do
+      raise ArgumentError, "no available curve25519 scalar multiplication implementation"
+    else
+      {:ok, public_key} -> public_key
+    end
   end
 
   @doc """
@@ -89,8 +95,32 @@ defmodule Messngr.Noise.KeyLoader do
   def fingerprint(private_key) when is_binary(private_key) do
     private_key
     |> public_key()
-    |> then(&:crypto.hash(:blake2b, 32, &1))
+    |> then(&:crypto.hash(:blake2b, &1))
+    |> binary_part(0, 32)
     |> Base.encode16(case: :lower)
+  end
+
+  defp derive_public_with_crypto(private_key) do
+    if function_exported?(:crypto, :generate_key, 3) do
+      try do
+        {public, _} = :crypto.generate_key(:ecdh, :x25519, private_key)
+        {:ok, public}
+      rescue
+        _ -> :error
+      end
+    else
+      :error
+    end
+  end
+
+  defp derive_public_with_enacl(private_key) do
+    cond do
+      function_exported?(:enacl, :curve25519_scalarmult_base, 1) ->
+        {:ok, :enacl.curve25519_scalarmult_base(private_key)}
+
+      true ->
+        :error
+    end
   end
 
   defp fetch_from_env(nil, _opts), do: {:error, :env_var_not_configured}

@@ -4,6 +4,20 @@ defmodule Messngr.Transport.Noise.SessionTest do
   alias Messngr.Transport.Noise.Session
   alias Messngr.Transport.Noise.TestHelpers
 
+  setup do
+    unless enacl_available?() do
+      skip("enacl NIF not available; skipping Noise session tests")
+    end
+
+    :ok
+  end
+
+  defp enacl_available? do
+    function_exported?(:enacl_nif, :crypto_generichash, 3)
+  rescue
+    _ -> false
+  end
+
   describe "new_device/1" do
     test "completes NX handshake and exchanges ciphertext" do
       session = TestHelpers.build_session(:new)
@@ -16,15 +30,17 @@ defmodule Messngr.Transport.Noise.SessionTest do
       assert byte_size(Session.token(session)) == session.token_bytes
       assert Session.remote_static(session) == TestHelpers.client_public()
 
-      {:ok, ciphertext, session} = Session.encrypt(session, "hello noise")
+      {:ok, ciphertext, session_after_encrypt} = Session.encrypt(session, "hello noise")
+      session = session_after_encrypt
       {:ok, plaintext, client_split} = TestHelpers.decrypt_client(client_split, ciphertext)
       assert plaintext == "hello noise"
 
       {:ok, reply_cipher, client_split} = TestHelpers.encrypt_client(client_split, "reply")
-      {:ok, reply_plain, session} = Session.decrypt(session, reply_cipher)
+      {:ok, reply_plain, session_after_decrypt} = Session.decrypt(session, reply_cipher)
+      session = session_after_decrypt
       assert reply_plain == "reply"
 
-      {:ok, ciphertext, session} = Session.encrypt(session, "second")
+      {:ok, ciphertext, _session_after_second} = Session.encrypt(session, "second")
       {:ok, roundtrip, _client_split} = TestHelpers.decrypt_client(client_split, ciphertext)
       assert roundtrip == "second"
     end
@@ -79,17 +95,20 @@ defmodule Messngr.Transport.Noise.SessionTest do
       client_state = TestHelpers.client_state(:ik)
       {session, client_split} = TestHelpers.handshake_pair(session, client_state)
 
-      {:ok, session} = Session.rekey(session, :tx)
+      {:ok, session_after_rekey} = Session.rekey(session, :tx)
+      session = session_after_rekey
       client_split = TestHelpers.rekey_client(client_split, :rx)
 
-      {:ok, ciphertext, session} = Session.encrypt(session, "after-rekey")
+      {:ok, ciphertext, session_after_encrypt} = Session.encrypt(session, "after-rekey")
+      session = session_after_encrypt
       {:ok, plaintext, client_split} = TestHelpers.decrypt_client(client_split, ciphertext)
       assert plaintext == "after-rekey"
 
-      {:ok, session} = Session.rekey(session, :both)
+      {:ok, session_after_rekey} = Session.rekey(session, :both)
+      session = session_after_rekey
       client_split = TestHelpers.rekey_client(client_split, :both)
 
-      {:ok, ciphertext, session} = Session.encrypt(session, "second-rekey")
+      {:ok, ciphertext, _session_after_second} = Session.encrypt(session, "second-rekey")
       {:ok, plaintext, _client_split} = TestHelpers.decrypt_client(client_split, ciphertext)
       assert plaintext == "second-rekey"
     end

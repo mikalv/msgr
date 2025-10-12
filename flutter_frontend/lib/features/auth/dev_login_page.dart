@@ -4,7 +4,8 @@ import 'package:messngr/services/api/chat_api.dart';
 class DevLoginPage extends StatefulWidget {
   const DevLoginPage({super.key, required this.onSignedIn});
 
-  final Future<void> Function(AccountIdentity identity, String displayName) onSignedIn;
+  final Future<void> Function(AccountIdentity identity, String displayName)
+      onSignedIn;
 
   @override
   State<DevLoginPage> createState() => _DevLoginPageState();
@@ -71,7 +72,8 @@ class _DevLoginPageState extends State<DevLoginPage> {
           constraints: const BoxConstraints(maxWidth: 420),
           child: Card(
             elevation: 8,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
             child: Padding(
               padding: const EdgeInsets.all(32),
               child: Form(
@@ -82,7 +84,8 @@ class _DevLoginPageState extends State<DevLoginPage> {
                   children: [
                     Text(
                       'Sett opp konto',
-                      style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 12),
                     Text(
@@ -118,7 +121,8 @@ class _DevLoginPageState extends State<DevLoginPage> {
                       const SizedBox(height: 16),
                       Text(
                         _error!,
-                        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: theme.colorScheme.error),
                       ),
                     ],
                     const SizedBox(height: 24),

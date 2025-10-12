@@ -8,7 +8,8 @@ abstract class ChatRealtimeEvent {
 
 /// Event når en melding blir opprettet eller oppdatert.
 class ChatMessageEvent extends ChatRealtimeEvent {
-  const ChatMessageEvent(this.message, {this.kind = ChatMessageEventKind.created});
+  const ChatMessageEvent(this.message,
+      {this.kind = ChatMessageEventKind.created});
 
   final ChatMessage message;
   final ChatMessageEventKind kind;

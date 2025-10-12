@@ -12,6 +12,7 @@ RUN apt-get update \
         curl \
         git \
         inotify-tools \
+        libsodium-dev \
         postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
@@ -37,8 +38,14 @@ RUN mix local.hex --force && mix local.rebar --force
 # Copy minimal files to leverage Docker layer caching for deps
 COPY mix.exs mix.lock ./
 COPY config ./config
+COPY apps/auth_provider/mix.exs ./apps/auth_provider/mix.exs
+COPY apps/edge_router/mix.exs ./apps/edge_router/mix.exs
+COPY apps/family_space/mix.exs ./apps/family_space/mix.exs
+COPY apps/llm_gateway/mix.exs ./apps/llm_gateway/mix.exs
 COPY apps/msgr/mix.exs ./apps/msgr/mix.exs
 COPY apps/msgr_web/mix.exs ./apps/msgr_web/mix.exs
+COPY apps/slack_api/mix.exs ./apps/slack_api/mix.exs
+COPY apps/teams/mix.exs ./apps/teams/mix.exs
 
 # Fetch Elixir dependencies during build to speed up container start
 RUN mix deps.get

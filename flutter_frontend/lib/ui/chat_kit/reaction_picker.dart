@@ -13,8 +13,22 @@ class ChatReactionPicker extends StatefulWidget {
   final VoidCallback? onDismissed;
 
   static const defaultReactions = <String>[
-    '👍', '❤️', '🔥', '😂', '👏', '🤩', '🥳', '😮', '🙏', '💡', '🤔', '🎉',
-    '🎧', '☕️', '🌟', '🚀',
+    '👍',
+    '❤️',
+    '🔥',
+    '😂',
+    '👏',
+    '🤩',
+    '🥳',
+    '😮',
+    '🙏',
+    '💡',
+    '🤔',
+    '🎉',
+    '🎧',
+    '☕️',
+    '🌟',
+    '🚀',
   ];
 
   @override
@@ -88,7 +102,8 @@ class _ChatReactionPickerState extends State<ChatReactionPicker>
               const Divider(height: 1),
               Flexible(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   child: Wrap(
                     spacing: 12,
                     runSpacing: 12,

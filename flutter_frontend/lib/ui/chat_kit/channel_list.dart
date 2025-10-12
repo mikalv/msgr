@@ -175,7 +175,8 @@ class _ChannelTile extends StatelessWidget {
                     Text(
                       channel.subtitle,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
+                        color:
+                            theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
                         height: 1.3,
                       ),
                       maxLines: 2,

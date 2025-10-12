@@ -12,9 +12,13 @@ defmodule Messngr.Repo.Migrations.AddMediaMessages do
       modify :body, :text, null: true
     end
 
+    execute("ALTER TABLE messages ALTER COLUMN kind DROP DEFAULT")
+
     execute(
       "ALTER TABLE messages ALTER COLUMN kind TYPE message_kind USING kind::message_kind"
     )
+
+    execute("ALTER TABLE messages ALTER COLUMN kind SET DEFAULT 'text'::message_kind")
 
     create table(:media_uploads, primary_key: false) do
       add :id, :binary_id, primary_key: true
@@ -36,16 +40,20 @@ defmodule Messngr.Repo.Migrations.AddMediaMessages do
       timestamps(type: :utc_datetime)
     end
 
-    execute(
-      "ALTER TABLE media_uploads ALTER COLUMN kind TYPE message_kind USING kind::message_kind"
-    )
+    execute("ALTER TABLE media_uploads ALTER COLUMN kind TYPE message_kind USING kind::message_kind")
 
     execute(
       "CREATE TYPE media_upload_status AS ENUM ('pending','consumed')"
     )
 
+    execute("ALTER TABLE media_uploads ALTER COLUMN status DROP DEFAULT")
+
     execute(
       "ALTER TABLE media_uploads ALTER COLUMN status TYPE media_upload_status USING status::media_upload_status"
+    )
+
+    execute(
+      "ALTER TABLE media_uploads ALTER COLUMN status SET DEFAULT 'pending'::media_upload_status"
     )
 
     create index(:media_uploads, [:conversation_id])
@@ -61,6 +69,8 @@ defmodule Messngr.Repo.Migrations.AddMediaMessages do
     drop table(:media_uploads)
 
     execute("DROP TYPE IF EXISTS media_upload_status")
+
+    execute("ALTER TABLE messages ALTER COLUMN kind DROP DEFAULT")
 
     execute("ALTER TABLE messages ALTER COLUMN kind TYPE text")
 

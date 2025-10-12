@@ -13,8 +13,9 @@ void bootstrapLogging({
   OpenObserveLogClient? Function()? createLogClient,
 }) {
   Logger.root.level = level;
-  final openObserveClient =
-      createLogClient != null ? createLogClient() : OpenObserveLogClient.maybeCreate();
+  final openObserveClient = createLogClient != null
+      ? createLogClient()
+      : OpenObserveLogClient.maybeCreate();
 
   Logger.root.onRecord.listen((record) {
     // ignore: avoid_print

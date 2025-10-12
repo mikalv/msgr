@@ -21,5 +21,3 @@ class WebStorage implements StorageEngine {
 StorageEngine getReduxPersistStorage(log) {
   return WebStorage();
 }
-
-

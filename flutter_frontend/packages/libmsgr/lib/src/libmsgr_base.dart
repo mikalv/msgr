@@ -5,8 +5,8 @@ import 'package:crypto/crypto.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:libmsgr/src/connection.dart';
 import 'package:libmsgr/src/database/database.dart';
-import 'package:libmsgr/src/key_manager.dart';
 import 'package:libmsgr/src/server_resolver.dart';
+import 'package:libmsgr_core/libmsgr_core.dart';
 import 'package:libmsgr/src/typedefs.dart';
 import 'package:logging/logging.dart';
 

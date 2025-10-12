@@ -430,7 +430,7 @@ defmodule Messngr.Transport.Noise.Session do
     {:error, reason, %{session | current_pattern: nil, handshake_state: nil}}
   end
 
-  defp switch_pattern(%__MODULE__{pending_patterns: [next | rest]} = session, reason) do
+  defp switch_pattern(%__MODULE__{pending_patterns: [next | rest]} = session, _reason) do
     session = %{session | pending_patterns: rest, current_pattern: nil, handshake_state: nil}
 
     case apply_pattern(session, next) do
@@ -539,8 +539,17 @@ defmodule Messngr.Transport.Noise.Session do
     |> Map.get(key)
     |> Kernel.||(Map.get(actor, Atom.to_string(key)))
     |> case do
-      value when is_binary(value) and byte_size(String.trim(value)) > 0 -> String.trim(value)
-      other -> raise ArgumentError, "Noise session actor missing #{inspect(key)} (got: #{inspect(other)})"
+      value when is_binary(value) ->
+        trimmed = String.trim(value)
+
+        if trimmed == "" do
+          raise ArgumentError, "Noise session actor missing #{inspect(key)} (got: #{inspect(value)})"
+        else
+          trimmed
+        end
+
+      other ->
+        raise ArgumentError, "Noise session actor missing #{inspect(key)} (got: #{inspect(other)})"
     end
   end
 
@@ -550,7 +559,9 @@ defmodule Messngr.Transport.Noise.Session do
     |> Kernel.||(Map.get(actor, Atom.to_string(key)))
     |> case do
       nil -> nil
-      value when is_binary(value) and byte_size(String.trim(value)) > 0 -> String.trim(value)
+      value when is_binary(value) ->
+        trimmed = String.trim(value)
+        if trimmed == "", do: nil, else: trimmed
       _ -> nil
     end
   end
@@ -625,7 +636,7 @@ defmodule Messngr.Transport.Noise.Session do
   end
 
   defp maybe_binary(nil), do: nil
-  defp maybe_binary(value) when is_binary(value) -> value
+  defp maybe_binary(value) when is_binary(value), do: value
 
   defp maybe_binary(other) do
     raise ArgumentError, ":remote_static must be binary, got: #{inspect(other)}"

@@ -35,8 +35,8 @@ defmodule AuthProvider.Router do
     post "/v1/refresh_token", ApiController, :refresh_token
 
     scope "/xmppAuth" do
-      get "check_password", ApiController, :check_password
-      get "user_exists", ApiController, :user_exists
+      get "/check_password", ApiController, :check_password
+      get "/user_exists", ApiController, :user_exists
     end
   end
 
@@ -71,7 +71,7 @@ defmodule AuthProvider.Router do
     get "/authorize", AuthorizeController, :authorize
   end
 
-  def fetch_current_user(conn, opts \\ []) do
+  def fetch_current_user(conn, _opts \\ []) do
     conn
   end
 

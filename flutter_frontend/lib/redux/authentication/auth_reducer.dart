@@ -16,7 +16,8 @@ final authReducers = <AuthState Function(AuthState, dynamic)>[
   TypedReducer<AuthState, OnCreateTeamSuccessAction>(_onCreateTeam),
   TypedReducer<AuthState, RequestCodeMsisdnAction>(_onMsisdnCodeRequest),
   TypedReducer<AuthState, RequestCodeEmailAction>(_onEmailCodeRequest),
-  TypedReducer<AuthState, ServerRequestCodeFromUserAction>(_onServerRequestCode),
+  TypedReducer<AuthState, ServerRequestCodeFromUserAction>(
+      _onServerRequestCode),
 ];
 
 AuthState _onMsisdnCodeRequest(

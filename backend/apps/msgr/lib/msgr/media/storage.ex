@@ -35,19 +35,6 @@ defmodule Messngr.Media.Storage do
     URI.merge(endpoint(), "#{bucket}/#{object_key}") |> to_string()
   end
 
-  @spec presign_upload(String.t(), String.t(), DateTime.t(), keyword()) :: String.t()
-  def presign_upload(bucket, object_key, expires_at, opts \\ []) do
-    ttl_seconds =
-      opts
-      |> Keyword.get(:ttl_seconds, max(DateTime.diff(expires_at, DateTime.utc_now(), :second), 60))
-
-    secret = config() |> Keyword.get(:secret, "development-secret")
-    payload = Enum.join([bucket, object_key, Integer.to_string(ttl_seconds)], ":")
-    signature = :crypto.mac(:hmac, :sha256, secret, payload) |> Base.url_encode64(padding: false)
-
-    upload_url(bucket, object_key) <> "?X-Amz-Expires=#{ttl_seconds}&X-Amz-Signature=#{signature}"
-  end
-
   @spec public_url(String.t(), String.t()) :: String.t()
   def public_url(bucket, object_key) do
     URI.merge(public_endpoint(), "#{bucket}/#{object_key}") |> to_string()

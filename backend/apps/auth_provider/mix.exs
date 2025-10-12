@@ -23,7 +23,7 @@ defmodule AuthProvider.MixProject do
   def application do
     [
       mod: {AuthProvider.Application, []},
-      extra_applications: [:logger, :runtime_tools, :jose]
+      extra_applications: [:logger, :runtime_tools, :jose, :guardian]
     ]
   end
 
@@ -60,7 +60,7 @@ defmodule AuthProvider.MixProject do
       {:boruta, "~> 2.3"},
       {:ecto_sql, "~> 3.10"},
       {:postgrex, ">= 0.0.0"},
-      {:guardian, "~> 2.3"},
+      {:guardian, "~> 2.3.2"},
       {:guardian_db, "~> 3.0"},
       {:hammer, "~> 6.2"},
       {:oauth2, "~> 2.1"},
@@ -87,7 +87,7 @@ defmodule AuthProvider.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "assets.setup", "assets.build"],
+      setup: ["deps.get", "deps.compile", "assets.setup", "assets.build"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind msgr_web", "esbuild msgr_web"],

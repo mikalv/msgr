@@ -21,21 +21,19 @@ class ChatBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final timestamp = message.insertedAt ?? message.sentAt;
-    final formattedTime = timestamp != null
-        ? DateFormat.Hm().format(timestamp.toLocal())
-        : '';
+    final formattedTime =
+        timestamp != null ? DateFormat.Hm().format(timestamp.toLocal()) : '';
 
     final alignment = isMine ? Alignment.centerRight : Alignment.centerLeft;
     final borderRadius = BorderRadius.only(
       topLeft: const Radius.circular(24),
       topRight: const Radius.circular(24),
       bottomLeft: isMine ? const Radius.circular(20) : const Radius.circular(8),
-      bottomRight: isMine ? const Radius.circular(8) : const Radius.circular(20),
+      bottomRight:
+          isMine ? const Radius.circular(8) : const Radius.circular(20),
     );
 
-    final background = isMine
-        ? null
-        : ChatTheme.otherBubbleColor(theme);
+    final background = isMine ? null : ChatTheme.otherBubbleColor(theme);
 
     final gradient = isMine ? ChatTheme.selfBubbleGradient(theme) : null;
     final textColor = isMine
@@ -43,7 +41,8 @@ class ChatBubble extends StatelessWidget {
         : theme.colorScheme.onSurface;
     final subtleColor = textColor.withOpacity(0.7);
 
-    final mediaContent = _buildMediaContent(context, message.data, textColor, subtleColor);
+    final mediaContent =
+        _buildMediaContent(context, message.data, textColor, subtleColor);
     final bodyContent = _buildBodyContent(message.data, textColor);
 
     final children = <Widget>[];
@@ -141,9 +140,7 @@ class ChatBubble extends StatelessWidget {
         ),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: isMine
-                ? Colors.white.withOpacity(0.06)
-                : background,
+            color: isMine ? Colors.white.withOpacity(0.06) : background,
             borderRadius: borderRadius,
           ),
           child: Padding(
@@ -250,7 +247,8 @@ class ChatBubble extends StatelessWidget {
     if (data is MsgrAudioMessage) {
       final isVoice = data.kind == MsgrMessageKind.voice;
       final icon = isVoice ? Icons.mic : Icons.graphic_eq;
-      final duration = _formatDuration(data.duration);
+      final duration =
+          data.duration != null ? _formatDuration(data.duration!) : null;
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
@@ -285,9 +283,9 @@ class ChatBubble extends StatelessWidget {
               Text(
                 duration,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: subtleColor,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
+                  color: subtleColor,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ],
           ],
@@ -296,7 +294,7 @@ class ChatBubble extends StatelessWidget {
     }
 
     if (data is MsgrFileMessage) {
-      final size = _formatBytes(data.byteSize);
+      final size = data.byteSize != null ? _formatBytes(data.byteSize!) : null;
       return Container(
         width: 260,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -332,11 +330,6 @@ class ChatBubble extends StatelessWidget {
                     ),
                 ],
               ),
-            child: _MessageContent(
-              message: message,
-              isMine: isMine,
-              textColor: textColor,
-              formattedTime: formattedTime,
             ),
             const SizedBox(width: 8),
             Icon(Icons.download, size: 18, color: subtleColor),
@@ -663,8 +656,7 @@ class _StatusIcon extends StatelessWidget {
       case 'delivered':
         return Icon(Icons.done_all, size: 14, color: color);
       case 'read':
-        return Icon(Icons.done_all,
-            size: 14, color: color.withOpacity(0.9));
+        return Icon(Icons.done_all, size: 14, color: color.withOpacity(0.9));
       default:
         return const SizedBox.shrink();
     }
@@ -729,27 +721,6 @@ double _aspectRatio(int? width, int? height, {double fallback = 4 / 3}) {
   return width / height;
 }
 
-String? _formatDuration(double? seconds) {
-  if (seconds == null) return null;
-  final duration = Duration(milliseconds: (seconds * 1000).round());
-  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-  final secs = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-  return '$minutes:$secs';
-}
-
-String? _formatBytes(int? bytes) {
-  if (bytes == null || bytes <= 0) return null;
-  const units = ['B', 'KB', 'MB', 'GB'];
-  var value = bytes.toDouble();
-  var unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex++;
-  }
-  if (unitIndex == 0) {
-    return '${value.toInt()} ${units[unitIndex]}';
-  }
-  return '${value.toStringAsFixed(1)} ${units[unitIndex]}';
 class _AudioAttachmentView extends StatelessWidget {
   const _AudioAttachmentView({
     required this.audio,
@@ -767,7 +738,8 @@ class _AudioAttachmentView extends StatelessWidget {
         ? waveform.take(40).toList(growable: false)
         : const [0.15, 0.35, 0.22, 0.55, 0.28, 0.48, 0.32];
     final duration = audio.duration;
-    final durationLabel = duration != null ? _formatDuration(duration) : null;
+    final durationLabel =
+        duration != null ? _formatDuration(duration) : null;
 
     return Container(
       width: double.infinity,
@@ -893,8 +865,7 @@ class _VideoAttachmentView extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 child: Text(
                   _formatDuration(duration),
                   style: const TextStyle(

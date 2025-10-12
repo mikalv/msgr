@@ -5,34 +5,15 @@ defmodule MessngrWeb.MediaUploadJSON do
     %{
       data: %{
         id: upload.id,
-        kind: upload.kind |> to_string(),
-        status: upload.status |> to_string(),
+        kind: to_string(upload.kind),
+        status: to_string(upload.status),
         bucket: upload.bucket,
         object_key: upload.object_key,
         content_type: upload.content_type,
         byte_size: upload.byte_size,
         expires_at: upload.expires_at,
-        upload: %{
-          method: instructions["method"],
-          url: instructions["url"],
-          headers: instructions["headers"],
-          bucket: instructions["bucket"],
-          object_key: instructions["objectKey"],
-          public_url: instructions["publicUrl"],
-          expires_at: instructions["expiresAt"],
-          retention_expires_at: instructions["retentionExpiresAt"],
-          thumbnail_upload: encode_thumbnail(instructions["thumbnailUpload"])
-        }
-          method: instructions["upload"]["method"],
-          url: instructions["upload"]["url"],
-          headers: instructions["upload"]["headers"],
-          expires_at: instructions["upload"]["expiresAt"]
-        },
-        download: %{
-          method: instructions["download"]["method"],
-          url: instructions["download"]["url"],
-          expires_at: instructions["download"]["expiresAt"]
-        },
+        upload: encode_upload_instructions(instructions),
+        download: encode_download(instructions["download"]),
         public_url: instructions["publicUrl"],
         retention_until: instructions["retentionUntil"]
       }
@@ -50,6 +31,44 @@ defmodule MessngrWeb.MediaUploadJSON do
       object_key: thumbnail["objectKey"],
       public_url: thumbnail["publicUrl"],
       expires_at: thumbnail["expiresAt"]
+    }
+  end
+
+  defp encode_upload_instructions(nil), do: nil
+
+  defp encode_upload_instructions(instructions) when is_map(instructions) do
+    %{
+      method: instructions["method"],
+      url: instructions["url"],
+      headers: instructions["headers"],
+      bucket: instructions["bucket"],
+      object_key: instructions["objectKey"],
+      public_url: instructions["publicUrl"],
+      expires_at: instructions["expiresAt"],
+      retention_expires_at: instructions["retentionExpiresAt"],
+      thumbnail_upload: encode_thumbnail(instructions["thumbnailUpload"]),
+      multipart: encode_multipart(instructions["upload"])
+    }
+  end
+
+  defp encode_multipart(nil), do: nil
+
+  defp encode_multipart(%{} = upload) do
+    %{
+      method: upload["method"],
+      url: upload["url"],
+      headers: upload["headers"],
+      expires_at: upload["expiresAt"]
+    }
+  end
+
+  defp encode_download(nil), do: nil
+
+  defp encode_download(%{} = download) do
+    %{
+      method: download["method"],
+      url: download["url"],
+      expires_at: download["expiresAt"]
     }
   end
 end

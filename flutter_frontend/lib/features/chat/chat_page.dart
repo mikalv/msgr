@@ -51,10 +51,11 @@ class _ChatViewState extends State<_ChatView> {
             final identity = viewModel.identity;
             final profileThemes = _buildProfileThemes(theme, viewModel);
             final fallbackTheme = ChatProfileThemeData.resolve(
-              identity?.profileId ?? 'self',
+              identity.profileId,
               theme: theme,
-              messageTheme:
-                  viewModel.messages.isNotEmpty ? viewModel.messages.first.theme : null,
+              messageTheme: viewModel.messages.isNotEmpty
+                  ? viewModel.messages.first.theme
+                  : null,
             );
 
             return ChatProfileTheme(
@@ -76,10 +77,12 @@ class _ChatViewState extends State<_ChatView> {
                                   if (showChannelPanel)
                                     SizedBox(
                                       width: 280,
-                                      child: _ChannelSidebar(viewModel: viewModel),
+                                      child:
+                                          _ChannelSidebar(viewModel: viewModel),
                                     ),
                                   if (showChannelPanel)
-                                    const VerticalDivider(width: 1, thickness: 1),
+                                    const VerticalDivider(
+                                        width: 1, thickness: 1),
                                   Expanded(
                                     child: Padding(
                                       padding: const EdgeInsets.all(24),
@@ -110,7 +113,8 @@ Map<String, ChatProfileThemeData> _buildProfileThemes(
 ) {
   final map = <String, ChatProfileThemeData>{};
   for (final message in viewModel.messages) {
-    final profileId = message.profileId.isNotEmpty ? message.profileId : 'system';
+    final profileId =
+        message.profileId.isNotEmpty ? message.profileId : 'system';
     map.putIfAbsent(
       profileId,
       () => ChatProfileThemeData.resolve(
@@ -155,13 +159,15 @@ class _ChannelSidebar extends StatelessWidget {
                   children: [
                     Text(
                       displayName ?? 'Profil',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       session.identity.profileId,
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.hintColor),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -187,7 +193,9 @@ class _ChannelSidebar extends StatelessWidget {
               child: ConnectionStatusBanner(
                 isOnline: !viewModel.isOffline,
                 message: 'Frakoblet – viser hurtigbufferte kanaler.',
-                retry: viewModel.isOffline ? () => viewModel.fetchMessages() : null,
+                retry: viewModel.isOffline
+                    ? () => viewModel.fetchMessages()
+                    : null,
               ),
             ),
           Expanded(
@@ -205,8 +213,9 @@ class _ChannelSidebar extends StatelessWidget {
               ],
               selectedId: viewModel.selectedThreadId,
               onChannelTap: (summary) {
-                final match = viewModel.channels
-                    .firstWhere((thread) => thread.id == summary.id, orElse: () => _summaryToThread(summary));
+                final match = viewModel.channels.firstWhere(
+                    (thread) => thread.id == summary.id,
+                    orElse: () => _summaryToThread(summary));
                 viewModel.selectThread(match);
               },
             ),
@@ -235,17 +244,19 @@ class _ThreadColumn extends StatelessWidget {
     final threadState = viewModel.threadViewNotifier.state;
     final typingKey = threadState.threadId ?? 'root';
     final typingParticipants =
-        viewModel.typingNotifier.activeByThread[typingKey] ?? const <TypingParticipant>[];
+        viewModel.typingNotifier.activeByThread[typingKey] ??
+            const <TypingParticipant>[];
 
     final pinnedIds = {for (final pinned in pinnedMessages) pinned.messageId};
 
     final filteredMessages = <ChatThreadMessage>[];
     for (final message in viewModel.messages) {
-      final includePinned = threadState.showPinned && pinnedIds.contains(message.id);
-      final includeThread =
-          !threadState.showPinned && threadState.threadId != null &&
-              (message.threadId == threadState.threadId ||
-                  message.id == threadState.rootMessageId);
+      final includePinned =
+          threadState.showPinned && pinnedIds.contains(message.id);
+      final includeThread = !threadState.showPinned &&
+          threadState.threadId != null &&
+          (message.threadId == threadState.threadId ||
+              message.id == threadState.rootMessageId);
       final includeDefault =
           !threadState.showPinned && threadState.threadId == null;
 
@@ -262,7 +273,8 @@ class _ThreadColumn extends StatelessWidget {
           timestamp: message.sentAt ?? message.insertedAt ?? DateTime.now(),
           isOwn: message.profileId == currentProfileId,
           reactions: viewModel.reactionsFor(message.id),
-          isOnline: !viewModel.isOffline || message.profileId == currentProfileId,
+          isOnline:
+              !viewModel.isOffline || message.profileId == currentProfileId,
           isEdited: message.isEdited,
           isDeleted: message.isDeleted,
         ),
@@ -272,7 +284,8 @@ class _ThreadColumn extends StatelessWidget {
     if (viewModel.thread == null) {
       return _EmptyConversationState(
         isLoading: viewModel.isLoading,
-        onStartConversation: () => _showStartConversationDialog(context, viewModel),
+        onStartConversation: () =>
+            _showStartConversationDialog(context, viewModel),
         showInlineChannels: showInlineChannels,
       );
     }
@@ -297,8 +310,9 @@ class _ThreadColumn extends StatelessWidget {
               ],
               selectedId: viewModel.selectedThreadId,
               onChannelTap: (summary) {
-                final match = viewModel.channels
-                    .firstWhere((thread) => thread.id == summary.id, orElse: () => _summaryToThread(summary));
+                final match = viewModel.channels.firstWhere(
+                    (thread) => thread.id == summary.id,
+                    orElse: () => _summaryToThread(summary));
                 viewModel.selectThread(match);
               },
             ),
@@ -311,18 +325,18 @@ class _ThreadColumn extends StatelessWidget {
               message: viewModel.isOffline
                   ? 'Frakoblet – meldinger sendes når du er online igjen.'
                   : 'Tilkoblet til msgr-nettet.',
-              retry: viewModel.isOffline ? () => viewModel.fetchMessages() : null,
+              retry:
+                  viewModel.isOffline ? () => viewModel.fetchMessages() : null,
             ),
           ),
         Text(
           viewModel.thread?.displayName ?? 'Samtale',
-          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+          style: theme.textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 4),
         Text(
-          viewModel.isOffline
-              ? 'Viser lagrede meldinger'
-              : 'Direkte samtale',
+          viewModel.isOffline ? 'Viser lagrede meldinger' : 'Direkte samtale',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -342,7 +356,8 @@ class _ThreadColumn extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
-              onPressed: () => viewModel.threadViewNotifier.setPinnedView(false),
+              onPressed: () =>
+                  viewModel.threadViewNotifier.setPinnedView(false),
               icon: const Icon(Icons.close),
               label: const Text('Tilbake til samtale'),
             ),
@@ -439,7 +454,8 @@ class _EmptyConversationState extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             'Ingen samtale valgt',
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Padding(
@@ -464,7 +480,8 @@ class _EmptyConversationState extends StatelessWidget {
   }
 }
 
-Future<void> _showStartConversationDialog(BuildContext context, ChatViewModel viewModel) async {
+Future<void> _showStartConversationDialog(
+    BuildContext context, ChatViewModel viewModel) async {
   final emailController = TextEditingController();
   final profileIdController = TextEditingController();
   String? errorMessage;
@@ -521,7 +538,8 @@ Future<void> _showStartConversationDialog(BuildContext context, ChatViewModel vi
               }
             } on ApiException catch (error) {
               setState(() {
-                errorMessage = 'Kunne ikke starte samtale (${error.statusCode}).';
+                errorMessage =
+                    'Kunne ikke starte samtale (${error.statusCode}).';
               });
             } catch (error) {
               setState(() {
@@ -561,10 +579,8 @@ Future<void> _showStartConversationDialog(BuildContext context, ChatViewModel vi
                     alignment: Alignment.centerLeft,
                     child: Text(
                       errorMessage!,
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: Theme.of(context).colorScheme.error),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.error),
                     ),
                   ),
                 ],
@@ -572,7 +588,9 @@ Future<void> _showStartConversationDialog(BuildContext context, ChatViewModel vi
             ),
             actions: [
               TextButton(
-                onPressed: submitting ? null : () => Navigator.of(dialogContext).maybePop(),
+                onPressed: submitting
+                    ? null
+                    : () => Navigator.of(dialogContext).maybePop(),
                 child: const Text('Avbryt'),
               ),
               FilledButton(

@@ -103,9 +103,27 @@ defmodule MessngrWeb.ConversationChannel do
            Messngr.mark_message_read(
              socket.assigns.conversation_id,
              socket.assigns.current_profile.id,
-             message_id
+             message_id,
+             %{device: socket.assigns[:current_device]}
            ) do
       {:reply, {:ok, %{status: "read"}}, socket}
+    else
+      {:error, reason} -> reply_reason_error(socket, reason)
+    end
+  end
+
+  def handle_in("message:deliver", payload, socket) when is_map(payload) do
+    socket = touch_activity(socket)
+
+    with {:ok, message_id} <- require_message_id(payload),
+         {:ok, _receipt} <-
+           Messngr.acknowledge_message_delivery(
+             socket.assigns.conversation_id,
+             socket.assigns.current_profile.id,
+             message_id,
+             %{device: socket.assigns[:current_device]}
+           ) do
+      {:reply, {:ok, %{status: "delivered"}}, socket}
     else
       {:error, reason} -> reply_reason_error(socket, reason)
     end
@@ -181,6 +199,49 @@ defmodule MessngrWeb.ConversationChannel do
     else
       {:error, reason} -> reply_reason_error(socket, reason)
     end
+  end
+
+  def handle_in("message:sync", payload, socket) when is_map(payload) do
+    socket = touch_activity(socket)
+
+    opts = build_sync_opts(payload)
+    page = Messngr.list_messages(socket.assigns.conversation_id, opts)
+
+    Messngr.broadcast_backlog(socket.assigns.conversation_id, page)
+
+    {:reply, {:ok, MessageJSON.index(%{page: page})}, socket}
+  end
+
+  def handle_in("message:sync", _payload, socket) do
+    {:reply, {:error, %{errors: ["invalid payload"]}}, socket}
+  end
+
+  def handle_in("conversation:watch", _payload, socket) do
+    socket = touch_activity(socket)
+
+    case Messngr.watch_conversation(socket.assigns.conversation_id, socket.assigns.current_profile.id) do
+      {:ok, payload} ->
+        {:reply, {:ok, ConversationJSON.watchers(%{payload: payload})}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{reason: reason}}, socket}
+    end
+  rescue
+    Ecto.NoResultsError -> {:reply, {:error, %{reason: "forbidden"}}, socket}
+  end
+
+  def handle_in("conversation:unwatch", _payload, socket) do
+    socket = touch_activity(socket)
+
+    case Messngr.unwatch_conversation(socket.assigns.conversation_id, socket.assigns.current_profile.id) do
+      {:ok, payload} ->
+        {:reply, {:ok, ConversationJSON.watchers(%{payload: payload})}, socket}
+
+      {:error, reason} ->
+        {:reply, {:error, %{reason: reason}}, socket}
+    end
+  rescue
+    Ecto.NoResultsError -> {:reply, {:error, %{reason: "forbidden"}}, socket}
   end
 
   def handle_in("typing:start", payload, socket) when is_map(payload) do
@@ -267,46 +328,6 @@ defmodule MessngrWeb.ConversationChannel do
   end
 
   @impl true
-  def handle_in("message:sync", payload, socket) when is_map(payload) do
-    opts = build_sync_opts(payload)
-    page = Messngr.list_messages(socket.assigns.conversation_id, opts)
-
-    Messngr.broadcast_backlog(socket.assigns.conversation_id, page)
-
-    {:reply, {:ok, MessageJSON.index(%{page: page})}, socket}
-  end
-
-  def handle_in("message:sync", _payload, socket) do
-    {:reply, {:error, %{errors: ["invalid payload"]}}, socket}
-  end
-
-  @impl true
-  def handle_in("conversation:watch", _payload, socket) do
-    case Messngr.watch_conversation(socket.assigns.conversation_id, socket.assigns.current_profile.id) do
-      {:ok, payload} ->
-        {:reply, {:ok, ConversationJSON.watchers(%{payload: payload})}, socket}
-
-      {:error, reason} ->
-        {:reply, {:error, %{reason: reason}}, socket}
-    end
-  rescue
-    Ecto.NoResultsError -> {:reply, {:error, %{reason: "forbidden"}}, socket}
-  end
-
-  @impl true
-  def handle_in("conversation:unwatch", _payload, socket) do
-    case Messngr.unwatch_conversation(socket.assigns.conversation_id, socket.assigns.current_profile.id) do
-      {:ok, payload} ->
-        {:reply, {:ok, ConversationJSON.watchers(%{payload: payload})}, socket}
-
-      {:error, reason} ->
-        {:reply, {:error, %{reason: reason}}, socket}
-    end
-  rescue
-    Ecto.NoResultsError -> {:reply, {:error, %{reason: "forbidden"}}, socket}
-  end
-
-  @impl true
   def handle_info({:message_created, message}, socket) do
     push(socket, "message_created", MessageJSON.show(%{message: message}))
     {:noreply, socket}
@@ -339,6 +360,11 @@ defmodule MessngrWeb.ConversationChannel do
 
   def handle_info({:message_unpinned, payload}, socket) do
     push(socket, "message_unpinned", format_pinned_event(payload))
+    {:noreply, socket}
+  end
+
+  def handle_info({:message_delivered, payload}, socket) do
+    push(socket, "message_delivered", format_message_delivered(payload))
     {:noreply, socket}
   end
 
@@ -386,7 +412,12 @@ defmodule MessngrWeb.ConversationChannel do
 
   defp require_emoji(payload) do
     case Map.get(payload, "emoji") || Map.get(payload, :emoji) do
-      emoji when is_binary(emoji) and byte_size(String.trim(emoji)) > 0 -> {:ok, emoji}
+      emoji when is_binary(emoji) ->
+        if String.trim(emoji) == "" do
+          {:error, "emoji is required"}
+        else
+          {:ok, emoji}
+        end
       _ -> {:error, "emoji is required"}
     end
   end
@@ -549,7 +580,7 @@ defmodule MessngrWeb.ConversationChannel do
     end
   end
 
-  defp presence_meta(socket, overrides \\ %{}) do
+  defp presence_meta(socket, overrides) do
     base = %{
       profile_id: socket.assigns.current_profile.id,
       profile_name: socket.assigns.current_profile.name,
@@ -608,6 +639,11 @@ defmodule MessngrWeb.ConversationChannel do
   defp format_message_read(payload) do
     payload
     |> Map.update(:read_at, nil, &encode_datetime/1)
+  end
+
+  defp format_message_delivered(payload) do
+    payload
+    |> Map.update(:delivered_at, nil, &encode_datetime/1)
   end
 
   defp format_message_deleted(%{message_id: message_id} = payload) do

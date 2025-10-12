@@ -53,7 +53,8 @@ class _ChatComposerDemoState extends State<ChatComposerDemo> {
                 debugPrint('Sendt: ${result.text}');
                 debugPrint('Vedlegg: ${result.attachments.length}');
                 debugPrint('Kommando: ${result.command?.name}');
-                debugPrint('Voice note: ${result.voiceNote?.formattedDuration}');
+                debugPrint(
+                    'Voice note: ${result.voiceNote?.formattedDuration}');
                 _lastResult.value = result;
               },
               isSending: false,

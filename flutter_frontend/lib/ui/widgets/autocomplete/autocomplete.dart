@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-
-
 class Autocomplete extends StatefulWidget {
   const Autocomplete({super.key});
 

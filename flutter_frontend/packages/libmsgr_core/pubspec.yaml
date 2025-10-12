@@ -1,0 +1,20 @@
+name: libmsgr_core
+description: Pure Dart core for msgr backend integrations.
+version: 0.1.0
+repository: https://github.com/msgr-no/flutter_client
+
+environment:
+  sdk: ^3.5.1
+
+dependencies:
+  cryptography: ^2.7.0
+  http: ^1.2.2
+  jwt_decoder: ^2.0.1
+  logging: ^1.2.0
+  meta: ^1.15.0
+  uuid: ^4.4.2
+
+dev_dependencies:
+  lints: ^4.0.0
+  mockito: ^5.4.4
+  test: ^1.24.0

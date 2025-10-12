@@ -26,7 +26,12 @@ defmodule Messngr.Connectors.IRCBridgeTest do
 
     assert [message] = QueueRecorder.published(agent)
     assert message.topic == "bridge/irc/outbound_command"
-    assert message.payload.payload == %{command: "PRIVMSG", target: "#msgr", arguments: ["Hello"]}
+    assert message.payload.payload == %{
+             command: "PRIVMSG",
+             target: "#msgr",
+             arguments: ["Hello"],
+             metadata: %{}
+           }
     assert message.payload.trace_id == "cmd"
   end
 

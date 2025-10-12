@@ -5,6 +5,7 @@ import 'package:messngr/features/chat/models/chat_message.dart';
 import 'package:messngr/features/chat/models/chat_thread.dart';
 import 'package:messngr/features/chat/models/reaction_aggregate.dart';
 import 'package:messngr/features/chat/state/chat_cache_repository.dart';
+import 'package:messngr/features/chat/state/composer_autosave_manager.dart';
 import 'package:messngr/features/chat/state/message_editing_notifier.dart';
 import 'package:messngr/features/chat/state/pinned_messages_notifier.dart';
 import 'package:messngr/features/chat/state/reaction_aggregator_notifier.dart';
@@ -45,8 +46,13 @@ class ChatViewModel extends ChangeNotifier {
         pinnedNotifier = pinned ?? PinnedMessagesNotifier(),
         threadViewNotifier = threadView ?? ThreadViewNotifier(),
         messageEditingNotifier = editing ?? MessageEditingNotifier() {
-    _mediaUploader = mediaUploader ?? ChatMediaUploader(api: _api, identity: _identity);
+    _mediaUploader =
+        mediaUploader ?? ChatMediaUploader(api: _api, identity: _identity);
     composerController.addListener(_handleComposerChanged);
+    _autosaveManager = ComposerDraftAutosaveManager(
+      cache: _cache,
+      controller: composerController,
+    );
   }
 
   final ChatApi _api;
@@ -62,6 +68,7 @@ class ChatViewModel extends ChangeNotifier {
   final MessageEditingNotifier messageEditingNotifier;
   late final ChatMediaUploader _mediaUploader;
   final AccountIdentity _identity;
+  late final ComposerDraftAutosaveManager _autosaveManager;
 
   static const _typingIdleDuration = Duration(seconds: 5);
 
@@ -223,6 +230,8 @@ class ChatViewModel extends ChangeNotifier {
       return;
     }
 
+    await _autosaveManager.flushNow();
+
     final attachments = result.attachments;
     final voiceNote = result.voiceNote;
     var remainingText = result.text.trim();
@@ -241,10 +250,19 @@ class ChatViewModel extends ChangeNotifier {
         return;
       }
       _error = null;
+      composerController.setSendState(ComposerSendState.sending);
       _isSending = true;
       notifyListeners();
       final success = await _sendTextOnly(trimmed);
       _isSending = false;
+      if (_isOffline) {
+        composerController.setSendState(ComposerSendState.queuedOffline);
+      } else {
+        composerController.setSendState(
+          success ? ComposerSendState.idle : ComposerSendState.failed,
+          error: _error,
+        );
+      }
       notifyListeners();
       if (success) {
         composerController.clear();
@@ -253,13 +271,19 @@ class ChatViewModel extends ChangeNotifier {
     }
 
     if (_isOffline) {
-      _setError('Ingen nettverkstilkobling – kan ikke laste opp media.');
+      const message = 'Ingen nettverkstilkobling – kan ikke laste opp media.';
+      _setError(message);
+      composerController.setSendState(
+        ComposerSendState.failed,
+        error: message,
+      );
       return;
     }
 
     final uploader = _ensureMediaUploader();
 
     _setError(null);
+    composerController.setSendState(ComposerSendState.sending);
     _isSending = true;
     notifyListeners();
 
@@ -313,14 +337,25 @@ class ChatViewModel extends ChangeNotifier {
       await _cache.saveMessages(_thread!.id, _messages);
     } on ApiException catch (error) {
       debugPrint('media send failed: $error');
-      _setError('Kunne ikke sende media (${error.statusCode}).');
+      final message = 'Kunne ikke sende media (${error.statusCode}).';
+      _setError(message);
+      composerController.setSendState(
+        ComposerSendState.failed,
+        error: message,
+      );
       shouldClearComposer = false;
     } catch (error, stack) {
       debugPrint('media upload failed: $error\n$stack');
-      _setError('Kunne ikke sende media.');
+      const message = 'Kunne ikke sende media.';
+      _setError(message);
+      composerController.setSendState(
+        ComposerSendState.failed,
+        error: message,
+      );
       shouldClearComposer = false;
     } finally {
       _isSending = false;
+      composerController.setSendState(ComposerSendState.idle);
       notifyListeners();
       if (shouldClearComposer) {
         composerController.clear();
@@ -355,7 +390,12 @@ class ChatViewModel extends ChangeNotifier {
     await _cache.saveMessages(_thread!.id, _messages);
 
     if (_isOffline) {
-      _setError('Ingen nettverkstilkobling – meldingen ble lagret.');
+      const message = 'Ingen nettverkstilkobling – meldingen ble lagret.';
+      _setError(message);
+      composerController.setSendState(
+        ComposerSendState.queuedOffline,
+        error: message,
+      );
       _stopTypingActivity();
       return true;
     }
@@ -380,20 +420,35 @@ class ChatViewModel extends ChangeNotifier {
         debugPrint('Fallback send failed: $fallbackError');
         _messages = _messages.where((message) => message.id != tempId).toList();
         await _cache.saveMessages(_thread!.id, _messages);
-        _setError('Kunne ikke sende melding (${fallbackError.statusCode}).');
+        final message = 'Kunne ikke sende melding (${fallbackError.statusCode}).';
+        _setError(message);
+        composerController.setSendState(
+          ComposerSendState.failed,
+          error: message,
+        );
         return false;
       }
     } on ApiException catch (error) {
       debugPrint('sendMessage failed: $error');
       _messages = _messages.where((message) => message.id != tempId).toList();
       await _cache.saveMessages(_thread!.id, _messages);
-      _setError('Kunne ikke sende melding (${error.statusCode}).');
+      final message = 'Kunne ikke sende melding (${error.statusCode}).';
+      _setError(message);
+      composerController.setSendState(
+        ComposerSendState.failed,
+        error: message,
+      );
       return false;
     } catch (error, stack) {
       debugPrint('sendMessage failed unexpectedly: $error\n$stack');
       _messages = _messages.where((message) => message.id != tempId).toList();
       await _cache.saveMessages(_thread!.id, _messages);
-      _setError('Kunne ikke sende melding.');
+      const message = 'Kunne ikke sende melding.';
+      _setError(message);
+      composerController.setSendState(
+        ComposerSendState.failed,
+        error: message,
+      );
       return false;
     } finally {
       _stopTypingActivity();
@@ -409,6 +464,8 @@ class ChatViewModel extends ChangeNotifier {
     _acknowledgedReads.clear();
     _stopTypingActivity();
     notifyListeners();
+
+    await _autosaveManager.flushNow();
 
     _thread = thread;
     _selectedThreadId = thread.id;
@@ -633,13 +690,13 @@ class ChatViewModel extends ChangeNotifier {
     });
   }
 
-  void _restoreComposerDraft(String? text) {
+  void _restoreComposerDraft(ChatDraftSnapshot? snapshot) {
     _suppressComposerPersistence = true;
     try {
-      if (text == null || text.isEmpty) {
+      if (snapshot == null || snapshot.isEmpty) {
         composerController.clear();
       } else {
-        composerController.setText(text);
+        composerController.restoreSnapshot(snapshot);
       }
     } finally {
       _suppressComposerPersistence = false;
@@ -676,7 +733,11 @@ class ChatViewModel extends ChangeNotifier {
     }
     final threadId = _thread?.id ?? _selectedThreadId;
     if (threadId != null) {
-      _cache.saveDraft(threadId, composerController.value.text);
+      final snapshot = composerController.snapshot();
+      _autosaveManager.scheduleSave(
+        threadId: threadId,
+        snapshot: snapshot,
+      );
     }
     _updateTypingState(composerController.value.text.trim().isNotEmpty);
   }
@@ -974,6 +1035,7 @@ class ChatViewModel extends ChangeNotifier {
   @override
   void dispose() {
     composerController.removeListener(_handleComposerChanged);
+    _autosaveManager.dispose();
     _realtimeSubscription?.cancel();
     _connectivitySubscription?.cancel();
     _stopTypingActivity();

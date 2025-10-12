@@ -13,6 +13,28 @@ defmodule AuthProvider.Idp.IdentityProvider do
   @foreign_key_type :binary_id
 
   @type strategy :: :native | :external_oidc
+  @type t :: %__MODULE__{
+          id: binary() | nil,
+          tenant:
+            AuthProvider.Idp.Tenant.t()
+            | Ecto.Association.NotLoaded.t()
+            | nil,
+          tenant_id: binary() | nil,
+          name: String.t() | nil,
+          slug: String.t() | nil,
+          strategy: strategy() | nil,
+          issuer: String.t() | nil,
+          client_id: String.t() | nil,
+          client_secret: String.t() | nil,
+          authorization_endpoint: String.t() | nil,
+          token_endpoint: String.t() | nil,
+          userinfo_endpoint: String.t() | nil,
+          jwks_uri: String.t() | nil,
+          metadata: map(),
+          is_default: boolean(),
+          inserted_at: NaiveDateTime.t() | nil,
+          updated_at: NaiveDateTime.t() | nil
+        }
 
   schema "idp_identity_providers" do
     belongs_to :tenant, AuthProvider.Idp.Tenant
@@ -108,4 +130,3 @@ defmodule AuthProvider.Idp.IdentityProvider do
   def external_oidc?(%IdentityProvider{strategy: :external_oidc}), do: true
   def external_oidc?(_), do: false
 end
-

@@ -4,12 +4,13 @@ defmodule Messngr do
   kan operere på kontoer, profiler og chatter uten å importere moduler direkte.
   """
 
-  alias Messngr.{AI, Accounts, Auth, Calls, Chat, Media}
+  alias Messngr.{AI, Accounts, Auth, Chat, Media}
 
   # Accounts
   defdelegate list_accounts, to: Accounts
   defdelegate get_account!(id), to: Accounts
   defdelegate create_account(attrs), to: Accounts
+  defdelegate update_account(account, attrs), to: Accounts
   defdelegate create_profile(attrs), to: Accounts
   defdelegate list_profiles(account_id), to: Accounts
   defdelegate get_profile!(id), to: Accounts
@@ -38,6 +39,7 @@ defmodule Messngr do
   def create_channel_conversation(owner_profile_id, attrs \\ %{}) do
     Chat.create_channel_conversation(owner_profile_id, attrs)
   end
+  def update_conversation(conversation_id, attrs), do: Chat.update_conversation(conversation_id, attrs)
   defdelegate send_message(conversation_id, profile_id, attrs), to: Chat
   def list_messages(conversation_id, opts \\ []), do: Chat.list_messages(conversation_id, opts)
   def react_to_message(conversation_id, profile_id, message_id, emoji, opts \\ %{}) do
@@ -56,8 +58,12 @@ defmodule Messngr do
     Chat.unpin_message(conversation_id, profile_id, message_id)
   end
 
-  def mark_message_read(conversation_id, profile_id, message_id) do
-    Chat.mark_message_read(conversation_id, profile_id, message_id)
+  def mark_message_read(conversation_id, profile_id, message_id, opts \\ %{}) do
+    Chat.mark_message_read(conversation_id, profile_id, message_id, opts)
+  end
+
+  def acknowledge_message_delivery(conversation_id, profile_id, message_id, opts \\ %{}) do
+    Chat.acknowledge_message_delivery(conversation_id, profile_id, message_id, opts)
   end
 
   def update_message(conversation_id, profile_id, message_id, attrs) do

@@ -30,12 +30,44 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Hei der');
     await tester.pumpAndSettle();
 
+    expect(find.text('Endringer ikke lagret ennå'), findsOneWidget);
+
     await tester.tap(find.byIcon(Icons.send_rounded));
     await tester.pumpAndSettle();
 
     expect(submitted, isNotNull);
     expect(submitted!.text, 'Hei der');
     expect(submitted!.attachments, isEmpty);
+    expect(submitted!.mentions, isEmpty);
+  });
+
+  testWidgets('autosave status reacts to controller updates', (tester) async {
+    final controller = ChatComposerController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            onSubmit: (_) {},
+            isSending: false,
+          ),
+        ),
+      ),
+    );
+
+    controller.markAutosaveInProgress();
+    await tester.pump();
+    expect(find.text('Lagrer utkast …'), findsOneWidget);
+
+    final timestamp = DateTime(2024, 1, 1, 12, 30);
+    controller.markAutosaveSuccess(timestamp);
+    await tester.pump();
+    expect(find.textContaining('Utkast lagret'), findsOneWidget);
+
+    controller.markAutosaveFailure();
+    await tester.pump();
+    expect(find.text('Kunne ikke lagre utkast'), findsOneWidget);
   });
 
   testWidgets('emoji picker inserts emoji at caret', (tester) async {
@@ -93,6 +125,7 @@ void main() {
     expect(submitted, isNotNull);
     expect(submitted!.command, isNotNull);
     expect(submitted!.command!.name, '/giphy');
+    expect(submitted!.mentions, isEmpty);
   });
 
   testWidgets('file attachments are displayed and removable', (tester) async {
@@ -156,6 +189,138 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(controller.value.voiceNote, isNotNull);
+  });
+
+  testWidgets('formatting toolbar inserts markdown markers', (tester) async {
+    final controller = ChatComposerController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            onSubmit: (_) {},
+            isSending: false,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(TextField));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.format_bold));
+    await tester.pumpAndSettle();
+
+    expect(controller.value.text, contains('**tekst**'));
+  });
+
+  testWidgets('mentions palette inserts selected mention', (tester) async {
+    final controller = ChatComposerController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            onSubmit: (_) {},
+            isSending: false,
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), '@a');
+    await tester.pumpAndSettle();
+
+    expect(find.text('@ada'), findsOneWidget);
+
+    await tester.tap(find.text('@ada'));
+    await tester.pumpAndSettle();
+
+    expect(controller.value.text, contains('@ada '));
+    expect(controller.value.mentions, isNotEmpty);
+    expect(controller.value.mentions.first.handle, 'ada');
+  });
+
+  testWidgets('link dialog wraps selection in markdown link', (tester) async {
+    final controller = ChatComposerController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            onSubmit: (_) {},
+            isSending: false,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextField), 'Les mer');
+    await tester.pump();
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: 'Les mer',
+        selection: TextSelection(baseOffset: 0, extentOffset: 7),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.link));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('composerLinkUrlField')),
+      'https://example.com',
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Sett inn'));
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.value.text,
+      contains('[Les mer](https://example.com)'),
+    );
+  });
+
+  testWidgets('resize handle adjusts composer height', (tester) async {
+    final controller = ChatComposerController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            onSubmit: (_) {},
+            isSending: false,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+
+    final initialField = tester.widget<TextField>(find.byType(TextField));
+    final initialLines = initialField.minLines ?? 0;
+    expect(initialLines, greaterThan(0));
+
+    await tester.drag(
+      find.byKey(const ValueKey('composerResizeHandle')),
+      const Offset(0, -90),
+    );
+    await tester.pump();
+
+    final resizedField = tester.widget<TextField>(find.byType(TextField));
+    expect(resizedField.minLines, greaterThan(initialLines));
+    expect(resizedField.maxLines, equals(resizedField.minLines));
   });
 }
 

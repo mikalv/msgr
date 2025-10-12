@@ -1,5 +1,5 @@
 defmodule LlmGatewayTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias LlmGateway.Request
 

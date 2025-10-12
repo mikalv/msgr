@@ -75,8 +75,9 @@ class _PinputLoginCodeState extends State<PinputLoginCode> {
   @override
   Widget build(BuildContext context) {
     final authState = StoreProvider.of<AppState>(context).state.authState;
-    final targetHint =
-        authState.pendingTargetHint ?? authState.pendingEmail ?? authState.pendingMsisdn;
+    final targetHint = authState.pendingTargetHint ??
+        authState.pendingEmail ??
+        authState.pendingMsisdn;
     final debugCode = authState.pendingDebugCode;
 
     const focusedBorderColor = Color(0xFF6366F1);

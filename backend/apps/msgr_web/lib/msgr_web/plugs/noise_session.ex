@@ -57,7 +57,8 @@ defmodule MessngrWeb.Plugs.NoiseSession do
   resolved actor.
   """
   @spec verify_token(String.t(), keyword()) :: {:ok, Actor.t()} | {:error, term()}
-  def verify_token(encoded_token, opts \\ []) when is_binary(encoded_token) do
+  def verify_token(encoded_token, opts \\ [])
+  def verify_token(encoded_token, opts) when is_binary(encoded_token) do
     with {:ok, raw_token} <- decode_token(encoded_token),
          {:ok, session, %NoiseActor{} = actor} <- SessionStore.fetch(raw_token, opts),
          {:ok, account} <- load_account(actor.account_id),
@@ -126,8 +127,8 @@ defmodule MessngrWeb.Plugs.NoiseSession do
     |> get_req_header("authorization")
     |> List.first()
     |> case do
-      "Noise " <> token when byte_size(String.trim(token)) > 0 -> {:ok, String.trim(token), :authorization}
-      "Bearer " <> token when byte_size(String.trim(token)) > 0 -> {:ok, String.trim(token), :authorization}
+      "Noise " <> token -> normalize_token(token, :authorization)
+      "Bearer " <> token -> normalize_token(token, :authorization)
       _ -> :error
     end
   end
@@ -137,7 +138,7 @@ defmodule MessngrWeb.Plugs.NoiseSession do
     |> get_req_header("x-noise-session")
     |> List.first()
     |> case do
-      token when is_binary(token) and byte_size(String.trim(token)) > 0 -> {:ok, String.trim(token), :header}
+      token when is_binary(token) -> normalize_token(token, :header)
       _ -> :error
     end
   end
@@ -146,6 +147,15 @@ defmodule MessngrWeb.Plugs.NoiseSession do
     case get_session(conn, :noise_session_token) do
       token when is_binary(token) and byte_size(token) > 0 -> {:ok, token, :session}
       _ -> :error
+    end
+  end
+
+  defp normalize_token(token, source) do
+    token
+    |> String.trim()
+    |> case do
+      "" -> :error
+      trimmed -> {:ok, trimmed, source}
     end
   end
 
@@ -181,7 +191,7 @@ defmodule MessngrWeb.Plugs.NoiseSession do
 
   defp maybe_store_session(conn, actor, :authorization, opts), do: maybe_store_session(conn, actor, :header, opts)
 
-  defp maybe_store_session(conn, actor, _source, %{assign_session: false}), do: conn
+  defp maybe_store_session(conn, _actor, _source, %{assign_session: false}), do: conn
 
   defp maybe_store_session(conn, actor, _source, _opts) do
     put_session(conn, :noise_session_token, actor.encoded_token)

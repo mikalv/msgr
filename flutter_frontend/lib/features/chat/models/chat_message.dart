@@ -25,7 +25,8 @@ class ChatMessage {
   final String? threadId;
 
   /// Creates a chat message from an existing msgr message instance.
-  factory ChatMessage.fromMsgrMessage(MsgrMessage message) => ChatMessage._(message);
+  factory ChatMessage.fromMsgrMessage(MsgrMessage message) =>
+      ChatMessage._(message);
 
   /// Convenience constructor for authored text messages.
   factory ChatMessage.text({
@@ -304,7 +305,8 @@ class ChatMessage {
         theme: theme,
       );
     } else {
-      throw UnsupportedError('Unsupported message type: ${message.runtimeType}');
+      throw UnsupportedError(
+          'Unsupported message type: ${message.runtimeType}');
     }
 
     return ChatMessage._(
@@ -359,20 +361,24 @@ class ChatMessage {
   MsgrMessageKind get kind => message.kind;
 
   /// Author profile identifier when present.
-  String get profileId =>
-      message is MsgrAuthoredMessage ? (message as MsgrAuthoredMessage).profileId : '';
+  String get profileId => message is MsgrAuthoredMessage
+      ? (message as MsgrAuthoredMessage).profileId
+      : '';
 
   /// Author display name when present.
-  String get profileName =>
-      message is MsgrAuthoredMessage ? (message as MsgrAuthoredMessage).profileName : '';
+  String get profileName => message is MsgrAuthoredMessage
+      ? (message as MsgrAuthoredMessage).profileName
+      : '';
 
   /// Author rendering mode when present.
-  String get profileMode =>
-      message is MsgrAuthoredMessage ? (message as MsgrAuthoredMessage).profileMode : 'system';
+  String get profileMode => message is MsgrAuthoredMessage
+      ? (message as MsgrAuthoredMessage).profileMode
+      : 'system';
 
   /// Delivery status for authored messages.
-  String get status =>
-      message is MsgrAuthoredMessage ? (message as MsgrAuthoredMessage).status : 'sent';
+  String get status => message is MsgrAuthoredMessage
+      ? (message as MsgrAuthoredMessage).status
+      : 'sent';
 
   /// Indicates whether the message has been edited since creation.
   bool get isEdited => editedAt != null;
@@ -437,7 +443,8 @@ Map<String, dynamic> _normalisePayload(Map<String, dynamic> payload) {
     putInt('height', media['height']);
     putString('sha256', media['sha256'] ?? media['hash']);
 
-    final retention = media['retentionExpiresAt'] ?? media['retention_expires_at'];
+    final retention =
+        media['retentionExpiresAt'] ?? media['retention_expires_at'];
     if (retention is String) {
       normalizedMedia['retentionExpiresAt'] = retention;
     }
@@ -488,12 +495,14 @@ Map<String, dynamic> _normalisePayload(Map<String, dynamic> payload) {
         normalizedMedia['thumbnailHeight'] = thumbHeight;
         thumbnail['height'] = thumbHeight;
       }
-      final thumbContentType = rawThumbnail['contentType'] ?? rawThumbnail['content_type'];
+      final thumbContentType =
+          rawThumbnail['contentType'] ?? rawThumbnail['content_type'];
       if (thumbContentType is String && thumbContentType.isNotEmpty) {
         normalizedMedia['thumbnailContentType'] = thumbContentType;
         thumbnail['contentType'] = thumbContentType;
       }
-      final thumbObjectKey = rawThumbnail['objectKey'] ?? rawThumbnail['object_key'];
+      final thumbObjectKey =
+          rawThumbnail['objectKey'] ?? rawThumbnail['object_key'];
       if (thumbObjectKey is String && thumbObjectKey.isNotEmpty) {
         normalizedMedia['thumbnailObjectKey'] = thumbObjectKey;
         thumbnail['objectKey'] = thumbObjectKey;

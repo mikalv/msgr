@@ -17,6 +17,8 @@ defmodule MessngrWeb.ConnCase do
 
   use ExUnit.CaseTemplate
 
+  alias Messngr.Noise.SessionFixtures
+
   using do
     quote do
       # The default endpoint for testing
@@ -43,7 +45,7 @@ defmodule MessngrWeb.ConnCase do
   token and device fixture.
   """
   def attach_noise_session(conn, account, profile, attrs \\ %{}) do
-    session_info = noise_session_fixture(account, profile, attrs)
+    session_info = SessionFixtures.noise_session_fixture(account, profile, attrs)
     conn = Plug.Conn.put_req_header(conn, "authorization", "Noise #{session_info.token}")
     {conn, session_info}
   end

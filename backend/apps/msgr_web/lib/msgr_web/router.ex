@@ -9,13 +9,22 @@ defmodule MessngrWeb.Router do
     plug MessngrWeb.Plugs.CurrentActor
   end
 
+  pipeline :browser do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :fetch_live_flash
+    plug :put_root_layout, {MessngrWeb.Layouts, :root}
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+  end
+
   scope "/api", MessngrWeb do
     pipe_through :api
 
     post "/auth/challenge", AuthController, :challenge
     post "/auth/verify", AuthController, :verify
     post "/auth/oidc", AuthController, :oidc
-    resources "/users", AccountController, only: [:index, :create]
+    resources "/users", AccountController, only: [:index, :create, :update]
   end
 
   scope "/api", MessngrWeb do
@@ -23,9 +32,11 @@ defmodule MessngrWeb.Router do
 
     get "/conversations", ConversationController, :index
     post "/conversations", ConversationController, :create
+    patch "/conversations/:id", ConversationController, :update
     post "/conversations/:id/uploads", MediaUploadController, :create
     get "/conversations/:id/messages", MessageController, :index
     post "/conversations/:id/messages", MessageController, :create
+    post "/conversations/:id/messages/:message_id/delivery", MessageController, :deliver
     post "/conversations/:id/watch", ConversationController, :watch
     delete "/conversations/:id/watch", ConversationController, :unwatch
     get "/conversations/:id/watchers", ConversationController, :watchers

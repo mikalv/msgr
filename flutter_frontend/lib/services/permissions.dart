@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart';
 
-
 Future<void> requestMeetingPermissions() async {
   var status = await [Permission.camera, Permission.microphone].request();
   if (status[Permission.camera] != PermissionStatus.granted ||

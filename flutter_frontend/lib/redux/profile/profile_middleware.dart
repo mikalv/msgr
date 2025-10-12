@@ -10,10 +10,7 @@ import 'package:redux/redux.dart';
 import 'package:libmsgr/src/registration_service.dart';
 
 List<Middleware<AppState>> createProfileMiddleware() {
-  return [
-    TypedMiddleware<AppState, CreateProfileAction>(
-        _createProfile())
-  ];
+  return [TypedMiddleware<AppState, CreateProfileAction>(_createProfile())];
 }
 
 void Function(

@@ -12,7 +12,6 @@ defmodule Messngr.Noise.Handshake do
 
   alias Messngr.Noise.SessionStore
   alias Messngr.Transport.Noise.{Registry, Session}
-  alias Plug.Crypto
 
   @signature_hash :sha256
 
@@ -78,7 +77,7 @@ defmodule Messngr.Noise.Handshake do
   def verify_signature(%Session{} = session, signature) when is_binary(signature) do
     expected = signature(session)
 
-    if Crypto.secure_compare(expected, signature) do
+    if secure_compare(expected, signature) do
       :ok
     else
       {:error, :invalid_signature}
@@ -115,5 +114,27 @@ defmodule Messngr.Noise.Handshake do
 
       {:ok, %{session: session, token: token}}
     end
+  end
+
+  defp secure_compare(expected, signature) when is_binary(expected) and is_binary(signature) do
+    if Code.ensure_loaded?(Plug.Crypto) and function_exported?(Plug.Crypto, :secure_compare, 2) do
+      Plug.Crypto.secure_compare(expected, signature)
+    else
+      constant_time_compare(expected, signature)
+    end
+  end
+
+  defp secure_compare(_expected, _signature), do: false
+
+  defp constant_time_compare(expected, signature) when byte_size(expected) == byte_size(signature) do
+    constant_time_compare(expected, signature, 0) == 0
+  end
+
+  defp constant_time_compare(_expected, _signature), do: false
+
+  defp constant_time_compare(<<>>, <<>>, acc), do: acc
+
+  defp constant_time_compare(<<expected_byte, expected_rest::binary>>, <<signature_byte, signature_rest::binary>>, acc) do
+    constant_time_compare(expected_rest, signature_rest, :erlang.bor(acc, :erlang.bxor(expected_byte, signature_byte)))
   end
 end

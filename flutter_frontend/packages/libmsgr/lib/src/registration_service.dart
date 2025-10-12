@@ -1,186 +1,38 @@
-import 'dart:convert';
-import 'dart:io';
-
-import 'package:jwt_decoder/jwt_decoder.dart';
 import 'package:libmsgr/libmsgr.dart';
-import 'package:libmsgr/src/server_resolver.dart';
+import 'package:libmsgr/src/models/profile.dart';
+import 'package:libmsgr/src/models/team.dart';
+import 'package:libmsgr/src/models/user.dart';
+import 'package:libmsgr_core/libmsgr_core.dart';
 import 'package:logging/logging.dart';
-import 'package:http/http.dart' as http;
 
-// HttpHeaders.authorizationHeader
-// This is implemented as a singleton and not as a provider like services
-// in this project would for the most be, I assume...
-class RegistrationService {
-  static final RegistrationService _singleton = RegistrationService._internal();
-  final Logger _log = Logger('RegistrationService');
+/// Flutter-specific facade over the core registration service.
+class RegistrationService extends RegistrationServiceCore {
+  factory RegistrationService() => _singleton;
 
-  final client = http.Client();
-  late String deviceId;
-  Map<String, dynamic>? _cachedDeviceInfo;
-  Map<String, dynamic>? _cachedAppInfo;
-  String? msisdn;
-  String? email;
-  AuthChallenge? lastChallenge;
-
-  factory RegistrationService() {
-    return _singleton;
-  }
-
-  RegistrationService._internal() {
+  RegistrationService._internal({RegistrationApi? api})
+      : _log = Logger('RegistrationService'),
+        super(
+          keyManager: LibMsgr().keyManager,
+          secureStorage: LibMsgr().secureStorage,
+          deviceInfoProvider: LibMsgr().deviceInfo,
+          api: api,
+        ) {
     _log.info('RegistrationService starting up');
   }
 
-  void updateCachedContext({
-    required Map<String, dynamic> deviceInfo,
-    required Map<String, dynamic> appInfo,
-  }) {
-    _cachedDeviceInfo = Map<String, dynamic>.from(deviceInfo);
-    _cachedAppInfo = Map<String, dynamic>.from(appInfo);
+  final Logger _log;
+  static final RegistrationService _singleton = RegistrationService._internal();
+
+  String get deviceId => keyManager.deviceId;
+
+  Future<AuthChallenge?> requestForSignInCodeEmail(String email) async {
+    this.email = email;
+    return requestChallenge(channel: 'email', identifier: email);
   }
 
-  Future<Map<String, dynamic>> _deviceInfoForRequest(
-      Map<String, dynamic>? overrideDeviceInfo) async {
-    if (overrideDeviceInfo != null) {
-      return Map<String, dynamic>.from(overrideDeviceInfo);
-    }
-    if (_cachedDeviceInfo != null) {
-      return Map<String, dynamic>.from(_cachedDeviceInfo!);
-    }
-    final info = await LibMsgr().deviceInfo.extractInformation();
-    return info.map((key, value) => MapEntry(key.toString(), value));
-  }
-
-  Map<String, dynamic> _appInfoForRequest(Map<String, dynamic>? overrideAppInfo) {
-    final resolved = overrideAppInfo ?? _cachedAppInfo ?? const {};
-    return Map<String, dynamic>.from(resolved);
-  }
-
-  Future<void> maybeRegisterDevice({
-    Map<String, dynamic>? deviceInfo,
-    Map<String, dynamic>? appInfo,
-  }) async {
-    var isReg = await LibMsgr()
-        .secureStorage
-        .containsKey(kIsDeviceRegisteredWithServerNameStr);
-    if (!isReg) {
-      _log.info('Attempting to register device!');
-      await registerDevice(deviceInfo: deviceInfo, appInfo: appInfo);
-      await LibMsgr()
-          .secureStorage
-          .writeValue(kIsDeviceRegisteredWithServerNameStr, deviceId);
-    }
-  }
-
-  Future<bool> registerDevice({
-    Map<String, dynamic>? deviceInfo,
-    Map<String, dynamic>? appInfo,
-  }) async {
-    _log.finest('registerDevice triggered');
-    var url = ServerResolver.getAuthServer('/api/v1/device/register');
-    var keyData = await LibMsgr().keyManager.getDataForServer();
-    deviceId = LibMsgr().keyManager.deviceId!;
-    final resolvedDeviceInfo = await _deviceInfoForRequest(deviceInfo);
-    final resolvedAppInfo = _appInfoForRequest(appInfo);
-    var srvData = jsonEncode({
-      'from': deviceId,
-      'payload': {
-        'keyData': keyData,
-        'deviceInfo': resolvedDeviceInfo,
-        if (resolvedAppInfo.isNotEmpty) 'appInfo': resolvedAppInfo,
-      }
-    });
-    var hdrs = {
-      'Content-Type': 'application/json; charset=UTF-8',
-      'User-Agent': kUserAgentNameString
-    };
-    var response = await http.post(url, body: srvData, headers: hdrs);
-    _log.finest('registerDevice Response status: ${response.statusCode}');
-    _log.finest('registerDevice Response body: ${response.body}');
-    if (response.statusCode == 200) {
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  Future<bool> syncDeviceContext({
-    Map<String, dynamic>? deviceInfo,
-    Map<String, dynamic>? appInfo,
-  }) async {
-    _log.finest('syncDeviceContext triggered');
-    var url = ServerResolver.getAuthServer('/api/v1/device/context');
-    deviceId = LibMsgr().keyManager.deviceId!;
-    final resolvedDeviceInfo = await _deviceInfoForRequest(deviceInfo);
-    final resolvedAppInfo = _appInfoForRequest(appInfo);
-
-    final body = jsonEncode({
-      'from': deviceId,
-      'deviceInfo': resolvedDeviceInfo,
-      'appInfo': resolvedAppInfo,
-    });
-
-    final hdrs = {
-      'Content-Type': 'application/json; charset=UTF-8',
-      'User-Agent': kUserAgentNameString
-    };
-    final response = await http.post(url, body: body, headers: hdrs);
-    _log.finest(
-        'syncDeviceContext Response status: ${response.statusCode} body: ${response.body}');
-    return response.statusCode == 200;
-  }
-
-  Future<Profile?> createProfile(String teamName, String token, String username,
-      String firstName, String lastName) async {
-    _log.finest('createProfile triggered');
-    var url = ServerResolver.getTeamServer(teamName, '/v1/api/profiles');
-
-    var body = {
-      'first_name': firstName,
-      'last_name': lastName,
-      'username': username
-    };
-
-    var hdrs = {
-      'Content-Type': 'application/json; charset=UTF-8',
-      'User-Agent': kUserAgentNameString,
-      HttpHeaders.authorizationHeader: 'Bearer $token'
-    };
-    var response = await http.post(url, body: jsonEncode(body), headers: hdrs);
-    _log.finest(
-        'createProfile Response status: ${response.statusCode} url= $url');
-    _log.finest('createProfile Response body: ${response.body}');
-    if (response.statusCode == 200) {
-      var message = jsonDecode(response.body);
-      return Profile.fromJson(message);
-    } else {
-      return null;
-    }
-  }
-
-  Future<Map<String, dynamic>?> selectTeam(
-      String teamName, String token) async {
-    _log.finest('selectTeam triggered');
-    var url =
-        ServerResolver.getMainServer('/public/v1/api/select/team/$teamName');
-
-    var hdrs = {
-      'Content-Type': 'application/json; charset=UTF-8',
-      'User-Agent': kUserAgentNameString,
-      HttpHeaders.authorizationHeader: 'Bearer $token'
-    };
-    var response = await http.post(url, headers: hdrs);
-    _log.finest('selectTeam Response status: ${response.statusCode} url= $url');
-    _log.finest('selectTeam Response body: ${response.body}');
-    if (response.statusCode == 200) {
-      var message = jsonDecode(response.body);
-      if (message['status'] == 'ok') {
-        return message;
-      } else {
-        return null;
-      }
-    } else {
-      return null;
-    }
+  Future<AuthChallenge?> requestForSignInCodeMsisdn(String msisdn) async {
+    this.msisdn = msisdn;
+    return requestChallenge(channel: 'phone', identifier: msisdn);
   }
 
   Future<User?> submitEmailCodeForToken({
@@ -188,11 +40,12 @@ class RegistrationService {
     required String code,
     String? displayName,
   }) async {
-    return _submitCodeForToken(
+    final session = await verifyCode(
       challengeId: challengeId,
       code: code,
       displayName: displayName ?? email,
     );
+    return session != null ? _toUser(session) : null;
   }
 
   Future<User?> submitMsisdnCodeForToken({
@@ -200,238 +53,66 @@ class RegistrationService {
     required String code,
     String? displayName,
   }) async {
-    return _submitCodeForToken(
+    final session = await verifyCode(
       challengeId: challengeId,
       code: code,
       displayName: displayName ?? msisdn,
     );
+    return session != null ? _toUser(session) : null;
   }
 
-  Future<User?> _submitCodeForToken({
-    required String challengeId,
-    required String code,
-    String? displayName,
-  }) async {
-    _log.finest('submitCodeForToken triggered');
-    deviceId = LibMsgr().keyManager.deviceId!;
-
-    var url = ServerResolver.getAuthServer('/api/auth/verify');
-    var hdrs = {
-      'Content-Type': 'application/json; charset=UTF-8',
-      'User-Agent': kUserAgentNameString
-    };
-    var body = jsonEncode({
-      'challenge_id': challengeId,
-      'code': code,
-      if (displayName != null && displayName.isNotEmpty) 'display_name': displayName,
-    });
-    var response = await http.post(url, body: body, headers: hdrs);
-    _log.finest('submitCodeForToken Response status: ${response.statusCode}');
-    _log.finest('submitCodeForToken Response body: ${response.body}');
-    if (response.statusCode == 200) {
-      var message = jsonDecode(response.body) as Map<String, dynamic>;
-      var account = message['account'] as Map<String, dynamic>;
-      var identity = message['identity'] as Map<String, dynamic>;
-
-      var identifier = account['email'] ?? account['phone_number'] ?? identity['kind'];
-      return User(
-        id: account['id'] as String?,
-        identifier: identifier as String,
-        accessToken: identity['id'] as String,
-        refreshToken: identity['id'] as String,
-      );
-    }
-    return null;
+  Future<List<Team>> listMyTeams(String accessToken) async {
+    final teams = await listTeams(token: accessToken);
+    return teams.map((e) => Team.fromJson(e)).toList();
   }
 
-  Future<AuthChallenge?> requestForSignInCodeEmail(String? inputEmail) async {
-    deviceId = LibMsgr().keyManager.deviceId!;
-    if (inputEmail == null || inputEmail.isEmpty) {
-      _log.warning(
-          'An attempt to call requestForSignInCode with no arguments!');
-      return Future.value(null);
-    }
-    email = inputEmail;
-    return _requestForSignInCode({
-      'channel': 'email',
-      'identifier': inputEmail,
-      'device_id': deviceId,
-    });
+  Future<Map<String, dynamic>?> selectTeam(String teamName, String token) {
+    return super.selectTeam(teamName: teamName, token: token);
   }
 
-  Future<AuthChallenge?> requestForSignInCodeMsisdn(String? number) async {
-    deviceId = LibMsgr().keyManager.deviceId!;
-    if (number == null || number.isEmpty) {
-      _log.warning(
-          'An attempt to call requestForSignInCode with no arguments!');
-      return Future.value(null);
-    }
-    msisdn = number;
-    return _requestForSignInCode({
-      'channel': 'phone',
-      'identifier': number,
-      'device_id': deviceId,
-    });
-  }
-
-  Future<AuthChallenge?> _requestForSignInCode(Map<String, dynamic> body) async {
-    _log.finest('requestForSignInCode triggered (body: $body)');
-
-    deviceId = LibMsgr().keyManager.deviceId!;
-
-    var url = ServerResolver.getAuthServer('/api/auth/challenge');
-    var hdrs = {
-      'Content-Type': 'application/json; charset=UTF-8',
-      'User-Agent': kUserAgentNameString
-    };
-    var response = await http.post(url, body: jsonEncode(body), headers: hdrs);
-    _log.finest('requestForSignInCode Response status: ${response.statusCode}');
-    _log.finest('requestForSignInCode Response body: ${response.body}');
-    if (response.statusCode == 201) {
-      var message = jsonDecode(response.body) as Map<String, dynamic>;
-      lastChallenge = AuthChallenge.fromJson(message);
-      return lastChallenge;
-    }
-    return null;
-  }
-
-  Future<User?> completeOidc({
-    required String provider,
-    required String subject,
-    String? email,
-    String? name,
-  }) async {
-    var url = ServerResolver.getAuthServer('/api/auth/oidc');
-    var hdrs = {
-      'Content-Type': 'application/json; charset=UTF-8',
-      'User-Agent': kUserAgentNameString
-    };
-    var response = await http.post(
-      url,
-      headers: hdrs,
-      body: jsonEncode({
-        'provider': provider,
-        'subject': subject,
-        if (email != null) 'email': email,
-        if (name != null) 'name': name,
-      }),
+  Future<Profile?> createProfile(
+    String teamName,
+    String token,
+    String username,
+    String firstName,
+    String lastName,
+  ) async {
+    final result = await super.createProfile(
+      teamName: teamName,
+      token: token,
+      username: username,
+      firstName: firstName,
+      lastName: lastName,
     );
-
-    if (response.statusCode == 200) {
-      var message = jsonDecode(response.body) as Map<String, dynamic>;
-      var account = message['account'] as Map<String, dynamic>;
-      var identity = message['identity'] as Map<String, dynamic>;
-
-      var identifier = account['email'] ?? account['phone_number'] ?? identity['kind'];
-      return User(
-        id: account['id'] as String?,
-        identifier: identifier as String,
-        accessToken: identity['id'] as String,
-        refreshToken: identity['id'] as String,
-      );
+    if (result == null) {
+      return null;
     }
-    return null;
+    return Profile.fromJson(result.data);
   }
 
   Future<Team?> createNewTeam(
-      String teamName, String teamDesc, String token) async {
-    _log.finest('createNewTeam triggered');
-
-    var url = ServerResolver.getMainServer('/public/v1/api/teams');
-    Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
-    var body = {
-      'team_name': teamName,
-      'description': teamDesc,
-      'uid': decodedToken['sub']
-    };
-    var hdrs = {
-      'Content-Type': 'application/json; charset=UTF-8',
-      'User-Agent': kUserAgentNameString,
-      HttpHeaders.authorizationHeader: 'Bearer $token'
-    };
-    var response = await http.post(url, body: jsonEncode(body), headers: hdrs);
-    _log.finest(
-        'createNewTeam Response status: ${response.statusCode} url= $url');
-    _log.finest('createNewTeam Response body: ${response.body}');
-    if (response.statusCode == 200) {
-      var message = jsonDecode(response.body);
-      if (message['status'] == 'ok') {
-        return Team.fromJson(message['team']);
-      } else {
-        return null;
-      }
-    } else {
+    String teamName,
+    String teamDesc,
+    String token,
+  ) async {
+    final result = await super.createTeam(
+      teamName: teamName,
+      description: teamDesc,
+      token: token,
+    );
+    if (result == null) {
       return null;
     }
+    return Team.fromJson(result.team);
   }
 
-  Future<List<Team>> listMyTeams(token) async {
-    _log.finest('listMyTeams triggered');
-
-    var url = ServerResolver.getMainServer('/public/v1/api/teams');
-    var hdrs = {
-      'Content-Type': 'application/json; charset=UTF-8',
-      'User-Agent': kUserAgentNameString,
-      HttpHeaders.authorizationHeader: 'Bearer $token'
-    };
-    var response = await http.get(url, headers: hdrs);
-    _log.finest(
-        'listMyTeams Response status: ${response.statusCode} url= $url');
-    _log.finest('listMyTeams Response body: ${response.body}');
-    if (response.statusCode == 200) {
-      var message = jsonDecode(response.body);
-      if (message['status'] == 'ok') {
-        return message['teams'].map<Team>((obj) => Team.fromJson(obj)).toList()
-            as List<Team>;
-      } else {
-        return [];
-      }
-    } else {
-      return [];
-    }
+  User _toUser(UserSession session) {
+    final userId = session.userId ?? session.identifier;
+    return User(
+      id: userId,
+      identifier: session.identifier,
+      accessToken: session.accessToken,
+      refreshToken: session.refreshToken,
+    );
   }
-
-  Future<RefreshSessionResponse?> refreshSession(
-      {required String refreshToken}) async {
-    _log.finest('refreshSession triggered');
-    var url = ServerResolver.getAuthServer('/api/v1/refresh_token');
-    deviceId = LibMsgr().keyManager.deviceId!;
-
-    final body = jsonEncode({'from': deviceId, 'token': refreshToken});
-    final hdrs = {
-      'Content-Type': 'application/json; charset=UTF-8',
-      'User-Agent': kUserAgentNameString
-    };
-
-    final response = await http.post(url, body: body, headers: hdrs);
-    _log.finest('refreshSession Response status: ${response.statusCode}');
-    _log.finest('refreshSession Response body: ${response.body}');
-
-    if (response.statusCode != 200) {
-      return null;
-    }
-
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    if (decoded['status'] != 'ok') {
-      return null;
-    }
-
-    final token = decoded['token'] as String?;
-    final refresh = decoded['refresh_token'] as String?;
-    if (token == null || refresh == null) {
-      return null;
-    }
-
-    return RefreshSessionResponse(accessToken: token, refreshToken: refresh);
-  }
-}
-
-class RefreshSessionResponse {
-  const RefreshSessionResponse({
-    required this.accessToken,
-    required this.refreshToken,
-  });
-
-  final String accessToken;
-  final String refreshToken;
 }

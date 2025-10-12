@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'controller.dart';
 
 /// Usage:
-/// 
+///
 /// ```
 ///   class MyWidget extends StatelessWidget {
 ///    const MyWidget({Key? key}) : super(key: key);
@@ -24,17 +24,16 @@ import 'controller.dart';
 ///        inputFieldBuilder: (context, inputFieldValues){
 ///          return TextField(
 ///            controller: inputFieldValues.textEditingController,
-///            focusNode: inputFieldValues.focusNode, 
+///            focusNode: inputFieldValues.focusNode,
 ///          );
 ///        }
 ///      );
 ///    }
 ///  }
 ///  ```
-/// 
-/// 
-/// 
-
+///
+///
+///
 
 class TextFieldTags<T> extends StatefulWidget {
   ///[validator] allows you to validate the tag that has been entered

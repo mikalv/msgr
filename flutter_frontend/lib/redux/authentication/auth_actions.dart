@@ -103,7 +103,8 @@ class ServerRequestCodeFromUserAction extends AuthActions {
   final String channel;
   final AuthChallenge challenge;
 
-  ServerRequestCodeFromUserAction({required this.channel, required this.challenge});
+  ServerRequestCodeFromUserAction(
+      {required this.channel, required this.challenge});
 
   @override
   String toString() {
@@ -116,7 +117,8 @@ class RequestCodeMsisdnAction extends AuthActions {
   final String? displayName;
   final Completer completer;
 
-  RequestCodeMsisdnAction({required this.msisdn, this.displayName, required Completer completer})
+  RequestCodeMsisdnAction(
+      {required this.msisdn, this.displayName, required Completer completer})
       : completer = completer ?? Completer();
 
   @override
@@ -130,7 +132,8 @@ class RequestCodeEmailAction extends AuthActions {
   final String? displayName;
   final Completer completer;
 
-  RequestCodeEmailAction({required this.email, this.displayName, required Completer completer})
+  RequestCodeEmailAction(
+      {required this.email, this.displayName, required Completer completer})
       : completer = completer ?? Completer();
 
   @override

@@ -32,6 +32,13 @@ defmodule Messngr.Accounts do
     end
   end
 
+  @spec update_account(Account.t(), map()) :: {:ok, Account.t()} | {:error, Ecto.Changeset.t()}
+  def update_account(%Account{} = account, attrs) when is_map(attrs) do
+    account
+    |> Account.changeset(attrs)
+    |> Repo.update()
+  end
+
   defp do_create_account(attrs) do
     %Account{}
     |> Account.changeset(attrs)
@@ -136,7 +143,7 @@ defmodule Messngr.Accounts do
 
   @spec attach_device_for_identity(Identity.t(), map()) ::
           {:ok, %{identity: Identity.t(), device: Device.t() | nil}} | {:error, term()}
-  def attach_device_for_identity(%Identity{} = identity, attrs \ %{}) do
+  def attach_device_for_identity(%Identity{} = identity, attrs \\ %{}) do
     device_public_key =
       attrs
       |> Map.get(:device_public_key)

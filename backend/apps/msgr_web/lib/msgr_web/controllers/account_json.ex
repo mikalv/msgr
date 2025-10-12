@@ -18,6 +18,7 @@ defmodule MessngrWeb.AccountJSON do
       phone_number: account.phone_number,
       locale: account.locale,
       time_zone: account.time_zone,
+      read_receipts_enabled: account.read_receipts_enabled,
       profiles: Enum.map(account.profiles, &profile/1)
     }
   end

@@ -23,7 +23,8 @@ class ChatTheme {
     final brightness = theme.brightness;
     return BoxDecoration(
       color: Color.alphaBlend(
-        scheme.surfaceTint.withOpacity(brightness == Brightness.dark ? 0.12 : 0.18),
+        scheme.surfaceTint
+            .withOpacity(brightness == Brightness.dark ? 0.12 : 0.18),
         scheme.surface.withOpacity(brightness == Brightness.dark ? 0.82 : 0.94),
       ),
       borderRadius: BorderRadius.circular(32),
@@ -33,7 +34,8 @@ class ChatTheme {
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(brightness == Brightness.dark ? 0.35 : 0.16),
+          color: Colors.black
+              .withOpacity(brightness == Brightness.dark ? 0.35 : 0.16),
           blurRadius: 40,
           spreadRadius: -12,
           offset: const Offset(0, 32),

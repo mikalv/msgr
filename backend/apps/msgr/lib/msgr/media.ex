@@ -7,24 +7,7 @@ defmodule Messngr.Media do
   alias Messngr.Media.{Storage, Upload}
   alias Messngr.Repo
 
-  @type upload_instructions :: %{
-          required("id") => String.t(),
-          required("upload") => %{
-            required("method") => String.t(),
-            required("url") => String.t(),
-            required("headers") => map(),
-            required("expiresAt") => DateTime.t()
-          },
-          required("download") => %{
-            required("method") => String.t(),
-            required("url") => String.t(),
-            required("expiresAt") => DateTime.t()
-          },
-          required("bucket") => String.t(),
-          required("objectKey") => String.t(),
-          required("publicUrl") => String.t(),
-          required("retentionUntil") => DateTime.t()
-        }
+  @type upload_instructions :: map()
 
   @doc """
   Creates a new upload request and returns the storage instructions needed to
@@ -63,7 +46,7 @@ defmodule Messngr.Media do
           {:ok, map()} | {:error, term()}
   def consume_upload(upload_id, conversation_id, profile_id, metadata \\ %{}) do
     Repo.transaction(fn ->
-      upload = Repo.get_for_update(Upload, upload_id)
+      upload = Repo.get!(Upload, upload_id, lock: "FOR UPDATE")
 
       cond do
         is_nil(upload) -> Repo.rollback(:not_found)
@@ -72,8 +55,11 @@ defmodule Messngr.Media do
         upload.status != :pending -> Repo.rollback(:already_consumed)
         Upload.expired?(upload) -> Repo.rollback(:expired)
         true ->
-          with {:ok, normalized_metadata, attrs} <- normalize_metadata(metadata),
-               {:ok, updated} <- Upload.consume(upload, normalized_metadata, attrs) |> Repo.update() do
+          with {:ok, normalized_metadata, _attrs} <- normalize_metadata(metadata),
+               {:ok, updated} <-
+                 upload
+                 |> Upload.consume(normalized_metadata)
+                 |> Repo.update() do
             Upload.payload(updated)
             |> put_retention()
           else
@@ -126,44 +112,6 @@ defmodule Messngr.Media do
   end
 
   defp build_instructions(%Upload{} = upload) do
-    signed_url = Storage.presign_upload(upload.bucket, upload.object_key, upload.expires_at)
-
-    %{
-      "id" => upload.id,
-      "method" => "PUT",
-      "url" => signed_url,
-      "headers" => %{"content-type" => upload.content_type},
-      "bucket" => upload.bucket,
-      "objectKey" => upload.object_key,
-      "publicUrl" => Storage.public_url(upload.bucket, upload.object_key),
-      "expiresAt" => upload.expires_at,
-      "retentionExpiresAt" => upload.retention_expires_at,
-      "thumbnailUpload" => build_thumbnail_instructions(upload)
-    }
-    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-    |> Map.new()
-  end
-
-  defp build_thumbnail_instructions(%Upload{kind: kind} = upload) when kind in [:image, :video] do
-    object_key = Upload.thumbnail_object_key(upload.object_key)
-    signed_url = Storage.presign_upload(upload.bucket, object_key, upload.expires_at)
-
-    %{
-      "method" => "PUT",
-      "url" => signed_url,
-      "headers" => %{"content-type" => "image/jpeg"},
-      "bucket" => upload.bucket,
-      "objectKey" => object_key,
-      "publicUrl" => Storage.public_url(upload.bucket, object_key),
-      "expiresAt" => upload.expires_at
-    }
-  end
-
-  defp build_thumbnail_instructions(_upload), do: nil
-
-  defp config do
-    Application.get_env(:msgr, __MODULE__, [])
-  end
     upload_signed =
       Storage.presign_upload(upload.bucket, upload.object_key, content_type: upload.content_type)
 
@@ -186,8 +134,31 @@ defmodule Messngr.Media do
       "bucket" => upload.bucket,
       "objectKey" => upload.object_key,
       "publicUrl" => Storage.public_url(upload.bucket, upload.object_key),
-      "retentionUntil" => retention_until()
+      "retentionUntil" => retention_until(),
+      "thumbnailUpload" => build_thumbnail_instructions(upload)
     }
+  end
+
+  defp build_thumbnail_instructions(%Upload{kind: kind} = upload) when kind in [:image, :video] do
+    object_key = Upload.thumbnail_object_key(upload.object_key)
+    upload_signed =
+      Storage.presign_upload(upload.bucket, object_key, content_type: "image/jpeg")
+
+    %{
+      "method" => upload_signed.method,
+      "url" => upload_signed.url,
+      "headers" => upload_signed.headers,
+      "bucket" => upload.bucket,
+      "objectKey" => object_key,
+      "publicUrl" => Storage.public_url(upload.bucket, object_key),
+      "expiresAt" => upload_signed.expires_at
+    }
+  end
+
+  defp build_thumbnail_instructions(_upload), do: nil
+
+  defp config do
+    Application.get_env(:msgr, __MODULE__, [])
   end
 
   defp put_retention(payload) do

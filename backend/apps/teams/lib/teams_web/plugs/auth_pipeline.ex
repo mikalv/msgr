@@ -3,6 +3,8 @@ defmodule TeamsWeb.Plugs.AuthPipeline do
     module: AuthProvider.Guardian,
     error_handler: TeamsWeb.AuthErrorHandler
 
+  @plug_builder_opts init_mode: :runtime
+
   @claims %{typ: "access"}
 
   plug Guardian.Plug.VerifySession, claims: @claims

@@ -38,7 +38,10 @@ extension Target on Object {
     if (kIsWeb) {
       return false;
     } else {
-      return Platform.isLinux || Platform.isFuchsia || Platform.isWindows || Platform.isMacOS;
+      return Platform.isLinux ||
+          Platform.isFuchsia ||
+          Platform.isWindows ||
+          Platform.isMacOS;
     }
   }
   // ···

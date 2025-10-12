@@ -7,6 +7,10 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
   alias Messngr.Transport.Noise.{Session, TestHelpers}
 
   setup do
+    unless enacl_available?() do
+      skip("enacl NIF not available; skipping Noise handshake flow tests")
+    end
+
     original_flag = FeatureFlags.require_noise_handshake?()
     FeatureFlags.put(:noise_handshake_required, true)
 
@@ -36,7 +40,8 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
                  "last_handshake_at" => DateTime.utc_now()
                })
 
-      assert %{id: ^Session.id(session), token: token} = noise
+      session_id = Session.id(session)
+      assert %{id: ^session_id, token: token} = noise
       assert is_binary(token)
 
       {:ok, raw_token} = SessionStore.decode_token(token)
@@ -70,7 +75,7 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
     end
 
     test "fails when session is no longer present" do
-      %{session: session, signature: signature, device_key: device_key} = establish_handshake()
+      %{session: session, signature: _signature, device_key: device_key} = establish_handshake()
 
       {:ok, challenge, code} =
         Auth.start_challenge(%{
@@ -84,12 +89,12 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
       assert {:error, {:noise_handshake, :noise_session_not_found}} =
                Auth.verify_challenge(challenge.id, code, %{
                  "noise_session_id" => Session.id(session),
-                 "noise_signature" => signature
+                 "noise_signature" => Handshake.encoded_signature(session)
                })
     end
 
     test "accepts handshake after session rekey" do
-      %{session: session, signature: signature, device_key: device_key} = establish_handshake()
+      %{session: session, signature: _signature, device_key: device_key} = establish_handshake()
 
       {:ok, rekeyed} = Session.rekey(session, :both)
       {:ok, rekeyed} = Handshake.persist(rekeyed)
@@ -126,5 +131,11 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
       signature: Handshake.encoded_signature(session),
       device_key: Handshake.device_key(session)
     }
+  end
+
+  defp enacl_available? do
+    function_exported?(:enacl_nif, :crypto_generichash, 3)
+  rescue
+    _ -> false
   end
 end

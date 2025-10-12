@@ -3,21 +3,22 @@ import 'dart:convert';
 class LoggingEnvironment {
   LoggingEnvironment._()
       : _default = _LoggingValues(
-          enabled:
-              const bool.fromEnvironment('MSGR_LOG_ENABLED', defaultValue: false),
-          endpoint: const String.fromEnvironment(
-              'MSGR_LOG_ENDPOINT',
+          enabled: const bool.fromEnvironment('MSGR_LOG_ENABLED',
+              defaultValue: false),
+          endpoint: const String.fromEnvironment('MSGR_LOG_ENDPOINT',
               defaultValue: 'http://localhost:5080'),
-          org: const String.fromEnvironment('MSGR_LOG_ORG', defaultValue: 'default'),
-          stream:
-              const String.fromEnvironment('MSGR_LOG_STREAM', defaultValue: 'flutter'),
-          dataset: const String.fromEnvironment('MSGR_LOG_DATASET', defaultValue: '_json'),
+          org: const String.fromEnvironment('MSGR_LOG_ORG',
+              defaultValue: 'default'),
+          stream: const String.fromEnvironment('MSGR_LOG_STREAM',
+              defaultValue: 'flutter'),
+          dataset: const String.fromEnvironment('MSGR_LOG_DATASET',
+              defaultValue: '_json'),
           username: const String.fromEnvironment('MSGR_LOG_USERNAME',
               defaultValue: 'root@example.com'),
           password: const String.fromEnvironment('MSGR_LOG_PASSWORD',
               defaultValue: 'Complexpass#123'),
-          service:
-              const String.fromEnvironment('MSGR_LOG_SERVICE', defaultValue: 'msgr_flutter'),
+          service: const String.fromEnvironment('MSGR_LOG_SERVICE',
+              defaultValue: 'msgr_flutter'),
         );
 
   static final LoggingEnvironment instance = LoggingEnvironment._();

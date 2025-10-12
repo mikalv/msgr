@@ -1,34 +1,31 @@
 import 'package:libmsgr/libmsgr.dart';
-import 'package:libmsgr/src/registration_service.dart';
+import 'package:libmsgr/src/models/profile.dart';
+import 'package:libmsgr/src/models/team.dart';
+import 'package:libmsgr/src/models/user.dart';
 import 'package:libmsgr/src/repositories/base.dart';
+import 'package:libmsgr_core/libmsgr_core.dart';
 
-/// This function takes a list of integers and returns a new list with each
-/// integer incremented by one.
-///
-/// - Parameter numbers: A list of integers to be incremented.
-/// - Returns: A new list of integers where each integer is incremented by one.
 class AuthRepository extends BaseRepository<User> {
-  AuthRepository({required super.teamName});
+  AuthRepository({required super.teamName}) : _registration = RegistrationService();
 
-  Future<User?> getAuthenticatedUser() async {}
-  Future<Device?> getDevice() async {}
+  final RegistrationService _registration;
 
   Future<AuthChallenge?> requestMsisdnCode(String msisdn) async {
-    await RegistrationService().maybeRegisterDevice();
-    return RegistrationService().requestForSignInCodeMsisdn(msisdn);
+    await _registration.maybeRegisterDevice();
+    return _registration.requestForSignInCodeMsisdn(msisdn);
   }
 
   Future<AuthChallenge?> requestEmailCode(String email) async {
-    await RegistrationService().maybeRegisterDevice();
-    return RegistrationService().requestForSignInCodeEmail(email);
+    await _registration.maybeRegisterDevice();
+    return _registration.requestForSignInCodeEmail(email);
   }
 
   Future<User?> loginWithEmailAndCode({
     required String challengeId,
     required String code,
     String? displayName,
-  }) {
-    return RegistrationService().submitEmailCodeForToken(
+  }) async {
+    return _registration.submitEmailCodeForToken(
       challengeId: challengeId,
       code: code,
       displayName: displayName,
@@ -39,8 +36,8 @@ class AuthRepository extends BaseRepository<User> {
     required String challengeId,
     required String code,
     String? displayName,
-  }) {
-    return RegistrationService().submitMsisdnCodeForToken(
+  }) async {
+    return _registration.submitMsisdnCodeForToken(
       challengeId: challengeId,
       code: code,
       displayName: displayName,
@@ -48,22 +45,38 @@ class AuthRepository extends BaseRepository<User> {
   }
 
   Future<List<Team>> listMyTeams(String accessToken) async {
-    return RegistrationService().listMyTeams(accessToken);
+    return _registration.listMyTeams(accessToken);
   }
 
-  Future<Map<String, dynamic>?> selectTeam(
-      String teamName, String token) async {
-    return RegistrationService().selectTeam(teamName, token);
+  Future<Map<String, dynamic>?> selectTeam(String teamName, String token) {
+    return _registration.selectTeam(teamName, token);
   }
 
-  Future<Profile?> createProfile(String teamName, String token, String username,
-      String firstName, String lastName) async {
-    return RegistrationService()
-        .createProfile(teamName, token, username, firstName, lastName);
+  Future<Profile?> createProfile(
+    String teamName,
+    String token,
+    String username,
+    String firstName,
+    String lastName,
+  ) async {
+    return _registration.createProfile(
+      teamName,
+      token,
+      username,
+      firstName,
+      lastName,
+    );
   }
 
   Future<Team?> createNewTeam(
-      String teamName, String teamDesc, String token) async {
-    return RegistrationService().createNewTeam(teamName, teamDesc, token);
+    String teamName,
+    String teamDesc,
+    String token,
+  ) async {
+    return _registration.createNewTeam(teamName, teamDesc, token);
+  }
+
+  Future<RefreshSessionResponse?> refreshSession(String refreshToken) {
+    return _registration.refreshSession(refreshToken: refreshToken);
   }
 }

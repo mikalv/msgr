@@ -118,7 +118,8 @@ class _DayDivider extends StatelessWidget {
 
     return Row(
       children: [
-        const Expanded(child: Divider(indent: 24, endIndent: 12, thickness: 0.6)),
+        const Expanded(
+            child: Divider(indent: 24, endIndent: 12, thickness: 0.6)),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
@@ -136,7 +137,8 @@ class _DayDivider extends StatelessWidget {
             ),
           ),
         ),
-        const Expanded(child: Divider(indent: 12, endIndent: 24, thickness: 0.6)),
+        const Expanded(
+            child: Divider(indent: 12, endIndent: 24, thickness: 0.6)),
       ],
     );
   }

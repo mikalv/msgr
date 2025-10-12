@@ -27,6 +27,7 @@ defmodule Messngr.Logging.OpenObserveBackendTest do
       dataset: "_json",
       username: "user@example.com",
       password: "secret",
+      enabled: true,
       metadata: [:module],
       http_client: fn method, request, http_opts, opts ->
         send(self(), {:http_request, method, request, http_opts, opts})
@@ -47,18 +48,18 @@ defmodule Messngr.Logging.OpenObserveBackendTest do
         state
       )
 
-    assert_receive {:http_request, :post, {url, headers, 'application/json', body}, [], []}
+    assert_receive {:http_request, :post, {url, headers, ~c"application/json", body}, [], []}
 
     assert to_string(url) ==
              "http://openobserve:5080/api/default/logs/backend/_json"
 
-    assert {'authorization', 'Basic dXNlckBleGFtcGxlLmNvbTpzZWNyZXQ='} in headers
+    assert {~c"authorization", ~c"Basic dXNlckBleGFtcGxlLmNvbTpzZWNyZXQ="} in headers
 
     [entry] = Jason.decode!(body)
 
     assert entry["message"] == "hello"
     assert entry["service"] == state.service
-    assert entry["metadata"]["module"] =~ "OpenObserveBackendTest"
+    assert to_string(entry["metadata"]["module"]) =~ "OpenObserveBackendTest"
   end
 
   test "respects minimum level" do

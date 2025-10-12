@@ -1,9 +1,11 @@
-const apiServer = 'teams.msgr.no';
-const authApiServer = 'auth.msgr.no';
-const localAuthApiServer = 'auth.7f000001.nip.io:4080';
-const localApiServer = 'teams.7f000001.nip.io:4080';
-const localDevelopment = true;
+import 'package:libmsgr_core/libmsgr_core.dart';
+
+const apiServer = MsgrHosts.apiServer;
+const authApiServer = MsgrHosts.authApiServer;
+const localAuthApiServer = MsgrHosts.localAuthApiServer;
+const localApiServer = MsgrHosts.localApiServer;
+const localDevelopment = MsgrConstants.localDevelopment;
 
 const String kIsDeviceRegisteredWithServerNameStr =
-    'isDeviceRegisteredWithServer';
-const String kUserAgentNameString = 'MsgrApp-v1';
+    MsgrConstants.kIsDeviceRegisteredWithServerNameStr;
+const String kUserAgentNameString = MsgrConstants.kUserAgentNameString;

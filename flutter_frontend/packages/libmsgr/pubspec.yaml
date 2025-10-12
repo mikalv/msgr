@@ -15,6 +15,8 @@ dependency_overrides:
 
 # Add regular dependencies here.
 dependencies:
+  libmsgr_core:
+    path: ../libmsgr_core
   get_it: ^7.7.0
   uuid: ^4.4.2
   shared_preferences: ^2.3.2

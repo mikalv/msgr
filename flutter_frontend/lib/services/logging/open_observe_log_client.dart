@@ -31,7 +31,8 @@ class OpenObserveLogClient {
         'service': _environment.serviceName,
         'timestamp': record.time.toUtc().toIso8601String(),
         if (record.error != null) 'error': _stringify(record.error!),
-        if (record.stackTrace != null) 'stackTrace': record.stackTrace.toString(),
+        if (record.stackTrace != null)
+          'stackTrace': record.stackTrace.toString(),
         'metadata': {
           'sequenceNumber': record.sequenceNumber,
           if (record.zone != null) 'zone': record.zone.toString(),
@@ -45,8 +46,8 @@ class OpenObserveLogClient {
     };
 
     try {
-      final response =
-          await _client.post(_environment.ingestUri, headers: headers, body: body);
+      final response = await _client.post(_environment.ingestUri,
+          headers: headers, body: body);
       if (response.statusCode >= 400) {
         debugPrint(
             'OpenObserve rejected log ${response.statusCode}: ${response.body}');

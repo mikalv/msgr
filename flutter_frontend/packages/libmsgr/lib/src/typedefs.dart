@@ -1,4 +1,3 @@
-
 import 'package:libmsgr/libmsgr.dart';
 
 typedef TeamNameType = String;
@@ -12,7 +11,6 @@ typedef MessageList = List<MMessage>;
 
 typedef ProfileCacheType = Map<String, Profile>;
 typedef ProfileList = List<Profile>;
-
 
 typedef RoomCacheType = Map<String, Room>;
 

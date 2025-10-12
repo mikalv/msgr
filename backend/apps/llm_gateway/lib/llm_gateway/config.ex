@@ -50,11 +50,15 @@ defmodule LlmGateway.Config do
     system = system_credentials(provider)
     team = team_credentials(team_id, provider)
 
-    {:ok,
-     base
-     |> Keyword.merge(override_config)
-     |> Keyword.put(:credentials, merge_maps([system, team, override_credentials]))
-     |> ensure_required_credentials(provider)}
+    base_config =
+      base
+      |> Keyword.merge(override_config)
+      |> Keyword.put(:credentials, merge_maps([system, team, override_credentials]))
+
+    case ensure_required_credentials(base_config, provider) do
+      {:ok, validated} -> {:ok, validated}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   defp merge_maps(maps) do

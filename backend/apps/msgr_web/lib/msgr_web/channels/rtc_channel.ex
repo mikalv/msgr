@@ -93,7 +93,7 @@ defmodule MessngrWeb.RTCChannel do
     :ok
   end
 
-  defp ensure_call(_conversation_id, profile_id, %{"call_id" => call_id}) when is_binary(call_id) do
+  defp ensure_call(_conversation_id, _profile_id, %{"call_id" => call_id}) when is_binary(call_id) do
     case Calls.fetch_call(call_id) do
       {:ok, call} -> {:ok, call}
       {:error, :not_found} -> {:error, :call_not_found}

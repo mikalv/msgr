@@ -29,6 +29,9 @@ export 'src/services/contact_api.dart';
 
 export 'src/lib_constants.dart';
 
+export 'package:libmsgr_core/libmsgr_core.dart'
+    show UserSession, RefreshSessionResponse, TeamCreationResult, ProfileResult;
+
 export 'src/repositories/repository_factory.dart';
 
 export 'src/redux.dart';

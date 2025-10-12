@@ -70,7 +70,8 @@ class ChatSocketException implements Exception {
   final Object? details;
 
   @override
-  String toString() => 'ChatSocketException(message: $message, details: $details)';
+  String toString() =>
+      'ChatSocketException(message: $message, details: $details)';
 }
 
 /// Implementasjon som bruker Phoenix Channels over WebSocket.
@@ -168,7 +169,8 @@ class ChatSocket implements ChatRealtime {
           return ChatMessage.fromJson(data);
         }
 
-        throw ChatSocketException('Uventet svar fra server.', response.response);
+        throw ChatSocketException(
+            'Uventet svar fra server.', response.response);
       }
 
       if (response.isError) {
@@ -320,7 +322,9 @@ class ChatSocket implements ChatRealtime {
         final messageId = map['message_id'] as String?;
         final emoji = map['emoji'] as String?;
         final profileId = map['profile_id'] as String?;
-        if (messageId != null && emoji != null && profileId != null &&
+        if (messageId != null &&
+            emoji != null &&
+            profileId != null &&
             !_eventController.isClosed) {
           final aggregates = <ReactionAggregate>[];
           final rawAggregates = map['aggregates'];
@@ -354,7 +358,9 @@ class ChatSocket implements ChatRealtime {
         final map = _ensureMap(payload);
         final messageId = map['message_id'] as String?;
         final pinnedById = map['pinned_by_id'] as String?;
-        if (messageId != null && pinnedById != null && !_eventController.isClosed) {
+        if (messageId != null &&
+            pinnedById != null &&
+            !_eventController.isClosed) {
           _eventController.add(
             ChatPinnedEvent(
               messageId: messageId,
@@ -371,7 +377,9 @@ class ChatSocket implements ChatRealtime {
         final map = _ensureMap(payload);
         final profileId = map['profile_id'] as String?;
         final profileName = map['profile_name'] as String?;
-        if (profileId != null && profileName != null && !_eventController.isClosed) {
+        if (profileId != null &&
+            profileName != null &&
+            !_eventController.isClosed) {
           _eventController.add(
             ChatTypingEvent(
               profileId: profileId,
@@ -387,7 +395,9 @@ class ChatSocket implements ChatRealtime {
         final map = _ensureMap(payload);
         final profileId = map['profile_id'] as String?;
         final messageId = map['message_id'] as String?;
-        if (profileId != null && messageId != null && !_eventController.isClosed) {
+        if (profileId != null &&
+            messageId != null &&
+            !_eventController.isClosed) {
           _eventController.add(
             ChatReadEvent(
               profileId: profileId,
@@ -447,7 +457,8 @@ class ChatSocket implements ChatRealtime {
         throw ChatSocketException('Handling ble avvist.', response.response);
       }
       if (!response.isOk) {
-        throw ChatSocketException('Uventet svar fra server.', response.response);
+        throw ChatSocketException(
+            'Uventet svar fra server.', response.response);
       }
     } on ChannelTimeoutException catch (error) {
       throw ChatSocketException('Handlingen timet ut.', error);

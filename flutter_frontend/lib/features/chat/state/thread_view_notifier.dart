@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 
 class ThreadViewState {
-  const ThreadViewState({this.threadId, this.rootMessageId, this.showPinned = false});
+  const ThreadViewState(
+      {this.threadId, this.rootMessageId, this.showPinned = false});
 
   final String? threadId;
   final String? rootMessageId;
@@ -14,7 +15,10 @@ class ThreadViewNotifier extends ChangeNotifier {
   ThreadViewState get state => _state;
 
   void openThread(String threadId, {required String rootMessageId}) {
-    _state = ThreadViewState(threadId: threadId, rootMessageId: rootMessageId, showPinned: _state.showPinned);
+    _state = ThreadViewState(
+        threadId: threadId,
+        rootMessageId: rootMessageId,
+        showPinned: _state.showPinned);
     notifyListeners();
   }
 
