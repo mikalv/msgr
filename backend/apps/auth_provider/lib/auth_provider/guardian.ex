@@ -1,4 +1,10 @@
 defmodule AuthProvider.Guardian do
+  require Logger
+
+  if Code.ensure_loaded?(Logger) do
+    Logger.debug("Compiling AuthProvider.Guardian", module: __MODULE__)
+  end
+
   use Guardian, otp_app: :auth_provider,
                     permissions: %{
                       default: [:access],

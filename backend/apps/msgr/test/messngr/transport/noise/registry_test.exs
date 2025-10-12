@@ -6,6 +6,14 @@ defmodule Messngr.Transport.Noise.RegistryTest do
   alias Messngr.Transport.Noise.TestHelpers
 
   setup do
+    unless enacl_available?() do
+      skip("enacl NIF not available; skipping Noise registry tests")
+    end
+
+    :ok
+  end
+
+  setup do
     %{registry: start_supervised!({Registry, ttl: 80, cleanup_interval: 20})}
   end
 
@@ -70,5 +78,11 @@ defmodule Messngr.Transport.Noise.RegistryTest do
     client_state = TestHelpers.client_state(:nx)
     {session, _} = TestHelpers.handshake_pair(session, client_state)
     session
+  end
+
+  defp enacl_available? do
+    function_exported?(:enacl_nif, :crypto_generichash, 3)
+  rescue
+    _ -> false
   end
 end

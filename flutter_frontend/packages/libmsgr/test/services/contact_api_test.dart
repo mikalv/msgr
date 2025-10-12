@@ -7,7 +7,8 @@ import 'package:test/test.dart';
 
 void main() {
   group('ContactApiClient', () {
-    const context = ContactApiContext(accountId: 'acct-1', profileId: 'profile-1');
+    const context =
+        ContactApiContext(accountId: 'acct-1', profileId: 'profile-1');
 
     test('imports contacts and returns parsed records', () async {
       late http.Request capturedRequest;
@@ -15,7 +16,8 @@ void main() {
       final client = MockClient((request) async {
         capturedRequest = request;
         expect(request.method, equals('POST'));
-        expect(request.url.toString(), equals('http://teams.7f000001.nip.io:4080/api/contacts/import'));
+        expect(request.url.toString(),
+            equals('http://teams.7f000001.nip.io:4080/api/contacts/import'));
         expect(
           request.headers,
           containsPair('x-account-id', context.accountId),
@@ -27,7 +29,8 @@ void main() {
 
         final decoded = jsonDecode(request.body) as Map<String, dynamic>;
         expect(decoded['contacts'], isA<List>());
-        final first = (decoded['contacts'] as List).single as Map<String, dynamic>;
+        final first =
+            (decoded['contacts'] as List).single as Map<String, dynamic>;
         expect(first['name'], equals('Eva'));
         expect(first['email'], equals('eva@example.com'));
         expect(first['labels'], equals(['venn']));
@@ -78,7 +81,8 @@ void main() {
 
     test('looks up known contacts and exposes matches', () async {
       final client = MockClient((request) async {
-        expect(request.url.toString(), equals('http://teams.7f000001.nip.io:4080/api/contacts/lookup'));
+        expect(request.url.toString(),
+            equals('http://teams.7f000001.nip.io:4080/api/contacts/lookup'));
 
         return http.Response(
           jsonEncode({
@@ -133,7 +137,8 @@ void main() {
 
       expect(
         () => api.importContacts(context: context, contacts: const []),
-        throwsA(isA<ContactApiException>().having((e) => e.statusCode, 'status', 500)),
+        throwsA(isA<ContactApiException>()
+            .having((e) => e.statusCode, 'status', 500)),
       );
     });
   });

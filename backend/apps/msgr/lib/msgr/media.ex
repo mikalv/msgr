@@ -46,7 +46,7 @@ defmodule Messngr.Media do
           {:ok, map()} | {:error, term()}
   def consume_upload(upload_id, conversation_id, profile_id, metadata \\ %{}) do
     Repo.transaction(fn ->
-      upload = Repo.get_for_update(Upload, upload_id)
+      upload = Repo.get!(Upload, upload_id, lock: "FOR UPDATE")
 
       cond do
         is_nil(upload) -> Repo.rollback(:not_found)
@@ -55,8 +55,11 @@ defmodule Messngr.Media do
         upload.status != :pending -> Repo.rollback(:already_consumed)
         Upload.expired?(upload) -> Repo.rollback(:expired)
         true ->
-          with {:ok, normalized_metadata, attrs} <- normalize_metadata(metadata),
-               {:ok, updated} <- Upload.consume(upload, normalized_metadata, attrs) |> Repo.update() do
+          with {:ok, normalized_metadata, _attrs} <- normalize_metadata(metadata),
+               {:ok, updated} <-
+                 upload
+                 |> Upload.consume(normalized_metadata)
+                 |> Repo.update() do
             Upload.payload(updated)
             |> put_retention()
           else

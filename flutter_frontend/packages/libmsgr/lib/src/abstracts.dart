@@ -1,34 +1,21 @@
 import 'package:libmsgr/src/typedefs.dart';
+import 'package:libmsgr_core/libmsgr_core.dart' as core;
 
-abstract class ASecureStorage {
-  Future<bool> containsKey(key);
-  Future<String?> readValue(key);
-  Future<Map<String, String>> readAll();
-  Future<String> writeValue(key, value);
-  Future<void> deleteAll();
-  Future<void> deleteKey(key);
-}
+typedef ASecureStorage = core.SecureStorage;
+typedef ASharedPreferences = core.KeyValueStore;
 
-abstract class ASharedPreferences {
-  Future<void> clear({Set<String>? allowList});
-  Future<bool> containsKey(String key);
-  Future<Map<String, Object?>> getAll({Set<String>? allowList});
-  Future<bool?> getBool(String key);
-  Future<double?> getDouble(String key);
-  Future<int?> getInt(String key);
-  Future<Set<String>> getKeys({Set<String>? allowList});
-  Future<String?> getString(String key);
-  Future<List<String>?> getStringList(String key);
-  Future<void> remove(String key);
-  Future<void> setBool(String key, bool value);
-  Future<void> setDouble(String key, double value);
-  Future<void> setInt(String key, int value);
-  Future<void> setString(String key, String value);
-  Future<void> setStringList(String key, List<String> value);
-}
-
-abstract class ADeviceInfo {
+abstract class ADeviceInfo extends core.DeviceInfoProvider {
+  /// Legacy API preserved for existing call sites.
   Future<Map<dynamic, dynamic>> extractInformation();
+
+  @override
+  Future<Map<String, dynamic>> deviceInfo() async {
+    final raw = await extractInformation();
+    return raw.map((key, value) => MapEntry(key.toString(), value));
+  }
+
+  @override
+  Future<Map<String, dynamic>> appInfo();
 }
 
 abstract class Listenable {

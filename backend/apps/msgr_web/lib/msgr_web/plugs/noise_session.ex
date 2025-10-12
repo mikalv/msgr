@@ -191,7 +191,7 @@ defmodule MessngrWeb.Plugs.NoiseSession do
 
   defp maybe_store_session(conn, actor, :authorization, opts), do: maybe_store_session(conn, actor, :header, opts)
 
-  defp maybe_store_session(conn, actor, _source, %{assign_session: false}), do: conn
+  defp maybe_store_session(conn, _actor, _source, %{assign_session: false}), do: conn
 
   defp maybe_store_session(conn, actor, _source, _opts) do
     put_session(conn, :noise_session_token, actor.encoded_token)

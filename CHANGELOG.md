@@ -2,6 +2,16 @@
 
 ## Unreleased
 - Added MVP-plan for chat-klient i `docs/chat_client_mvp_plan.md`.
+- Added per-recipient message delivery receipts with database schema, REST and
+  WebSocket acknowledgement flows, status propagation to messages, and test
+  coverage for delivery/read guarantees.
+- Added read receipt privacy controls so accounts and team conversations can
+  disable read acknowledgements; the backend now skips read broadcasts/status
+  escalations when disabled, exposes the settings via conversation payloads,
+  and covers the behaviour with new regression tests.
+- Added REST toggles for read receipt preferences on accounts and conversations,
+  exposing the settings in account payloads and adding controller coverage so
+  privacy choices can be updated after onboarding.
 - Added Markdown-lenkeformatering i chat-komponistens verktøylinje og et drahåndtak for høydejustering med nye widgettester og oppdatert paritetsplan.
 - Hardened chat composer phase A/B work: added autosave snapshot persistence with background sync manager, pessimistic send/queue states with retry UI, refreshed accessibility (focus order, semantics) and documented design & research updates.
 - Split the Flutter chat composer into a modular library with dedicated files

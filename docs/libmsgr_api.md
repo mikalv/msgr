@@ -81,11 +81,11 @@ suitable for use both in Flutter and in command line tools.
 
 ## Command line utilities
 
-The `tool/msgr_cli.dart` entry point exercises the APIs described above. It
-bootstraps `LibMsgr` with in-memory adapters and exposes an `integration-flow`
-command that registers a device, performs the email OTP flow, creates a new team
-and ensures a profile exists. The CLI is used both for manual smoke testing and
-inside the end-to-end integration test located at
-`integration_tests/test_cli_flow.py`.
+CLI tooling now lives in the `packages/libmsgr_cli` package. The legacy
+`tool/msgr_cli.dart` entrypoint forwards to the new implementation so existing
+integration tests keep working.
 
-For details on the command line usage see the package README.
+`libmsgr_cli` boots the pure Dart core (`libmsgr_core`), persists state in a
+local directory and exposes an `integration-flow` command that registers a
+device, completes the OTP auth flow, creates a team and ensures a profile
+exists. See `packages/libmsgr_cli/README.md` for usage instructions.

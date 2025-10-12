@@ -39,6 +39,10 @@ defmodule Messngr.MixProject do
       {:decibel, "~> 0.2.3"},
       {:uuid, "~> 1.1"},
       {:enoise, "~> 1.1"},
+      {:enacl,
+       git: "https://github.com/mikalv/enacl.git",
+       ref: "e287977b91eb7eeddb282567c3a779865a0cd803",
+       override: true},
       {:telemetry, "~> 1.3"},
       {:dns_cluster, "~> 0.1.1"},
       {:phoenix_pubsub, "~> 2.1"},
@@ -47,8 +51,10 @@ defmodule Messngr.MixProject do
       {:jason, "~> 1.2"},
       {:swoosh, "~> 1.5"},
       {:finch, "~> 0.13"},
-      {:guardian, "~> 2.3"},
+      {:guardian, "~> 2.3.2"},
       {:guardian_db, "~> 3.0"},
+      {:llm_gateway, in_umbrella: true},
+      {:plug_crypto, "~> 2.0"},
       {:mox, "~> 0.5", only: :test}
     ]
   end

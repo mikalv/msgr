@@ -26,7 +26,12 @@ defmodule Messngr.Connectors.MatrixBridgeTest do
 
     assert [message] = QueueRecorder.published(agent)
     assert message.topic == "bridge/matrix/outbound_event"
-    assert message.payload.payload == %{room_id: "!room:server", event_type: "m.room.message", content: %{body: "Hello"}}
+    assert message.payload.payload == %{
+             room_id: "!room:server",
+             event_type: "m.room.message",
+             content: %{body: "Hello"},
+             metadata: %{}
+           }
     assert message.payload.trace_id == "event"
   end
 

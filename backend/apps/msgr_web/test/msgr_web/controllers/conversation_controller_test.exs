@@ -62,6 +62,26 @@ defmodule MessngrWeb.ConversationControllerTest do
     assert %{"data" => %{"count" => 0}} = json_response(unwatch_conn, 200)
   end
 
+  test "updates conversation read receipt preference", %{
+    conn: conn,
+    target_profile: target_profile,
+    current_profile: profile
+  } do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile.id, target_profile.id)
+
+    conn =
+      patch(conn, ~p"/api/conversations/#{conversation.id}", %{
+        "read_receipts_enabled" => false
+      })
+
+    assert %{
+             "data" => %{
+               "id" => ^conversation.id,
+               "read_receipts_enabled" => false
+             }
+           } = json_response(conn, 200)
+  end
+
   test "missing header returns unauthorized", %{target_profile: target_profile} do
     conn = build_conn()
     conn = post(conn, ~p"/api/conversations", %{target_profile_id: target_profile.id})

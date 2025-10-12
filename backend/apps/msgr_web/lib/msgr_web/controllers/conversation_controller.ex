@@ -32,6 +32,7 @@ defmodule MessngrWeb.ConversationController do
           topic: Map.get(params, "topic"),
           structure_type: parse_structure_type(params)
         }
+        attrs = maybe_put_read_receipts_enabled(attrs, parse_read_receipts_enabled(params))
 
         with {:ok, conversation} <-
                Messngr.create_group_conversation(current_profile.id, participant_ids, attrs) do
@@ -45,6 +46,7 @@ defmodule MessngrWeb.ConversationController do
           structure_type: parse_structure_type(params),
           visibility: parse_visibility(params)
         }
+        attrs = maybe_put_read_receipts_enabled(attrs, parse_read_receipts_enabled(params))
 
         with {:ok, conversation} <- Messngr.create_channel_conversation(current_profile.id, attrs) do
           render(conn, :show, conversation: conversation)
@@ -56,6 +58,20 @@ defmodule MessngrWeb.ConversationController do
   end
 
   def create(_conn, _params), do: {:error, :bad_request}
+
+  def update(conn, %{"id" => conversation_id} = params) do
+    current_profile = conn.assigns.current_profile
+    attrs_source = Map.get(params, "conversation") || params
+
+    attrs =
+      %{}
+      |> maybe_put_read_receipts_enabled(parse_read_receipts_enabled(attrs_source))
+
+    with {:ok, _} <- Messngr.ensure_membership(conversation_id, current_profile.id),
+         {:ok, conversation} <- Messngr.update_conversation(conversation_id, attrs) do
+      render(conn, :show, conversation: conversation)
+    end
+  end
 
   def watch(conn, %{"id" => conversation_id}) do
     current_profile = conn.assigns.current_profile
@@ -109,6 +125,30 @@ defmodule MessngrWeb.ConversationController do
     |> Kernel.||(Map.get(params, "hidden") |> hidden_to_visibility())
   end
 
+  defp parse_read_receipts_enabled(params) do
+    params
+    |> Map.get("read_receipts_enabled")
+    |> Kernel.||(Map.get(params, "readReceiptsEnabled"))
+    |> Kernel.||(Map.get(params, :read_receipts_enabled))
+    |> Kernel.||(Map.get(params, :readReceiptsEnabled))
+    |> case do
+      nil ->
+        nested =
+          cond do
+            is_map(Map.get(params, "conversation")) -> Map.get(params, "conversation")
+            is_map(Map.get(params, :conversation)) -> Map.get(params, :conversation)
+            true -> nil
+          end
+
+        if is_map(nested), do: parse_read_receipts_enabled(nested), else: nil
+
+      value when value in [true, false] -> value
+      value when value in ["true", "1", 1] -> true
+      value when value in ["false", "0", 0] -> false
+      _ -> nil
+    end
+  end
+
   defp build_list_opts(params) do
     []
     |> maybe_put(:limit, params["limit"])
@@ -128,4 +168,7 @@ defmodule MessngrWeb.ConversationController do
   defp hidden_to_visibility(nil), do: nil
   defp hidden_to_visibility(value) when value in [true, "true", 1, "1"], do: "private"
   defp hidden_to_visibility(_value), do: nil
+
+  defp maybe_put_read_receipts_enabled(attrs, nil), do: attrs
+  defp maybe_put_read_receipts_enabled(attrs, value), do: Map.put(attrs, :read_receipts_enabled, value)
 end

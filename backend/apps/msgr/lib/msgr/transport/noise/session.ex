@@ -430,7 +430,7 @@ defmodule Messngr.Transport.Noise.Session do
     {:error, reason, %{session | current_pattern: nil, handshake_state: nil}}
   end
 
-  defp switch_pattern(%__MODULE__{pending_patterns: [next | rest]} = session, reason) do
+  defp switch_pattern(%__MODULE__{pending_patterns: [next | rest]} = session, _reason) do
     session = %{session | pending_patterns: rest, current_pattern: nil, handshake_state: nil}
 
     case apply_pattern(session, next) do

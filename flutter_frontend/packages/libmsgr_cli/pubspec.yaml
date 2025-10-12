@@ -1,0 +1,22 @@
+name: libmsgr_cli
+description: Command line tooling for exercising msgr backend flows.
+version: 0.1.0
+repository: https://github.com/msgr-no/flutter_client
+
+environment:
+  sdk: ^3.5.1
+
+dependency_overrides:
+  libmsgr_core:
+    path: ../libmsgr_core
+
+dependencies:
+  args: ^2.5.0
+  logging: ^1.2.0
+  path: ^1.8.3
+  libmsgr_core:
+    path: ../libmsgr_core
+
+dev_dependencies:
+  lints: ^4.0.0
+  test: ^1.24.0

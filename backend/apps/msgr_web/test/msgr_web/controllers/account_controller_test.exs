@@ -11,8 +11,13 @@ defmodule MessngrWeb.AccountControllerTest do
           "email" => "kari@example.com"
         })
 
-      assert %{"data" => %{"display_name" => "Kari", "profiles" => [%{"name" => "Privat"}]}} =
-               json_response(conn, 201)
+      assert %{
+               "data" => %{
+                 "display_name" => "Kari",
+                 "profiles" => [%{"name" => "Privat"}],
+                 "read_receipts_enabled" => true
+               }
+             } = json_response(conn, 201)
     end
   end
 
@@ -23,6 +28,24 @@ defmodule MessngrWeb.AccountControllerTest do
       conn = get(conn, ~p"/api/users")
 
       assert %{"data" => [_]} = json_response(conn, 200)
+    end
+  end
+
+  describe "PATCH /api/users/:id" do
+    test "updates read receipt preference", %{conn: conn} do
+      {:ok, account} = Accounts.create_account(%{"display_name" => "Kari"})
+
+      conn =
+        patch(conn, ~p"/api/users/#{account.id}", %{
+          "read_receipts_enabled" => false
+        })
+
+      assert %{
+               "data" => %{
+                 "id" => ^account.id,
+                 "read_receipts_enabled" => false
+               }
+             } = json_response(conn, 200)
     end
   end
 end

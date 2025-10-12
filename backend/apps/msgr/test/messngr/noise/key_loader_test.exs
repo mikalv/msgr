@@ -36,15 +36,22 @@ defmodule Messngr.Noise.KeyLoaderTest do
   end
 
   test "derives public key and fingerprint deterministically" do
-    {:ok, _type, private_key, public_key} = :enoise_keypair.new(:dh25519)
+    private_key =
+      <<0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+        16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31>>
+
+    {public_key, _} = :crypto.generate_key(:ecdh, :x25519, private_key)
 
     assert KeyLoader.public_key(private_key) == public_key
 
-    assert KeyLoader.fingerprint(private_key) ==
-             private_key
-             |> KeyLoader.public_key()
-             |> then(&:crypto.hash(:blake2b, 32, &1))
-             |> Base.encode16(case: :lower)
+    expected =
+      private_key
+      |> KeyLoader.public_key()
+      |> then(&:crypto.hash(:blake2b, &1))
+      |> binary_part(0, 32)
+      |> Base.encode16(case: :lower)
+
+    assert KeyLoader.fingerprint(private_key) == expected
   end
 
   test "loads key via secrets manager" do

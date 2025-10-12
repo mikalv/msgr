@@ -158,9 +158,11 @@ class KnownContactMatch {
     final query = json['query'];
 
     return KnownContactMatch(
-      queryEmail: query is Map<String, dynamic> ? query['email'] as String? : null,
-      queryPhoneNumber:
-          query is Map<String, dynamic> ? query['phone_number'] as String? : null,
+      queryEmail:
+          query is Map<String, dynamic> ? query['email'] as String? : null,
+      queryPhoneNumber: query is Map<String, dynamic>
+          ? query['phone_number'] as String?
+          : null,
       match: json['match'] is Map<String, dynamic>
           ? ContactMatchDetails.fromJson(json['match'] as Map<String, dynamic>)
           : null,

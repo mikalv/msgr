@@ -1,6 +1,5 @@
+import 'package:libmsgr_core/libmsgr_core.dart';
 import 'package:test/test.dart';
-
-import '../../tool/src/memory_adapters.dart';
 
 void main() {
   group('MemorySecureStorage', () {
@@ -31,7 +30,7 @@ void main() {
 
   group('MemorySharedPreferences', () {
     test('supports primitive setters and getters', () async {
-      final prefs = MemorySharedPreferences();
+      final prefs = MemoryKeyValueStore();
       await prefs.setBool('bool', true);
       await prefs.setDouble('double', 1.5);
       await prefs.setInt('int', 42);
@@ -46,7 +45,7 @@ void main() {
     });
 
     test('clear respects allow list', () async {
-      final prefs = MemorySharedPreferences();
+      final prefs = MemoryKeyValueStore();
       await prefs.setInt('keep', 1);
       await prefs.setInt('drop', 2);
 
@@ -56,7 +55,7 @@ void main() {
     });
 
     test('getAll filters by allow list', () async {
-      final prefs = MemorySharedPreferences();
+      final prefs = MemoryKeyValueStore();
       await prefs.setInt('keep', 1);
       await prefs.setInt('drop', 2);
 
@@ -66,12 +65,9 @@ void main() {
   });
 
   test('FakeDeviceInfo exposes deterministic info map', () async {
-    final device = FakeDeviceInfo('device-123');
-    final info = device.info;
+    final device = MemoryDeviceInfo(deviceId: 'device-123');
+    final info = await device.deviceInfo();
     expect(info['deviceId'], 'device-123');
-
-    final extracted = await device.extractInformation();
-    expect(extracted['deviceId'], 'device-123');
 
     final appInfo = await device.appInfo();
     expect(appInfo['appName'], 'integration-cli');

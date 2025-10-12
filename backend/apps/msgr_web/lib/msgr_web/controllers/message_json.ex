@@ -1,5 +1,5 @@
 defmodule MessngrWeb.MessageJSON do
-  alias Messngr.Chat.Message
+  alias Messngr.Chat.{Message, MessageReceipt}
   alias Messngr.Accounts.Profile
 
   def index(%{page: %{entries: entries, meta: meta}}) do
@@ -8,6 +8,10 @@ defmodule MessngrWeb.MessageJSON do
 
   def show(%{message: message}) do
     %{data: message(message)}
+  end
+
+  def receipt(%{receipt: receipt}) do
+    %{data: receipt(receipt)}
   end
 
   defp encode_meta(nil), do: %{start_cursor: nil, end_cursor: nil, has_more: %{before: false, after: false}}
@@ -41,7 +45,21 @@ defmodule MessngrWeb.MessageJSON do
       payload: message.payload || %{},
       metadata: message.metadata || %{},
       thread_id: message.thread_id,
-      profile: profile_payload(message.profile)
+      profile: profile_payload(message.profile),
+      receipts: Enum.map(message.receipts || [], &receipt/1)
+    }
+  end
+
+  defp receipt(%MessageReceipt{} = receipt) do
+    %{
+      id: receipt.id,
+      status: receipt.status,
+      delivered_at: receipt.delivered_at,
+      read_at: receipt.read_at,
+      message_id: receipt.message_id,
+      recipient_id: receipt.recipient_id,
+      device_id: receipt.device_id,
+      metadata: receipt.metadata || %{}
     }
   end
 

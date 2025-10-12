@@ -22,7 +22,17 @@ defmodule Messngr.Calls.Participant do
     |> new()
   end
 
-  def new(profile_id, opts) when is_binary(profile_id) do
+  def new(opts) when is_list(opts) do
+    profile_id = Keyword.fetch!(opts, :profile_id)
+
+    opts
+    |> Keyword.put_new(:role, :participant)
+    |> Keyword.put_new(:status, :connecting)
+    |> new(profile_id)
+  end
+
+  @spec new(String.t(), keyword()) :: t()
+  def new(profile_id, opts) when is_binary(profile_id) and is_list(opts) do
     metadata = opts |> Keyword.get(:metadata, %{}) |> normalise_metadata()
 
     %__MODULE__{
@@ -31,15 +41,6 @@ defmodule Messngr.Calls.Participant do
       status: Keyword.fetch!(opts, :status),
       metadata: metadata
     }
-  end
-
-  def new(opts) when is_list(opts) do
-    profile_id = Keyword.fetch!(opts, :profile_id)
-
-    opts
-    |> Keyword.put_new(:role, :participant)
-    |> Keyword.put_new(:status, :connecting)
-    |> new(profile_id)
   end
 
   def host(profile_id) when is_binary(profile_id) do
