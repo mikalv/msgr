@@ -114,7 +114,8 @@ class _ThreadMessageTile extends StatelessWidget {
               color: message.isOwn
                   ? profileTheme.textStyle.color
                   : theme.colorScheme.onSurface,
-              fontStyle: message.isDeleted ? FontStyle.italic : FontStyle.normal,
+              fontStyle:
+                  message.isDeleted ? FontStyle.italic : FontStyle.normal,
             ),
           ),
           if (message.isEdited && !message.isDeleted)
@@ -181,9 +182,8 @@ class _ThreadMessageTile extends StatelessWidget {
                 profileTheme: profileTheme,
               ),
             GestureDetector(
-              onLongPress: onLongPress != null
-                  ? () => onLongPress!(message)
-                  : null,
+              onLongPress:
+                  onLongPress != null ? () => onLongPress!(message) : null,
               child: bubble,
             ),
             if (message.isOwn)

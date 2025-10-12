@@ -94,9 +94,9 @@ class HiveChatCacheStore implements ChatCacheStore {
   Future<void> saveMessages(String threadId, List<ChatMessage> messages) async {
     await _ensureReady();
     await _messageStore.record(threadId).put(
-          _db!,
-          {_messageKey: messages.map((message) => message.toJson()).toList()},
-        );
+      _db!,
+      {_messageKey: messages.map((message) => message.toJson()).toList()},
+    );
   }
 
   @override
@@ -108,8 +108,7 @@ class HiveChatCacheStore implements ChatCacheStore {
     if (raw is! List) return const [];
     return [
       for (final entry in raw)
-        if (entry is Map)
-          ChatMessage.fromJson(entry.cast<String, dynamic>()),
+        if (entry is Map) ChatMessage.fromJson(entry.cast<String, dynamic>()),
     ];
   }
 

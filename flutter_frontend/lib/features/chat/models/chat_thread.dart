@@ -124,5 +124,6 @@ class ChatThread extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, participantNames, kind, topic, structureType, visibility];
+  List<Object?> get props =>
+      [id, participantNames, kind, topic, structureType, visibility];
 }

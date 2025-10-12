@@ -30,8 +30,7 @@ AppState _onCreatedProfileReducer(
       pendingChannel: state.authState.pendingChannel,
       pendingTargetHint: state.authState.pendingTargetHint,
       pendingDebugCode: state.authState.pendingDebugCode,
-      pendingChallengeExpiresAt:
-          state.authState.pendingChallengeExpiresAt);
+      pendingChallengeExpiresAt: state.authState.pendingChallengeExpiresAt);
   return AppState(
       authState: auth,
       teamState: state.teamState,

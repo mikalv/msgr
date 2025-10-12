@@ -45,7 +45,8 @@ class ChatViewModel extends ChangeNotifier {
         pinnedNotifier = pinned ?? PinnedMessagesNotifier(),
         threadViewNotifier = threadView ?? ThreadViewNotifier(),
         messageEditingNotifier = editing ?? MessageEditingNotifier() {
-    _mediaUploader = mediaUploader ?? ChatMediaUploader(api: _api, identity: _identity);
+    _mediaUploader =
+        mediaUploader ?? ChatMediaUploader(api: _api, identity: _identity);
     composerController.addListener(_handleComposerChanged);
   }
 

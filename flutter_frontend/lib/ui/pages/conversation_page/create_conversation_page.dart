@@ -73,7 +73,9 @@ class _CreateConversationPageState extends State<CreateConversationPage> {
     }
 
     final visibility =
-        _selectedKind == ChatThreadKind.channel && _channelIsPrivate ? 'private' : 'team';
+        _selectedKind == ChatThreadKind.channel && _channelIsPrivate
+            ? 'private'
+            : 'team';
 
     debugPrint(
         'Conversation create request ($_selectedKind): members=$membersIDs topic=$topic structure=$structureType visibility=$visibility');
@@ -107,10 +109,9 @@ class _CreateConversationPageState extends State<CreateConversationPage> {
                         if (value == null) return;
                         setState(() {
                           _selectedKind = value;
-                          _selectedStructure =
-                              value == ChatThreadKind.channel
-                                  ? ChatStructureType.project
-                                  : ChatStructureType.friends;
+                          _selectedStructure = value == ChatThreadKind.channel
+                              ? ChatStructureType.project
+                              : ChatStructureType.friends;
                           _channelIsPrivate = false;
                         });
                       },

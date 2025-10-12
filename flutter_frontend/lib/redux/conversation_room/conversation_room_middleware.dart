@@ -17,8 +17,7 @@ List<Middleware<AppState>> createConversationsMiddlewares() {
 List<Middleware<AppState>> createRoomsMiddlewares() {
   return [
     TypedMiddleware<AppState, CreateRoomAction>(_onCreateRoom()),
-    TypedMiddleware<AppState, OnListRoomsResponseAction>(
-        _onListRooms()),
+    TypedMiddleware<AppState, OnListRoomsResponseAction>(_onListRooms()),
     TypedMiddleware<AppState, OnServerRefreshRoomsAction>(
         _onServerRefreshRooms()),
   ];

@@ -7,14 +7,16 @@
 class BackendEnvironment {
   BackendEnvironment._()
       : _default = _BackendValues(
-          scheme:
-              const String.fromEnvironment('MSGR_BACKEND_SCHEME', defaultValue: 'http'),
-          host: const String.fromEnvironment('MSGR_BACKEND_HOST', defaultValue: 'localhost'),
+          scheme: const String.fromEnvironment('MSGR_BACKEND_SCHEME',
+              defaultValue: 'http'),
+          host: const String.fromEnvironment('MSGR_BACKEND_HOST',
+              defaultValue: 'localhost'),
           port: _parsePort(
-            const String.fromEnvironment('MSGR_BACKEND_PORT', defaultValue: '4000'),
+            const String.fromEnvironment('MSGR_BACKEND_PORT',
+                defaultValue: '4000'),
           ),
-          apiPath:
-              const String.fromEnvironment('MSGR_BACKEND_API_PATH', defaultValue: 'api'),
+          apiPath: const String.fromEnvironment('MSGR_BACKEND_API_PATH',
+              defaultValue: 'api'),
         );
 
   static final BackendEnvironment instance = BackendEnvironment._();
@@ -108,8 +110,7 @@ class _BackendValues {
     );
   }
 
-  Uri resolve(String relativePath,
-      {Map<String, dynamic>? queryParameters}) {
+  Uri resolve(String relativePath, {Map<String, dynamic>? queryParameters}) {
     final segments = <String>[
       ...baseUri.pathSegments,
       ..._pathSegments(relativePath),

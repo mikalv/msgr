@@ -111,7 +111,8 @@ class ContactMatchDetails {
       identityValue: json['identity_value']?.toString() ?? '',
       profile: json['profile'] == null
           ? null
-          : ContactProfileSummary.fromJson(json['profile'] as Map<String, dynamic>),
+          : ContactProfileSummary.fromJson(
+              json['profile'] as Map<String, dynamic>),
     );
   }
 }

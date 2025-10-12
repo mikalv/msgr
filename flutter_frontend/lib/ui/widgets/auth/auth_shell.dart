@@ -158,10 +158,10 @@ class AuthShell extends StatelessWidget {
             'Sikre samtaler, levert stilfullt',
             textAlign: isWide ? TextAlign.left : TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  height: 1.2,
-                ) ??
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      height: 1.2,
+                    ) ??
                 const TextStyle(
                   color: Colors.white,
                   fontSize: 24,
@@ -244,10 +244,10 @@ class AuthShell extends StatelessWidget {
           Text(
             title,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  height: 1.15,
-                ) ??
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      height: 1.15,
+                    ) ??
                 const TextStyle(
                   fontSize: 28,
                   color: Colors.white,
@@ -258,9 +258,9 @@ class AuthShell extends StatelessWidget {
           Text(
             subtitle,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.white70,
-                  height: 1.5,
-                ) ??
+                      color: Colors.white70,
+                      height: 1.5,
+                    ) ??
                 const TextStyle(
                   color: Colors.white70,
                   height: 1.5,

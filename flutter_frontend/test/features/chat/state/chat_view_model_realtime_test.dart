@@ -10,6 +10,7 @@ import 'package:messngr/features/chat/state/chat_view_model.dart';
 import 'package:messngr/features/chat/widgets/chat_composer.dart';
 import 'package:messngr/services/api/chat_api.dart';
 import 'package:messngr/services/api/chat_realtime_event.dart';
+import 'package:messngr/services/api/contact_api.dart';
 import 'package:messngr/services/api/chat_socket.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -23,6 +24,7 @@ void main() {
     late _FakeConnectivity connectivity;
     late ChatViewModel viewModel;
     late ChatMessage remoteMessage;
+    late AccountIdentity identity;
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
@@ -40,12 +42,15 @@ void main() {
       api = _StubChatApi(initialMessages: [remoteMessage]);
       cache = InMemoryChatCacheStore();
       connectivity = _FakeConnectivity();
+      identity = const AccountIdentity(accountId: 'acc-1', profileId: 'profile-self');
       viewModel = ChatViewModel(
+        identity: identity,
         api: api,
         realtime: realtime,
         cache: cache,
         connectivity: connectivity,
         composer: ChatComposerController(),
+        contacts: _FakeContactApi(),
       );
       await viewModel.bootstrap();
       await _pump();
@@ -125,7 +130,7 @@ void main() {
         isTrue,
       );
 
-      final selfProfileId = viewModel.identity!.profileId;
+      final selfProfileId = viewModel.identity.profileId;
       final ownMessage = ChatMessage.text(
         id: 'msg-own-1',
         body: 'Min melding',
@@ -202,22 +207,12 @@ class _StubChatApi extends ChatApi {
       : _messages = List<ChatMessage>.from(initialMessages);
 
   final List<ChatMessage> _messages;
-  int _counter = 0;
 
   ChatThread get _thread => const ChatThread(
         id: 'conversation-test',
         participantNames: ['Demo', 'Buddy'],
         kind: ChatThreadKind.direct,
       );
-
-  @override
-  Future<AccountIdentity> createAccount(String displayName, {String? email}) async {
-    _counter += 1;
-    return AccountIdentity(
-      accountId: 'acc-$_counter',
-      profileId: 'profile-$_counter',
-    );
-  }
 
   @override
   Future<ChatThread> ensureDirectConversation({
@@ -369,4 +364,14 @@ class _FakeConnectivity extends Connectivity {
 
   @override
   Stream<ConnectivityResult> get onConnectivityChanged => _controller.stream;
+}
+
+class _FakeContactApi extends ContactApi {
+  @override
+  Future<List<KnownContactMatch>> lookupKnownContacts({
+    required AccountIdentity current,
+    required List<ContactImportEntry> targets,
+  }) async {
+    return const [];
+  }
 }

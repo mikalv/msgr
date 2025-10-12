@@ -456,7 +456,8 @@ class _SidebarButton extends StatelessWidget {
           foregroundColor: Theme.of(context).colorScheme.primary,
           padding: const EdgeInsets.symmetric(vertical: 14),
           textStyle: const TextStyle(fontWeight: FontWeight.w600),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           elevation: 0,
         ),
         icon: Icon(icon),
@@ -577,8 +578,7 @@ class _HomeInboxPanel extends StatelessWidget {
                     const SizedBox(height: 24),
                     ConversationsListWidget(
                       context: context,
-                      conversations:
-                          store.state.teamState?.conversations ?? [],
+                      conversations: store.state.teamState?.conversations ?? [],
                       store: store,
                     ),
                   ],
@@ -632,7 +632,9 @@ class _HomeActionStrip extends StatelessWidget {
         : const EdgeInsets.symmetric(horizontal: 18);
 
     return Container(
-      key: dense ? const Key('home_action_strip_dense') : const Key('home_action_strip'),
+      key: dense
+          ? const Key('home_action_strip_dense')
+          : const Key('home_action_strip'),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
@@ -731,7 +733,9 @@ class _HomeChatPanel extends StatelessWidget {
     final borderRadius = BorderRadius.circular(compact ? 24 : 36);
 
     return Container(
-      key: compact ? const Key('home_chat_panel_compact') : const Key('home_chat_panel'),
+      key: compact
+          ? const Key('home_chat_panel_compact')
+          : const Key('home_chat_panel'),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         borderRadius: borderRadius,

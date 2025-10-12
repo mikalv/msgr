@@ -22,7 +22,8 @@ class WelcomeScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 ElevatedButton(
-                    child: Text(AppLocalizations.of(context)!.translate('login')),
+                    child:
+                        Text(AppLocalizations.of(context)!.translate('login')),
                     onPressed: () {
                       StoreProvider.of<AppState>(context).dispatch(
                           NavigateToNewRouteAction(

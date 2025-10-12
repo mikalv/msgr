@@ -58,14 +58,16 @@ void Function(
     final currentUser = store.state.authState.currentUser;
     if (currentUser != null) {
       try {
-        final refreshedUser = await _sessionRefresher.refreshIfExpired(currentUser);
+        final refreshedUser =
+            await _sessionRefresher.refreshIfExpired(currentUser);
         if (refreshedUser != null && refreshedUser != currentUser) {
           store.dispatch(OnAuthenticatedAction(user: refreshedUser));
         }
       } on SessionRefreshException catch (error, stackTrace) {
         _log.warning('Session refresh failed', error, stackTrace);
       } catch (error, stackTrace) {
-        _log.severe('Unexpected error while refreshing session', error, stackTrace);
+        _log.severe(
+            'Unexpected error while refreshing session', error, stackTrace);
       }
     }
 
@@ -235,8 +237,8 @@ void Function(
       final challenge =
           await RegistrationService().requestForSignInCodeEmail(action.email);
       if (challenge != null) {
-        store.dispatch(
-            ServerRequestCodeFromUserAction(channel: 'email', challenge: challenge));
+        store.dispatch(ServerRequestCodeFromUserAction(
+            channel: 'email', challenge: challenge));
         action.completer.complete(challenge);
       } else {
         action.completer.completeError('Unable to request code');
@@ -259,8 +261,8 @@ void Function(
       final challenge =
           await RegistrationService().requestForSignInCodeMsisdn(action.msisdn);
       if (challenge != null) {
-        store.dispatch(
-            ServerRequestCodeFromUserAction(channel: 'phone', challenge: challenge));
+        store.dispatch(ServerRequestCodeFromUserAction(
+            channel: 'phone', challenge: challenge));
         action.completer.complete(challenge);
       } else {
         action.completer.completeError('Unable to request code');

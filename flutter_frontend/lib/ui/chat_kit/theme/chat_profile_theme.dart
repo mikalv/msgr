@@ -80,7 +80,8 @@ class ChatProfileTheme extends InheritedWidget {
   final ChatProfileThemeData fallback;
 
   static ChatProfileThemeData of(BuildContext context, String profileId) {
-    final scope = context.dependOnInheritedWidgetOfExactType<ChatProfileTheme>();
+    final scope =
+        context.dependOnInheritedWidgetOfExactType<ChatProfileTheme>();
     if (scope == null) {
       throw FlutterError(
         'ChatProfileTheme.of() called with a context that does not contain a ChatProfileTheme.',

@@ -60,10 +60,9 @@ class _MobileInputWithOutlineState extends State<MobileInputWithOutline> {
                     color: messngrgreen, blurRadius: 10, spreadRadius: 2)
               ]
             : [const BoxShadow(color: Colors.transparent)],
-        border:
-            Border.all(
-                color: widget.borderColor ?? Colors.grey,
-                width: widget.borderWidth ?? 1.5),
+        border: Border.all(
+            color: widget.borderColor ?? Colors.grey,
+            width: widget.borderWidth ?? 1.5),
         borderRadius: BorderRadius.all(Radius.circular(radius)));
   }
 
@@ -108,7 +107,8 @@ class _MobileInputWithOutlineState extends State<MobileInputWithOutline> {
                           fontWeight: FontWeight.w400,
                           color: widget.buttonhintTextColor ?? messngrGrey),
                   fillColor: widget.fillColor ??
-                      widget.backgroundColor ?? Colors.white,
+                      widget.backgroundColor ??
+                      Colors.white,
                   filled: true,
                   border: const OutlineInputBorder(
                     borderRadius: BorderRadius.all(

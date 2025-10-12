@@ -366,8 +366,7 @@ class MsgrSnackBarIntentTheme {
     required this.backgroundGradient,
     this.iconBackgroundColor = const Color(0x33FFFFFF),
     Color? actionForegroundColor,
-  }) : actionForegroundColor =
-            actionForegroundColor ?? foregroundColor;
+  }) : actionForegroundColor = actionForegroundColor ?? foregroundColor;
 
   /// Icon rendered inside the intent badge.
   final IconData icon;
@@ -397,7 +396,8 @@ class MsgrSnackBarIntentTheme {
       foregroundColor: foregroundColor ?? this.foregroundColor,
       backgroundGradient: backgroundGradient ?? this.backgroundGradient,
       iconBackgroundColor: iconBackgroundColor ?? this.iconBackgroundColor,
-      actionForegroundColor: actionForegroundColor ?? this.actionForegroundColor,
+      actionForegroundColor:
+          actionForegroundColor ?? this.actionForegroundColor,
     );
   }
 }

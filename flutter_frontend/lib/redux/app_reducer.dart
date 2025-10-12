@@ -20,7 +20,8 @@ AppState mainReducer(AppState state, action) {
   //state = appReducersCombined(state, action);
   state = profileReducersCombined(state, action);
   state = appReducersCombined(state, action);
-  final teamState = bootstrapReducersCombined(conversationAndRoomsReducers(
+  final teamState = bootstrapReducersCombined(
+      conversationAndRoomsReducers(
           state.teamState ??
               TeamState(
                   conversations: [],
@@ -28,7 +29,8 @@ AppState mainReducer(AppState state, action) {
                   currentRoom: null,
                   currentConversation: null,
                   selectedTeam: state.authState.currentTeam),
-          action), action);
+          action),
+      action);
   return AppState(
       teamState: teamState,
       uiState: uiReducersCombined(state.uiState, action),

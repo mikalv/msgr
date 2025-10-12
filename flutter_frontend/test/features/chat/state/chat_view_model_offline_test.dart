@@ -8,6 +8,7 @@ import 'package:messngr/features/chat/state/chat_cache_repository.dart';
 import 'package:messngr/features/chat/state/chat_view_model.dart';
 import 'package:messngr/features/chat/widgets/chat_composer.dart';
 import 'package:messngr/services/api/chat_api.dart';
+import 'package:messngr/services/api/contact_api.dart';
 import 'package:messngr/services/api/chat_realtime_event.dart';
 import 'package:messngr/services/api/chat_socket.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,12 +38,15 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final connectivity = _FakeConnectivity(initial: ConnectivityResult.none);
       final api = _FakeChatApi(thread: thread, message: message);
+      final identity = AccountIdentity(accountId: 'acc-1', profileId: 'profile-1');
       final viewModel = ChatViewModel(
+        identity: identity,
         api: api,
         realtime: _FakeRealtime(),
         cache: cache,
         connectivity: connectivity,
         composer: ChatComposerController(),
+        contacts: _FakeContactApi(),
       );
 
       await viewModel.bootstrap();
@@ -59,13 +63,6 @@ class _FakeChatApi extends ChatApi {
 
   final ChatThread thread;
   final ChatMessage message;
-  int _accountCounter = 0;
-
-  @override
-  Future<AccountIdentity> createAccount(String displayName, {String? email}) async {
-    _accountCounter++;
-    return AccountIdentity(accountId: 'acc-$_accountCounter', profileId: 'profile-$_accountCounter');
-  }
 
   @override
   Future<ChatThread> ensureDirectConversation({
@@ -157,4 +154,14 @@ class _FakeConnectivity extends Connectivity {
 
   @override
   Stream<ConnectivityResult> get onConnectivityChanged => _controller.stream;
+}
+
+class _FakeContactApi extends ContactApi {
+  @override
+  Future<List<KnownContactMatch>> lookupKnownContacts({
+    required AccountIdentity current,
+    required List<ContactImportEntry> targets,
+  }) async {
+    return const [];
+  }
 }

@@ -83,11 +83,7 @@ class _ConversationsListItemState extends State<ConversationsListItem> {
                         Text(
                           widget.conversation
                               .conversationName(widget
-                                  .store
-                                  .state
-                                  .teamState!
-                                  .selectedTeam!
-                                  .name)
+                                  .store.state.teamState!.selectedTeam!.name)
                               .toLowerCase(),
                           style: theme.data.titleStyle,
                         ),
