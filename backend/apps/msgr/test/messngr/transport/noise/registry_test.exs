@@ -1,5 +1,5 @@
 defmodule Messngr.Transport.Noise.RegistryTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Messngr.Transport.Noise.Registry
   alias Messngr.Transport.Noise.Session

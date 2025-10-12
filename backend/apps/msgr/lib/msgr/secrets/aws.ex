@@ -106,10 +106,10 @@ defmodule Messngr.Secrets.Aws do
     :inets.start()
     :ssl.start()
 
-    url = 'https://' ++ to_charlist(host) ++ '/'
+    url = ~c"https://" ++ to_charlist(host) ++ ~c"/"
     body = payload
 
-    case :httpc.request(:post, {url, headers, 'application/x-amz-json-1.1', body}, [], []) do
+    case :httpc.request(:post, {url, headers, ~c"application/x-amz-json-1.1", body}, [], []) do
       {:ok, {{_, 200, _}, response_headers, response_body}} ->
         {:ok, decode_body(response_headers, response_body)}
 

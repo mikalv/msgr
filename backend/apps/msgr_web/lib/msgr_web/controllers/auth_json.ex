@@ -24,7 +24,7 @@ defmodule MessngrWeb.AuthJSON do
 
     default_profile = List.first(profiles)
 
-    %{
+    base = %{
       account: %{
         id: account.id,
         display_name: account.display_name,

@@ -170,8 +170,15 @@ defmodule Messngr.Noise.SessionStore do
     |> Map.get(key)
     |> Kernel.||(Map.get(attrs, Atom.to_string(key)))
     |> case do
-      value when is_binary(value) and byte_size(String.trim(value)) > 0 ->
-        String.trim(value)
+      value when is_binary(value) ->
+        trimmed = String.trim(value)
+
+        if trimmed == "" do
+          raise ArgumentError,
+                "Noise session actor missing #{inspect(key)} (got: #{inspect(value)})"
+        else
+          trimmed
+        end
 
       other ->
         raise ArgumentError,
@@ -185,7 +192,9 @@ defmodule Messngr.Noise.SessionStore do
     |> Kernel.||(Map.get(attrs, Atom.to_string(key)))
     |> case do
       nil -> nil
-      value when is_binary(value) and byte_size(String.trim(value)) > 0 -> String.trim(value)
+      value when is_binary(value) ->
+        trimmed = String.trim(value)
+        if trimmed == "", do: nil, else: trimmed
       _ -> nil
     end
   end

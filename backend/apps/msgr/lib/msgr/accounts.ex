@@ -136,7 +136,7 @@ defmodule Messngr.Accounts do
 
   @spec attach_device_for_identity(Identity.t(), map()) ::
           {:ok, %{identity: Identity.t(), device: Device.t() | nil}} | {:error, term()}
-  def attach_device_for_identity(%Identity{} = identity, attrs \ %{}) do
+  def attach_device_for_identity(%Identity{} = identity, attrs \\ %{}) do
     device_public_key =
       attrs
       |> Map.get(:device_public_key)

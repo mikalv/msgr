@@ -36,7 +36,8 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
                  "last_handshake_at" => DateTime.utc_now()
                })
 
-      assert %{id: ^Session.id(session), token: token} = noise
+      session_id = Session.id(session)
+      assert %{id: ^session_id, token: token} = noise
       assert is_binary(token)
 
       {:ok, raw_token} = SessionStore.decode_token(token)
@@ -70,7 +71,7 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
     end
 
     test "fails when session is no longer present" do
-      %{session: session, signature: signature, device_key: device_key} = establish_handshake()
+      %{session: session, signature: _signature, device_key: device_key} = establish_handshake()
 
       {:ok, challenge, code} =
         Auth.start_challenge(%{
@@ -84,7 +85,7 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
       assert {:error, {:noise_handshake, :noise_session_not_found}} =
                Auth.verify_challenge(challenge.id, code, %{
                  "noise_session_id" => Session.id(session),
-                 "noise_signature" => signature
+                 "noise_signature" => Handshake.encoded_signature(session)
                })
     end
 

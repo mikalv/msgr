@@ -95,7 +95,7 @@ defmodule Messngr.Chat.Message do
 
     cond do
       kind in [:audio, :video, :voice, :file, :image, :thumbnail] ->
-        validate_media_payload(changeset, payload)
+        validate_media_payload(changeset, kind, payload)
 
       kind == :location ->
         require_payload_keys(changeset, payload, ["latitude", "longitude"])
@@ -105,7 +105,7 @@ defmodule Messngr.Chat.Message do
     end
   end
 
-  defp validate_media_payload(changeset, payload) do
+  defp validate_media_payload(changeset, kind, payload) do
     case require_payload_keys(changeset, payload, ["media"]) do
       %Ecto.Changeset{valid?: false} = changeset -> changeset
       %Ecto.Changeset{} ->

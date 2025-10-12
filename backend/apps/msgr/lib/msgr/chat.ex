@@ -746,11 +746,15 @@ defmodule Messngr.Chat do
         cutoff = conversation.updated_at || conversation.inserted_at
 
         filtered =
-          from {c, _cp} in query,
-            where:
-              fragment("COALESCE(?, ?) < ?", c.updated_at, c.inserted_at, ^cutoff) or
-                (fragment("COALESCE(?, ?) = ?", c.updated_at, c.inserted_at, ^cutoff) and
-                   c.id < ^conversation.id)
+          query
+          |> where([
+            c,
+            _cp
+          ],
+            fragment("COALESCE(?, ?) < ?", c.updated_at, c.inserted_at, ^cutoff) or
+              (fragment("COALESCE(?, ?) = ?", c.updated_at, c.inserted_at, ^cutoff) and
+                 c.id < ^conversation.id)
+          )
 
         {filtered, {conversation, participant}}
 
@@ -910,8 +914,10 @@ defmodule Messngr.Chat do
 
     :ets.lookup(table, conversation_id)
     |> Enum.each(fn
-      {^conversation_id, profile_id, inserted_at} when expired_watcher?(inserted_at, now, ttl) ->
-        :ets.delete_object(table, {conversation_id, profile_id, inserted_at})
+      {^conversation_id, profile_id, inserted_at} ->
+        if expired_watcher?(inserted_at, now, ttl) do
+          :ets.delete_object(table, {conversation_id, profile_id, inserted_at})
+        end
 
       _ ->
         :ok

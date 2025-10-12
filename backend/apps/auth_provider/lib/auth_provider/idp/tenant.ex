@@ -25,6 +25,21 @@ defmodule AuthProvider.Idp.Tenant do
   Messngr acts as a service provider.
   """
   @type strategy :: :native | :external_oidc
+  @type t :: %__MODULE__{
+          id: binary() | nil,
+          name: String.t() | nil,
+          slug: String.t() | nil,
+          default_locale: String.t() | nil,
+          default_identity_provider: strategy() | nil,
+          session_domain: String.t() | nil,
+          session_max_age_seconds: integer() | nil,
+          metadata: map(),
+          identity_providers:
+            [AuthProvider.Idp.IdentityProvider.t()]
+            | Ecto.Association.NotLoaded.t(),
+          inserted_at: NaiveDateTime.t() | nil,
+          updated_at: NaiveDateTime.t() | nil
+        }
 
   schema "idp_tenants" do
     field :name, :string
@@ -128,4 +143,3 @@ defmodule AuthProvider.Idp.Tenant do
     "_msgr_auth_" <> (slug || "tenant")
   end
 end
-

@@ -17,6 +17,8 @@ defmodule MessngrWeb.ChannelCase do
 
   use ExUnit.CaseTemplate
 
+  alias Messngr.Noise.SessionFixtures
+
   using do
     quote do
       # Import conveniences for testing with channels
@@ -40,7 +42,7 @@ defmodule MessngrWeb.ChannelCase do
   Returns `{socket, session_info}`.
   """
   def attach_noise_socket(socket, account, profile, attrs \\ %{}) do
-    session_info = noise_session_fixture(account, profile, attrs)
+    session_info = SessionFixtures.noise_session_fixture(account, profile, attrs)
 
     socket =
       socket

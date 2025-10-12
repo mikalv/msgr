@@ -47,12 +47,12 @@ defmodule Messngr.Logging.OpenObserveBackendTest do
         state
       )
 
-    assert_receive {:http_request, :post, {url, headers, 'application/json', body}, [], []}
+    assert_receive {:http_request, :post, {url, headers, ~c"application/json", body}, [], []}
 
     assert to_string(url) ==
              "http://openobserve:5080/api/default/logs/backend/_json"
 
-    assert {'authorization', 'Basic dXNlckBleGFtcGxlLmNvbTpzZWNyZXQ='} in headers
+    assert {~c"authorization", ~c"Basic dXNlckBleGFtcGxlLmNvbTpzZWNyZXQ="} in headers
 
     [entry] = Jason.decode!(body)
 

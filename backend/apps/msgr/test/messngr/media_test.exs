@@ -81,27 +81,6 @@ defmodule Messngr.MediaTest do
              })
 
     assert %{sha256: ["must be a valid SHA-256 hex digest"]} = errors_on(changeset)
-          "duration" => 12.5,
-          "checksum" => String.duplicate("a", 64),
-          "width" => 1920,
-          "height" => 1080,
-          "thumbnail" => %{
-            "bucket" => upload.bucket,
-            "objectKey" => upload.object_key <> "/thumbnail"
-          }
-        }
-      })
-
-    media_payload = payload["media"]
-    assert media_payload["duration"] == 12.5
-    assert media_payload["checksum"] == String.duplicate("a", 64)
-    assert media_payload["width"] == 1920
-    assert media_payload["height"] == 1080
-    assert media_payload["url"] =~ upload.object_key
-    assert %{"expiresAt" => _} = media_payload["retention"]
-    assert %{"url" => thumb_url} = media_payload["thumbnail"]
-    assert thumb_url =~ "thumbnail"
-    assert %Upload{status: :consumed} = Repo.get!(Upload, upload.id)
   end
 
   test "consume_upload rejects invalid checksum", %{profile: profile, conversation: conversation} do

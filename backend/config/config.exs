@@ -101,6 +101,11 @@ config :phoenix, :stacktrace_depth, 20
 
 config :phoenix, :plug_init_mode, :runtime
 
+config :hammer,
+  backend:
+    {Hammer.Backend.ETS,
+     [expiry_ms: :timer.minutes(10), cleanup_interval_ms: :timer.minutes(1)]}
+
 config :llm_gateway,
   default_provider: :openai,
   default_model: "gpt-4o-mini",
@@ -137,3 +142,5 @@ config :llm_gateway,
     google_vertex: %{api_key: System.get_env("GOOGLE_VERTEX_API_KEY")},
     openai_compatible: %{api_key: System.get_env("SELF_HOSTED_OPENAI_KEY")}
   }
+
+import_config "#{config_env()}.exs"

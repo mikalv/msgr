@@ -4,7 +4,7 @@ defmodule Messngr do
   kan operere på kontoer, profiler og chatter uten å importere moduler direkte.
   """
 
-  alias Messngr.{AI, Accounts, Auth, Calls, Chat, Media}
+  alias Messngr.{AI, Accounts, Auth, Chat, Media}
 
   # Accounts
   defdelegate list_accounts, to: Accounts

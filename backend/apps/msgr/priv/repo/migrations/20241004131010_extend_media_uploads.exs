@@ -7,19 +7,19 @@ defmodule Messngr.Repo.Migrations.ExtendMediaUploads do
     execute("ALTER TYPE message_kind ADD VALUE IF NOT EXISTS 'thumbnail'")
 
     alter table(:media_uploads) do
-      add :width, :integer
-      add :height, :integer
-      add :sha256, :string
-      add :retention_expires_at, :utc_datetime
+      add_if_not_exists :width, :integer
+      add_if_not_exists :height, :integer
+      add_if_not_exists :sha256, :string
+      add_if_not_exists :retention_expires_at, :utc_datetime
     end
   end
 
   def down do
     alter table(:media_uploads) do
-      remove :retention_expires_at
-      remove :sha256
-      remove :height
-      remove :width
+      remove_if_exists :retention_expires_at
+      remove_if_exists :sha256
+      remove_if_exists :height
+      remove_if_exists :width
     end
 
     execute("""

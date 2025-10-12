@@ -13,6 +13,7 @@ defmodule Messngr.Media.Upload do
   Metadata stored on the media upload record.
   """
   @type metadata :: map()
+  @type t :: %__MODULE__{}
 
   schema "media_uploads" do
     field :kind, Ecto.Enum, values: [:audio, :video, :image, :file, :voice, :thumbnail]
@@ -198,9 +199,6 @@ defmodule Messngr.Media.Upload do
     base = Path.rootname(object_key, ext)
     base <> "-thumbnail" <> (ext == "" && ".jpg" || ext)
   end
-
-  defp maybe_put(map, _key, nil), do: map
-  defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   defp validate_sha256(:sha256, nil), do: []
 

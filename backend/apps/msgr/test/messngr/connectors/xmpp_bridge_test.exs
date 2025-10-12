@@ -26,7 +26,12 @@ defmodule Messngr.Connectors.XMPPBridgeTest do
 
     assert [message] = QueueRecorder.published(agent)
     assert message.topic == "bridge/xmpp/outbound_stanza"
-    assert message.payload.payload == %{stanza: "<message/>", format: :xml, routing: %{to: "user@example.com"}}
+    assert message.payload.payload == %{
+             stanza: "<message/>",
+             format: :xml,
+             routing: %{to: "user@example.com"},
+             metadata: %{}
+           }
     assert message.payload.trace_id == "stanza"
   end
 

@@ -61,33 +61,33 @@ defmodule Messngr.AI do
     {:error, :text_required}
   end
 
-  def summarize(_team_id, text, _opts) when text |> to_string() |> String.trim() == "" do
-    {:error, :text_required}
-  end
-
   def summarize(team_id, text, opts) do
-    system_prompt =
-      opts
-      |> Keyword.get(:system_prompt)
-      |> case do
-        nil -> default_summary_prompt(opts)
-        prompt when is_binary(prompt) -> prompt
-        _ -> default_summary_prompt(opts)
-      end
+    if String.trim(text) == "" do
+      {:error, :text_required}
+    else
+      system_prompt =
+        opts
+        |> Keyword.get(:system_prompt)
+        |> case do
+          nil -> default_summary_prompt(opts)
+          prompt when is_binary(prompt) -> prompt
+          _ -> default_summary_prompt(opts)
+        end
 
-    context_message =
-      opts
-      |> Keyword.get(:context)
-      |> build_context_message()
+      context_message =
+        opts
+        |> Keyword.get(:context)
+        |> build_context_message()
 
-    messages =
-      [%{role: "system", content: system_prompt}]
-      |> maybe_append(context_message)
-      |> Kernel.++([%{role: "user", content: text}])
+      messages =
+        [%{role: "system", content: system_prompt}]
+        |> maybe_append(context_message)
+        |> Kernel.++([%{role: "user", content: text}])
 
-    forwarded_opts = Keyword.drop(opts, [:language, :style, :instructions, :context, :system_prompt])
+      forwarded_opts = Keyword.drop(opts, [:language, :style, :instructions, :context, :system_prompt])
 
-    chat(team_id, messages, forwarded_opts)
+      chat(team_id, messages, forwarded_opts)
+    end
   end
 
   @doc """
@@ -141,25 +141,25 @@ defmodule Messngr.AI do
     {:error, :prompt_required}
   end
 
-  def run_prompt(_team_id, prompt, _opts) when prompt |> to_string() |> String.trim() == "" do
-    {:error, :prompt_required}
-  end
-
   def run_prompt(team_id, prompt, opts) do
-    system_prompt =
-      opts
-      |> Keyword.get(:system_prompt)
-      |> case do
-        nil -> "You are a helpful assistant."
-        prompt when is_binary(prompt) -> prompt
-        _ -> "You are a helpful assistant."
-      end
+    if String.trim(prompt) == "" do
+      {:error, :prompt_required}
+    else
+      system_prompt =
+        opts
+        |> Keyword.get(:system_prompt)
+        |> case do
+          nil -> "You are a helpful assistant."
+          prompt when is_binary(prompt) -> prompt
+          _ -> "You are a helpful assistant."
+        end
 
-    messages = [%{role: "system", content: system_prompt}, %{role: "user", content: prompt}]
+      messages = [%{role: "system", content: system_prompt}, %{role: "user", content: prompt}]
 
-    forwarded_opts = Keyword.drop(opts, [:system_prompt])
+      forwarded_opts = Keyword.drop(opts, [:system_prompt])
 
-    chat(team_id, messages, forwarded_opts)
+      chat(team_id, messages, forwarded_opts)
+    end
   end
 
   defp sanitize_opts(opts) do

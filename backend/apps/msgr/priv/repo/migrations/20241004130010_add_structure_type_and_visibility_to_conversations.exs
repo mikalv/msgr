@@ -22,7 +22,7 @@ defmodule Messngr.Repo.Migrations.AddStructureTypeAndVisibilityToConversations d
 
     alter table(:conversations) do
       add :structure_type, :conversation_structure_type
-      add :visibility, :conversation_visibility, default: 'private', null: false
+      add :visibility, :conversation_visibility, default: fragment("'private'"), null: false
     end
   end
 

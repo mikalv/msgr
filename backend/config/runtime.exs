@@ -91,15 +91,19 @@ if noise_enabled do
   noise_key_result = Messngr.Noise.KeyLoader.load(noise_opts)
 
   noise_private_key =
-    case noise_key_result do
-      {:ok, key} -> key
-      {:error, :no_default_key} when config_env() == :dev ->
+    case {noise_key_result, config_env()} do
+      {{:ok, key}, _env} ->
+        key
+
+      {{:error, :no_default_key}, :dev} ->
         Logger.warning("Noise static key default missing in dev; generating ephemeral key")
         keypair = :enoise_keypair.new(:dh25519)
         elem(keypair, 2)
-      {:error, reason} when config_env() in [:prod, :staging] ->
+
+      {{:error, reason}, env} when env in [:prod, :staging] ->
         raise "Noise static key could not be loaded: #{inspect(reason)}"
-      {:error, reason} ->
+
+      {{:error, reason}, _env} ->
         Logger.warning("Noise static key unavailable, continuing without static key", reason: inspect(reason))
         nil
     end
