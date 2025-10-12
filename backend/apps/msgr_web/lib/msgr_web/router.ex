@@ -24,7 +24,7 @@ defmodule MessngrWeb.Router do
     post "/auth/challenge", AuthController, :challenge
     post "/auth/verify", AuthController, :verify
     post "/auth/oidc", AuthController, :oidc
-    resources "/users", AccountController, only: [:index, :create]
+    resources "/users", AccountController, only: [:index, :create, :update]
   end
 
   scope "/api", MessngrWeb do
@@ -32,6 +32,7 @@ defmodule MessngrWeb.Router do
 
     get "/conversations", ConversationController, :index
     post "/conversations", ConversationController, :create
+    patch "/conversations/:id", ConversationController, :update
     post "/conversations/:id/uploads", MediaUploadController, :create
     get "/conversations/:id/messages", MessageController, :index
     post "/conversations/:id/messages", MessageController, :create

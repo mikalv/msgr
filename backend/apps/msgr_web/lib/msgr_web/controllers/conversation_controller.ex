@@ -59,6 +59,20 @@ defmodule MessngrWeb.ConversationController do
 
   def create(_conn, _params), do: {:error, :bad_request}
 
+  def update(conn, %{"id" => conversation_id} = params) do
+    current_profile = conn.assigns.current_profile
+    attrs_source = Map.get(params, "conversation") || params
+
+    attrs =
+      %{}
+      |> maybe_put_read_receipts_enabled(parse_read_receipts_enabled(attrs_source))
+
+    with {:ok, _} <- Messngr.ensure_membership(conversation_id, current_profile.id),
+         {:ok, conversation} <- Messngr.update_conversation(conversation_id, attrs) do
+      render(conn, :show, conversation: conversation)
+    end
+  end
+
   def watch(conn, %{"id" => conversation_id}) do
     current_profile = conn.assigns.current_profile
 
@@ -116,7 +130,18 @@ defmodule MessngrWeb.ConversationController do
     |> Map.get("read_receipts_enabled")
     |> Kernel.||(Map.get(params, "readReceiptsEnabled"))
     |> Kernel.||(Map.get(params, :read_receipts_enabled))
+    |> Kernel.||(Map.get(params, :readReceiptsEnabled))
     |> case do
+      nil ->
+        nested =
+          cond do
+            is_map(Map.get(params, "conversation")) -> Map.get(params, "conversation")
+            is_map(Map.get(params, :conversation)) -> Map.get(params, :conversation)
+            true -> nil
+          end
+
+        if is_map(nested), do: parse_read_receipts_enabled(nested), else: nil
+
       value when value in [true, false] -> value
       value when value in ["true", "1", 1] -> true
       value when value in ["false", "0", 0] -> false

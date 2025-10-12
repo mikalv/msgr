@@ -10,6 +10,7 @@ defmodule Messngr do
   defdelegate list_accounts, to: Accounts
   defdelegate get_account!(id), to: Accounts
   defdelegate create_account(attrs), to: Accounts
+  defdelegate update_account(account, attrs), to: Accounts
   defdelegate create_profile(attrs), to: Accounts
   defdelegate list_profiles(account_id), to: Accounts
   defdelegate get_profile!(id), to: Accounts
