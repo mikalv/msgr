@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added Slack and Microsoft Teams bridge connectors with multi-instance routing,
+  catalog updates, and queue facades so multiple workspaces/tenants can link to
+  a single Msgr account with full test coverage.
 - Added a bridge unlink API with catalog status annotations and Flutter disconnect
   controls so users can safely log out of connected bridges and refresh the list
   of available connectors without technical steps.
