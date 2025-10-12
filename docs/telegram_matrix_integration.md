@@ -2,22 +2,25 @@
 
 ## Goals
 - Stand up a connector interface that emits intents onto a message queue instead of calling platform HTTP APIs directly.
-- Describe the shape of the Telegram, Matrix, IRC, and XMPP envelopes that bridge workers must understand.
+- Describe the shape of the Telegram, Matrix, IRC, XMPP, WhatsApp, and Signal envelopes that bridge workers must understand.
 - Provide a roadmap for building language-specific daemons that handle the proprietary networking stacks (MTProto, Matrix CS, IRC, XMPP) and communicate with the Elixir core through StoneMQ or compatible brokers.
+- Capture the requirements for a full Telegram client emulation flow so Msgr users can log into their personal Telegram account without relying on bot restrictions.
 
 ## Connector Facade
-- The Elixir layer creates a `ServiceBridge` per platform and publishes actions to topics such as `bridge/telegram/outbound_message`.
+- The Elixir layer creates a `ServiceBridge` per platform and publishes actions to topics such as `bridge/telegram/outbound_message` (or `bridge/telegram/<instance>/outbound_message` when routing to a specific daemon shard).
 - Every message carries a deterministic `service`, `action`, `payload`, and `trace_id`, making it straightforward to correlate logs across services.
 - Fire-and-forget actions (outbound message, ack) use `publish/4`; control flows (account linking, identity configuration) use `request/4` so we can wait for worker responses.
 
 ## Platform Envelopes
 - **Telegram**: `link_account` includes `user_id`, `phone_number`, MTProto `session` seed, and `two_factor` hints. `outbound_message` accepts `chat_id`, message content, and optional metadata for formatting or attachments. `ack_update` tells the worker which update IDs have been persisted.
+- **WhatsApp**: `link_account` shares the stored pairing blob (or requests a QR code), `outbound_message` transports chat JID, body, and metadata placeholders, and `ack_event` signals which event IDs have been persisted so the daemon can prune its buffer.
+- **Signal**: `link_account` delivers the device-link blob and optional device name, `outbound_message` provides recipient UUID, message body, attachments metadata, and sealed-sender hints, and `ack_event` tracks delivery/read receipts coming back from the Signal service.
 - **Matrix**: `link_account` sends homeserver and login secrets. `outbound_event` provides room ID, event type, JSON content, and optional metadata. `ack_sync` communicates the latest `next_batch` token.
 - **IRC**: `configure_identity` provisions SASL/NickServ credentials per network. `outbound_command` wraps raw IRC commands (`PRIVMSG`, `NOTICE`, etc.) with arguments. `ack_offset` announces consumption offsets so the worker can drop buffered backlog.
 - **XMPP**: `link_account` includes bare/full JIDs, passwords, and resource binding preferences. `outbound_stanza` transports XML/JSON stanza representations plus routing metadata. `ack_receipt` confirms delivery receipt handling.
 
 ## Bridge Daemon Requirements
-1. **Queue Adapter**: Implement StoneMQ (or alternative) publishers/subscribers that understand the `bridge/<service>/<action>` topics. The daemons should reply on deterministic response channels (e.g. `bridge/<service>/<action>/reply/<trace_id>`).
+1. **Queue Adapter**: Implement StoneMQ (or alternative) publishers/subscribers that understand the `bridge/<service>/<action>` topics. When capacity or ToS limits demand deterministic routing, the adapter must also support per-instance channels (`bridge/<service>/<instance>/<action>`). The daemons should reply on deterministic response channels (e.g. `bridge/<service>/<action>/reply/<trace_id>`).
 2. **Protocol Engine**: Embed existing libraries (GramJS, mautrix, go-xmpp, or plain IRC clients) to manage network state, reconnects, and encryption.
 3. **State Management**: Persist session keys (MTProto auth keys, Matrix access tokens, IRC SASL secrets, XMPP roster state) in the daemon's storage layer, encrypting sensitive data at rest.
 4. **Observability**: Propagate the `trace_id` and emit structured logs/metrics so the Elixir supervisor can correlate failures to queue messages.
@@ -28,3 +31,17 @@
 3. Extend account linking flows inside Msgr to persist queue-based credentials (e.g. storing Telegram session blobs instead of bot tokens).
 4. Build supervision trees that spin up connectors per linked account and subscribe to inbound queues for Telegram, Matrix, IRC, and XMPP events.
 5. Codify compliance guidelines for ToS-sensitive networks while prioritising ToS-free systems (IRC/XMPP) for early experiments.
+6. Validate Signal and WhatsApp client emulation flows end-to-end (device link → message sync → acknowledgement) before enabling them for beta users.
+
+## Telegram Client Emulation Notes
+- **Authentication Flow**: Use GramJS (or another MTProto client) to perform device registration, `auth.sendCode`, and `auth.signIn` using the queue-driven `link_account` payload. The bridge must surface two-factor prompts back to Msgr for manual confirmation.
+- **Session Persistence**: Store MTProto session files in the credential vault and expose opaque references to the daemon. Rotate the session when Telegram invalidates device keys.
+- **Update Handling**: Maintain `updates.getDifference` cursors per bridge instance. Publish `inbound_update` envelopes that normalise chats, users, and message entities so Elixir can persist them without hitting the Telegram API directly.
+- **Outbound Parity**: Prefer the same method set as official clients (`messages.sendMessage`, `messages.editMessage`, `messages.deleteMessages`). Unsupported media types should be downgraded to descriptive placeholders until the Msgr media pipeline can upload native attachments.
+- **Rate Limits & Sharding**: Respect Telegram flood limits by routing high-volume work to sharded bridge instances via `bridge/telegram/<instance>/<action>` topics, keeping each daemon below the ~100-connection soft ceiling per data centre.
+
+## Signal Client Emulation Notes
+- **Device Linking**: Use the open-source Signal Service (Axolotl/Signal CLI) stack to register the bridge as a companion device via linking codes. Persist the generated device blob encrypted at rest and expose it as `session.blob` in the `link_account` response so Msgr can restore sessions without re-linking.
+- **Message Sync**: Consume the Signal WebSocket/gRPC envelope stream, normalise the payload (sender UUID, timestamp, body, attachment metadata), and publish it as `inbound_event`. Maintain offset checkpoints to avoid replaying envelopes after reconnects.
+- **Outbound Delivery**: Encode plaintext messages with optional sealed-sender headers based on workspace policy, fall back to standard send requests for contacts that do not support sealed sender, and surface detailed failure reasons to Msgr.
+- **Acknowledgements**: Map Signal delivery/read receipts to `ack_event` payloads so the Elixir core can mark messages as delivered/read and allow the daemon to discard processed envelopes.

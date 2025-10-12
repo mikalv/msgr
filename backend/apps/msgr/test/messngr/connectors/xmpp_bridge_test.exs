@@ -35,6 +35,14 @@ defmodule Messngr.Connectors.XMPPBridgeTest do
     assert message.payload.trace_id == "stanza"
   end
 
+  test "send_stanza/3 supports routing to a specific instance", %{bridge: bridge, agent: agent} do
+    params = %{stanza: "<message/>", format: :xml, routing: %{to: "user@example.com"}}
+    assert :ok = XMPPBridge.send_stanza(bridge, params, instance: "xmpp-shard-1")
+
+    assert [message] = QueueRecorder.published(agent)
+    assert message.topic == "bridge/xmpp/xmpp-shard-1/outbound_stanza"
+  end
+
   test "ack_receipt/3 publishes receipt acknowledgement", %{bridge: bridge, agent: agent} do
     params = %{stanza_id: "abc-123", status: :delivered}
     assert :ok = XMPPBridge.ack_receipt(bridge, params, trace_id: "receipt")

@@ -35,6 +35,14 @@ defmodule Messngr.Connectors.IRCBridgeTest do
     assert message.payload.trace_id == "cmd"
   end
 
+  test "send_command/3 supports targeting bridge shards", %{bridge: bridge, agent: agent} do
+    params = %{command: "PRIVMSG", target: "#msgr", arguments: ["Hello"]}
+    assert :ok = IRCBridge.send_command(bridge, params, instance: :irc_eu_1)
+
+    assert [message] = QueueRecorder.published(agent)
+    assert message.topic == "bridge/irc/irc_eu_1/outbound_command"
+  end
+
   test "ack_offset/3 publishes acknowledgement", %{bridge: bridge, agent: agent} do
     params = %{network: "irc.libera.chat", channel: "#msgr", offset: 101}
     assert :ok = IRCBridge.ack_offset(bridge, params, trace_id: "offset")

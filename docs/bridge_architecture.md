@@ -1,7 +1,8 @@
 # Bridge Architecture Overview
 
 ## Component Map
-- **Connector Daemons**: One per external platform, implemented in the language that best matches the reverse-engineered stack (GramJS for Telegram, mautrix for Matrix, plain IRC/XMPP libraries). Each daemon exposes queue handlers for `bridge/<service>/<action>` topics and translates intents to native protocol calls.
+- **Connector Daemons**: One per external platform, implemented in the language that best matches the reverse-engineered stack (GramJS for Telegram, mautrix for Matrix, plain IRC/XMPP libraries). Each daemon exposes queue handlers for `bridge/<service>/<action>` topics (or `bridge/<service>/<instance>/<action>` when sharded) and translates intents to native protocol calls.
+- **Signal REST Adapter**: The Signal bridge now includes a `signal-cli-rest-api` client that polls for envelopes, issues acknowledgements, and relays outbound messages over HTTP while persisting session hints for reboots.
 - **Elixir Connector Facade**: The Msgr backend uses `ServiceBridge` helpers to build deterministic envelopes and publish them to the queue. Incoming events are normalised and persisted in Postgres before fanning out to clients.
 - **Message Fabric**: StoneMQ (or a compatible broker) provides pub/sub plus request/response semantics. We reserve namespaces per tenant and service to guarantee isolation and allow selective replay.
 - **Impersonation & Policy Layer**: Holds outbound routing logic, resolves which linked identity to impersonate, injects credentials, and enforces workspace policy before publishing intents.
@@ -10,14 +11,55 @@
 
 ## Data Flow
 1. **Inbound Messages**
-   - Daemon receives network traffic → emits canonical events to `bridge/<service>/inbound_event` (or service-specific topics).
-   - Elixir subscribers normalise the payload, persist it, and schedule ack messages such as `ack_update`, `ack_sync`, or `ack_offset`.
+   - Daemon receives network traffic → emits canonical events to `bridge/<service>/inbound_event`
+     (or `bridge/<service>/<instance>/inbound_event` when reporting from a sharded worker). Service
+     implementations fan these out as `inbound_message` (Matrix/IRC), `inbound_stanza` (XMPP), or
+     `inbound_update` (Telegram) envelopes depending on the protocol.
+   - Elixir subscribers normalise the payload, persist it, and schedule ack messages such as
+     `ack_update`, `ack_sync`, `ack_offset`, or `ack_receipt`.
 2. **Outbound Messages**
-   - Clients send a message → backend records intent → publishes an outbound envelope (`outbound_message`, `outbound_event`, etc.).
+   - Clients send a message → backend records intent → publishes an outbound envelope
+     (`outbound_message`, `outbound_event`, `outbound_stanza`, etc.). The `ServiceBridge` helper
+     optionally scopes the topic to a daemon instance (`bridge/<service>/<instance>/<action>`) when
+     we need to target a specific shard.
    - Daemon delivers the message using the platform protocol, then emits delivery status or errors referencing the original `trace_id`.
 3. **State Synchronisation**
    - Workers trigger periodic sync actions (`request_history`, `refresh_roster`) over the queue.
    - Daemons stream results and update tokens; Elixir writes checkpoints and notifies subscribers.
+
+## Service Action Map
+| Service  | Outbound Actions                                   | Inbound Actions                     | Ack/Control Actions                  |
+|----------|----------------------------------------------------|-------------------------------------|--------------------------------------|
+| Matrix   | `outbound_message`, `outbound_event`, `typing`      | `inbound_message`, membership feeds | `ack_sync`, `link_account` replies   |
+| IRC      | `outbound_message`, `outbound_command`             | `inbound_message`, `membership`     | `ack_offset`, `configure_identity`   |
+| XMPP     | `outbound_stanza`, `presence_update`               | `inbound_stanza`, roster snapshots  | `ack_receipt`, `link_account`        |
+| Telegram | `outbound_message`, `typing_update`, `media_stub`  | `inbound_update`, `state_update`    | `ack_update`, `link_account`         |
+| WhatsApp | `outbound_message`, `typing_placeholder`           | `inbound_event`, `state_update`     | `ack_event`, `link_account`          |
+| Signal   | `outbound_message`, `profile_sync`                 | `inbound_event`, `receipt_update`   | `ack_event`, `link_account`          |
+| Snapchat | `outbound_message` *(skeleton)*                    | _pending client implementation_     | `link_account` *(not implemented)*   |
+
+The table captures the canonical actions our queue contracts use per service. Each bridge daemon
+implements a subset tailored to the network's capabilities and gradually expands coverage as new
+features land (e.g., Telegram media uploads, XMPP MAM export streaming).
+
+## Share Link Service
+
+- **Purpose**: Some networks (notably IRC, SMS gateways, and legacy bots) can only receive plain
+  text. When a Msgr conversation contains media, location pins, or invites destined for those
+  bridges we persist a `share_link` record describing how the payload can be shared.
+- **Storage**: Share links live in Postgres (`share_links` table) with ownership (account,
+  optional profile, originating bridge account), expiry windows, view limits, and capability
+  profiles that outline how each downstream service should consume the payload (link-only vs
+  fetch-and-upload).
+- **URLs**: Each record exposes a stable HTTPS link (`https://msgr.no/s/<token>` by default) and a
+  `msgr://share/...` deep link. The tokenised URL is what IRC/XMPP bridges can paste into channels
+  when the native protocol lacks binary support.
+- **Payload Schema**: Bridges attach metadata such as `download` instructions, filenames, MIME
+  types, thumbnails, geo URIs, or invite codes. The capability profile lists which keys each target
+  needs (e.g., XMPP requires `download` + `content_type`, IRC only needs `public_url`).
+- **Access Control**: View counts are tracked transactionally so we can expire public links after a
+  limited number of fetches. When the limit is reached or the expiry timestamp passes the share
+  link becomes unavailable to bridges.
 
 ## Conversation History Streaming
 - Clients request historical windows by pushing `message:sync` on the Phoenix conversation channel.
@@ -32,7 +74,7 @@
 - Policy enforcement before publishing outbound intents to guard against DLP violations and cross-tenant leakage.
 
 ## Scalability Considerations
-- Horizontal scale by spinning up daemon shards per workspace or region; shards subscribe to the same topics with competing consumers.
+- Horizontal scale by spinning up daemon shards per workspace or region. Shards can subscribe as competing consumers on `bridge/<service>/<action>` or, when connection caps require deterministic routing, use per-instance topics (`bridge/<service>/<instance>/<action>`) so the Elixir layer can steer traffic to specific deployments.
 - Rate limiting implemented at the daemon level to respect platform-specific quotas, with back-pressure fed to Elixir through `throttle` events.
 - Idempotent processing using platform message IDs combined with Msgr `trace_id`s to deduplicate retries.
 - Replay buffers (StoneMQ durable topics) allow catch-up after outages without losing handshake state.

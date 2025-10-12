@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Awaitable, Callable, Dict, Optional, Protocol
+from typing import Awaitable, Callable, Dict, Mapping, Optional, Protocol
 
 from .envelope import Envelope
 from .telemetry import TelemetryRecorder, NoopTelemetry
 from .credentials import CredentialBootstrapper
 
 QueueHandler = Callable[[Envelope], Awaitable[None]]
+RequestHandler = Callable[[Envelope], Awaitable[Mapping[str, object]]]
 
 
 class QueueTransport(Protocol):
@@ -20,8 +21,15 @@ class QueueTransport(Protocol):
     async def publish(self, topic: str, body: bytes) -> None:
         ...
 
+    async def subscribe_request(
+        self, topic: str, handler: Callable[[bytes], Awaitable[bytes]]
+    ) -> None:
+        ...
 
-def topic_for(service: str, action: str) -> str:
+
+def topic_for(service: str, action: str, instance: Optional[str] = None) -> str:
+    if instance:
+        return f"bridge/{service}/{instance}/{action}"
     return f"bridge/{service}/{action}"
 
 
@@ -35,6 +43,7 @@ class StoneMQClient:
         *,
         telemetry: Optional[TelemetryRecorder] = None,
         credential_bootstrapper: Optional[CredentialBootstrapper] = None,
+        instance: Optional[str] = None,
     ) -> None:
         if not service:
             raise ValueError("service must not be empty")
@@ -43,9 +52,14 @@ class StoneMQClient:
         self._telemetry = telemetry or NoopTelemetry()
         self._credential_bootstrapper = credential_bootstrapper
         self._handlers: Dict[str, QueueHandler] = {}
+        self._request_handlers: Dict[str, RequestHandler] = {}
+        self._instance = self._normalise_instance(instance)
 
     def register(self, action: str, handler: QueueHandler) -> None:
         self._handlers[action] = handler
+
+    def register_request(self, action: str, handler: RequestHandler) -> None:
+        self._request_handlers[action] = handler
 
     async def start(self) -> None:
         if self._credential_bootstrapper is not None:
@@ -55,10 +69,22 @@ class StoneMQClient:
             raise RuntimeError("no handlers registered")
 
         for action, handler in self._handlers.items():
-            await self._transport.subscribe(topic_for(self._service, action), self._wrap(action, handler))
+            topic = topic_for(self._service, action, self._instance)
+            await self._transport.subscribe(topic, self._wrap(action, handler))
 
-    async def publish(self, action: str, envelope: Envelope) -> None:
-        await self._transport.publish(topic_for(self._service, action), envelope.to_json().encode("utf-8"))
+        if self._request_handlers:
+            subscribe_request = getattr(self._transport, "subscribe_request", None)
+            if subscribe_request is None:
+                raise RuntimeError("transport does not support request handlers")
+
+            for action, handler in self._request_handlers.items():
+                topic = topic_for(self._service, action, self._instance)
+                await subscribe_request(topic, self._wrap_request(action, handler))
+
+    async def publish(self, action: str, envelope: Envelope, *, instance: Optional[str] = None) -> None:
+        resolved_instance = self._instance if instance is None else self._normalise_instance(instance)
+        topic = topic_for(self._service, action, resolved_instance)
+        await self._transport.publish(topic, envelope.to_json().encode("utf-8"))
 
     def _wrap(self, action: str, handler: QueueHandler) -> Callable[[bytes], Awaitable[None]]:
         async def _inner(body: bytes) -> None:
@@ -75,3 +101,36 @@ class StoneMQClient:
                 self._telemetry.record_delivery(self._service, action, loop.time() - start, outcome)
 
         return _inner
+
+    def _wrap_request(
+        self, action: str, handler: RequestHandler
+    ) -> Callable[[bytes], Awaitable[bytes]]:
+        async def _inner(body: bytes) -> bytes:
+            loop = asyncio.get_running_loop()
+            start = loop.time()
+            outcome = "ok"
+            try:
+                envelope = Envelope.from_dict(json.loads(body.decode("utf-8")))
+                result = await handler(envelope)
+                if not isinstance(result, Mapping):
+                    raise TypeError("request handler must return a mapping")
+                return json.dumps(dict(result)).encode("utf-8")
+            except Exception:  # pylint: disable=broad-except
+                outcome = "error"
+                raise
+            finally:
+                self._telemetry.record_delivery(self._service, action, loop.time() - start, outcome)
+
+        return _inner
+
+    @staticmethod
+    def _normalise_instance(instance: Optional[str]) -> Optional[str]:
+        if instance is None:
+            return None
+
+        trimmed = instance.strip()
+        if not trimmed:
+            raise ValueError("instance must not be empty")
+        if "/" in trimmed:
+            raise ValueError("instance must not contain '/' characters")
+        return trimmed
