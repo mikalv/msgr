@@ -74,6 +74,7 @@ Run with `--help` to see the full option set.
 - Asset noise (images, fonts, CSS) and telemetry endpoints flagged in the rules file are counted but hidden from the match list; pass `--include-assets` to view everything.
 - Edit `config/rules.json` to tailor categories (auth, messaging-send/sync, attachments, telemetry, etc.) or add new matchers. Regex strings follow standard JavaScript `RegExp` syntax.
 - Adjust the auto-highlight threshold (`--highlight-threshold`) to raise/lower the minimum score for the “High-value events” section.
+- Straightforward document GETs without query parameters are deprioritised unless a rule marks them as interesting, so focus remains on API-esque calls.
 
 ## Next Steps
 - Add helpers that convert captured logs into invitational HAR files.

@@ -246,6 +246,21 @@ function normaliseHeaders(headers) {
   }, {});
 }
 
+function parseUrlDetails(rawUrl) {
+  if (!rawUrl) return null;
+  try {
+    const parsed = new URL(rawUrl);
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    return {
+      parsed,
+      hasQuery: Boolean(parsed.search && parsed.search.length > 1),
+      pathSegments: segments,
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
 function matchesCategory(event, category, headersLower) {
   const { match } = category;
   if (!match) return false;
@@ -309,8 +324,9 @@ function classifyEvent(event, rules) {
   const url = event.url || '';
   const resourceType = event.resourceType || '';
   const mimeType = event.mimeType || '';
+  const urlInfo = parseUrlDetails(url);
 
-  const isNoise =
+  const baseNoise =
     (resourceType && rules.noise.resourceTypes.has(resourceType)) ||
     (mimeType && rules.noise.mimePrefixes.some((prefix) => mimeType.startsWith(prefix))) ||
     (url && rules.noise.urlRegexes.some((regex) => regex.test(url)));
@@ -338,6 +354,9 @@ function classifyEvent(event, rules) {
 
   if (event.method) {
     const method = event.method.toUpperCase();
+    if (method === 'GET' && urlInfo && !urlInfo.hasQuery) {
+      score -= 1;
+    }
     if (rules.boosts.methods[method]) {
       score += rules.boosts.methods[method];
     }
@@ -361,11 +380,21 @@ function classifyEvent(event, rules) {
     score += 1;
   }
 
+  const method = event.method ? event.method.toUpperCase() : null;
+  const isPlainDocumentGet =
+    method === 'GET' &&
+    urlInfo &&
+    !urlInfo.hasQuery &&
+    (!resourceType || resourceType === 'Document') &&
+    urlInfo.pathSegments.length <= 1;
+
+  const computedNoise = Boolean(baseNoise || noiseThroughCategory || (isPlainDocumentGet && categories.length === 0));
+
   return {
     categories,
     score,
     headersLower,
-    isNoise: Boolean(isNoise || noiseThroughCategory),
+    isNoise: computedNoise,
   };
 }
 
