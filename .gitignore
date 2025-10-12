@@ -2,5 +2,6 @@ DerivedData/
 target/
 node_modules/
 reverse/official_client_recorder/captures/
+flutter_frontend/packages/libmsgr/build/
 backend/.envrc
 .DS_Store
