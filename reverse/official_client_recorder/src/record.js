@@ -3,9 +3,59 @@
 const fs = require('fs');
 const path = require('path');
 const { mkdir, readFile } = require('fs/promises');
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-extra');
+const StealthPlugin = require('puppeteer-extra-plugin-stealth');
+const {
+  decodeBodyContent,
+  getHeaderValue,
+  createOnceLogger,
+  decompressBodyContent,
+  persistResourceToDisk,
+  maybeBeautifyResource,
+} = require('./resource_utils');
 
 const CAPTURE_DIR = path.join(__dirname, '..', 'captures');
+const CAMOUFLAGE_PROFILES = [
+  {
+    id: 'macos-sonoma',
+    userAgent:
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 13_6_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    acceptLanguage: 'en-US,en;q=0.9',
+    languages: ['en-US', 'en'],
+    platform: 'MacIntel',
+    hardwareConcurrency: 8,
+    deviceMemory: 8,
+    maxTouchPoints: 1,
+    timezone: 'America/Los_Angeles',
+    viewport: { width: 1440, height: 900, deviceScaleFactor: 2 },
+  },
+  {
+    id: 'windows-11',
+    userAgent:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    acceptLanguage: 'en-US,en;q=0.9',
+    languages: ['en-US', 'en'],
+    platform: 'Win32',
+    hardwareConcurrency: 12,
+    deviceMemory: 16,
+    maxTouchPoints: 1,
+    timezone: 'America/New_York',
+    viewport: { width: 1920, height: 1080, deviceScaleFactor: 1 },
+  },
+  {
+    id: 'linux-workstation',
+    userAgent:
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+    acceptLanguage: 'en-GB,en;q=0.8',
+    languages: ['en-GB', 'en'],
+    platform: 'Linux x86_64',
+    hardwareConcurrency: 8,
+    deviceMemory: 8,
+    maxTouchPoints: 0,
+    timezone: 'Europe/London',
+    viewport: { width: 1680, height: 1050, deviceScaleFactor: 1 },
+  },
+];
 
 function printHelp() {
   const content = `
@@ -23,8 +73,16 @@ Options:
   --output <path>           Custom output file (default: captures/session-<timestamp>.jsonl)
   --executable <path>       Custom Chrome / Chromium binary path
   --capture-bodies          Persist HTTP response bodies and WebSocket payloads
+  --save-resources          Write decoded HTTP responses to disk for offline inspection
+  --no-save-resources       Disable resource persistence even if enabled elsewhere
+  --resources-dir <path>    Directory for saved resources (default: derived from --output)
+  --no-pretty-resources     Skip generating prettified text/JSON companions for saved resources
   --slowmo <ms>             Slow Puppeteer actions by the given milliseconds
   --devtools                Open DevTools automatically (only in non-headless mode)
+  --stealth                 Enable stealth evasion (default: on)
+  --no-stealth              Disable stealth evasion tweaks
+  --no-camouflage           Skip navigator/user-agent spoofing
+  --camouflage-profile <id> Use a specific camouflage profile (default: random)
   --chrome-arg <value>      Extra launch argument (repeatable)
   -h, --help                Show this help message
 `.trim();
@@ -35,8 +93,13 @@ function parseArgs(argv) {
   const options = {
     headless: false,
     captureBodies: false,
+    saveResources: false,
+    resourcesDir: null,
+    beautifyResources: true,
     chromeArgs: [],
     slowMo: 0,
+    stealth: true,
+    camouflage: true,
   };
 
   const args = [...argv];
@@ -52,8 +115,32 @@ function parseArgs(argv) {
       case '--capture-bodies':
         options.captureBodies = true;
         break;
+      case '--save-resources':
+        options.saveResources = true;
+        break;
+      case '--no-save-resources':
+        options.saveResources = false;
+        break;
+      case '--resources-dir':
+        options.resourcesDir = args.shift();
+        break;
+      case '--no-pretty-resources':
+        options.beautifyResources = false;
+        break;
       case '--devtools':
         options.devtools = true;
+        break;
+      case '--stealth':
+        options.stealth = true;
+        break;
+      case '--no-stealth':
+        options.stealth = false;
+        break;
+      case '--no-camouflage':
+        options.camouflage = false;
+        break;
+      case '--camouflage-profile':
+        options.camouflageProfile = args.shift();
         break;
       case '-h':
       case '--help':
@@ -107,6 +194,12 @@ function parseArgs(argv) {
         } else if (arg.startsWith('--executable=')) {
           const [, value] = arg.split('=');
           options.executable = value;
+        } else if (arg.startsWith('--resources-dir=')) {
+          const [, value] = arg.split('=');
+          options.resourcesDir = value;
+        } else if (arg.startsWith('--camouflage-profile=')) {
+          const [, value] = arg.split('=');
+          options.camouflageProfile = value;
         } else {
           throw new Error(`Unknown argument: ${arg}`);
         }
@@ -139,6 +232,158 @@ function resolveOutputPath(customPath) {
   }
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   return path.join(CAPTURE_DIR, `session-${stamp}.jsonl`);
+}
+
+function resolveResourceDirectory(customPath, outputPath) {
+  if (customPath) {
+    return path.isAbsolute(customPath)
+      ? customPath
+      : path.join(process.cwd(), customPath);
+  }
+  const outputDir = path.dirname(outputPath);
+  const baseName = path.basename(outputPath, path.extname(outputPath));
+  return path.join(outputDir, `${baseName}_resources`);
+}
+
+function pickCamouflageProfile(requestedId) {
+  if (CAMOUFLAGE_PROFILES.length === 0) {
+    return null;
+  }
+
+  if (requestedId) {
+    const normalized = requestedId.trim().toLowerCase();
+    const match = CAMOUFLAGE_PROFILES.find(
+      (profile) => profile.id.toLowerCase() === normalized,
+    );
+    if (match) {
+      return match;
+    }
+    console.warn(
+      `[Recorder] Unknown camouflage profile "${requestedId}", falling back to random preset.`,
+    );
+  }
+
+  const index = Math.floor(Math.random() * CAMOUFLAGE_PROFILES.length);
+  return CAMOUFLAGE_PROFILES[index];
+}
+
+async function applyCamouflage(page, profile) {
+  if (!profile) return;
+
+  if (profile.userAgent) {
+    await page.setUserAgent(profile.userAgent);
+  }
+
+  if (profile.acceptLanguage) {
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': profile.acceptLanguage,
+    });
+  }
+
+  if (profile.viewport) {
+    try {
+      await page.setViewport(profile.viewport);
+    } catch (error) {
+      console.warn(
+        `[Recorder] Unable to apply viewport ${JSON.stringify(profile.viewport)}: ${error.message}`,
+      );
+    }
+  }
+
+  if (profile.timezone) {
+    try {
+      await page.emulateTimezone(profile.timezone);
+    } catch (error) {
+      console.warn(
+        `[Recorder] Unable to emulate timezone "${profile.timezone}": ${error.message}`,
+      );
+    }
+  }
+
+  await page.evaluateOnNewDocument((config) => {
+    const defineGetter = (target, key, value) => {
+      try {
+        Object.defineProperty(target, key, {
+          get: () => value,
+          configurable: true,
+        });
+      } catch (_) {
+        // noop: property might be non-configurable in some environments.
+      }
+    };
+
+    const cloneArray = (input) => (Array.isArray(input) ? input.slice() : input);
+
+    if (config.languages && config.languages.length) {
+      defineGetter(navigator, 'languages', cloneArray(config.languages));
+      defineGetter(navigator, 'language', config.languages[0]);
+    }
+
+    if (config.platform) {
+      defineGetter(navigator, 'platform', config.platform);
+    }
+
+    if (typeof config.hardwareConcurrency === 'number') {
+      defineGetter(navigator, 'hardwareConcurrency', config.hardwareConcurrency);
+    }
+
+    if (typeof config.deviceMemory === 'number') {
+      defineGetter(navigator, 'deviceMemory', config.deviceMemory);
+    }
+
+    if (typeof config.maxTouchPoints === 'number') {
+      defineGetter(navigator, 'maxTouchPoints', config.maxTouchPoints);
+    }
+
+    defineGetter(navigator, 'webdriver', undefined);
+
+    if (!window.chrome) {
+      Object.defineProperty(window, 'chrome', {
+        value: { app: {}, runtime: {}, loadTimes: () => {}, csi: () => {} },
+        configurable: true,
+      });
+    }
+
+    if (!navigator.plugins || navigator.plugins.length === 0) {
+      const fakePlugins = [
+        {
+          name: 'Chrome PDF Plugin',
+          filename: 'internal-pdf-viewer',
+          description: 'Portable Document Format',
+        },
+        {
+          name: 'Chrome PDF Viewer',
+          filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai',
+          description: '',
+        },
+        {
+          name: 'Native Client',
+          filename: 'internal-nacl-plugin',
+          description: '',
+        },
+      ];
+      defineGetter(navigator, 'plugins', fakePlugins);
+    }
+
+    const { permissions } = navigator;
+    if (permissions && typeof permissions.query === 'function') {
+      const originalQuery = permissions.query.bind(permissions);
+      permissions.query = (parameters) => {
+        if (parameters && parameters.name === 'notifications') {
+          const state =
+            typeof Notification === 'undefined' ? 'default' : Notification.permission;
+          return Promise.resolve({ state });
+        }
+        return originalQuery(parameters);
+      };
+    }
+  }, {
+    languages: profile.languages,
+    platform: profile.platform,
+    hardwareConcurrency: profile.hardwareConcurrency,
+    deviceMemory: profile.deviceMemory,
+    maxTouchPoints: profile.maxTouchPoints,
+  });
 }
 
 function createWriter(filePath) {
@@ -182,9 +427,46 @@ async function main(argv) {
     process.exit(1);
   }
 
+  if (options.stealth) {
+    const alreadyRegistered =
+      Array.isArray(puppeteer.plugins) &&
+      puppeteer.plugins.some((plugin) => plugin.name === 'stealth');
+    if (!alreadyRegistered) {
+      puppeteer.use(StealthPlugin());
+    }
+  } else {
+    console.warn(
+      '[Recorder] Stealth evasion disabled via flags; automation may be easier to detect.',
+    );
+  }
+
+  const camouflageProfile =
+    options.camouflage !== false
+      ? pickCamouflageProfile(options.camouflageProfile)
+      : null;
+  if (camouflageProfile) {
+    console.log(`[Recorder] Using camouflage profile "${camouflageProfile.id}".`);
+  }
+
+  const chromeArgs = options.chromeArgs.filter(Boolean);
+
   const outputPath = resolveOutputPath(options.output);
-  await mkdir(path.dirname(outputPath), { recursive: true });
+  const outputDirectory = path.dirname(outputPath);
+  await mkdir(outputDirectory, { recursive: true });
+
+  const resourceDir =
+    options.saveResources === true
+      ? resolveResourceDirectory(options.resourcesDir, outputPath)
+      : null;
+  if (resourceDir) {
+    await mkdir(resourceDir, { recursive: true });
+    console.log(`[Recorder] Saving resources under ${resourceDir}`);
+  }
+
   const writer = createWriter(outputPath);
+  const resourceDirRelative = resourceDir
+    ? path.relative(outputDirectory, resourceDir) || '.'
+    : null;
   writer.write({
     type: 'metadata',
     event: 'session-start',
@@ -193,8 +475,13 @@ async function main(argv) {
       url: options.url,
       headless: options.headless,
       captureBodies: options.captureBodies,
+      saveResources: options.saveResources,
+      beautifyResources: options.beautifyResources,
       slowMo: options.slowMo,
-      chromeArgs: options.chromeArgs,
+      chromeArgs,
+      stealth: Boolean(options.stealth),
+      camouflageProfile: camouflageProfile ? camouflageProfile.id : null,
+      resourceDir: resourceDirRelative,
     },
   });
 
@@ -207,13 +494,8 @@ async function main(argv) {
   const launchOptions = {
     headless: options.headless ? 'new' : false,
     slowMo: options.slowMo || 0,
-    defaultViewport: null,
-    args: [
-      '--disable-features=IsolateOrigins,site-per-process',
-      '--enable-logging',
-      '--disable-web-security',
-      ...options.chromeArgs.filter(Boolean),
-    ],
+    defaultViewport: camouflageProfile?.viewport || null,
+    args: chromeArgs,
   };
 
   if (options.executable) {
@@ -226,11 +508,16 @@ async function main(argv) {
 
   const browser = await puppeteer.launch(launchOptions);
   const [page] = await browser.pages();
-  await page.setBypassCSP(true);
+  if (camouflageProfile) {
+    await applyCamouflage(page, camouflageProfile);
+  }
   const session = await page.target().createCDPSession();
   await session.send('Network.enable');
 
   const pendingResponses = new Map();
+  let resourceCounter = 0;
+  const shouldFetchResponseBody = options.captureBodies || options.saveResources;
+  const warnDecompressionOnce = createOnceLogger('decompression');
 
   const writeRequest = (params) => {
     const { requestId, request, wallTime, type, initiator, frameId } = params;
@@ -269,16 +556,67 @@ async function main(argv) {
     const { response, resourceType } = entry;
     let body = null;
     let base64Encoded = false;
+    let resourcePath = null;
+    let resourcePrettyPath = null;
+    let rawBodyString = null;
+    let rawBodyBase64 = false;
 
-    if (options.captureBodies) {
+    if (shouldFetchResponseBody) {
       try {
         const payload = await session.send('Network.getResponseBody', { requestId });
-        body = payload.body;
-        base64Encoded = payload.base64Encoded;
+        rawBodyString = payload.body;
+        rawBodyBase64 = payload.base64Encoded;
       } catch (error) {
-        body = null;
-        base64Encoded = false;
+        rawBodyString = null;
+        rawBodyBase64 = false;
         reason = reason || error.message;
+      }
+    }
+
+    if (rawBodyString != null) {
+      if (options.saveResources) {
+        const rawBuffer = decodeBodyContent(rawBodyString, rawBodyBase64);
+        const encodingHeader = getHeaderValue(response.headers, 'content-encoding');
+        const shouldAttemptDecompression =
+          Boolean(encodingHeader) && rawBodyBase64 === true;
+        const decodedBuffer = shouldAttemptDecompression
+          ? decompressBodyContent(rawBuffer, encodingHeader, warnDecompressionOnce)
+          : rawBuffer;
+        if (decodedBuffer) {
+          const currentIndex = ++resourceCounter;
+          try {
+            const savedPath = await persistResourceToDisk(
+              resourceDir,
+              response,
+              decodedBuffer,
+              requestId,
+              currentIndex,
+            );
+            if (savedPath) {
+              const relPath = path.relative(outputDirectory, savedPath);
+              resourcePath = relPath && relPath !== '' ? relPath : path.basename(savedPath);
+              if (options.beautifyResources) {
+                const prettyRelPath = await maybeBeautifyResource({
+                  buffer: decodedBuffer,
+                  response,
+                  absolutePath: savedPath,
+                  beautifyEnabled: options.beautifyResources,
+                  outputDirectory,
+                });
+                if (prettyRelPath) {
+                  resourcePrettyPath = prettyRelPath;
+                }
+              }
+            }
+          } catch (error) {
+            console.error('[Recorder] Failed to persist resource', error);
+          }
+        }
+      }
+
+      if (options.captureBodies) {
+        body = rawBodyString;
+        base64Encoded = rawBodyBase64;
       }
     }
 
@@ -302,6 +640,8 @@ async function main(argv) {
       timing: response.timing || null,
       body,
       base64Encoded,
+      resourcePath,
+      resourcePrettyPath,
       failureReason: reason,
     });
   };

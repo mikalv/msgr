@@ -7,6 +7,8 @@ This toolset launches Chrome (headless or full UI) against the official chat cli
 - Optional injection of a custom JavaScript automation script to reproduce deterministic flows.
 - Lossless capture of request/response metadata, payloads (when enabled), and WebSocket events.
 - Session files saved under `captures/` with timestamped filenames for easy cataloguing.
+- Optional resource export: persist decoded HTTP responses (JS blobs, protobuf bundles, etc.) to disk for deeper reverse-engineering.
+- Auto-generate prettified companions for JSON/JS assets when `prettier` is available, making captures easier to search and diff.
 
 ## Prerequisites
 - Node.js 18+
@@ -35,7 +37,15 @@ npm run record -- --url https://official.client.example --headless --script ./sc
 - `--output <path>`: Write the log to a custom file instead of the default timestamped name.
 - `--executable <path>`: Use a specific Chrome/Chromium binary.
 - `--capture-bodies`: Persist response bodies and WebSocket payloads (may generate large files).
+- `--save-resources`: Decode HTTP responses and store them under a session-scoped directory (defaults to `<capture>_resources/`).
+- `--resources-dir <path>`: Custom directory for exported resources. Combine with `--save-resources`.
+- `--no-pretty-resources`: Skip generating prettified text/JSON companions for saved resources.
 - `--slowmo <ms>`: Slow down Puppeteer’s actions for debugging.
+- `--devtools`: Open DevTools automatically (only in non-headless mode).
+- `--no-stealth`: Disable the built-in stealth plugin (enabled by default to reduce automation fingerprints).
+- `--no-camouflage`: Skip navigator/user-agent spoofing.
+- `--camouflage-profile <id>`: Force a specific fingerprint preset (`macos-sonoma`, `windows-11`, `linux-workstation`).
+- `--chrome-arg <value>`: Pass custom launch arguments to Chrome (repeatable).
 
 See `npm run record -- --help` for the full list.
 
@@ -66,6 +76,30 @@ By default this prints a summary (counts per event type, top endpoints, status d
 - `--show-bodies`: include payloads/bodies for the matches.
 - Built-in summary callouts highlight POST/PUT endpoints, `Set-Cookie` issuers, and interesting headers (auth tokens, cookies, FB-specific headers, etc.).
 - The CLI only prints a match list when you provide filters (`--search`, `--type`, `--request-id`, `--regex`); otherwise rely on the summary/highlights.
+
+When `--save-resources` is enabled, every `http-response` entry contains a `resourcePath` pointing to the decoded artifact relative to the capture log. The recorder writes these files beneath the session's resource directory so you can inspect heavy JS bundles or protobuf definitions without rehydrating the JSONL payloads.
+
+If you have `prettier` installed (add it with `npm install --save-dev prettier`), the recorder will also emit prettified companions like `*.pretty.json` / `*.pretty.js` beside the raw artifacts. These prettified files are referenced via `resourcePrettyPath` in the capture log; disable this behaviour with `--no-pretty-resources`.
+
+## Retroactive Resource Extraction
+
+Forgot to enable `--save-resources` (or captured before it existed)? Rehydrate assets later with:
+
+```bash
+npm run extract -- --file captures/session-2024-01-01T12-00-00-000Z.jsonl --output-dir tmp/resources
+```
+
+`client-recorder-extract` reads a JSONL capture, writes decoded responses (and optional prettified companions) under the chosen directory, and emits a manifest with URLs, status codes, and relative file paths. Use `--filter "<substring>"` to narrow by URL, `--limit N` to stop after N matches, and `--no-pretty-resources` if you only want the raw blobs.
+
+## Blob Analysis Toolkit
+
+Once you have a resource directory, surface the interesting payloads—protobuf bundles, giant JS blobs, JSON configs—with:
+
+```bash
+npm run blobs -- --dir tmp/resources --top 20 --json tmp/blob-report.json
+```
+
+`client-recorder-blobs` scans the directory, classifies files (JSON/JS/protobuf/etc.), reports the largest artefacts, and highlights likely protobuf definitions. The optional `--json` flag persists the full report for further digging.
 
 Run with `--help` to see the full option set.
 

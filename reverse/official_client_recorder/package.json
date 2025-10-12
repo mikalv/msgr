@@ -4,16 +4,22 @@
   "description": "Chrome-based recorder that captures HTTP and WebSocket traffic from the official client.",
   "bin": {
     "client-recorder": "./src/record.js",
-    "client-recorder-analyze": "./src/analyze.js"
+    "client-recorder-analyze": "./src/analyze.js",
+    "client-recorder-extract": "./src/extract_resources.js",
+    "client-recorder-blobs": "./src/analyze_blobs.js"
   },
   "scripts": {
     "record": "node src/record.js",
-    "analyze": "node src/analyze.js"
+    "analyze": "node src/analyze.js",
+    "extract": "node src/extract_resources.js",
+    "blobs": "node src/analyze_blobs.js"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "puppeteer": "^22.7.1"
+    "puppeteer": "^22.7.1",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
   }
 }

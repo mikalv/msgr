@@ -2,4 +2,5 @@ DerivedData/
 target/
 node_modules/
 reverse/official_client_recorder/captures/
+backend/.envrc
 .DS_Store
