@@ -1,6 +1,15 @@
 # Changelog
 
 ## Unreleased
+- Implemented read acknowledgement tracking in the Telegram bridge so Telethon clients send
+  `send_read_acknowledge` calls when Msgr emits `ack_update`, and expanded unit tests to cover
+  stored contexts and unknown-update behaviour.
+- Added a Signal REST client built on `signal-cli-rest-api`, complete with polling, outbound send,
+  and acknowledgement tests plus documentation updates for the new adapter.
+- Scaffolded a Snapchat bridge package with session helpers, a queue-facing daemon skeleton, and
+  regression tests that record unimplemented invocations pending real API access.
+- Updated bridge documentation to reflect Telegram acknowledgement support, the Signal REST client,
+  and the Snapchat skeleton status.
 - Implemented a Matrix bridge daemon with disk-backed session management, queue handlers for
   linking, outbound messaging, and update acknowledgements plus fake Matrix client support so the
   SDK can talk to homeservers once real protocol adapters land.

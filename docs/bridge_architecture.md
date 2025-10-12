@@ -2,6 +2,7 @@
 
 ## Component Map
 - **Connector Daemons**: One per external platform, implemented in the language that best matches the reverse-engineered stack (GramJS for Telegram, mautrix for Matrix, plain IRC/XMPP libraries). Each daemon exposes queue handlers for `bridge/<service>/<action>` topics (or `bridge/<service>/<instance>/<action>` when sharded) and translates intents to native protocol calls.
+- **Signal REST Adapter**: The Signal bridge now includes a `signal-cli-rest-api` client that polls for envelopes, issues acknowledgements, and relays outbound messages over HTTP while persisting session hints for reboots.
 - **Elixir Connector Facade**: The Msgr backend uses `ServiceBridge` helpers to build deterministic envelopes and publish them to the queue. Incoming events are normalised and persisted in Postgres before fanning out to clients.
 - **Message Fabric**: StoneMQ (or a compatible broker) provides pub/sub plus request/response semantics. We reserve namespaces per tenant and service to guarantee isolation and allow selective replay.
 - **Impersonation & Policy Layer**: Holds outbound routing logic, resolves which linked identity to impersonate, injects credentials, and enforces workspace policy before publishing intents.
@@ -35,6 +36,7 @@
 | Telegram | `outbound_message`, `typing_update`, `media_stub`  | `inbound_update`, `state_update`    | `ack_update`, `link_account`         |
 | WhatsApp | `outbound_message`, `typing_placeholder`           | `inbound_event`, `state_update`     | `ack_event`, `link_account`          |
 | Signal   | `outbound_message`, `profile_sync`                 | `inbound_event`, `receipt_update`   | `ack_event`, `link_account`          |
+| Snapchat | `outbound_message` *(skeleton)*                    | _pending client implementation_     | `link_account` *(not implemented)*   |
 
 The table captures the canonical actions our queue contracts use per service. Each bridge daemon
 implements a subset tailored to the network's capabilities and gradually expands coverage as new

@@ -20,14 +20,15 @@ before we can run them against the real networks.
 - **Operational blockers**: No code exists to log into or speak the XMPP protocol yet.
 
 ## Telegram
-- **Code status**: There is an MTProto-aware daemon in `bridge_sdks/python/msgr_telegram_bridge` that
-  wraps Telethon. Login, session persistence, outbound messaging, and inbound update forwarding are
-  implemented, but ack handling is currently a no-op and we still lack coverage for media/file
-  transfer flows.
-- **Missing work**: Implement read-receipt tracking for `ack_update`, flesh out media handling, and
-  exercise the Telethon adapter with live integration tests plus runtime configuration management.
-- **Operational blockers**: Requires Telethon dependencies and API credentials; until ack/media gaps
-  are closed we risk message duplication or missing content.
+- **Code status**: The MTProto daemon in `bridge_sdks/python/msgr_telegram_bridge` now records
+  message identifiers and issues Telethon read acknowledgements when the backend publishes
+  `ack_update`. Login, session persistence, outbound messaging, and inbound update forwarding are
+  implemented, but rich media/file transfer is still deferred.
+- **Missing work**: Flesh out media handling, test acknowledgements against channels/supergroups,
+  and exercise the Telethon adapter with live integration tests plus runtime configuration
+  management.
+- **Operational blockers**: Requires Telethon dependencies and API credentials; without media
+  support we will drop attachments on the floor.
 
 ## WhatsApp
 - **Code status**: Only protocol interfaces and session helpers exist in
@@ -40,11 +41,21 @@ before we can run them against the real networks.
   WhatsApp traffic.
 
 ## Signal
-- **Code status**: The bridge daemon coordinates queue handlers and session persistence, but the
-  `SignalClientProtocol` is only defined as an interface—there is no implementation wired to a
-  libsignal client.
-- **Missing work**: Provide an actual Signal client adapter (linking, sending, event streaming),
-  manage device slots/rate limits, and add integration tests against the Signal service.
-- **Operational blockers**: Lacking the client implementation prevents linking devices or relaying
-  traffic.
+- **Code status**: The bridge now ships with a REST client that targets `signal-cli-rest-api`,
+  handling account linking, outbound messaging, inbound polling, and acknowledgement cleanup while
+  persisting session hints to disk. The daemon wiring from previous work remains and now has a
+  concrete client implementation.
+- **Missing work**: Harden the REST client with attachment uploads, error retry/backoff, device slot
+  management, and end-to-end integration tests against a running `signal-cli` deployment.
+- **Operational blockers**: Operators must deploy and secure the REST API, provision device slots,
+  and feed credentials before the bridge can join the real network.
+
+## Snapchat
+- **Code status**: A queue-facing skeleton exists in `bridge_sdks/python/msgr_snapchat_bridge` that
+  captures intents and exposes session helpers, but it intentionally responds with
+  `not_implemented` payloads until a real client lands.
+- **Missing work**: Reverse-engineer or obtain official Snapchat messaging APIs, implement the
+  client protocol, and wire media/conversation semantics before the bridge can deliver traffic.
+- **Operational blockers**: Snapchat does not expose an officially supported API for multi-device
+  chat, so the skeleton cannot progress without further research and credential bootstrapping.
 

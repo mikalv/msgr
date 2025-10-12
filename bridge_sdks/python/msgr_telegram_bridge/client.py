@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, Mapping, Optional, Protocol
+from typing import Awaitable, Callable, Dict, Mapping, Optional, Protocol, Tuple
 
 UpdateHandler = Callable[[Mapping[str, object]], Awaitable[None]]
 
@@ -58,6 +58,14 @@ class SignInError(Exception):
     """Raised when Telegram refuses the provided login code."""
 
 
+@dataclass
+class _AckContext:
+    """Internal container for read acknowledgement metadata."""
+
+    peer: object
+    message_id: int
+
+
 class TelegramClientProtocol(Protocol):
     """Protocol describing the Telegram functionality the daemon relies on."""
 
@@ -99,6 +107,9 @@ class TelegramClientProtocol(Protocol):
         ...
 
     async def acknowledge_update(self, update_id: int) -> None:
+        ...
+
+    async def send_read_acknowledge(self, peer: object, *, max_id: int) -> None:
         ...
 
 
@@ -147,6 +158,7 @@ class _TelethonClient(TelegramClientProtocol):  # pragma: no cover - requires te
             system_lang_code=device.system_lang_code,
         )
         self._handlers: Dict[UpdateHandler, Callable] = {}
+        self._pending_acks: Dict[int, _AckContext] = {}
 
     async def connect(self) -> None:
         await self._client.connect()
@@ -201,8 +213,15 @@ class _TelethonClient(TelegramClientProtocol):  # pragma: no cover - requires te
 
     def add_update_handler(self, handler: UpdateHandler) -> None:
         async def _wrapped(event) -> None:
-            payload = _normalise_update(event)
+            payload, ack_context = await _normalise_update(self._client, event)
             if payload is not None:
+                update_id = payload.get("update_id")
+                if (
+                    update_id is not None
+                    and ack_context is not None
+                    and isinstance(update_id, int)
+                ):
+                    self._pending_acks[int(update_id)] = ack_context
                 await handler(payload)
 
         self._client.add_event_handler(_wrapped, events.Raw())
@@ -214,10 +233,15 @@ class _TelethonClient(TelegramClientProtocol):  # pragma: no cover - requires te
             self._client.remove_event_handler(wrapped)
 
     async def acknowledge_update(self, update_id: int) -> None:
-        # Telegram acknowledgements rely on per-dialog read markers. We'll implement
-        # per-dialog tracking later once we thread peer identifiers through the
-        # payload. For now the bridge simply records the ack client-side.
-        return None
+        context = self._pending_acks.pop(int(update_id), None)
+        if context is None:
+            return
+        await self._client.send_read_acknowledge(
+            context.peer, max_id=context.message_id
+        )
+
+    async def send_read_acknowledge(self, peer: object, *, max_id: int) -> None:
+        await self._client.send_read_acknowledge(peer, max_id=max_id)
 
 
 def _normalise_user(user) -> UserProfile:
@@ -229,11 +253,11 @@ def _normalise_user(user) -> UserProfile:
     )
 
 
-def _normalise_update(event) -> Optional[Dict[str, object]]:
+async def _normalise_update(client, event) -> Tuple[Optional[Dict[str, object]], Optional[_AckContext]]:
     update = getattr(event, "update", event)
 
     if types is None:
-        return None
+        return None, None
 
     if isinstance(update, types.UpdateNewMessage):  # type: ignore[attr-defined]
         message = update.message
@@ -241,16 +265,28 @@ def _normalise_update(event) -> Optional[Dict[str, object]]:
         peer = getattr(message, "peer_id", None)
         chat_id = _extract_peer_id(peer)
         if chat_id is None:
-            return None
+            return None, None
         text = getattr(message, "message", "")
-        return {
+        message_id = getattr(message, "id", None)
+        ack_context = None
+        if peer is not None and message_id is not None:
+            try:
+                input_peer = await client.get_input_entity(peer)
+            except Exception:  # pragma: no cover - Telethon raises rich errors
+                input_peer = None
+            if input_peer is not None:
+                ack_context = _AckContext(peer=input_peer, message_id=int(message_id))
+        payload: Dict[str, object] = {
             "update_id": update_id,
             "chat_id": chat_id,
             "message": text,
             "sender": getattr(message, "from_id", None),
         }
+        if message_id is not None:
+            payload["message_id"] = int(message_id)
+        return payload, ack_context
 
-    return None
+    return None, None
 
 
 def _extract_peer_id(peer) -> Optional[int]:
