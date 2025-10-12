@@ -102,4 +102,24 @@ void main() {
     final url = api.resolveAuthorizationUrl('/auth/bridge/123/start');
     expect(url.toString(), 'https://example.com:443/auth/bridge/123/start');
   });
+
+  test('unlink issues delete request', () async {
+    var deleteCalled = false;
+    final client = MockClient((request) async {
+      if (request.method == 'DELETE') {
+        deleteCalled = true;
+        expect(
+          request.url.toString(),
+          'https://example.com:443/api/bridges/telegram',
+        );
+        return http.Response('', 204);
+      }
+
+      return http.Response('{}', 200);
+    });
+
+    final api = BridgeApi(client: client);
+    await api.unlink(current: identity, bridgeId: 'telegram');
+    expect(deleteCalled, isTrue);
+  });
 }

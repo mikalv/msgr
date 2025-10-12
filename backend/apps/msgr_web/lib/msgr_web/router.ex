@@ -65,6 +65,7 @@ defmodule MessngrWeb.Router do
     post "/bridges/:bridge_id/sessions", BridgeAuthSessionController, :create
     get "/bridges/sessions/:id", BridgeAuthSessionController, :show
     post "/bridges/:bridge_id/sessions/:id/credentials", BridgeAuthSessionController, :submit_credentials
+    delete "/bridges/:bridge_id", BridgeAccountController, :delete
   end
 
   scope "/auth/bridge", MessngrWeb do

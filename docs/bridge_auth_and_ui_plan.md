@@ -16,6 +16,7 @@
   summaries stored on the session metadata so daemons can dequeue secrets without exposing them to the client.
 - ⚠️ **Daemon progress events** – Websocket push events, StoneMQ job signalling, and observability hooks are still TODO.
 - ✅ **Client UX (phase 1)** – Flutter client now ships a bridge catalog, filterable settings entry, and a multi-step wizard with embedded browser, credential forms, and status polling hooks. Websocket listeners and analytics remain TODO.
+- ✅ **Client unlink flow** – Catalog entries highlight linked connectors and provide an inline disconnect action that calls the new bridge unlink API for quick opt-outs.
 - ⚠️ **Self-hosted/tunnel egress** – Both future IP mitigation options require design/implementation work and documentation.
 
 ## Guiding Principles

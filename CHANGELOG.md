@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added a bridge unlink API with catalog status annotations and Flutter disconnect
+  controls so users can safely log out of connected bridges and refresh the list
+  of available connectors without technical steps.
 - Added a Flutter bridge center with catalog filters, embedded browser wizard,
   and credential forms backed by a new Bridge API client and widget tests so
   end users can link chat networks without technical setup.

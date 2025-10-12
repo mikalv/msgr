@@ -19,11 +19,13 @@ class BridgeCatalogController extends ChangeNotifier {
   Object? _error;
   List<BridgeCatalogEntry> _entries = const [];
   String _filter = 'available';
+  final Set<String> _disconnecting = <String>{};
 
   bool get isLoading => _loading;
   Object? get error => _error;
   String get filter => _filter;
   List<BridgeCatalogEntry> get entries => _entries;
+  bool isDisconnecting(String id) => _disconnecting.contains(id);
 
   List<BridgeCatalogEntry> get visibleEntries {
     switch (_filter) {
@@ -32,9 +34,7 @@ class BridgeCatalogController extends ChangeNotifier {
       case 'coming_soon':
         return _entries.where((entry) => entry.isComingSoon).toList();
       case 'linked':
-        return _entries
-            .where((entry) => entry.auth['status']?.toString() == 'linked')
-            .toList();
+        return _entries.where((entry) => entry.isLinked).toList();
       case 'available':
       default:
         return _entries.where((entry) => entry.isAvailable).toList();
@@ -62,5 +62,21 @@ class BridgeCatalogController extends ChangeNotifier {
     if (_filter == next) return;
     _filter = next;
     notifyListeners();
+  }
+
+  Future<void> disconnect(BridgeCatalogEntry entry) async {
+    if (_disconnecting.contains(entry.id)) return;
+    _disconnecting.add(entry.id);
+    notifyListeners();
+
+    try {
+      await _api.unlink(current: _identity, bridgeId: entry.id);
+      await load();
+    } catch (error) {
+      rethrow;
+    } finally {
+      _disconnecting.remove(entry.id);
+      notifyListeners();
+    }
   }
 }

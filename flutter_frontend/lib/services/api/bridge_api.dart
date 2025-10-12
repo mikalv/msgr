@@ -80,6 +80,20 @@ class BridgeApi {
     return BridgeAuthSession.fromJson(data);
   }
 
+  Future<void> unlink({
+    required AccountIdentity current,
+    required String bridgeId,
+  }) async {
+    final response = await _client.delete(
+      backendApiUri('bridges/$bridgeId'),
+      headers: _authHeaders(current),
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      _decodeBody(response);
+    }
+  }
+
   Uri resolveAuthorizationUrl(String path) {
     return _resolveBackendPath(path);
   }

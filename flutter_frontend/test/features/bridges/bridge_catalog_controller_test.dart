@@ -70,6 +70,68 @@ void main() {
     expect(controller.visibleEntries, hasLength(1));
     expect(controller.visibleEntries.first.displayName, 'Slack');
   });
+
+  test('disconnect triggers API call and refreshes state', () async {
+    var catalogCalls = 0;
+    final client = MockClient((request) async {
+      if (request.method == 'GET' && request.url.path.endsWith('/bridges/catalog')) {
+        catalogCalls += 1;
+        final linked = catalogCalls == 1;
+
+        final body = {
+          'data': [
+            {
+              'id': 'telegram',
+              'service': 'telegram',
+              'display_name': 'Telegram',
+              'description': 'desc',
+              'status': 'available',
+              'auth': {
+                'method': 'oauth',
+                'auth_surface': 'embedded_browser',
+                'status': linked ? 'linked' : 'not_linked',
+              },
+              'link': linked
+                  ? {
+                      'status': 'linked',
+                      'display_name': 'Alice',
+                      'external_id': 'tg-1',
+                    }
+                  : null,
+              'capabilities': {},
+              'categories': [],
+              'prerequisites': [],
+              'tags': ['oauth'],
+              'auth_paths': {'start': '/auth/start'},
+            }
+          ]
+        };
+
+        return http.Response(jsonEncode(body), 200);
+      }
+
+      if (request.method == 'DELETE' &&
+          request.url.path.endsWith('/bridges/telegram')) {
+        return http.Response('', 204);
+      }
+
+      return http.Response('unexpected', 500);
+    });
+
+    final controller = BridgeCatalogController(
+      identity: identity,
+      api: _FakeBridgeApi(client: client),
+    );
+
+    await controller.load();
+    expect(controller.entries, hasLength(1));
+    expect(controller.entries.first.isLinked, isTrue);
+
+    await controller.disconnect(controller.entries.first);
+
+    expect(controller.entries.first.isLinked, isFalse);
+    expect(catalogCalls, 2);
+  });
 }
 
 class _FakeBridgeApi extends BridgeApi {

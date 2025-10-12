@@ -96,9 +96,13 @@ class BridgeHubPage extends StatelessWidget {
                           final entry = entries[index];
                           return _BridgeCard(
                             entry: entry,
-                            onTap: entry.isAvailable
+                            onConnect: entry.isAvailable && !entry.isLinked
                                 ? () => _openWizard(context, entry)
                                 : null,
+                            onDisconnect: entry.isLinked
+                                ? () => _confirmDisconnect(context, controller, entry)
+                                : null,
+                            isDisconnecting: controller.isDisconnecting(entry.id),
                           );
                         },
                         childCount: entries.length,
@@ -142,6 +146,51 @@ class BridgeHubPage extends StatelessWidget {
         SnackBar(
           content: Text('Klarte ikke å starte innloggingen. Prøv igjen senere.'),
         ),
+      );
+    }
+  }
+
+  Future<void> _confirmDisconnect(
+    BuildContext context,
+    BridgeCatalogController controller,
+    BridgeCatalogEntry entry,
+  ) async {
+    final shouldDisconnect = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('Koble fra ${entry.displayName}?'),
+        content: Text(
+          'Du kan koble til igjen senere. Meldinger slutter å synkroniseres '
+          'til Msgr med en gang.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Avbryt'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Koble fra'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDisconnect != true || !context.mounted) {
+      return;
+    }
+
+    try {
+      await controller.disconnect(entry);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${entry.displayName} er nå koblet fra.')),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Failed to disconnect bridge ${entry.id}: $error\n$stackTrace');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Klarte ikke å koble fra. Prøv igjen.')),
       );
     }
   }
@@ -196,10 +245,17 @@ class _BridgeFilterChips extends StatelessWidget {
 }
 
 class _BridgeCard extends StatelessWidget {
-  const _BridgeCard({required this.entry, this.onTap});
+  const _BridgeCard({
+    required this.entry,
+    this.onConnect,
+    this.onDisconnect,
+    this.isDisconnecting = false,
+  });
 
   final BridgeCatalogEntry entry;
-  final VoidCallback? onTap;
+  final VoidCallback? onConnect;
+  final VoidCallback? onDisconnect;
+  final bool isDisconnecting;
 
   @override
   Widget build(BuildContext context) {
@@ -222,10 +278,17 @@ class _BridgeCard extends StatelessWidget {
       _ => Chip(label: Text(entry.status)),
     };
 
+    final connectedLabel = entry.linkedDisplayName ?? entry.linkedExternalId;
+    final connectedText = entry.isLinked
+        ? (connectedLabel != null
+            ? 'Koblet til som $connectedLabel'
+            : 'Koblet til')
+        : null;
+
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: InkWell(
-        onTap: onTap,
+        onTap: onConnect,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -266,6 +329,24 @@ class _BridgeCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
+              if (connectedText != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Icon(Icons.verified_user, color: colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          connectedText,
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: colorScheme.primary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -288,9 +369,24 @@ class _BridgeCard extends StatelessWidget {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  if (entry.isAvailable)
+                  if (entry.isLinked)
                     FilledButton.icon(
-                      onPressed: onTap,
+                      onPressed:
+                          isDisconnecting ? null : onDisconnect,
+                      icon: isDisconnecting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.link_off),
+                      label: Text(
+                        isDisconnecting ? 'Kobler fra…' : 'Koble fra',
+                      ),
+                    )
+                  else if (entry.isAvailable)
+                    FilledButton.icon(
+                      onPressed: onConnect,
                       icon: const Icon(Icons.link_rounded),
                       label: const Text('Koble til'),
                     )

@@ -11,6 +11,7 @@ class BridgeCatalogEntry {
     required this.description,
     required this.status,
     required this.auth,
+    required this.link,
     required this.capabilities,
     required this.categories,
     required this.prerequisites,
@@ -26,6 +27,7 @@ class BridgeCatalogEntry {
       description: json['description'] as String? ?? '',
       status: json['status'] as String? ?? 'available',
       auth: _normalizeMap(json['auth']),
+      link: _normalizeMap(json['link']),
       capabilities: _normalizeMap(json['capabilities']),
       categories:
           _normalizeStringList(json['categories'] as List<dynamic>? ?? const []),
@@ -42,6 +44,7 @@ class BridgeCatalogEntry {
   final String description;
   final String status;
   final Map<String, dynamic> auth;
+  final Map<String, dynamic> link;
   final Map<String, dynamic> capabilities;
   final List<String> categories;
   final List<String> prerequisites;
@@ -50,9 +53,15 @@ class BridgeCatalogEntry {
 
   bool get isAvailable => status == 'available';
   bool get isComingSoon => status == 'coming_soon';
+  bool get isLinked => auth['status']?.toString() == 'linked' || link['status']?.toString() == 'linked';
 
   String get loginMethod => auth['method']?.toString() ?? '';
   String get authSurface => auth['auth_surface']?.toString() ?? '';
+
+  String? get linkedDisplayName => _stringOrNull(link['display_name']);
+  String? get linkedExternalId => _stringOrNull(link['external_id']);
+  String? get linkedAt => _stringOrNull(link['linked_at']);
+  String? get lastSyncedAt => _stringOrNull(link['last_synced_at']);
 
   Map<String, dynamic>? get formSchema {
     final value = auth['form'];
@@ -81,6 +90,7 @@ class BridgeCatalogEntry {
         other.description == description &&
         other.status == status &&
         const DeepCollectionEquality().equals(other.auth, auth) &&
+        const DeepCollectionEquality().equals(other.link, link) &&
         const DeepCollectionEquality()
             .equals(other.capabilities, capabilities) &&
         const ListEquality<String>().equals(other.categories, categories) &&
@@ -98,6 +108,7 @@ class BridgeCatalogEntry {
         description,
         status,
         const DeepCollectionEquality().hash(auth),
+        const DeepCollectionEquality().hash(link),
         const DeepCollectionEquality().hash(capabilities),
         Object.hashAll(categories),
         Object.hashAll(prerequisites),
@@ -113,6 +124,13 @@ class BridgeCatalogEntry {
       return value.map((key, dynamic val) => MapEntry(key.toString(), val));
     }
     return const <String, dynamic>{};
+  }
+
+  static String? _stringOrNull(dynamic value) {
+    if (value is String && value.isNotEmpty) {
+      return value;
+    }
+    return null;
   }
 
   static List<String> _normalizeStringList(List<dynamic> raw) {
