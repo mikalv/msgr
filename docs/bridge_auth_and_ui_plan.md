@@ -6,6 +6,17 @@
 - Ensure the backend and daemon layers can manage tokens securely while keeping the client experience responsive and transparent.
 - Prepare for future scale challenges where bridge traffic density risks IP bans by enabling optional self-hosted egress paths.
 
+## Implementation Status (October 2024)
+- ✅ **Backend catalog & auth session scaffolding** – `/api/bridges/catalog` and `/api/bridges/:id/sessions` now exist with a
+  static connector catalog, session persistence, and JSON renderers.
+- ⚠️ **OAuth/OIDC relay endpoints** – Browser bootstrap/callback endpoints (`/auth/bridge/:session_id/*`) are not yet
+  implemented; tokens are not exchanged or stored in the credential vault.
+- ⚠️ **Non-OAuth credential hand-off** – Secure queues between the backend and daemons plus credential scrubbing/TTL cleanup
+  remain unimplemented.
+- ⚠️ **Daemon progress events** – Websocket push events, StoneMQ job signalling, and observability hooks are still TODO.
+- ⚠️ **Client UX** – Bridge list, wizard surfaces, websocket listeners, and analytics instrumentation have not started.
+- ⚠️ **Self-hosted/tunnel egress** – Both future IP mitigation options require design/implementation work and documentation.
+
 ## Guiding Principles
 1. **Security First** – Bridge login flows must never expose raw credentials to the Msgr client. Use PKCE/OIDC or delegated token exchange wherever possible and vault all secrets server-side.
 2. **Progressive Disclosure** – Keep the default UI simple (bridge list, statuses, quick actions) while offering an "Advanced" path for power users (custom endpoints, self-hosted daemons).
