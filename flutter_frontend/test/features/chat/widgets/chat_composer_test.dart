@@ -242,6 +242,86 @@ void main() {
     expect(controller.value.mentions, isNotEmpty);
     expect(controller.value.mentions.first.handle, 'ada');
   });
+
+  testWidgets('link dialog wraps selection in markdown link', (tester) async {
+    final controller = ChatComposerController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            onSubmit: (_) {},
+            isSending: false,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+
+    await tester.enterText(find.byType(TextField), 'Les mer');
+    await tester.pump();
+
+    tester.testTextInput.updateEditingValue(
+      const TextEditingValue(
+        text: 'Les mer',
+        selection: TextSelection(baseOffset: 0, extentOffset: 7),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byIcon(Icons.link));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('composerLinkUrlField')),
+      'https://example.com',
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('Sett inn'));
+    await tester.pumpAndSettle();
+
+    expect(
+      controller.value.text,
+      contains('[Les mer](https://example.com)'),
+    );
+  });
+
+  testWidgets('resize handle adjusts composer height', (tester) async {
+    final controller = ChatComposerController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            onSubmit: (_) {},
+            isSending: false,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+
+    final initialField = tester.widget<TextField>(find.byType(TextField));
+    final initialLines = initialField.minLines ?? 0;
+    expect(initialLines, greaterThan(0));
+
+    await tester.drag(
+      find.byKey(const ValueKey('composerResizeHandle')),
+      const Offset(0, -90),
+    );
+    await tester.pump();
+
+    final resizedField = tester.widget<TextField>(find.byType(TextField));
+    expect(resizedField.minLines, greaterThan(initialLines));
+    expect(resizedField.maxLines, equals(resizedField.minLines));
+  });
 }
 
 class _FakeFilePicker extends FilePickerPlatform {

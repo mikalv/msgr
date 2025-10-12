@@ -53,8 +53,10 @@
 * [x] - Innfør focus- og accessibility-tests: skjermleserbaner, tastaturnavigasjon, high-contrast theme og kontrastkrav i designsystemet.
 
 ### Fase C – Funksjonsparitet og opplevelse (uke 4–8)
-- Bygg rik tekst-editor med inline toolbar (bold, italics, lenker, code-blocks) og tastatursnarveier; sørg for rent Markdown/HTML-output og kompatibilitet med `msgr_messages`.
-- Implementer blokkelementer (sitater, lister) og multi-line resizing med drag-handle som følger responsive prinsipper fra [frontend_responsive.md](./frontend_responsive.md).
+* [ ] - Bygg rik tekst-editor med inline toolbar (bold, italics, lenker, code-blocks) og tastatursnarveier; sørg for rent Markdown/HTML-output og kompatibilitet med `msgr_messages`.
+  * [x] - Lenkeformatering med dialog og Markdown-output i composerens verktøylinje.
+* [ ] - Implementer blokkelementer (sitater, lister) og multi-line resizing med drag-handle som følger responsive prinsipper fra [frontend_responsive.md](./frontend_responsive.md).
+  * [x] - Drag-handle for høydejustering av meldingsfeltet med tastaturnavigasjon og semantikk.
 - Utvid slash-kommandoer med søk, kategorier og suggestion API; synkroniser med backend og legg inn permission checks.
 - Legg til @mentions med autocomplete, emoji reaction shortcuts og support for sitering av meldinger.
 - Forhåndsvisning av filer, bilder, video og lenker (inkl. upload progress, cancel, retry). Integrer med eksisterende `ChatMediaAttachment` og valider med widget/e2e-tester.

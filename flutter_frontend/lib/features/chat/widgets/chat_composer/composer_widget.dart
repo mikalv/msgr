@@ -1,6 +1,9 @@
 part of 'package:messngr/features/chat/widgets/chat_composer.dart';
 
-enum _FormattingAction { bold, italic, strike, code, bullet, quote }
+const _linkTextFieldKey = ValueKey('composerLinkTextField');
+const _linkUrlFieldKey = ValueKey('composerLinkUrlField');
+
+enum _FormattingAction { bold, italic, strike, code, link, bullet, quote }
 
 class ChatComposer extends StatefulWidget {
   const ChatComposer({
@@ -37,6 +40,11 @@ class _ChatComposerState extends State<ChatComposer>
   StreamSubscription<ChatVoiceState>? _voiceSubscription;
   final ImagePicker _imagePicker = ImagePicker();
 
+  static const int _defaultLineSpan = 3;
+  static const int _minResizableLines = 1;
+  static const int _maxResizableLines = 12;
+  static const double _lineDragSensitivity = 28;
+
   bool _isDropHover = false;
 
   bool _showEmoji = false;
@@ -45,6 +53,10 @@ class _ChatComposerState extends State<ChatComposer>
   int? _mentionTriggerIndex;
   String _mentionQuery = '';
   List<ComposerMention> _mentionCandidates = const <ComposerMention>[];
+
+  late int _lineSpan;
+  double? _resizeStartDy;
+  int? _resizeStartLines;
 
   List<SlashCommand> get _matchedCommands {
     final text = _textController.text;
@@ -73,6 +85,7 @@ class _ChatComposerState extends State<ChatComposer>
       duration: const Duration(milliseconds: 220),
     );
     _value = widget.controller.value;
+    _lineSpan = _suggestedLineSpanForText(_value.text);
     widget.controller.addListener(_handleControllerChanged);
     _textController.addListener(_handleDraftChanged);
     _voiceSubscription =
@@ -86,6 +99,7 @@ class _ChatComposerState extends State<ChatComposer>
       oldWidget.controller.removeListener(_handleControllerChanged);
       widget.controller.addListener(_handleControllerChanged);
       _value = widget.controller.value;
+      _lineSpan = _suggestedLineSpanForText(_value.text);
       _textController.text = _value.text;
     }
   }
@@ -227,6 +241,8 @@ class _ChatComposerState extends State<ChatComposer>
                               placeholder: isCompact
                                   ? 'Melding'
                                   : 'Del en oppdatering eller skriv / for kommandoer',
+                              minLines: _lineSpan,
+                              maxLines: _lineSpan,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -292,6 +308,13 @@ class _ChatComposerState extends State<ChatComposer>
                                 ),
                                 const SizedBox(width: 8),
                                 _ComposerIconButton(
+                                  icon: Icons.link,
+                                  tooltip: 'Sett inn lenke',
+                                  onTap:
+                                      () => _applyFormatting(_FormattingAction.link),
+                                ),
+                                const SizedBox(width: 8),
+                                _ComposerIconButton(
                                   icon: Icons.format_list_bulleted,
                                   tooltip: 'Punktliste',
                                   onTap: () => _applyFormatting(
@@ -306,6 +329,23 @@ class _ChatComposerState extends State<ChatComposer>
                                 ),
                               ],
                             ),
+                          ),
+                        ),
+                      if (showFormatting)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _ComposerResizeHandle(
+                            key: const ValueKey('composerResizeHandle'),
+                            lineSpan: _lineSpan,
+                            minLines: _minResizableLines,
+                            maxLines: _maxResizableLines,
+                            onVerticalDragStart: _handleResizeStart,
+                            onVerticalDragUpdate: _handleResizeUpdate,
+                            onVerticalDragEnd: _handleResizeEnd,
+                            onVerticalDragCancel: _handleResizeCancel,
+                            onIncrease: _increaseLineSpan,
+                            onDecrease: _decreaseLineSpan,
+                            onReset: _resetLineSpan,
                           ),
                         ),
                       if (_shouldShowMentionPalette)
@@ -359,6 +399,12 @@ class _ChatComposerState extends State<ChatComposer>
     }
     setState(() {
       _value = next;
+      final suggested = _suggestedLineSpanForText(next.text);
+      if (suggested > _lineSpan) {
+        _lineSpan = suggested;
+      } else if (next.text.isEmpty && _lineSpan != _defaultLineSpan) {
+        _lineSpan = _defaultLineSpan;
+      }
     });
   }
 
@@ -468,6 +514,15 @@ class _ChatComposerState extends State<ChatComposer>
         _clearMentionPalette();
       });
     }
+  }
+
+  int _suggestedLineSpanForText(String text) {
+    if (text.isEmpty) {
+      return _defaultLineSpan;
+    }
+    final rawLines = text.split('\n').length;
+    final clamped = rawLines.clamp(_minResizableLines, _maxResizableLines);
+    return clamped is int ? clamped : (clamped as num).toInt();
   }
 
   void _updateMentionState() {
@@ -631,6 +686,66 @@ class _ChatComposerState extends State<ChatComposer>
     _focusNode.requestFocus();
   }
 
+  void _handleResizeStart(DragStartDetails details) {
+    _resizeStartDy = details.globalPosition.dy;
+    _resizeStartLines = _lineSpan;
+    _focusNode.requestFocus();
+  }
+
+  void _handleResizeUpdate(DragUpdateDetails details) {
+    final startDy = _resizeStartDy;
+    final startLines = _resizeStartLines;
+    if (startDy == null || startLines == null) {
+      return;
+    }
+    final delta = startDy - details.globalPosition.dy;
+    final linesDelta = (delta / _lineDragSensitivity).round();
+    final nextLines =
+        (startLines + linesDelta).clamp(_minResizableLines, _maxResizableLines);
+    final int resolved =
+        nextLines is int ? nextLines : (nextLines as num).toInt();
+    if (resolved != _lineSpan) {
+      setState(() => _lineSpan = resolved);
+    }
+  }
+
+  void _handleResizeEnd(DragEndDetails details) {
+    _resetResizeTracking();
+  }
+
+  void _handleResizeCancel() {
+    _resetResizeTracking();
+  }
+
+  void _resetResizeTracking() {
+    _resizeStartDy = null;
+    _resizeStartLines = null;
+  }
+
+  void _increaseLineSpan() {
+    if (_lineSpan >= _maxResizableLines) {
+      return;
+    }
+    setState(() => _lineSpan += 1);
+    _focusNode.requestFocus();
+  }
+
+  void _decreaseLineSpan() {
+    if (_lineSpan <= _minResizableLines) {
+      return;
+    }
+    setState(() => _lineSpan -= 1);
+    _focusNode.requestFocus();
+  }
+
+  void _resetLineSpan() {
+    if (_lineSpan == _defaultLineSpan) {
+      return;
+    }
+    setState(() => _lineSpan = _defaultLineSpan);
+    _focusNode.requestFocus();
+  }
+
   void _applyFormatting(_FormattingAction action) {
     switch (action) {
       case _FormattingAction.bold:
@@ -644,6 +759,9 @@ class _ChatComposerState extends State<ChatComposer>
         break;
       case _FormattingAction.code:
         _applyInlineFormat(prefix: '`', suffix: '`', placeholder: 'kode');
+        break;
+      case _FormattingAction.link:
+        unawaited(_applyLinkFormatting());
         break;
       case _FormattingAction.bullet:
         _applyLinePrefix('- ');
@@ -692,6 +810,166 @@ class _ChatComposerState extends State<ChatComposer>
     }
     widget.controller.setText(_textController.text);
     _focusNode.requestFocus();
+  }
+
+  Future<void> _applyLinkFormatting() async {
+    final selection = _textController.selection;
+    final text = _textController.text;
+    final hasSelection = selection.isValid && !selection.isCollapsed;
+    final selectedText = hasSelection
+        ? text.substring(selection.start, selection.end)
+        : '';
+
+    final dialogResult = await _showLinkDialog(
+      initialLabel: selectedText,
+      initialUrl: hasSelection && _looksLikeUrl(selectedText)
+          ? selectedText
+          : null,
+    );
+    if (!mounted || dialogResult == null) {
+      return;
+    }
+
+    final label = dialogResult.label.isNotEmpty
+        ? dialogResult.label
+        : dialogResult.url;
+    final insertion = '[$label](${dialogResult.url})';
+
+    if (!selection.isValid) {
+      final insertionStart = text.length;
+      final newText = '$text$insertion';
+      _textController
+        ..text = newText
+        ..selection = TextSelection(
+          baseOffset: insertionStart + 1,
+          extentOffset: insertionStart + 1 + label.length,
+        );
+    } else if (selection.isCollapsed) {
+      final start = selection.start;
+      final newText = text.replaceRange(start, start, insertion);
+      _textController
+        ..text = newText
+        ..selection = TextSelection(
+          baseOffset: start + 1,
+          extentOffset: start + 1 + label.length,
+        );
+    } else {
+      final start = selection.start;
+      final end = selection.end;
+      final newText = text.replaceRange(start, end, insertion);
+      _textController
+        ..text = newText
+        ..selection = TextSelection(
+          baseOffset: start + 1,
+          extentOffset: start + 1 + label.length,
+        );
+    }
+    widget.controller.setText(_textController.text);
+    _focusNode.requestFocus();
+  }
+
+  Future<_LinkData?> _showLinkDialog({
+    required String initialLabel,
+    String? initialUrl,
+  }) {
+    final normalizedInitialUrl =
+        initialUrl != null && initialUrl.isNotEmpty ? initialUrl : 'https://';
+    return showDialog<_LinkData>(
+      context: context,
+      builder: (context) {
+        final labelController = TextEditingController(text: initialLabel);
+        final urlController = TextEditingController(text: normalizedInitialUrl);
+        String? errorText;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Sett inn lenke'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    key: _linkTextFieldKey,
+                    controller: labelController,
+                    decoration: const InputDecoration(
+                      labelText: 'Visningstekst',
+                    ),
+                    textInputAction: TextInputAction.next,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    key: _linkUrlFieldKey,
+                    controller: urlController,
+                    decoration: InputDecoration(
+                      labelText: 'URL',
+                      errorText: errorText,
+                    ),
+                    keyboardType: TextInputType.url,
+                    autofocus: initialLabel.isEmpty,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Avbryt'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final rawUrl = urlController.text.trim();
+                    if (rawUrl.isEmpty) {
+                      setState(() => errorText = 'Oppgi en gyldig URL.');
+                      return;
+                    }
+                    final normalized = _normaliseUrl(rawUrl);
+                    if (!_looksLikeUrl(normalized)) {
+                      setState(() => errorText = 'Oppgi en gyldig URL.');
+                      return;
+                    }
+                    Navigator.of(context).pop(
+                      _LinkData(
+                        label: labelController.text.trim(),
+                        url: normalized,
+                      ),
+                    );
+                  },
+                  child: const Text('Sett inn'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  bool _looksLikeUrl(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return false;
+    }
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null) {
+      return false;
+    }
+    if (uri.scheme.isEmpty) {
+      return trimmed.startsWith('www.');
+    }
+    return uri.hasScheme && uri.host.isNotEmpty;
+  }
+
+  String _normaliseUrl(String value) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return trimmed;
+    }
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null) {
+      return trimmed;
+    }
+    if (uri.hasScheme) {
+      return trimmed;
+    }
+    return 'https://$trimmed';
   }
 
   void _applyLinePrefix(String prefix) {
@@ -766,6 +1044,82 @@ class _ChatComposerState extends State<ChatComposer>
     });
     _focusNode.requestFocus();
   }
+}
+
+class _ComposerResizeHandle extends StatelessWidget {
+  const _ComposerResizeHandle({
+    super.key,
+    required this.lineSpan,
+    required this.minLines,
+    required this.maxLines,
+    required this.onVerticalDragStart,
+    required this.onVerticalDragUpdate,
+    required this.onVerticalDragEnd,
+    required this.onVerticalDragCancel,
+    required this.onIncrease,
+    required this.onDecrease,
+    required this.onReset,
+  });
+
+  final int lineSpan;
+  final int minLines;
+  final int maxLines;
+  final GestureDragStartCallback onVerticalDragStart;
+  final GestureDragUpdateCallback onVerticalDragUpdate;
+  final GestureDragEndCallback onVerticalDragEnd;
+  final VoidCallback onVerticalDragCancel;
+  final VoidCallback onIncrease;
+  final VoidCallback onDecrease;
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isAtMin = lineSpan <= minLines;
+    final isAtMax = lineSpan >= maxLines;
+    return Semantics(
+      label: 'Juster høyden på meldingsfeltet',
+      value: '$lineSpan linjer',
+      increasedValue: isAtMax ? null : '${lineSpan + 1} linjer',
+      decreasedValue: isAtMin ? null : '${lineSpan - 1} linjer',
+      onIncrease: isAtMax ? null : onIncrease,
+      onDecrease: isAtMin ? null : onDecrease,
+      child: Tooltip(
+        message: 'Dra for å endre høyde (${lineSpan} linjer)',
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onVerticalDragStart: onVerticalDragStart,
+          onVerticalDragUpdate: onVerticalDragUpdate,
+          onVerticalDragEnd: onVerticalDragEnd,
+          onVerticalDragCancel: onVerticalDragCancel,
+          onDoubleTap: onReset,
+          child: MouseRegion(
+            cursor: SystemMouseCursors.resizeUpDown,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 28),
+              child: Center(
+                child: Icon(
+                  Icons.drag_handle,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.8),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LinkData {
+  const _LinkData({
+    required this.label,
+    required this.url,
+  });
+
+  final String label;
+  final String url;
 }
 
 class _AutosaveStatusLabel extends StatelessWidget {

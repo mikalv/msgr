@@ -18,6 +18,8 @@
 - **Retry**: Ved sendefeil vises banner med "Prøv igjen" som trigger `onSubmit` med eksisterende draft.
 - **Vedlegg**: Drag & drop og filvelger deaktivert mens sending pågår for å unngå state-konflikt.
 - **Voice**: Recorder-knapp følger busy-state; stoppfunksjon alltid tilgjengelig.
+- **Lenker**: Verktøylinjen åpner dialog for visningstekst/URL og legger inn Markdown-lenker med automatisk `https://`-prefiks.
+- **Høydejustering**: Drag-håndtak under feltet endrer synlig linjetall (med tastatursnarveier via skjermleser) for å støtte lange utkast.
 
 ## 4. Tilgjengelighet og fokusrekkefølge
 1. Emoji

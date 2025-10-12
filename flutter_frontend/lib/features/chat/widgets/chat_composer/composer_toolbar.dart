@@ -7,6 +7,8 @@ class _ComposerTextField extends StatelessWidget {
     required this.onSubmitted,
     required this.isSending,
     required this.placeholder,
+    required this.minLines,
+    required this.maxLines,
   });
 
   final TextEditingController controller;
@@ -14,6 +16,8 @@ class _ComposerTextField extends StatelessWidget {
   final ValueChanged<String> onSubmitted;
   final bool isSending;
   final String placeholder;
+  final int minLines;
+  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -23,8 +27,8 @@ class _ComposerTextField extends StatelessWidget {
       focusNode: focusNode,
       textCapitalization: TextCapitalization.sentences,
       textInputAction: TextInputAction.send,
-      minLines: 1,
-      maxLines: 6,
+      minLines: minLines,
+      maxLines: maxLines,
       enabled: !isSending,
       onSubmitted: onSubmitted,
       decoration: InputDecoration(
