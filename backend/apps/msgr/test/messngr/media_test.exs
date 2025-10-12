@@ -67,7 +67,7 @@ defmodule Messngr.MediaTest do
     assert %Upload{status: :consumed, width: 1920, height: 1080, sha256: ^sha} = Repo.get!(Upload, upload.id)
   end
 
-  test "consume_upload rejects invalid checksum", %{profile: profile, conversation: conversation} do
+  test "consume_upload rejects invalid sha digest", %{profile: profile, conversation: conversation} do
     {:ok, upload, _} =
       Media.create_upload(conversation.id, profile.id, %{
         "kind" => "audio",
@@ -83,7 +83,7 @@ defmodule Messngr.MediaTest do
     assert %{sha256: ["must be a valid SHA-256 hex digest"]} = errors_on(changeset)
   end
 
-  test "consume_upload rejects invalid checksum", %{profile: profile, conversation: conversation} do
+  test "consume_upload returns checksum error for malformed checksum field", %{profile: profile, conversation: conversation} do
     {:ok, upload, _instructions} =
       Media.create_upload(conversation.id, profile.id, %{
         "kind" => "audio",

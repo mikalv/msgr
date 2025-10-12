@@ -125,14 +125,41 @@ defmodule Messngr.Logging.OpenObserveBackend do
   end
 
   defp load_options(name) when is_atom(name) do
-    base = Application.get_env(:logger, __MODULE__, [])
-    overrides = Application.get_env(:logger, {__MODULE__, name}, [])
-    Keyword.merge(base, overrides)
+    base_config = Application.get_env(:messngr_logging, __MODULE__, [])
+    logger_base = Application.get_env(:logger, __MODULE__, [])
+
+    global_opts =
+      base_config
+      |> Keyword.get(:default, [])
+      |> Keyword.merge(logger_base)
+
+    handler_opts =
+      base_config
+      |> Keyword.get(name, [])
+      |> Keyword.merge(logger_handler_opts(name))
+
+    Keyword.merge(global_opts, handler_opts)
   end
 
   defp load_options(opts) when is_list(opts) do
-    base = Application.get_env(:logger, __MODULE__, [])
-    Keyword.merge(base, opts)
+    base_config = Application.get_env(:messngr_logging, __MODULE__, [])
+    logger_base = Application.get_env(:logger, __MODULE__, [])
+
+    global_opts =
+      base_config
+      |> Keyword.get(:default, [])
+      |> Keyword.merge(logger_base)
+
+    Keyword.merge(global_opts, opts)
+  end
+
+  defp logger_handler_opts(name) do
+    :logger
+    |> Application.get_all_env()
+    |> Enum.find_value([], fn
+      {{__MODULE__, ^name}, opts} -> opts
+      _ -> nil
+    end)
   end
 
   defp ensure_clients_started do
@@ -181,10 +208,18 @@ defmodule Messngr.Logging.OpenObserveBackend do
 
   defp inspect_metadata(%{__struct__: _} = value), do: inspect(value)
 
+  defp inspect_metadata(value) when is_pid(value) or is_reference(value) or is_function(value) or is_port(value),
+    do: inspect(value)
+
   defp inspect_metadata(value) when is_tuple(value) or is_map(value) or is_list(value),
     do: inspect(value)
 
-  defp inspect_metadata(value), do: value
+  defp inspect_metadata(value) when is_integer(value) or is_float(value) or is_boolean(value),
+    do: value
+
+  defp inspect_metadata(value) when is_binary(value), do: value
+
+  defp inspect_metadata(value), do: inspect(value)
 
   defp format_timestamp({{year, month, day}, {hour, minute, second, micro}}) do
     NaiveDateTime.new!(year, month, day, hour, minute, second, micro)
@@ -196,10 +231,10 @@ defmodule Messngr.Logging.OpenObserveBackend do
     payload = Jason.encode!([entry])
 
     headers =
-      [{'content-type', 'application/json'}]
+      [{~c"content-type", ~c"application/json"}]
       |> maybe_add_auth(state.auth_header)
 
-    request = {String.to_charlist(state.url), headers, 'application/json', payload}
+    request = {String.to_charlist(state.url), headers, ~c"application/json", payload}
 
     case state.http_client.(:post, request, [], []) do
       {:ok, _response} -> :ok
@@ -218,7 +253,7 @@ defmodule Messngr.Logging.OpenObserveBackend do
   defp maybe_add_auth(headers, nil), do: headers
 
   defp maybe_add_auth(headers, auth) do
-    [{'authorization', String.to_charlist(auth)} | headers]
+    [{~c"authorization", String.to_charlist(auth)} | headers]
   end
 
   defp maybe_put_metadata(entry, metadata) when metadata == %{}, do: entry

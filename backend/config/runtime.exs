@@ -5,22 +5,37 @@ if System.get_env("PHX_SERVER") do
   config :msgr_web, MessngrWeb.Endpoint, server: true
 end
 
+env = config_env()
+
+default_db =
+  case env do
+    :prod -> "msgr_prod"
+    _ -> "msgr_dev"
+  end
+
 config :msgr, Messngr.Repo,
-  username: System.fetch_env!("POSTGRES_USERNAME"),
-  password: System.fetch_env!("POSTGRES_PASSWORD"),
+  username: System.get_env("POSTGRES_USERNAME", "postgres"),
+  password: System.get_env("POSTGRES_PASSWORD", "postgres"),
   hostname: System.get_env("POSTGRES_HOST", "localhost"),
-  database: System.get_env("POSTGRES_DB", "msgr_prod"),
+  database: System.get_env("POSTGRES_DB", default_db),
   port: String.to_integer(System.get_env("POSTGRES_PORT", "5432")),
   ssl: String.downcase(System.get_env("POSTGRES_SSL", "false")) == "true"
 
 secret_key =
-  System.get_env("SECRET_KEY_BASE") ||
-    raise "SECRET_KEY_BASE environment variable is missing."
+  case System.get_env("SECRET_KEY_BASE") do
+    nil when env in [:dev, :test] ->
+      Base.encode16(:crypto.strong_rand_bytes(32))
+
+    nil ->
+      raise "SECRET_KEY_BASE environment variable is missing."
+
+    value ->
+      value
+  end
 
 config :msgr_web, MessngrWeb.Endpoint,
   http: [
-    port: String.to_integer(System.get_env("PORT", "4000")),
-    transport_options: [socket_opts: [:inet6]]
+    port: String.to_integer(System.get_env("PORT", "4000"))
   ],
   secret_key_base: secret_key,
   url: [
@@ -97,8 +112,10 @@ if noise_enabled do
 
       {{:error, :no_default_key}, :dev} ->
         Logger.warning("Noise static key default missing in dev; generating ephemeral key")
-        keypair = :enoise_keypair.new(:dh25519)
-        elem(keypair, 2)
+        case :crypto.generate_key(:ecdh, :x25519) do
+          {private, _public} -> private
+          {:ok, {private, _public}} -> private
+        end
 
       {{:error, reason}, env} when env in [:prod, :staging] ->
         raise "Noise static key could not be loaded: #{inspect(reason)}"

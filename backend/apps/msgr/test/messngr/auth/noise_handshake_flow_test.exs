@@ -7,6 +7,10 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
   alias Messngr.Transport.Noise.{Session, TestHelpers}
 
   setup do
+    unless enacl_available?() do
+      skip("enacl NIF not available; skipping Noise handshake flow tests")
+    end
+
     original_flag = FeatureFlags.require_noise_handshake?()
     FeatureFlags.put(:noise_handshake_required, true)
 
@@ -90,7 +94,7 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
     end
 
     test "accepts handshake after session rekey" do
-      %{session: session, signature: signature, device_key: device_key} = establish_handshake()
+      %{session: session, signature: _signature, device_key: device_key} = establish_handshake()
 
       {:ok, rekeyed} = Session.rekey(session, :both)
       {:ok, rekeyed} = Handshake.persist(rekeyed)
@@ -127,5 +131,11 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
       signature: Handshake.encoded_signature(session),
       device_key: Handshake.device_key(session)
     }
+  end
+
+  defp enacl_available? do
+    function_exported?(:enacl_nif, :crypto_generichash, 3)
+  rescue
+    _ -> false
   end
 end

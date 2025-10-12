@@ -56,12 +56,12 @@ defmodule Messngr.Calls.CallSession do
 
       :error ->
         with :ok <- ensure_capacity(session) do
-          participant =
+          participant_opts =
             opts
-            |> Keyword.put(:profile_id, profile_id)
             |> Keyword.put_new(:role, :participant)
             |> Keyword.put_new(:status, :connecting)
-            |> Participant.new()
+
+          participant = Participant.new(profile_id, participant_opts)
 
           {:ok, put_in(session.participants[profile_id], participant), participant}
         end

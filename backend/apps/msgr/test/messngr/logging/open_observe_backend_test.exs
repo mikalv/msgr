@@ -27,6 +27,7 @@ defmodule Messngr.Logging.OpenObserveBackendTest do
       dataset: "_json",
       username: "user@example.com",
       password: "secret",
+      enabled: true,
       metadata: [:module],
       http_client: fn method, request, http_opts, opts ->
         send(self(), {:http_request, method, request, http_opts, opts})
@@ -58,7 +59,7 @@ defmodule Messngr.Logging.OpenObserveBackendTest do
 
     assert entry["message"] == "hello"
     assert entry["service"] == state.service
-    assert entry["metadata"]["module"] =~ "OpenObserveBackendTest"
+    assert to_string(entry["metadata"]["module"]) =~ "OpenObserveBackendTest"
   end
 
   test "respects minimum level" do

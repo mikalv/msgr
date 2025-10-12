@@ -4,7 +4,9 @@ defmodule EdgeRouter.MainProxy do
   @main_domain ".msgr.no"
 
   def main_domain() do
-    "." <> System.get_env("PHX_HOST") || @main_domain
+    System.get_env("PHX_HOST")
+    |> coalesce_main_domain()
+    |> ensure_leading_dot()
   end
 
   @impl MainProxy.Proxy
@@ -40,5 +42,10 @@ defmodule EdgeRouter.MainProxy do
     ]
   end
 
+  defp coalesce_main_domain(nil), do: @main_domain
+  defp coalesce_main_domain(""), do: @main_domain
+  defp coalesce_main_domain(host), do: host
 
+  defp ensure_leading_dot("." <> _ = host), do: host
+  defp ensure_leading_dot(host), do: "." <> host
 end

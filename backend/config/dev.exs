@@ -53,13 +53,42 @@ config :msgr_web, MessngrWeb.Endpoint,
 config :msgr_web, dev_routes: true
 config :msgr_web, :expose_otp_codes, true
 
+shared_repo_dev_config = [
+  username: System.get_env("POSTGRES_USERNAME", "postgres"),
+  password: System.get_env("POSTGRES_PASSWORD", "postgres"),
+  hostname: System.get_env("POSTGRES_HOST", "localhost"),
+  database: System.get_env("POSTGRES_DB", "msgr_dev"),
+  pool_size: String.to_integer(System.get_env("POSTGRES_POOL_SIZE", "10"))
+]
+
+config :auth_provider, AuthProvider.Repo, shared_repo_dev_config
+config :teams, Teams.Repo, shared_repo_dev_config
+
 config :logger, :console, format: "[$level] $message\n"
 
 config :logger,
   backends: [:console, {Messngr.Logging.OpenObserveBackend, :openobserve_dev}]
 
-config :logger, {Messngr.Logging.OpenObserveBackend, :openobserve_dev},
-  enabled: System.get_env("OPENOBSERVE_ENABLED", "true") == "true",
+openobserve_transport =
+  case String.downcase(System.get_env("OPENOBSERVE_TRANSPORT", "http")) do
+    "stonemq" -> :stonemq
+    _ -> :http
+  end
+
+openobserve_queue_module =
+  System.get_env("OPENOBSERVE_QUEUE_MODULE")
+  |> case do
+    nil -> nil
+    "" -> nil
+    module ->
+      module
+      |> String.split(".")
+      |> Enum.map(&String.to_atom/1)
+      |> Module.concat()
+  end
+
+openobserve_opts = [
+  enabled: System.get_env("OPENOBSERVE_ENABLED", "false") == "true",
   endpoint: System.get_env("OPENOBSERVE_ENDPOINT", "http://openobserve:5080"),
   org: System.get_env("OPENOBSERVE_ORG", "default"),
   stream: System.get_env("OPENOBSERVE_STREAM", "backend"),
@@ -69,23 +98,14 @@ config :logger, {Messngr.Logging.OpenObserveBackend, :openobserve_dev},
   metadata: [:application, :module, :function, :line, :request_id, :pid],
   level: :debug,
   service: System.get_env("OPENOBSERVE_SERVICE", "msgr_backend_dev"),
-  transport:
-    case String.downcase(System.get_env("OPENOBSERVE_TRANSPORT", "http")) do
-      "stonemq" -> :stonemq
-      _ -> :http
-    end,
+  transport: openobserve_transport,
   queue_topic: System.get_env("OPENOBSERVE_QUEUE_TOPIC", "observability/logs"),
-  queue_module:
-    System.get_env("OPENOBSERVE_QUEUE_MODULE")
-    |> case do
-      nil -> nil
-      "" -> nil
-      module ->
-        module
-        |> String.split(".")
-        |> Enum.map(&String.to_atom/1)
-        |> Module.concat()
-    end
+  queue_module: openobserve_queue_module
+]
+
+config :messngr_logging, Messngr.Logging.OpenObserveBackend,
+  default: [],
+  openobserve_dev: openobserve_opts
 
 config :msgr_web, :prometheus,
   enabled: true,

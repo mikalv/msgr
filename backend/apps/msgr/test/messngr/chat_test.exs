@@ -406,6 +406,7 @@ defmodule Messngr.ChatTest do
     assert unwatch_payload.count == 1
     refute Enum.any?(unwatch_payload.watchers, &(&1.id == profile_a.id))
   end
+
   test "watchers expire after ttl", %{profile_a: profile_a, profile_b: profile_b} do
     {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
 

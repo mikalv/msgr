@@ -21,6 +21,8 @@ config :msgr_web, :expose_otp_codes, true
 
 config :phoenix, :plug_init_mode, :runtime
 
+config :msgr, :noise_session_registry, enabled: false
+
 shared_repo_config =
   [
     username: System.get_env("POSTGRES_USERNAME", "postgres"),

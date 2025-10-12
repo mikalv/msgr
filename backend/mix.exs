@@ -62,6 +62,7 @@ defmodule Messngr.Umbrella.MixProject do
     [
       setup: [
         "deps.get",
+        "cmd --app auth_provider mix setup",
         "cmd --app msgr mix setup",
         "cmd --app msgr_web mix setup"
       ]

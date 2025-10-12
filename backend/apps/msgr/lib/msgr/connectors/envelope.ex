@@ -78,8 +78,18 @@ defmodule Msgr.Connectors.Envelope do
     normalised_map =
       map
       |> Enum.map(fn
-        {key, value} when is_atom(key) -> {key, value}
-        {key, value} when is_binary(key) -> {String.to_existing_atom(key) rescue key, value}
+        {key, value} when is_atom(key) ->
+          {key, value}
+
+        {key, value} when is_binary(key) ->
+          atom =
+            try do
+              String.to_existing_atom(key)
+            rescue
+              ArgumentError -> key
+            end
+
+          {atom, value}
       end)
       |> Map.new()
 

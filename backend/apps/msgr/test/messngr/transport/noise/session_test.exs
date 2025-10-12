@@ -4,6 +4,20 @@ defmodule Messngr.Transport.Noise.SessionTest do
   alias Messngr.Transport.Noise.Session
   alias Messngr.Transport.Noise.TestHelpers
 
+  setup do
+    unless enacl_available?() do
+      skip("enacl NIF not available; skipping Noise session tests")
+    end
+
+    :ok
+  end
+
+  defp enacl_available? do
+    function_exported?(:enacl_nif, :crypto_generichash, 3)
+  rescue
+    _ -> false
+  end
+
   describe "new_device/1" do
     test "completes NX handshake and exchanges ciphertext" do
       session = TestHelpers.build_session(:new)
@@ -26,8 +40,7 @@ defmodule Messngr.Transport.Noise.SessionTest do
       session = session_after_decrypt
       assert reply_plain == "reply"
 
-      {:ok, ciphertext, session_after_second} = Session.encrypt(session, "second")
-      session = session_after_second
+      {:ok, ciphertext, _session_after_second} = Session.encrypt(session, "second")
       {:ok, roundtrip, _client_split} = TestHelpers.decrypt_client(client_split, ciphertext)
       assert roundtrip == "second"
     end
@@ -95,8 +108,7 @@ defmodule Messngr.Transport.Noise.SessionTest do
       session = session_after_rekey
       client_split = TestHelpers.rekey_client(client_split, :both)
 
-      {:ok, ciphertext, session_after_second} = Session.encrypt(session, "second-rekey")
-      session = session_after_second
+      {:ok, ciphertext, _session_after_second} = Session.encrypt(session, "second-rekey")
       {:ok, plaintext, _client_split} = TestHelpers.decrypt_client(client_split, ciphertext)
       assert plaintext == "second-rekey"
     end
