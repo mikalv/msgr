@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Awaitable, Callable, Dict, Mapping, Optional
+import copy
+import inspect
+from typing import Awaitable, Callable, Dict, Mapping, Optional, Sequence
 
 from msgr_bridge_sdk import Envelope, StoneMQClient, build_envelope
 
@@ -13,6 +15,19 @@ from .client import (
     decode_session_blob,
 )
 from .session import SessionManager
+
+_DEFAULT_CAPABILITIES: Mapping[str, object] = {
+    "messaging": {
+        "text": True,
+        "replies": True,
+        "edits": True,
+        "deletes": True,
+        "entities": True,
+        "media_types": ["photo", "video", "audio", "voice", "file", "sticker"],
+    },
+    "presence": {"typing": True, "read_receipts": True},
+    "threads": {"supported": False},
+}
 
 
 class TelegramBridgeDaemon:
@@ -55,15 +70,7 @@ class TelegramBridgeDaemon:
 
         if await client.is_authorized():
             profile = await client.get_me()
-            await self._register_update_handler(user_id, client)
-            session_b64 = await self._sessions.export_session(user_id)
-            response: Dict[str, object] = {
-                "status": "linked",
-                "user": profile.to_dict(),
-            }
-            if session_b64 is not None:
-                response["session"] = {"blob": session_b64}
-            return response
+            return await self._build_linked_response(user_id, client, profile)
 
         phone_number = payload.get("phone_number")
         if not isinstance(phone_number, str) or not phone_number:
@@ -99,15 +106,7 @@ class TelegramBridgeDaemon:
                 "reason": str(exc),
             }
 
-        await self._register_update_handler(user_id, client)
-        session_b64 = await self._sessions.export_session(user_id)
-        response = {
-            "status": "linked",
-            "user": profile.to_dict(),
-        }
-        if session_b64 is not None:
-            response["session"] = {"blob": session_b64}
-        return response
+        return await self._build_linked_response(user_id, client, profile)
 
     async def _handle_outbound_message(self, envelope: Envelope) -> None:
         payload = envelope.payload
@@ -221,3 +220,66 @@ class TelegramBridgeDaemon:
     @property
     def acked_updates(self) -> Dict[int, Mapping[str, object]]:
         return dict(self._ack_state)
+
+    async def _build_linked_response(
+        self, user_id: str, client: TelegramClientProtocol, profile
+    ) -> Mapping[str, object]:
+        await self._register_update_handler(user_id, client)
+        session_b64 = await self._sessions.export_session(user_id)
+        contacts = await _collect_sequence(client, "list_contacts")
+        chats = await _collect_sequence(client, "list_dialogs")
+        capabilities = await _resolve_capabilities(client)
+
+        response: Dict[str, object] = {
+            "status": "linked",
+            "user": profile.to_dict(),
+            "capabilities": capabilities,
+            "contacts": contacts,
+            "chats": chats,
+        }
+        if session_b64 is not None:
+            response["session"] = {"blob": session_b64}
+        return response
+
+
+async def _resolve_capabilities(client: TelegramClientProtocol) -> Dict[str, object]:
+    descriptor = getattr(client, "describe_capabilities", None)
+    if descriptor is None:
+        return copy.deepcopy(dict(_DEFAULT_CAPABILITIES))
+
+    value = descriptor()
+    if inspect.isawaitable(value):
+        value = await value
+
+    if isinstance(value, Mapping):
+        return _stringify_keys(value)
+
+    return copy.deepcopy(dict(_DEFAULT_CAPABILITIES))
+
+
+async def _collect_sequence(
+    client: TelegramClientProtocol, method_name: str
+) -> list[Dict[str, object]]:
+    method = getattr(client, method_name, None)
+    if method is None:
+        return []
+
+    result = method()
+    if inspect.isawaitable(result):
+        result = await result
+
+    if not isinstance(result, Sequence):
+        return []
+
+    collection: list[Dict[str, object]] = []
+    for item in result:
+        if isinstance(item, Mapping):
+            collection.append(_stringify_keys(item))
+    return collection
+
+
+def _stringify_keys(data: Mapping[str, object]) -> Dict[str, object]:
+    return {
+        (key if isinstance(key, str) else str(key)): value
+        for key, value in data.items()
+    }

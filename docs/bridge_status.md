@@ -3,6 +3,17 @@
 This document summarises what exists in the repository for each chat bridge and what remains
 before we can run them against the real networks.
 
+## Bridge Data Store
+- **Code status**: A new `Messngr.Bridges` context persists bridge identities, reported capabilities,
+  contact rosters, and channel/group memberships in PostgreSQL via the `bridge_accounts`,
+  `bridge_contacts`, and `bridge_channels` tables. Telegram and Signal connectors synchronise
+  their daemon responses into this store so the core backend understands what features are
+  available per account.
+- **Missing work**: Wire the store into Matrix/IRC/XMPP once their daemons land, add retention and
+  reconciliation jobs, and expose capability summaries to the product surface.
+- **Operational blockers**: Schema migrations must be applied before linking accounts; operators
+  should provision adequate disk space for per-user contact/channel snapshots.
+
 ## Matrix & IRC
 - **Code status**: Only planning material exists in `docs/matrix_irc_bridge_blueprint.md`; there are
   no daemon packages or protocol adapters in `bridge_sdks`. The queue helpers in the Go SDK are the
@@ -22,9 +33,9 @@ before we can run them against the real networks.
 ## Telegram
 - **Code status**: The MTProto daemon in `bridge_sdks/python/msgr_telegram_bridge` now records
   message identifiers, issues Telethon read acknowledgements when the backend publishes
-  `ack_update`, supports outbound edits/deletions, and normalises inbound updates with reply
-  metadata, entities, and media descriptors. Login, session persistence, outbound messaging, and
-  inbound update forwarding are implemented.
+  `ack_update`, supports outbound edits/deletions, normalises inbound updates, and advertises
+  capabilities plus contact/channel snapshots during the link handshake. Login, session
+  persistence, outbound messaging, and inbound update forwarding are implemented.
 - **Missing work**: Flesh out rich media uploads (videos/documents), test acknowledgements against
   channels/supergroups, and exercise the Telethon adapter with live integration tests plus runtime
   configuration management.
@@ -41,11 +52,11 @@ before we can run them against the real networks.
 - **Operational blockers**: Without a real client implementation the daemon cannot pair or send any
   WhatsApp traffic.
 
-## Signal
 - **Code status**: The bridge now ships with a REST client that targets `signal-cli-rest-api`,
   handling account linking, outbound messaging with attachment uploads, inbound polling, and
-  acknowledgement cleanup while persisting session hints to disk. The daemon wiring from previous
-  work remains and now has a concrete client implementation.
+  acknowledgement cleanup while persisting session hints to disk. The daemon also reports
+  capabilities and cached contacts/conversation identifiers so the backend can populate the
+  Postgres bridge store.
 - **Missing work**: Harden the REST client with streaming uploads for large media, error
   retry/backoff, device slot management, and end-to-end integration tests against a running
   `signal-cli` deployment.

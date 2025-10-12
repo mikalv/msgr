@@ -1,6 +1,14 @@
 # Changelog
 
 ## Unreleased
+- Added a Postgres-backed `Messngr.Bridges` context with new `bridge_accounts`,
+  `bridge_contacts`, and `bridge_channels` tables so bridge daemons can persist
+  capabilities, session material, contact rosters, and channel memberships per
+  account.
+- Extended the Telegram and Signal bridge daemons to advertise capability maps
+  and roster/channel snapshots during the link handshake and wired the Elixir
+  connectors to sync those payloads into the new bridge data store with unit
+  coverage.
 - Extended the Telegram bridge daemon with outbound edit/delete handlers and richer inbound
   normalisation so replies, entities, and media descriptors flow through to Msgr alongside
   acknowledgements.

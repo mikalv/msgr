@@ -141,6 +141,15 @@ class TelegramClientProtocol(Protocol):
     async def send_read_acknowledge(self, peer: object, *, max_id: int) -> None:
         ...
 
+    async def describe_capabilities(self) -> Mapping[str, object]:
+        ...
+
+    async def list_contacts(self) -> Sequence[Mapping[str, object]]:
+        ...
+
+    async def list_dialogs(self) -> Sequence[Mapping[str, object]]:
+        ...
+
 
 class TelethonClientFactory:
     """Factory producing Telethon-backed client instances."""
@@ -297,6 +306,26 @@ class _TelethonClient(TelegramClientProtocol):  # pragma: no cover - requires te
 
     async def send_read_acknowledge(self, peer: object, *, max_id: int) -> None:
         await self._client.send_read_acknowledge(peer, max_id=max_id)
+
+    async def describe_capabilities(self) -> Mapping[str, object]:
+        return {
+            "messaging": {
+                "text": True,
+                "replies": True,
+                "edits": True,
+                "deletes": True,
+                "entities": True,
+                "media_types": ["photo", "video", "audio", "voice", "file", "sticker"],
+            },
+            "presence": {"typing": True, "read_receipts": True},
+            "threads": {"supported": False},
+        }
+
+    async def list_contacts(self) -> Sequence[Mapping[str, object]]:
+        return []
+
+    async def list_dialogs(self) -> Sequence[Mapping[str, object]]:
+        return []
 
 
 def _normalise_user(user) -> UserProfile:

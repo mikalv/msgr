@@ -10,7 +10,7 @@ import os
 from io import BytesIO
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, Mapping, MutableMapping, Optional, Protocol
+from typing import Awaitable, Callable, Dict, Mapping, MutableMapping, Optional, Protocol, Sequence
 from urllib import error as urlerror
 from urllib import parse as urlparse
 from urllib import request as urlrequest
@@ -92,6 +92,15 @@ class SignalClientProtocol(Protocol):
         ...
 
     async def acknowledge_event(self, event_id: str) -> None:
+        ...
+
+    async def list_contacts(self) -> Sequence[Mapping[str, object]]:
+        ...
+
+    async def list_conversations(self) -> Sequence[Mapping[str, object]]:
+        ...
+
+    async def describe_capabilities(self) -> Mapping[str, object]:
         ...
 
 
@@ -418,6 +427,28 @@ class SignalRestClient(SignalClientProtocol):
         await self._transport.request(
             "DELETE", f"/v1/receive/{self._account}/{event_id}"
         )
+
+    async def list_contacts(self) -> Sequence[Mapping[str, object]]:
+        contacts = self._session_cache.get("contacts")
+        if isinstance(contacts, Sequence):
+            return [dict(entry) for entry in contacts if isinstance(entry, Mapping)]
+        return []
+
+    async def list_conversations(self) -> Sequence[Mapping[str, object]]:
+        conversations = self._session_cache.get("conversations")
+        if isinstance(conversations, Sequence):
+            return [dict(entry) for entry in conversations if isinstance(entry, Mapping)]
+        return []
+
+    async def describe_capabilities(self) -> Mapping[str, object]:
+        return {
+            "messaging": {
+                "text": True,
+                "attachments": ["image", "video", "audio", "file"],
+                "reactions": True,
+            },
+            "presence": {"typing": True, "read_receipts": True},
+        }
 
     async def _poll_updates(self) -> None:
         try:

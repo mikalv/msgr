@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -52,6 +53,12 @@ class FakeTelegramClient:
         self.acked: list[int] = []
         self.pending_ack: Dict[int, Dict[str, object]] = {}
         self.read_receipts: list[tuple[object, int]] = []
+        self.capabilities: Mapping[str, object] = {
+            "messaging": {"text": True, "media_types": ["image", "video"]},
+            "presence": {"typing": True},
+        }
+        self.contacts_snapshot: list[Mapping[str, object]] = []
+        self.dialogs_snapshot: list[Mapping[str, object]] = []
 
     async def connect(self) -> None:
         self.connected = True
@@ -148,6 +155,15 @@ class FakeTelegramClient:
 
     async def send_read_acknowledge(self, peer: object, *, max_id: int) -> None:
         self.read_receipts.append((peer, max_id))
+
+    async def describe_capabilities(self) -> Mapping[str, object]:
+        return copy.deepcopy(self.capabilities)
+
+    async def list_contacts(self) -> Sequence[Mapping[str, object]]:
+        return list(self.contacts_snapshot)
+
+    async def list_dialogs(self) -> Sequence[Mapping[str, object]]:
+        return list(self.dialogs_snapshot)
 
     async def dispatch_update(self, update) -> None:
         peer_obj = None
@@ -250,6 +266,12 @@ def _run(async_fn: Callable[[], Awaitable[None]]) -> None:
 
 def test_link_account_with_existing_session(tmp_path: Path) -> None:
     client = FakeTelegramClient()
+    client.contacts_snapshot = [
+        {"id": "200", "username": "bob", "first_name": "Bob", "last_name": "Builder"}
+    ]
+    client.dialogs_snapshot = [
+        {"id": 99, "name": "Team Chat", "type": "supergroup"}
+    ]
     daemon, transport, _, _ = _build_daemon(tmp_path, client)
 
     async def scenario() -> None:
@@ -262,6 +284,9 @@ def test_link_account_with_existing_session(tmp_path: Path) -> None:
         assert response["status"] == "linked"
         assert response["user"]["username"] == "alice"
         assert "session" in response
+        assert response["capabilities"]["messaging"]["text"]
+        assert response["contacts"][0]["id"] == "200"
+        assert response["chats"][0]["id"] == 99
 
         await client.dispatch_update(
             {

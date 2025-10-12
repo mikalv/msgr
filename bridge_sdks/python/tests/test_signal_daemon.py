@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, Mapping, Optional
+from typing import Awaitable, Callable, Dict, Mapping, Optional, Sequence
 
 from msgr_bridge_sdk import StoneMQClient, build_envelope
 from msgr_signal_bridge import (
@@ -49,6 +49,12 @@ class FakeSignalClient:
         self.handlers: list[Callable[[Mapping[str, object]], Awaitable[None]]] = []
         self.linking_requests: list[Optional[str]] = []
         self.acked: list[str] = []
+        self.capabilities: Mapping[str, object] = {
+            "messaging": {"text": True, "attachments": ["image"]},
+            "presence": {"typing": True},
+        }
+        self.contacts_snapshot: list[Mapping[str, object]] = []
+        self.conversations_snapshot: list[Mapping[str, object]] = []
 
     async def connect(self) -> None:
         self.connected = True
@@ -102,6 +108,15 @@ class FakeSignalClient:
         for handler in list(self.handlers):
             await handler(event)
 
+    async def list_contacts(self) -> Sequence[Mapping[str, object]]:
+        return list(self.contacts_snapshot)
+
+    async def list_conversations(self) -> Sequence[Mapping[str, object]]:
+        return list(self.conversations_snapshot)
+
+    async def describe_capabilities(self) -> Mapping[str, object]:
+        return self.capabilities
+
 
 class FakeClientFactory:
     def __init__(self) -> None:
@@ -140,6 +155,12 @@ def _run(async_fn: Callable[[], Awaitable[None]]) -> None:
 
 def test_link_account_with_existing_session(tmp_path: Path) -> None:
     client = FakeSignalClient()
+    client.contacts_snapshot = [{"uuid": "uuid-200", "name": "Bob"}]
+    client.conversations_snapshot = [{"id": "chat-1", "type": "group", "title": "Friends"}]
+    client.capabilities = {
+        "messaging": {"text": True, "attachments": ["image", "video"]},
+        "presence": {"typing": True},
+    }
     daemon, transport, _, _ = _build_daemon(tmp_path, client)
 
     async def scenario() -> None:
@@ -158,6 +179,9 @@ def test_link_account_with_existing_session(tmp_path: Path) -> None:
 
         assert response["status"] == "linked"
         assert response["user"]["uuid"] == "uuid-123"
+        assert response["capabilities"]["messaging"]["attachments"] == ["image", "video"]
+        assert response["contacts"][0]["uuid"] == "uuid-200"
+        assert response["conversations"][0]["id"] == "chat-1"
 
         await client.dispatch_event({"event_id": "evt-1", "chat_id": "6789", "message": "hei"})
         update_topic = "bridge/signal/inbound_event"
