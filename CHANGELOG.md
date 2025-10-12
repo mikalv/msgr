@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Added bridge contact profiles, match-key storage, and profile links so Msgr
+  can aggregate the same person across bridge rosters and native Msgr contacts;
+  includes new Postgres tables, context helpers, and regression tests for the
+  matching workflow.
 - Added a Postgres-backed `Messngr.Bridges` context with new `bridge_accounts`,
   `bridge_contacts`, and `bridge_channels` tables so bridge daemons can persist
   capabilities, session material, contact rosters, and channel memberships per

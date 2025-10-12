@@ -7,7 +7,7 @@ defmodule Messngr.Bridges.Contact do
 
   import Ecto.Changeset
 
-  alias Messngr.Bridges.BridgeAccount
+  alias Messngr.Bridges.{BridgeAccount, ContactProfile}
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -19,6 +19,7 @@ defmodule Messngr.Bridges.Contact do
     field :metadata, :map, default: %{}
 
     belongs_to :bridge_account, BridgeAccount
+    belongs_to :profile, ContactProfile
 
     timestamps(type: :utc_datetime)
   end
@@ -26,8 +27,8 @@ defmodule Messngr.Bridges.Contact do
   @doc false
   def changeset(contact, attrs) do
     contact
-    |> cast(attrs, [:bridge_account_id, :external_id, :display_name, :handle, :metadata])
-    |> validate_required([:bridge_account_id, :external_id])
+    |> cast(attrs, [:bridge_account_id, :profile_id, :external_id, :display_name, :handle, :metadata])
+    |> validate_required([:bridge_account_id, :profile_id, :external_id])
     |> validate_change(:metadata, &ensure_map/2)
   end
 
