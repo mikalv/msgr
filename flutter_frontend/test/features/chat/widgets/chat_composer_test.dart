@@ -36,6 +36,7 @@ void main() {
     expect(submitted, isNotNull);
     expect(submitted!.text, 'Hei der');
     expect(submitted!.attachments, isEmpty);
+    expect(submitted!.mentions, isEmpty);
   });
 
   testWidgets('emoji picker inserts emoji at caret', (tester) async {
@@ -93,6 +94,7 @@ void main() {
     expect(submitted, isNotNull);
     expect(submitted!.command, isNotNull);
     expect(submitted!.command!.name, '/giphy');
+    expect(submitted!.mentions, isEmpty);
   });
 
   testWidgets('file attachments are displayed and removable', (tester) async {
@@ -156,6 +158,58 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(controller.value.voiceNote, isNotNull);
+  });
+
+  testWidgets('formatting toolbar inserts markdown markers', (tester) async {
+    final controller = ChatComposerController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            onSubmit: (_) {},
+            isSending: false,
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(TextField));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.format_bold));
+    await tester.pumpAndSettle();
+
+    expect(controller.value.text, contains('**tekst**'));
+  });
+
+  testWidgets('mentions palette inserts selected mention', (tester) async {
+    final controller = ChatComposerController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ChatComposer(
+            controller: controller,
+            onSubmit: (_) {},
+            isSending: false,
+          ),
+        ),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField), '@a');
+    await tester.pumpAndSettle();
+
+    expect(find.text('@ada'), findsOneWidget);
+
+    await tester.tap(find.text('@ada'));
+    await tester.pumpAndSettle();
+
+    expect(controller.value.text, contains('@ada '));
+    expect(controller.value.mentions, isNotEmpty);
+    expect(controller.value.mentions.first.handle, 'ada');
   });
 }
 

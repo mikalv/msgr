@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added formatting toolbar, mention-autocomplete palette and mention tracking to
+  the Flutter chat composer, including controller/result updates and new widget
+  tests for the rich text actions.
 - Routed backend logger output through StoneMQ envelopes so `Messngr.Logging.OpenObserveBackend` can forward entries to
   OpenObserve via the `observability/logs` topic, including StoneMQ transport configuration and tests.
 - Added StoneMQ-aware OpenObserve loggers to the Go and Python bridge SDKs so daemons can emit envelopes compatible with the

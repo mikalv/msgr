@@ -11,6 +11,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import 'package:messngr/features/chat/widgets/chat_theme.dart';
 
+enum _FormattingAction { bold, italic, strike, code, bullet, quote }
+
 class ChatComposer extends StatefulWidget {
   const ChatComposer({
     super.key,
@@ -19,6 +21,7 @@ class ChatComposer extends StatefulWidget {
     required this.isSending,
     this.errorMessage,
     this.availableCommands = SlashCommand.defaults,
+    this.availableMentions = ComposerMention.defaults,
     ChatVoiceRecorder? voiceRecorder,
     this.filePicker,
   }) : voiceRecorder = voiceRecorder ?? SimulatedChatVoiceRecorder();
@@ -28,6 +31,7 @@ class ChatComposer extends StatefulWidget {
   final bool isSending;
   final String? errorMessage;
   final List<SlashCommand> availableCommands;
+  final List<ComposerMention> availableMentions;
   final ChatVoiceRecorder voiceRecorder;
   final FilePickerPlatform? filePicker;
 
@@ -48,6 +52,10 @@ class _ChatComposerState extends State<ChatComposer>
 
   bool _showEmoji = false;
   int _commandSelection = 0;
+  int _mentionSelection = 0;
+  int? _mentionTriggerIndex;
+  String _mentionQuery = '';
+  List<ComposerMention> _mentionCandidates = const <ComposerMention>[];
 
   List<SlashCommand> get _matchedCommands {
     final text = _textController.text;
@@ -62,11 +70,14 @@ class _ChatComposerState extends State<ChatComposer>
   }
 
   bool get _shouldShowCommandPalette => _matchedCommands.isNotEmpty;
+  bool get _shouldShowMentionPalette =>
+      _mentionTriggerIndex != null && _mentionCandidates.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
     _focusNode = FocusNode();
+    _focusNode.addListener(_handleFocusChanged);
     _textController = TextEditingController(text: widget.controller.value.text);
     _expanderController = AnimationController(
       vsync: this,
@@ -95,6 +106,7 @@ class _ChatComposerState extends State<ChatComposer>
     _voiceSubscription?.cancel();
     widget.controller.removeListener(_handleControllerChanged);
     _textController.dispose();
+    _focusNode.removeListener(_handleFocusChanged);
     _focusNode.dispose();
     _expanderController.dispose();
     super.dispose();
@@ -108,6 +120,8 @@ class _ChatComposerState extends State<ChatComposer>
 
     final attachments = _value.attachments;
     final voiceNote = _value.voiceNote;
+    final showFormatting =
+        _focusNode.hasFocus || _textController.text.trim().isNotEmpty;
 
     if (_showEmoji) {
       _expanderController.forward();
@@ -207,9 +221,9 @@ class _ChatComposerState extends State<ChatComposer>
               child: CallbackShortcuts(
                 bindings: <ShortcutActivator, VoidCallback>{
                   const SingleActivator(LogicalKeyboardKey.enter,
-                      control: true): _submit,
+                      control: true): () => _submit(forceSend: true),
                   const SingleActivator(LogicalKeyboardKey.enter, meta: true):
-                      _submit,
+                      () => _submit(forceSend: true),
                   const SingleActivator(LogicalKeyboardKey.escape):
                       _handleEscape,
                   const SingleActivator(LogicalKeyboardKey.arrowDown):
@@ -265,10 +279,70 @@ class _ChatComposerState extends State<ChatComposer>
                           _SendButton(
                             isEnabled: _canSend,
                             isSending: widget.isSending,
-                            onPressed: _canSend ? _submit : null,
+                            onPressed:
+                                _canSend ? () => _submit(forceSend: true) : null,
                           ),
                         ],
                       ),
+                      if (showFormatting)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _ComposerIconButton(
+                                  icon: Icons.format_bold,
+                                  tooltip: 'Fet tekst',
+                                  onTap: () =>
+                                      _applyFormatting(_FormattingAction.bold),
+                                ),
+                                const SizedBox(width: 8),
+                                _ComposerIconButton(
+                                  icon: Icons.format_italic,
+                                  tooltip: 'Kursiv',
+                                  onTap: () => _applyFormatting(
+                                      _FormattingAction.italic),
+                                ),
+                                const SizedBox(width: 8),
+                                _ComposerIconButton(
+                                  icon: Icons.format_strikethrough,
+                                  tooltip: 'Gjennomstreking',
+                                  onTap: () => _applyFormatting(
+                                      _FormattingAction.strike),
+                                ),
+                                const SizedBox(width: 8),
+                                _ComposerIconButton(
+                                  icon: Icons.code,
+                                  tooltip: 'Kode',
+                                  onTap: () =>
+                                      _applyFormatting(_FormattingAction.code),
+                                ),
+                                const SizedBox(width: 8),
+                                _ComposerIconButton(
+                                  icon: Icons.format_list_bulleted,
+                                  tooltip: 'Punktliste',
+                                  onTap: () => _applyFormatting(
+                                      _FormattingAction.bullet),
+                                ),
+                                const SizedBox(width: 8),
+                                _ComposerIconButton(
+                                  icon: Icons.format_quote,
+                                  tooltip: 'Sitér',
+                                  onTap: () =>
+                                      _applyFormatting(_FormattingAction.quote),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      if (_shouldShowMentionPalette)
+                        _MentionPalette(
+                          mentions: _mentionCandidates,
+                          highlightedIndex: _mentionSelection,
+                          query: _mentionQuery,
+                          onSelect: _applyMention,
+                        ),
                       if (_shouldShowCommandPalette)
                         _CommandPalette(
                           commands: _matchedCommands,
@@ -393,13 +467,85 @@ class _ChatComposerState extends State<ChatComposer>
     });
   }
 
+  void _handleFocusChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   void _handleDraftChanged() {
-    widget.controller.setText(_textController.text);
+    final text = _textController.text;
+    widget.controller.setText(text);
+    widget.controller.syncMentionsWithText(text);
+    _updateMentionSuggestions();
     if (_shouldShowCommandPalette) {
       setState(() {
         _commandSelection = 0;
       });
     }
+  }
+
+  void _updateMentionSuggestions() {
+    final selection = _textController.selection;
+    if (!selection.isValid) {
+      if (_shouldShowMentionPalette) {
+        setState(_clearMentionPalette);
+      }
+      return;
+    }
+
+    final text = _textController.text;
+    final cursor = selection.baseOffset;
+    if (cursor <= 0 || cursor > text.length) {
+      if (_shouldShowMentionPalette) {
+        setState(_clearMentionPalette);
+      }
+      return;
+    }
+
+    final beforeCursor = text.substring(0, cursor);
+    var index = cursor - 1;
+    var found = false;
+    while (index >= 0) {
+      final char = beforeCursor.substring(index, index + 1);
+      if (char == '@') {
+        final previous = index > 0 ? beforeCursor.substring(index - 1, index) : ' ';
+        final isValidBoundary = previous.trim().isEmpty || previous == '(';
+        if (!isValidBoundary) {
+          break;
+        }
+        final rawQuery = beforeCursor.substring(index + 1);
+        if (rawQuery.contains(RegExp(r'[\s@]'))) {
+          break;
+        }
+        final matches = widget.availableMentions
+            .where((mention) => mention.matches(rawQuery))
+            .toList(growable: false);
+        setState(() {
+          _mentionTriggerIndex = index;
+          _mentionQuery = rawQuery;
+          _mentionCandidates = matches;
+          _mentionSelection = 0;
+        });
+        found = true;
+        break;
+      }
+      if (char.trim().isEmpty) {
+        break;
+      }
+      index--;
+    }
+
+    if (!found && _shouldShowMentionPalette) {
+      setState(_clearMentionPalette);
+    }
+  }
+
+  void _clearMentionPalette() {
+    _mentionTriggerIndex = null;
+    _mentionQuery = '';
+    _mentionCandidates = const <ComposerMention>[];
+    _mentionSelection = 0;
   }
 
   void _toggleEmoji() {
@@ -433,6 +579,10 @@ class _ChatComposerState extends State<ChatComposer>
       setState(() => _showEmoji = false);
       return;
     }
+    if (_shouldShowMentionPalette) {
+      setState(_clearMentionPalette);
+      return;
+    }
     if (_shouldShowCommandPalette) {
       setState(() {
         _textController.clear();
@@ -442,6 +592,13 @@ class _ChatComposerState extends State<ChatComposer>
   }
 
   void _selectNextCommand() {
+    if (_shouldShowMentionPalette) {
+      setState(() {
+        _mentionSelection =
+            (_mentionSelection + 1).clamp(0, _mentionCandidates.length - 1);
+      });
+      return;
+    }
     if (!_shouldShowCommandPalette) return;
     setState(() {
       _commandSelection =
@@ -450,6 +607,13 @@ class _ChatComposerState extends State<ChatComposer>
   }
 
   void _selectPreviousCommand() {
+    if (_shouldShowMentionPalette) {
+      setState(() {
+        _mentionSelection =
+            (_mentionSelection - 1).clamp(0, _mentionCandidates.length - 1);
+      });
+      return;
+    }
     if (!_shouldShowCommandPalette) return;
     setState(() {
       _commandSelection =
@@ -469,7 +633,149 @@ class _ChatComposerState extends State<ChatComposer>
     });
   }
 
-  void _submit() {
+  void _applyMention(ComposerMention mention) {
+    final triggerIndex = _mentionTriggerIndex;
+    if (triggerIndex == null) {
+      return;
+    }
+    final selection = _textController.selection;
+    final end = selection.isValid ? selection.baseOffset : _textController.text.length;
+    final replacement = '@${mention.handle} ';
+    final text = _textController.text;
+    final newText = text.replaceRange(triggerIndex, end, replacement);
+    _textController
+      ..text = newText
+      ..selection = TextSelection.collapsed(offset: triggerIndex + replacement.length);
+    widget.controller.setText(newText);
+    widget.controller.addMention(mention);
+    widget.controller.syncMentionsWithText(newText);
+    setState(_clearMentionPalette);
+    _focusNode.requestFocus();
+  }
+
+  void _applyFormatting(_FormattingAction action) {
+    switch (action) {
+      case _FormattingAction.bold:
+        _applyInlineFormat(prefix: '**', suffix: '**');
+        break;
+      case _FormattingAction.italic:
+        _applyInlineFormat(prefix: '_', suffix: '_');
+        break;
+      case _FormattingAction.strike:
+        _applyInlineFormat(prefix: '~~', suffix: '~~');
+        break;
+      case _FormattingAction.code:
+        _applyInlineFormat(prefix: '`', suffix: '`', placeholder: 'kode');
+        break;
+      case _FormattingAction.bullet:
+        _applyLinePrefix('- ');
+        break;
+      case _FormattingAction.quote:
+        _applyLinePrefix('> ');
+        break;
+    }
+  }
+
+  void _applyInlineFormat({
+    required String prefix,
+    required String suffix,
+    String placeholder = 'tekst',
+  }) {
+    final selection = _textController.selection;
+    final text = _textController.text;
+    if (!selection.isValid) {
+      final insertion = '$prefix$placeholder$suffix';
+      final newText = '$text$insertion';
+      final start = text.length + prefix.length;
+      final end = start + placeholder.length;
+      _textController
+        ..text = newText
+        ..selection = TextSelection(baseOffset: start, extentOffset: end);
+    } else if (selection.isCollapsed) {
+      final insertion = '$prefix$placeholder$suffix';
+      final newText = text.replaceRange(selection.start, selection.end, insertion);
+      final start = selection.start + prefix.length;
+      final end = start + placeholder.length;
+      _textController
+        ..text = newText
+        ..selection = TextSelection(baseOffset: start, extentOffset: end);
+    } else {
+      final selected = text.substring(selection.start, selection.end);
+      final newText = text.replaceRange(
+        selection.start,
+        selection.end,
+        '$prefix$selected$suffix',
+      );
+      final start = selection.start + prefix.length;
+      final end = selection.end + prefix.length;
+      _textController
+        ..text = newText
+        ..selection = TextSelection(baseOffset: start, extentOffset: end);
+    }
+    widget.controller.setText(_textController.text);
+    _focusNode.requestFocus();
+  }
+
+  void _applyLinePrefix(String prefix) {
+    final selection = _textController.selection;
+    final text = _textController.text;
+    if (!selection.isValid) {
+      final newText = text.isEmpty ? prefix : '$text\n$prefix';
+      _textController
+        ..text = newText
+        ..selection = TextSelection.collapsed(offset: newText.length);
+      widget.controller.setText(newText);
+      _focusNode.requestFocus();
+      return;
+    }
+
+    if (selection.isCollapsed) {
+      final cursor = selection.start;
+      final lineStart = cursor == 0 ? 0 : text.lastIndexOf('\n', cursor - 1) + 1;
+      final newText = text.replaceRange(lineStart, lineStart, prefix);
+      _textController
+        ..text = newText
+        ..selection = TextSelection.collapsed(offset: cursor + prefix.length);
+      widget.controller.setText(newText);
+      _focusNode.requestFocus();
+      return;
+    }
+
+    final selected = text.substring(selection.start, selection.end);
+    final lines = selected.split('\n');
+    final buffer = StringBuffer();
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      if (line.trim().isEmpty) {
+        buffer.write(prefix.trimRight());
+      } else if (line.trimLeft().startsWith(prefix.trim())) {
+        buffer.write(line);
+      } else {
+        buffer.write('$prefix$line');
+      }
+      if (i != lines.length - 1) {
+        buffer.write('\n');
+      }
+    }
+    final formatted = buffer.toString();
+    final newText = text.replaceRange(selection.start, selection.end, formatted);
+    _textController
+      ..text = newText
+      ..selection = TextSelection(
+        baseOffset: selection.start,
+        extentOffset: selection.start + formatted.length,
+      );
+    widget.controller.setText(newText);
+    _focusNode.requestFocus();
+  }
+
+  void _submit({bool forceSend = false}) {
+    if (_shouldShowMentionPalette && !forceSend) {
+      if (_mentionCandidates.isNotEmpty) {
+        _applyMention(_mentionCandidates[_mentionSelection]);
+      }
+      return;
+    }
     if (!_canSend) return;
     final command =
         _shouldShowCommandPalette ? _matchedCommands[_commandSelection] : null;
@@ -478,6 +784,7 @@ class _ChatComposerState extends State<ChatComposer>
     setState(() {
       _showEmoji = false;
       _commandSelection = 0;
+      _clearMentionPalette();
     });
     _focusNode.requestFocus();
   }
@@ -759,6 +1066,107 @@ class _VoiceRecorderButton extends StatelessWidget {
   }
 }
 
+class _MentionPalette extends StatelessWidget {
+  const _MentionPalette({
+    required this.mentions,
+    required this.highlightedIndex,
+    required this.query,
+    required this.onSelect,
+  });
+
+  final List<ComposerMention> mentions;
+  final int highlightedIndex;
+  final String query;
+  final ValueChanged<ComposerMention> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (mentions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.58),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (query.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Text(
+                'Nevner: @$query',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          for (var i = 0; i < mentions.length; i++)
+            InkWell(
+              onTap: () => onSelect(mentions[i]),
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(i == 0 ? 18 : 0),
+                bottom: Radius.circular(i == mentions.length - 1 ? 18 : 0),
+              ),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: i == highlightedIndex
+                      ? theme.colorScheme.primary.withOpacity(0.12)
+                      : Colors.transparent,
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor:
+                          theme.colorScheme.primary.withOpacity(0.18),
+                      child: Text(
+                        mentions[i].initials,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            mentions[i].displayName,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            '@${mentions[i].handle}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.keyboard_return, size: 16),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AttachmentPreview extends StatelessWidget {
   const _AttachmentPreview({
     required this.attachments,
@@ -944,12 +1352,34 @@ class ChatComposerController extends ChangeNotifier {
     );
   }
 
+  void addMention(ComposerMention mention) {
+    final mentions = [..._value.mentions];
+    if (mentions.any((m) => m.id == mention.id)) {
+      return;
+    }
+    mentions.add(mention);
+    _update(_value.copyWith(mentions: mentions));
+  }
+
+  void syncMentionsWithText(String text) {
+    if (_value.mentions.isEmpty) {
+      return;
+    }
+    final active = _value.mentions
+        .where((mention) => text.contains('@${mention.handle}'))
+        .toList();
+    if (!listEquals(active, _value.mentions)) {
+      _update(_value.copyWith(mentions: active));
+    }
+  }
+
   ChatComposerResult buildResult({SlashCommand? command}) {
     return ChatComposerResult(
       text: _value.text.trim(),
       attachments: List.unmodifiable(_value.attachments),
       voiceNote: _value.voiceNote,
       command: command ?? _value.command,
+      mentions: List.unmodifiable(_value.mentions),
     );
   }
 
@@ -969,6 +1399,7 @@ class ChatComposerValue {
     required this.text,
     required this.attachments,
     required this.voiceNote,
+    required this.mentions,
     this.error,
     this.command,
   });
@@ -978,6 +1409,7 @@ class ChatComposerValue {
   final String text;
   final List<ComposerAttachment> attachments;
   final ComposerVoiceNote? voiceNote;
+  final List<ComposerMention> mentions;
   final String? error;
   final SlashCommand? command;
 
@@ -985,6 +1417,7 @@ class ChatComposerValue {
         text: '',
         attachments: [],
         voiceNote: null,
+        mentions: [],
         error: null,
         command: null,
       );
@@ -997,13 +1430,18 @@ class ChatComposerValue {
     Object? error = _unset,
     SlashCommand? command,
     bool clearCommand = false,
+    List<ComposerMention>? mentions,
+    bool clearMentions = false,
   }) {
     final resolvedError = error == _unset ? this.error : error as String?;
     final resolvedCommand = clearCommand ? null : (command ?? this.command);
+    final resolvedMentions =
+        clearMentions ? <ComposerMention>[] : (mentions ?? this.mentions);
     return ChatComposerValue(
       text: text ?? this.text,
       attachments: attachments ?? this.attachments,
       voiceNote: clearVoiceNote ? null : (voiceNote ?? this.voiceNote),
+      mentions: resolvedMentions,
       error: resolvedError,
       command: resolvedCommand,
     );
@@ -1016,6 +1454,7 @@ class ChatComposerValue {
         other.text == text &&
         listEquals(other.attachments, attachments) &&
         other.voiceNote == voiceNote &&
+        listEquals(other.mentions, mentions) &&
         other.error == error &&
         other.command == command;
   }
@@ -1025,6 +1464,7 @@ class ChatComposerValue {
         text,
         Object.hashAll(attachments),
         voiceNote,
+        Object.hashAll(mentions),
         error,
         command,
       );
@@ -1036,14 +1476,17 @@ class ChatComposerResult {
     required this.attachments,
     this.voiceNote,
     this.command,
+    required this.mentions,
   });
 
   final String text;
   final List<ComposerAttachment> attachments;
   final ComposerVoiceNote? voiceNote;
   final SlashCommand? command;
+  final List<ComposerMention> mentions;
 
   bool get hasCommand => command != null;
+  bool get hasMentions => mentions.isNotEmpty;
 }
 
 class ComposerAttachment {
@@ -1148,6 +1591,47 @@ class SlashCommand {
   ];
 }
 
+class ComposerMention {
+  const ComposerMention({
+    required this.id,
+    required this.displayName,
+    required this.handle,
+    this.avatarUrl,
+  });
+
+  final String id;
+  final String displayName;
+  final String handle;
+  final String? avatarUrl;
+
+  String get initials {
+    final parts = displayName.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) {
+      return handle.isNotEmpty ? handle.substring(0, 1).toUpperCase() : '?';
+    }
+    final buffer = StringBuffer();
+    for (final part in parts.take(2)) {
+      buffer.write(part.substring(0, 1).toUpperCase());
+    }
+    return buffer.toString();
+  }
+
+  bool matches(String query) {
+    if (query.isEmpty) return true;
+    final lower = query.toLowerCase();
+    return displayName.toLowerCase().contains(lower) ||
+        handle.toLowerCase().contains(lower);
+  }
+
+  static const defaults = <ComposerMention>[
+    ComposerMention(id: '1', displayName: 'Ada Lovelace', handle: 'ada'),
+    ComposerMention(id: '2', displayName: 'Nikola Tesla', handle: 'tesla'),
+    ComposerMention(id: '3', displayName: 'Katherine Johnson', handle: 'kjohnson'),
+    ComposerMention(id: '4', displayName: 'Jo Nesbø', handle: 'jnesbo'),
+    ComposerMention(id: '5', displayName: 'Astrid Lindgren', handle: 'astrid'),
+  ];
+}
+
 abstract class ChatVoiceRecorder {
   bool get isRecording;
   Stream<ChatVoiceState> get stateStream;
@@ -1193,543 +1677,3 @@ class SimulatedChatVoiceRecorder implements ChatVoiceRecorder {
   }
 }
 
-class _ComposerTextField extends StatelessWidget {
-  const _ComposerTextField({
-    required this.controller,
-    required this.focusNode,
-    required this.onSubmitted,
-    required this.isSending,
-    required this.placeholder,
-  });
-
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  final ValueChanged<String> onSubmitted;
-  final bool isSending;
-  final String placeholder;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return TextField(
-      controller: controller,
-      focusNode: focusNode,
-      textCapitalization: TextCapitalization.sentences,
-      textInputAction: TextInputAction.send,
-      minLines: 1,
-      maxLines: 6,
-      enabled: !isSending,
-      decoration: InputDecoration(
-        hintText: placeholder,
-        border: InputBorder.none,
-        hintStyle: theme.textTheme.bodyLarge?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
-        ),
-      ),
-      onSubmitted: onSubmitted,
-    );
-  }
-}
-
-class _EmojiPicker extends StatelessWidget {
-  const _EmojiPicker({required this.onSelect});
-
-  final ValueChanged<String> onSelect;
-
-  static const _emojis = [
-    '😀',
-    '😁',
-    '😂',
-    '🤣',
-    '😊',
-    '😍',
-    '😘',
-    '😎',
-    '🤩',
-    '🥳',
-    '🤔',
-    '🤯',
-    '😴',
-    '😇',
-    '😡',
-    '😭',
-    '🙌',
-    '👏',
-    '👍',
-    '👎',
-    '🙏',
-    '💡',
-    '🔥',
-    '🌟',
-    '✨',
-    '🎉',
-    '🚀',
-    '🎧',
-    '🍕',
-    '☕️',
-    '🏖️',
-    '📎',
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: theme.colorScheme.primary.withOpacity(0.12),
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        child: Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            for (final emoji in _emojis)
-              GestureDetector(
-                onTap: () => onSelect(emoji),
-                child: Text(
-                  emoji,
-                  style: const TextStyle(fontSize: 24),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CommandPalette extends StatelessWidget {
-  const _CommandPalette({
-    required this.commands,
-    required this.highlightedIndex,
-    required this.onSelect,
-  });
-
-  final List<SlashCommand> commands;
-  final int highlightedIndex;
-  final ValueChanged<SlashCommand> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.only(top: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.52),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < commands.length; i++)
-            InkWell(
-              onTap: () => onSelect(commands[i]),
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(i == 0 ? 18 : 0),
-                bottom: Radius.circular(i == commands.length - 1 ? 18 : 0),
-              ),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 150),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: i == highlightedIndex
-                      ? theme.colorScheme.primary.withOpacity(0.12)
-                      : Colors.transparent,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            commands[i].name,
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            commands[i].description,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.keyboard_return, size: 16),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AttachmentPreview extends StatelessWidget {
-  const _AttachmentPreview({
-    required this.attachments,
-    required this.voiceNote,
-    required this.onRemoveAttachment,
-    required this.onRemoveVoiceNote,
-  });
-
-  final List<ComposerAttachment> attachments;
-  final ComposerVoiceNote? voiceNote;
-  final ValueChanged<ComposerAttachment> onRemoveAttachment;
-  final VoidCallback onRemoveVoiceNote;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: [
-          for (final attachment in attachments)
-            _AttachmentTile(
-              attachment: attachment,
-              onRemove: () => onRemoveAttachment(attachment),
-            ),
-          if (voiceNote != null)
-            _VoiceNoteTile(
-              voiceNote: voiceNote!,
-              onRemove: onRemoveVoiceNote,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AttachmentTile extends StatelessWidget {
-  const _AttachmentTile({required this.attachment, required this.onRemove});
-
-  final ComposerAttachment attachment;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final borderRadius = BorderRadius.circular(18);
-
-    if (attachment.isImage && attachment.bytes != null) {
-      return Stack(
-        children: [
-          ClipRRect(
-            borderRadius: borderRadius,
-            child: Image.memory(
-              attachment.bytes!,
-              width: 100,
-              height: 100,
-              fit: BoxFit.cover,
-            ),
-          ),
-          Positioned(
-            top: 4,
-            right: 4,
-            child: _AttachmentRemoveButton(onPressed: onRemove),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                borderRadius:
-                    BorderRadius.vertical(bottom: borderRadius.bottomLeft),
-                color: Colors.black.withOpacity(0.45),
-              ),
-              child: Text(
-                attachment.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style:
-                    theme.textTheme.labelSmall?.copyWith(color: Colors.white),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    final icon = attachment.isVideo
-        ? Icons.videocam_outlined
-        : attachment.isAudio
-            ? Icons.audiotrack
-            : Icons.insert_drive_file_outlined;
-
-    return Container(
-      width: 220,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.6),
-        borderRadius: borderRadius,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 20, color: theme.colorScheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  attachment.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  attachment.humanSize,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 16),
-            tooltip: 'Fjern',
-            onPressed: onRemove,
-            splashRadius: 18,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VoiceNoteTile extends StatelessWidget {
-  const _VoiceNoteTile({required this.voiceNote, required this.onRemove});
-
-  final ComposerVoiceNote voiceNote;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.55),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.mic, color: theme.colorScheme.primary),
-          const SizedBox(width: 10),
-          Text(
-            'Lydklipp ${voiceNote.formattedDuration}',
-            style: theme.textTheme.bodySmall,
-          ),
-          const SizedBox(width: 10),
-          IconButton(
-            icon: const Icon(Icons.close, size: 16),
-            tooltip: 'Fjern lydklipp',
-            onPressed: onRemove,
-            splashRadius: 18,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AttachmentRemoveButton extends StatelessWidget {
-  const _AttachmentRemoveButton({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black.withOpacity(0.45),
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onPressed,
-        child: const Padding(
-          padding: EdgeInsets.all(4),
-          child: Icon(Icons.close, size: 14, color: Colors.white),
-        ),
-      ),
-    );
-  }
-}
-
-class _VoiceRecorderButton extends StatelessWidget {
-  const _VoiceRecorderButton({
-    required this.isRecording,
-    required this.onStart,
-    required this.onStop,
-  });
-
-  final bool isRecording;
-  final VoidCallback onStart;
-  final VoidCallback onStop;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Tooltip(
-      message: isRecording ? 'Stopp opptak' : 'Spill inn lydklipp',
-      child: GestureDetector(
-        onTap: isRecording ? onStop : onStart,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: isRecording
-                ? theme.colorScheme.error.withOpacity(0.2)
-                : theme.colorScheme.surfaceVariant.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Icon(
-            isRecording ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
-            color: isRecording
-                ? theme.colorScheme.error
-                : theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ComposerIconButton extends StatelessWidget {
-  const _ComposerIconButton({
-    required this.icon,
-    required this.tooltip,
-    this.onTap,
-    this.isActive = false,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback? onTap;
-  final bool isActive;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = isActive
-        ? theme.colorScheme.primary
-        : theme.colorScheme.onSurfaceVariant;
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        type: MaterialType.transparency,
-        child: InkResponse(
-          onTap: onTap,
-          radius: 24,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: isActive
-                  ? theme.colorScheme.primary.withOpacity(0.14)
-                  : theme.colorScheme.surfaceVariant.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(icon, color: color),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SendButton extends StatelessWidget {
-  const _SendButton({
-    required this.isEnabled,
-    required this.isSending,
-    this.onPressed,
-  });
-
-  final bool isEnabled;
-  final bool isSending;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return AnimatedScale(
-      scale: isEnabled || isSending ? 1 : 0.92,
-      duration: const Duration(milliseconds: 180),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: ChatTheme.selfBubbleGradient(theme),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: IconButton(
-          iconSize: 22,
-          padding: const EdgeInsets.all(12),
-          icon: isSending
-              ? SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      theme.colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                )
-              : const Icon(Icons.send_rounded),
-          color: theme.colorScheme.onPrimaryContainer,
-          onPressed: isEnabled ? onPressed : null,
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.error.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.error.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, color: theme.colorScheme.error, size: 18),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.error,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
