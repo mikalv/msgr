@@ -25,6 +25,14 @@ media_sse_kms_key_id =
     value -> value
   end
 
+share_link_segments =
+  System.get_env("SHARE_LINK_PATH_SEGMENTS", "links")
+  |> String.split("/", trim: true)
+  |> case do
+    [] -> ["links"]
+    segments -> segments
+  end
+
 config :msgr, Messngr.Media.Storage,
   bucket: System.get_env("MEDIA_BUCKET", "msgr-media"),
   endpoint: System.get_env("MEDIA_ENDPOINT", "http://localhost:9000"),
@@ -38,6 +46,13 @@ config :msgr, Messngr.Media.Storage,
 config :msgr, Messngr.Media,
   upload_ttl_seconds: String.to_integer(System.get_env("MEDIA_UPLOAD_TTL", "900")),
   retention_ttl_seconds: String.to_integer(System.get_env("MEDIA_RETENTION_TTL", "604800"))
+
+config :msgr, Messngr.ShareLinks,
+  public_base_url: System.get_env("SHARE_LINK_PUBLIC_BASE_URL", "https://msgr.no"),
+  public_path: System.get_env("SHARE_LINK_PUBLIC_PATH", "/s"),
+  msgr_scheme: System.get_env("SHARE_LINK_SCHEME", "msgr"),
+  msgr_host: System.get_env("SHARE_LINK_HOST", "share"),
+  msgr_path_segments: share_link_segments
 
 host = System.get_env("PHX_HOST", "localhost")
 

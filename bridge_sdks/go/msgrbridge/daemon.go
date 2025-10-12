@@ -3,6 +3,7 @@ package msgrbridge
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -13,6 +14,7 @@ type Handler func(context.Context, Envelope) error
 // Daemon wires queue subscriptions, credential bootstrap and telemetry.
 type Daemon struct {
 	service      string
+	instance     string
 	queue        QueueClient
 	telemetry    TelemetryReporter
 	credentials  CredentialBootstrapper
@@ -37,6 +39,13 @@ func WithCredentialBootstrapper(bootstrapper CredentialBootstrapper) DaemonOptio
 	}
 }
 
+// WithInstance scopes subscriptions to a particular bridge instance identifier.
+func WithInstance(instance string) DaemonOption {
+	return func(d *Daemon) {
+		d.instance = instance
+	}
+}
+
 // NewDaemon constructs a daemon for a given service.
 func NewDaemon(service string, queue QueueClient, opts ...DaemonOption) (*Daemon, error) {
 	if service == "" {
@@ -56,6 +65,12 @@ func NewDaemon(service string, queue QueueClient, opts ...DaemonOption) (*Daemon
 	for _, opt := range opts {
 		opt(daemon)
 	}
+
+	normalisedInstance, err := validateInstance(daemon.instance)
+	if err != nil {
+		return nil, err
+	}
+	daemon.instance = normalisedInstance
 
 	return daemon, nil
 }
@@ -85,7 +100,12 @@ func (d *Daemon) Start(ctx context.Context) error {
 	for action, handler := range d.handlers {
 		action := action
 		handler := handler
-		if err := d.queue.Subscribe(ctx, Topic(d.service, action), d.wrapHandler(action, handler)); err != nil {
+		topic := Topic(d.service, action)
+		if d.instance != "" {
+			topic = TopicForInstance(d.service, d.instance, action)
+		}
+
+		if err := d.queue.Subscribe(ctx, topic, d.wrapHandler(action, handler)); err != nil {
 			return fmt.Errorf("subscribe %s: %w", action, err)
 		}
 	}
@@ -114,4 +134,20 @@ func (d *Daemon) wrapHandler(action string, handler Handler) QueueMessageHandler
 		d.telemetry.RecordDelivery(d.service, action, time.Since(start), outcome)
 		return nil
 	}
+}
+
+func validateInstance(instance string) (string, error) {
+	if instance == "" {
+		return "", nil
+	}
+
+	trimmed := strings.TrimSpace(instance)
+	if trimmed == "" {
+		return "", fmt.Errorf("instance must not be blank")
+	}
+	if strings.Contains(trimmed, "/") {
+		return "", fmt.Errorf("instance must not contain '/' characters")
+	}
+
+	return trimmed, nil
 }

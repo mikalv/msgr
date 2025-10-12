@@ -1,12 +1,12 @@
 # credo:disable-for-this-file Credo.Check.Readability.Specs
 
-defmodule Msgr.Connectors.TelegramBridge do
+defmodule Msgr.Connectors.SignalBridge do
   @moduledoc """
-  Connector facade for Telegram bridge daemons.
+  Connector facade for Signal bridge daemons.
 
-  The Elixir side only understands how to describe intents. The actual network
-  traffic flows through a separate worker (Go, Python, etc.) that speaks the
-  proprietary MTProto stack and reports back via the message queue.
+  Provides helpers for publishing queue envelopes that drive the device-link
+  handshake, outbound messaging, and acknowledgement flows handled by the
+  Python bridge daemon.
   """
 
   alias Msgr.Connectors.ServiceBridge
@@ -15,17 +15,14 @@ defmodule Msgr.Connectors.TelegramBridge do
   @type bridge :: ServiceBridge.t()
 
   @spec new(keyword()) :: bridge()
-  def new(opts), do: ServiceBridge.new(:telegram, opts)
+  def new(opts), do: ServiceBridge.new(:signal, opts)
 
   @doc """
-  Initiates the out-of-band linking ceremony for a Telegram account.
-
-  The payload delegates MTProto negotiations to the bridge worker which can be
-  implemented in whichever language is most convenient.
+  Initiates or resumes the Signal device-link ceremony for a Msgr identity.
   """
   @spec link_account(bridge(), map(), keyword()) :: {:ok, map()} | {:error, term()}
   def link_account(bridge, params, opts \\ []) do
-    payload = Map.take(params, [:user_id, :phone_number, :session, :two_factor])
+    payload = Map.take(params, [:user_id, :session, :linking])
 
     case ServiceBridge.request(bridge, :link_account, payload, opts) do
       {:ok, response} ->
@@ -40,25 +37,26 @@ defmodule Msgr.Connectors.TelegramBridge do
   end
 
   @doc """
-  Emits an outbound message intent for Telegram chats.
+  Publishes an outbound message intent for a Signal conversation.
   """
   @spec send_message(bridge(), map(), keyword()) :: :ok | {:error, term()}
   def send_message(bridge, params, opts \\ []) do
     payload =
       params
-      |> Map.take([:chat_id, :message, :entities, :reply_to, :media])
+      |> Map.take([:chat_id, :message, :attachments, :metadata])
+      |> Map.put_new(:attachments, Map.get(params, :attachments, []))
       |> Map.put_new(:metadata, Map.get(params, :metadata, %{}))
 
     ServiceBridge.publish(bridge, :outbound_message, payload, opts)
   end
 
   @doc """
-  Acknowledges updates once the Elixir core has persisted them.
+  Acknowledges inbound Signal events once Msgr has persisted them.
   """
-  @spec ack_update(bridge(), map(), keyword()) :: :ok | {:error, term()}
-  def ack_update(bridge, params, opts \\ []) do
-    payload = Map.take(params, [:update_id, :status, :received_at])
-    ServiceBridge.publish(bridge, :ack_update, payload, opts)
+  @spec ack_event(bridge(), map(), keyword()) :: :ok | {:error, term()}
+  def ack_event(bridge, params, opts \\ []) do
+    payload = Map.take(params, [:event_id, :status, :received_at])
+    ServiceBridge.publish(bridge, :ack_event, payload, opts)
   end
 
   defp persist_link_response(%ServiceBridge{} = bridge, params, response) do
@@ -100,9 +98,9 @@ defmodule Msgr.Connectors.TelegramBridge do
       response
       |> Map.get("contacts") || Map.get(response, :contacts) || []
 
-    chats =
+    conversations =
       response
-      |> Map.get("chats") || Map.get(response, :chats) || []
+      |> Map.get("conversations") || Map.get(response, :conversations) || []
 
     %{
       external_id: extract_user_id(user),
@@ -111,31 +109,32 @@ defmodule Msgr.Connectors.TelegramBridge do
       session: ensure_map(session),
       capabilities: ensure_map(capabilities),
       contacts: ensure_list(contacts),
-      channels: ensure_list(chats)
+      channels: ensure_list(conversations)
     }
   end
 
   defp extract_user_id(user) do
     cond do
-      is_map(user) and Map.has_key?(user, "id") -> to_string(user["id"])
-      is_map(user) and Map.has_key?(user, :id) -> to_string(user[:id])
+      is_map(user) and Map.has_key?(user, "uuid") -> user["uuid"]
+      is_map(user) and Map.has_key?(user, :uuid) -> user[:uuid]
+      is_map(user) and Map.has_key?(user, "id") -> user["id"]
       true -> nil
+    end
+    |> case do
+      nil -> nil
+      value -> to_string(value)
     end
   end
 
   defp extract_display_name(user) when is_map(user) do
-    username = Map.get(user, "username") || Map.get(user, :username)
-    first = Map.get(user, "first_name") || Map.get(user, :first_name)
-    last = Map.get(user, "last_name") || Map.get(user, :last_name)
-
-    display =
-      [first, last]
-      |> Enum.filter(&(is_binary(&1) and &1 != ""))
-      |> Enum.join(" ")
+    display = Map.get(user, "display_name") || Map.get(user, :display_name)
+    name = Map.get(user, "name") || Map.get(user, :name)
+    phone = Map.get(user, "phone_number") || Map.get(user, :phone_number)
 
     cond do
-      display != "" -> display
-      is_binary(username) and username != "" -> username
+      is_binary(display) and display != "" -> display
+      is_binary(name) and name != "" -> name
+      is_binary(phone) and phone != "" -> phone
       true -> extract_user_id(user)
     end
   end

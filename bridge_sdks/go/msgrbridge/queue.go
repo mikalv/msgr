@@ -13,5 +13,18 @@ type QueueClient interface {
 
 // Topic returns the canonical queue topic for a service/action pair.
 func Topic(service, action string) string {
-	return "bridge/" + service + "/" + action
+	return buildTopic(service, action, "")
+}
+
+// TopicForInstance returns the queue topic for a service/action scoped to a specific bridge instance.
+func TopicForInstance(service, instance, action string) string {
+	return buildTopic(service, action, instance)
+}
+
+func buildTopic(service, action, instance string) string {
+	if instance == "" {
+		return "bridge/" + service + "/" + action
+	}
+
+	return "bridge/" + service + "/" + instance + "/" + action
 }

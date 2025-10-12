@@ -1,6 +1,69 @@
 # Changelog
 
 ## Unreleased
+- Introduced a Postgres-backed share link service with capability profiles,
+  msgr:// deep-link generation, and public URL helpers so bridges can share
+  media, locations, and invites with text-only networks while enforcing
+  expiry/view limits.
+- Added bridge contact profiles, match-key storage, and profile links so Msgr
+  can aggregate the same person across bridge rosters and native Msgr contacts;
+  includes new Postgres tables, context helpers, and regression tests for the
+  matching workflow.
+- Added a Postgres-backed `Messngr.Bridges` context with new `bridge_accounts`,
+  `bridge_contacts`, and `bridge_channels` tables so bridge daemons can persist
+  capabilities, session material, contact rosters, and channel memberships per
+  account.
+- Extended the Telegram and Signal bridge daemons to advertise capability maps
+  and roster/channel snapshots during the link handshake and wired the Elixir
+  connectors to sync those payloads into the new bridge data store with unit
+  coverage.
+- Extended the Telegram bridge daemon with outbound edit/delete handlers and richer inbound
+  normalisation so replies, entities, and media descriptors flow through to Msgr alongside
+  acknowledgements.
+- Added attachment upload support to the Signal REST client, including multipart handling for
+  inline data, pre-uploaded attachment IDs, and regression tests covering both code paths.
+- Implemented read acknowledgement tracking in the Telegram bridge so Telethon clients send
+  `send_read_acknowledge` calls when Msgr emits `ack_update`, and expanded unit tests to cover
+  stored contexts and unknown-update behaviour.
+- Added a Signal REST client built on `signal-cli-rest-api`, complete with polling, outbound send,
+  and acknowledgement tests plus documentation updates for the new adapter.
+- Scaffolded a Snapchat bridge package with session helpers, a queue-facing daemon skeleton, and
+  regression tests that record unimplemented invocations pending real API access.
+- Updated bridge documentation to reflect Telegram acknowledgement support, the Signal REST client,
+  and the Snapchat skeleton status.
+- Implemented a Matrix bridge daemon with disk-backed session management, queue handlers for
+  linking, outbound messaging, and update acknowledgements plus fake Matrix client support so the
+  SDK can talk to homeservers once real protocol adapters land.
+- Added Matrix bridge unit tests that exercise account linking, outbound message relays, inbound
+  update publication, and acknowledgement tracking through the StoneMQ client transport.
+- Documented the current bridge implementation gaps in `docs/bridge_status.md` so we know which
+  services still need real protocol clients before the deployments can run.
+- Implemented a Signal bridge daemon skeleton with device-link queue handlers, disk-backed session
+  management, and unit tests covering account linking, outbound messaging, and acknowledgement
+  workflows to mirror the WhatsApp/Telegram bridges.
+- Documented Signal support across the multi-bridge blueprint, architecture overview, and
+  integration kick-off notes, expanding the `msgr://` scheme, service action map, and lifecycle
+  guidance for device linking and sealed-sender handling.
+- Introduced a WhatsApp bridge daemon skeleton with client-protocol abstractions, disk-backed
+  session management, StoneMQ queue wiring, and unit tests covering QR pairing flows, outbound
+  messaging, and acknowledgement handling.
+- Documented WhatsApp support in the multi-bridge blueprint with queue contracts, lifecycle notes,
+  URL mappings, and failure-handling guidance so deployments can plan for multi-device pairing.
+- Implemented the first Telegram MTProto bridge daemon with a Telethon-compatible
+  client factory, disk-backed session store, StoneMQ queue wiring, and tests for
+  linking flows, outbound messaging, and update acknowledgements.
+- Extended the Python StoneMQ client with request-handler support so bridge
+  daemons can respond to `link_account` RPCs, including new unit tests covering
+  transport behaviour.
+- Expanded the bridge blueprint to cover XMPP and Telegram alongside Matrix/IRC, detailing
+  queue contracts, lifecycle expectations, and the `msgr://` scheme for new resources, plus updated
+  architecture notes for multi-service action maps and Telegram client emulation guidance.
+- Added instance-routing regression tests for the XMPP and Telegram connector facades so `send_stanza`
+  and `send_message` can target sharded bridge deployments while preserving default metadata.
+- Implemented instance-aware bridge routing so Msgr can target specific Matrix/IRC shards via `bridge/<service>/<bridge_id>/<action>` topics, updating the Elixir connector facade, Go/Python SDKs, docs, and tests to respect connection caps per daemon deployment.
+- Documented the initial Matrix and IRC bridge blueprint, covering MVP
+  transport goals, queue mappings, and an `msgr://` deep-linking scheme for
+  channels, identities, and messages.
 - Added MVP-plan for chat-klient i `docs/chat_client_mvp_plan.md`.
 - Added per-recipient message delivery receipts with database schema, REST and
   WebSocket acknowledgement flows, status propagation to messages, and test

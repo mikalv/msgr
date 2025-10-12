@@ -35,6 +35,14 @@ defmodule Messngr.Connectors.MatrixBridgeTest do
     assert message.payload.trace_id == "event"
   end
 
+  test "send_event/3 supports routing to a specific instance", %{bridge: bridge, agent: agent} do
+    params = %{room_id: "!room:server", event_type: "m.room.message", content: %{body: "Hello"}}
+    assert :ok = MatrixBridge.send_event(bridge, params, instance: "matrix-eu-1")
+
+    assert [message] = QueueRecorder.published(agent)
+    assert message.topic == "bridge/matrix/matrix-eu-1/outbound_event"
+  end
+
   test "ack_sync/3 publishes sync acknowledgement", %{bridge: bridge, agent: agent} do
     params = %{next_batch: "s72595_4483_1934", stream_position: 10}
     assert :ok = MatrixBridge.ack_sync(bridge, params, trace_id: "sync")
