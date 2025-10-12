@@ -1,7 +1,10 @@
 defmodule Messngr.ChatTest do
   use Messngr.DataCase
 
+  import Ecto.Query
+
   alias Messngr.{Accounts, Chat, Media, Repo}
+  alias Messngr.Chat.MessageReceipt
   alias Messngr.Media.Upload
 
   setup do
@@ -93,6 +96,9 @@ defmodule Messngr.ChatTest do
     page = Chat.list_messages(conversation.id)
     assert Enum.map(page.entries, & &1.body) == ["Hei"]
     assert page.meta.has_more == %{before: false, after: false}
+
+    receipts = Repo.all(from r in MessageReceipt, where: r.message_id == ^message.id)
+    assert [%MessageReceipt{status: :pending, recipient_id: ^profile_b.id}] = receipts
   end
 
   test "list_messages/2 respects limit", %{profile_a: profile_a, profile_b: profile_b} do
@@ -328,6 +334,54 @@ defmodule Messngr.ChatTest do
       assert_receive {:message_read, payload}
       assert payload[:profile_id] == other.id
       assert payload[:message_id] == message.id
+      assert Map.has_key?(payload, :device_id)
+    end
+
+    test "acknowledge_message_delivery/4 marks receipt delivered and broadcasts", %{
+      conversation: conversation,
+      message: message,
+      other: other
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      assert {:ok, %MessageReceipt{} = receipt} =
+               Chat.acknowledge_message_delivery(conversation.id, other.id, message.id)
+
+      assert receipt.status == :delivered
+      assert receipt.delivered_at
+
+      assert_receive {:message_delivered, payload}
+      assert payload[:profile_id] == other.id
+      assert payload[:message_id] == message.id
+      assert payload[:delivered_at]
+
+      updated_message = Repo.get!(Messngr.Chat.Message, message.id)
+      assert updated_message.status == :delivered
+    end
+
+    test "mark_message_read/4 escalates receipt status to read", %{
+      conversation: conversation,
+      message: message,
+      other: other
+    } do
+      :ok = Chat.subscribe_to_conversation(conversation.id)
+
+      {:ok, _} = Chat.acknowledge_message_delivery(conversation.id, other.id, message.id)
+
+      assert {:ok, _participant} =
+               Chat.mark_message_read(conversation.id, other.id, message.id)
+
+      receipt =
+        Repo.get_by!(MessageReceipt,
+          message_id: message.id,
+          recipient_id: other.id
+        )
+
+      assert receipt.status == :read
+      assert receipt.read_at
+
+      updated_message = Repo.get!(Messngr.Chat.Message, message.id)
+      assert updated_message.status == :read
     end
 
     test "update_message/4 updates body and broadcasts", %{

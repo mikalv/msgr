@@ -56,8 +56,12 @@ defmodule Messngr do
     Chat.unpin_message(conversation_id, profile_id, message_id)
   end
 
-  def mark_message_read(conversation_id, profile_id, message_id) do
-    Chat.mark_message_read(conversation_id, profile_id, message_id)
+  def mark_message_read(conversation_id, profile_id, message_id, opts \\ %{}) do
+    Chat.mark_message_read(conversation_id, profile_id, message_id, opts)
+  end
+
+  def acknowledge_message_delivery(conversation_id, profile_id, message_id, opts \\ %{}) do
+    Chat.acknowledge_message_delivery(conversation_id, profile_id, message_id, opts)
   end
 
   def update_message(conversation_id, profile_id, message_id, attrs) do

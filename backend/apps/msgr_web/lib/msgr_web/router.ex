@@ -35,6 +35,7 @@ defmodule MessngrWeb.Router do
     post "/conversations/:id/uploads", MediaUploadController, :create
     get "/conversations/:id/messages", MessageController, :index
     post "/conversations/:id/messages", MessageController, :create
+    post "/conversations/:id/messages/:message_id/delivery", MessageController, :deliver
     post "/conversations/:id/watch", ConversationController, :watch
     delete "/conversations/:id/watch", ConversationController, :unwatch
     get "/conversations/:id/watchers", ConversationController, :watchers

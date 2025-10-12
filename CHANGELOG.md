@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added per-recipient message delivery receipts with database schema, REST and
+  WebSocket acknowledgement flows, status propagation to messages, and test
+  coverage for delivery/read guarantees.
 - Added Markdown-lenkeformatering i chat-komponistens verktøylinje og et drahåndtak for høydejustering med nye widgettester og oppdatert paritetsplan.
 - Hardened chat composer phase A/B work: added autosave snapshot persistence with background sync manager, pessimistic send/queue states with retry UI, refreshed accessibility (focus order, semantics) and documented design & research updates.
 - Split the Flutter chat composer into a modular library with dedicated files

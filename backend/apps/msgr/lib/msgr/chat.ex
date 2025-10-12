@@ -12,11 +12,12 @@ defmodule Messngr.Chat do
     Conversation,
     Message,
     MessageReaction,
+    MessageReceipt,
     MessageThread,
     Participant,
     PinnedMessage
   }
-  alias Messngr.Accounts.Profile
+  alias Messngr.Accounts.{Device, Profile}
 
   @conversation_topic_prefix "conversation"
 
@@ -85,7 +86,9 @@ defmodule Messngr.Chat do
         |> Map.put_new_lazy("sent_at", fn -> DateTime.utc_now() end)
 
       case %Message{} |> Message.changeset(message_attrs) |> Repo.insert() do
-        {:ok, message} -> Repo.preload(message, :profile)
+        {:ok, message} ->
+          :ok = ensure_pending_receipts(message, conversation_id, profile_id)
+          Repo.preload(message, [:profile, receipts: [:recipient, :device]])
         {:error, reason} -> Repo.rollback(reason)
       end
     end)
@@ -233,9 +236,9 @@ defmodule Messngr.Chat do
     end
   end
 
-  @spec mark_message_read(binary(), binary(), binary()) ::
+  @spec mark_message_read(binary(), binary(), binary(), map()) ::
           {:ok, Participant.t()} | {:error, term()}
-  def mark_message_read(conversation_id, profile_id, message_id) do
+  def mark_message_read(conversation_id, profile_id, message_id, opts \\ %{}) do
     Repo.transaction(fn ->
       participant = ensure_participant!(conversation_id, profile_id)
       message = fetch_message!(conversation_id, message_id)
@@ -243,18 +246,67 @@ defmodule Messngr.Chat do
       read_at = DateTime.utc_now()
       attrs = %{last_read_at: read_at}
 
-      participant
-      |> Participant.changeset(attrs)
-      |> Repo.update()
-      |> case do
-        {:ok, updated} -> {updated, message, read_at}
+      device = resolve_receipt_device(participant, opts)
+
+      case Participant.changeset(participant, attrs) |> Repo.update() do
+        {:ok, updated} ->
+          {receipt, message_info} = mark_receipt_read(message, participant, read_at, device)
+          {updated, message, read_at, receipt, message_info}
+
         {:error, reason} -> Repo.rollback(reason)
       end
     end)
     |> case do
-      {:ok, {participant, message, read_at}} ->
-        broadcast_message_read(conversation_id, participant.profile_id, message.id, read_at)
+      {:ok, {participant, message, read_at, receipt, message_info}} ->
+        broadcast_message_read(
+          conversation_id,
+          participant.profile_id,
+          message.id,
+          read_at,
+          receipt && receipt.device_id
+        )
+
+        maybe_broadcast_message_status(message_info)
         {:ok, participant}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec acknowledge_message_delivery(binary(), binary(), binary(), map()) ::
+          {:ok, MessageReceipt.t()} | {:error, term()}
+  def acknowledge_message_delivery(conversation_id, profile_id, message_id, opts \\ %{}) do
+    Repo.transaction(fn ->
+      participant = ensure_participant!(conversation_id, profile_id)
+      message = fetch_message!(conversation_id, message_id)
+
+      receipt = fetch_receipt!(message, participant)
+      device = resolve_receipt_device(participant, opts)
+      delivered_at = DateTime.utc_now()
+
+      attrs =
+        %{}
+        |> Map.put(:status, :delivered)
+        |> Map.put(:delivered_at, delivered_at)
+        |> maybe_put(:device_id, device && device.id)
+
+      case MessageReceipt.changeset(receipt, attrs) |> Repo.update() do
+        {:ok, updated_receipt} ->
+          message_info =
+            maybe_update_message_status(message)
+            |> Map.put(:conversation_id, message.conversation_id)
+
+          {updated_receipt, delivered_at, message_info}
+
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+    |> case do
+      {:ok, {receipt, delivered_at, message_info}} ->
+        broadcast_message_delivered(message_info.conversation_id, receipt, delivered_at)
+        maybe_broadcast_message_status(message_info)
+        {:ok, Repo.preload(receipt, [:recipient, :device])}
 
       {:error, reason} ->
         {:error, reason}
@@ -386,7 +438,7 @@ defmodule Messngr.Chat do
       results
       |> Enum.take(limit)
       |> Enum.reverse()
-      |> Repo.preload(:profile)
+      |> Repo.preload([:profile, receipts: [:recipient, :device]])
 
     %{entries: entries, meta: build_meta(conversation_id, entries, pivot, :before, has_more_before)}
   end
@@ -414,14 +466,14 @@ defmodule Messngr.Chat do
     entries =
       results
       |> Enum.take(limit)
-      |> Repo.preload(:profile)
+      |> Repo.preload([:profile, receipts: [:recipient, :device]])
 
     %{entries: entries, meta: build_meta(conversation_id, entries, pivot, :after, has_more_after)}
   end
 
   defp list_messages_around(conversation_id, message_id, limit) do
     with %Message{conversation_id: ^conversation_id} = pivot <- Repo.get(Message, message_id) do
-      pivot = Repo.preload(pivot, :profile)
+      pivot = Repo.preload(pivot, [:profile, receipts: [:recipient, :device]])
 
       before_limit = div(limit, 2)
       after_limit = max(limit - before_limit - 1, 0)
@@ -1560,6 +1612,144 @@ defmodule Messngr.Chat do
   defp normalize_metadata(metadata) when is_map(metadata), do: metadata
   defp normalize_metadata(_metadata), do: Repo.rollback(:invalid_metadata)
 
+  defp ensure_pending_receipts(%Message{} = message, conversation_id, sender_profile_id) do
+    recipient_ids =
+      Repo.all(
+        from p in Participant,
+          where: p.conversation_id == ^conversation_id and p.profile_id != ^sender_profile_id,
+          select: p.profile_id
+      )
+
+    case recipient_ids do
+      [] -> :ok
+      ids ->
+        now = DateTime.utc_now()
+
+        entries =
+          Enum.map(ids, fn recipient_id ->
+            %{
+              id: Ecto.UUID.generate(),
+              message_id: message.id,
+              recipient_id: recipient_id,
+              status: "pending",
+              metadata: %{},
+              inserted_at: now,
+              updated_at: now
+            }
+          end)
+
+        Repo.insert_all(MessageReceipt, entries, on_conflict: :nothing)
+        :ok
+    end
+  end
+
+  defp resolve_receipt_device(_participant, opts) when opts in [%{}, nil], do: nil
+
+  defp resolve_receipt_device(%Participant{} = participant, opts) when is_map(opts) do
+    cond do
+      match?(%Device{}, opts[:device]) -> ensure_device_owner(opts[:device], participant)
+      device_id = Map.get(opts, :device_id) -> load_device_for_participant(device_id, participant)
+      device_id = Map.get(opts, "device_id") -> load_device_for_participant(device_id, participant)
+      device_id = Map.get(opts, "deviceId") -> load_device_for_participant(device_id, participant)
+      true -> nil
+    end
+  end
+
+  defp ensure_device_owner(%Device{} = device, %Participant{} = participant) do
+    cond do
+      is_binary(device.profile_id) and device.profile_id != participant.profile_id ->
+        Repo.rollback(:invalid_device)
+
+      true -> device
+    end
+  end
+
+  defp load_device_for_participant(device_id, %Participant{} = participant) do
+    case Repo.get(Device, device_id) do
+      %Device{} = device -> ensure_device_owner(device, participant)
+      nil -> Repo.rollback(:device_not_found)
+    end
+  end
+
+  defp mark_receipt_read(%Message{} = message, %Participant{} = participant, read_at, device) do
+    case Repo.get_by(MessageReceipt, message_id: message.id, recipient_id: participant.profile_id) do
+      nil ->
+        {nil,
+         maybe_update_message_status(message)
+         |> Map.put(:conversation_id, message.conversation_id)}
+
+      %MessageReceipt{} = receipt ->
+        attrs =
+          %{status: :read, read_at: read_at, delivered_at: receipt.delivered_at || read_at}
+          |> maybe_put(:device_id, device && device.id)
+
+        case MessageReceipt.changeset(receipt, attrs) |> Repo.update() do
+          {:ok, updated} ->
+            {updated,
+             maybe_update_message_status(message)
+             |> Map.put(:conversation_id, message.conversation_id)}
+
+          {:error, reason} -> Repo.rollback(reason)
+        end
+    end
+  end
+
+  defp fetch_receipt!(%Message{} = message, %Participant{} = participant) do
+    case Repo.get_by(MessageReceipt, message_id: message.id, recipient_id: participant.profile_id) do
+      %MessageReceipt{} = receipt -> receipt
+      nil -> Repo.rollback(:receipt_not_found)
+    end
+  end
+
+  defp maybe_update_message_status(%Message{} = message) do
+    statuses =
+      Repo.all(
+        from r in MessageReceipt,
+          where: r.message_id == ^message.id,
+          select: r.status
+      )
+
+    cond do
+      statuses == [] ->
+        %{message_id: message.id, status: message.status, status_changed?: false}
+
+      Enum.all?(statuses, &(&1 == :read)) ->
+        apply_message_status(message, :read)
+
+      Enum.all?(statuses, &(&1 in [:delivered, :read])) ->
+        apply_message_status(message, :delivered)
+
+      true ->
+        apply_message_status(message, :sent)
+    end
+  end
+
+  defp apply_message_status(%Message{} = message, status) do
+    if message.status == status do
+      %{message_id: message.id, status: status, status_changed?: false}
+    else
+      case Message.changeset(message, %{status: status}) |> Repo.update() do
+        {:ok, updated} -> %{message_id: updated.id, status: updated.status, status_changed?: true}
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end
+  end
+
+  defp maybe_broadcast_message_status(%{status_changed?: true, message_id: message_id, conversation_id: conversation_id}) do
+    message =
+      Message
+      |> Repo.get!(message_id)
+      |> Repo.preload([:profile, receipts: [:recipient, :device]])
+
+    broadcast_message_updated(%{message | conversation_id: conversation_id})
+    :ok
+  end
+
+  defp maybe_broadcast_message_status(_), do: :ok
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
   defp broadcast_reaction_added(conversation_id, %MessageReaction{} = reaction) do
     broadcast_conversation_event(conversation_id, {:reaction_added, reaction_payload(reaction)})
   end
@@ -1576,11 +1766,21 @@ defmodule Messngr.Chat do
     broadcast_conversation_event(conversation_id, {:message_unpinned, pinned_payload(pinned)})
   end
 
-  defp broadcast_message_read(conversation_id, profile_id, message_id, read_at) do
+  defp broadcast_message_delivered(conversation_id, %MessageReceipt{} = receipt, delivered_at) do
+    broadcast_conversation_event(conversation_id, {:message_delivered, %{
+      profile_id: receipt.recipient_id,
+      message_id: receipt.message_id,
+      delivered_at: delivered_at,
+      device_id: receipt.device_id
+    }})
+  end
+
+  defp broadcast_message_read(conversation_id, profile_id, message_id, read_at, device_id) do
     broadcast_conversation_event(conversation_id, {:message_read, %{
       profile_id: profile_id,
       message_id: message_id,
-      read_at: read_at
+      read_at: read_at,
+      device_id: device_id
     }})
   end
 
