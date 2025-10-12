@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added bridge catalog metadata, authentication session storage, and REST endpoints so clients can list bridges and bootstrap login flows with embedded browser/device-link guidance.
 - Drafted a bridge authentication and client experience plan covering OAuth/OIDC flows, UI wizard design, and future IP egress mitigation options.
 - Documented Snapchat web protocol capture details in `reverse/docs/snapchat.protocol.md` and outlined bridge implications.
 - Added a Snapchat service bridge facade with session refresh, messaging, and sync helpers plus test coverage.
