@@ -1,4 +1,5 @@
 import asyncio
+import json
 from typing import Awaitable, Callable, Dict
 
 import pytest
@@ -17,6 +18,7 @@ class MemoryTransport:
     def __init__(self) -> None:
         self.subscriptions: Dict[str, Callable[[bytes], Awaitable[None]]] = {}
         self.published: Dict[str, bytes] = {}
+        self.request_handlers: Dict[str, Callable[[bytes], Awaitable[bytes]]] = {}
 
     async def subscribe(self, topic: str, handler: Callable[[bytes], Awaitable[None]]) -> None:
         self.subscriptions[topic] = handler
@@ -26,6 +28,13 @@ class MemoryTransport:
         handler = self.subscriptions.get(topic)
         if handler is not None:
             await handler(body)
+
+    async def subscribe_request(self, topic: str, handler: Callable[[bytes], Awaitable[bytes]]) -> None:
+        self.request_handlers[topic] = handler
+
+    async def request(self, topic: str, body: bytes) -> bytes:
+        handler = self.request_handlers[topic]
+        return await handler(body)
 
 
 class RecordingTelemetry(NoopTelemetry):
@@ -94,6 +103,29 @@ def test_client_requires_handlers() -> None:
         except RuntimeError:
             return
         raise AssertionError("expected RuntimeError")
+
+    asyncio.run(scenario())
+
+
+def test_client_can_register_request_handlers() -> None:
+    transport = MemoryTransport()
+
+    async def scenario() -> None:
+        client = StoneMQClient("telegram", transport)
+
+        async def handler(envelope: Envelope) -> Dict[str, str]:
+            assert envelope.action == "link_account"
+            return {"status": "ok"}
+
+        client.register("inbound_update", lambda envelope: asyncio.sleep(0))
+        client.register_request("link_account", handler)
+        await client.start()
+
+        request_envelope = build_envelope("telegram", "link_account", {"user_id": "123"})
+        topic = topic_for("telegram", "link_account")
+        response_body = await transport.request(topic, request_envelope.to_json().encode("utf-8"))
+
+        assert json.loads(response_body.decode("utf-8")) == {"status": "ok"}
 
     asyncio.run(scenario())
 

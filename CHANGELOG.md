@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- Implemented the first Telegram MTProto bridge daemon with a Telethon-compatible
+  client factory, disk-backed session store, StoneMQ queue wiring, and tests for
+  linking flows, outbound messaging, and update acknowledgements.
+- Extended the Python StoneMQ client with request-handler support so bridge
+  daemons can respond to `link_account` RPCs, including new unit tests covering
+  transport behaviour.
 - Expanded the bridge blueprint to cover XMPP and Telegram alongside Matrix/IRC, detailing
   queue contracts, lifecycle expectations, and the `msgr://` scheme for new resources, plus updated
   architecture notes for multi-service action maps and Telegram client emulation guidance.
