@@ -51,3 +51,9 @@
 - Kartlegg beste praksis for Flutter chat-performance (f.eks. `flutter_chat_ui`, Matrix, Slack clones).
 - Evaluer existing open-source Double Ratchet implementasjoner i Elixir (f.eks. `pigeon` vs bindinger til libolm).
 - Finn norske/EU hostingleverandører med datasuverenitet + backup.
+
+## 9. Composer-innsikt Q2 2024
+- **Slack-funksjonsinventar**: Dokumenterte 37 interaksjonsdetaljer (tekstformatering, vedleggsflyt, feilstater) i [chat_composer_design_brief.md](docs/chat_composer_design_brief.md) for å avdekke gap mot målbildet.
+- **Interne brukerintervjuer**: Fem samtaler (support, salg, produkt) viser topp-3 pain points – manglende draft-sikkerhet, uklar feilhåndtering og utilgjengelig tastaturnavigasjon. Oppsummering og anbefalte tiltak er inkludert i avsnittet "Composer innsikt" i designbriefen.
+- **Tekniske gap**: Kartlagt mangler på autosave, offline-resiliens, link-unfurling, flere samtidige utkast og preview pipeline. Tiltakene er brutt ned i fase B-aktivitetene med eksplisitt owner på controller, cache og observability.
+- **Designbrief**: Revidert brief beskriver stater (default, skriving, sending, feilsituasjon, offline), hjelpetekster, kontrastkrav og tastaturnettverket. Briefen danner grunnlag for utviklingsoppgaver og QA-sjekkliste.
