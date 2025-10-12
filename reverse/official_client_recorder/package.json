@@ -6,13 +6,15 @@
     "client-recorder": "./src/record.js",
     "client-recorder-analyze": "./src/analyze.js",
     "client-recorder-extract": "./src/extract_resources.js",
-    "client-recorder-blobs": "./src/analyze_blobs.js"
+    "client-recorder-blobs": "./src/analyze_blobs.js",
+    "client-recorder-pretty": "./src/pretty_resources.js"
   },
   "scripts": {
     "record": "node src/record.js",
     "analyze": "node src/analyze.js",
     "extract": "node src/extract_resources.js",
-    "blobs": "node src/analyze_blobs.js"
+    "blobs": "node src/analyze_blobs.js",
+    "pretty": "node src/pretty_resources.js"
   },
   "engines": {
     "node": ">=18.0.0"

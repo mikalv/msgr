@@ -91,6 +91,16 @@ npm run extract -- --file captures/session-2024-01-01T12-00-00-000Z.jsonl --outp
 
 `client-recorder-extract` reads a JSONL capture, writes decoded responses (and optional prettified companions) under the chosen directory, and emits a manifest with URLs, status codes, and relative file paths. Use `--filter "<substring>"` to narrow by URL, `--limit N` to stop after N matches, and `--no-pretty-resources` if you only want the raw blobs.
 
+## Standalone Beautifier
+
+Already have a directory of resources and want prettified JSON/JS without re-recording? Run:
+
+```bash
+npm run pretty -- --dir tmp/resources
+```
+
+`client-recorder-pretty` walks the directory, skips existing `*.pretty.*` files (unless `--include-pretty`), and emits formatted companions for anything that looks like JSON or JavaScript. Use `--file <path>` to prettify a single blob, or `--max-bytes` to adjust the size threshold.
+
 ## Blob Analysis Toolkit
 
 Once you have a resource directory, surface the interesting payloads—protobuf bundles, giant JS blobs, JSON configs—with:
