@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Split the Flutter chat composer into a modular library with dedicated files
+  for the widget, toolbar, palettes, controller, models and voice helpers so it
+  is easier to navigate and maintain.
 - Added formatting toolbar, mention-autocomplete palette and mention tracking to
   the Flutter chat composer, including controller/result updates and new widget
   tests for the rich text actions.
