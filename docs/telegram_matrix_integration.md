@@ -4,6 +4,7 @@
 - Stand up a connector interface that emits intents onto a message queue instead of calling platform HTTP APIs directly.
 - Describe the shape of the Telegram, Matrix, IRC, and XMPP envelopes that bridge workers must understand.
 - Provide a roadmap for building language-specific daemons that handle the proprietary networking stacks (MTProto, Matrix CS, IRC, XMPP) and communicate with the Elixir core through StoneMQ or compatible brokers.
+- Capture the requirements for a full Telegram client emulation flow so Msgr users can log into their personal Telegram account without relying on bot restrictions.
 
 ## Connector Facade
 - The Elixir layer creates a `ServiceBridge` per platform and publishes actions to topics such as `bridge/telegram/outbound_message` (or `bridge/telegram/<instance>/outbound_message` when routing to a specific daemon shard).
@@ -28,3 +29,10 @@
 3. Extend account linking flows inside Msgr to persist queue-based credentials (e.g. storing Telegram session blobs instead of bot tokens).
 4. Build supervision trees that spin up connectors per linked account and subscribe to inbound queues for Telegram, Matrix, IRC, and XMPP events.
 5. Codify compliance guidelines for ToS-sensitive networks while prioritising ToS-free systems (IRC/XMPP) for early experiments.
+
+## Telegram Client Emulation Notes
+- **Authentication Flow**: Use GramJS (or another MTProto client) to perform device registration, `auth.sendCode`, and `auth.signIn` using the queue-driven `link_account` payload. The bridge must surface two-factor prompts back to Msgr for manual confirmation.
+- **Session Persistence**: Store MTProto session files in the credential vault and expose opaque references to the daemon. Rotate the session when Telegram invalidates device keys.
+- **Update Handling**: Maintain `updates.getDifference` cursors per bridge instance. Publish `inbound_update` envelopes that normalise chats, users, and message entities so Elixir can persist them without hitting the Telegram API directly.
+- **Outbound Parity**: Prefer the same method set as official clients (`messages.sendMessage`, `messages.editMessage`, `messages.deleteMessages`). Unsupported media types should be downgraded to descriptive placeholders until the Msgr media pipeline can upload native attachments.
+- **Rate Limits & Sharding**: Respect Telegram flood limits by routing high-volume work to sharded bridge instances via `bridge/telegram/<instance>/<action>` topics, keeping each daemon below the ~100-connection soft ceiling per data centre.

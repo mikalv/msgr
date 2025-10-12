@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- Expanded the bridge blueprint to cover XMPP and Telegram alongside Matrix/IRC, detailing
+  queue contracts, lifecycle expectations, and the `msgr://` scheme for new resources, plus updated
+  architecture notes for multi-service action maps and Telegram client emulation guidance.
+- Added instance-routing regression tests for the XMPP and Telegram connector facades so `send_stanza`
+  and `send_message` can target sharded bridge deployments while preserving default metadata.
 - Implemented instance-aware bridge routing so Msgr can target specific Matrix/IRC shards via `bridge/<service>/<bridge_id>/<action>` topics, updating the Elixir connector facade, Go/Python SDKs, docs, and tests to respect connection caps per daemon deployment.
 - Documented the initial Matrix and IRC bridge blueprint, covering MVP
   transport goals, queue mappings, and an `msgr://` deep-linking scheme for

@@ -10,14 +10,33 @@
 
 ## Data Flow
 1. **Inbound Messages**
-   - Daemon receives network traffic → emits canonical events to `bridge/<service>/inbound_event` (or `bridge/<service>/<instance>/inbound_event` when reporting from a sharded worker).
-   - Elixir subscribers normalise the payload, persist it, and schedule ack messages such as `ack_update`, `ack_sync`, or `ack_offset`.
+   - Daemon receives network traffic → emits canonical events to `bridge/<service>/inbound_event`
+     (or `bridge/<service>/<instance>/inbound_event` when reporting from a sharded worker). Service
+     implementations fan these out as `inbound_message` (Matrix/IRC), `inbound_stanza` (XMPP), or
+     `inbound_update` (Telegram) envelopes depending on the protocol.
+   - Elixir subscribers normalise the payload, persist it, and schedule ack messages such as
+     `ack_update`, `ack_sync`, `ack_offset`, or `ack_receipt`.
 2. **Outbound Messages**
-   - Clients send a message → backend records intent → publishes an outbound envelope (`outbound_message`, `outbound_event`, etc.). The `ServiceBridge` helper optionally scopes the topic to a daemon instance (`bridge/<service>/<instance>/<action>`) when we need to target a specific shard.
+   - Clients send a message → backend records intent → publishes an outbound envelope
+     (`outbound_message`, `outbound_event`, `outbound_stanza`, etc.). The `ServiceBridge` helper
+     optionally scopes the topic to a daemon instance (`bridge/<service>/<instance>/<action>`) when
+     we need to target a specific shard.
    - Daemon delivers the message using the platform protocol, then emits delivery status or errors referencing the original `trace_id`.
 3. **State Synchronisation**
    - Workers trigger periodic sync actions (`request_history`, `refresh_roster`) over the queue.
    - Daemons stream results and update tokens; Elixir writes checkpoints and notifies subscribers.
+
+## Service Action Map
+| Service  | Outbound Actions                                   | Inbound Actions                     | Ack/Control Actions                 |
+|----------|----------------------------------------------------|-------------------------------------|-------------------------------------|
+| Matrix   | `outbound_message`, `outbound_event`, `typing`      | `inbound_message`, membership feeds | `ack_sync`, `link_account` replies  |
+| IRC      | `outbound_message`, `outbound_command`             | `inbound_message`, `membership`     | `ack_offset`, `configure_identity`  |
+| XMPP     | `outbound_stanza`, `presence_update`               | `inbound_stanza`, roster snapshots  | `ack_receipt`, `link_account`       |
+| Telegram | `outbound_message`, `typing_update`, `media_stub`  | `inbound_update`, `state_update`    | `ack_update`, `link_account`        |
+
+The table captures the canonical actions our queue contracts use per service. Each bridge daemon
+implements a subset tailored to the network's capabilities and gradually expands coverage as new
+features land (e.g., Telegram media uploads, XMPP MAM export streaming).
 
 ## Conversation History Streaming
 - Clients request historical windows by pushing `message:sync` on the Phoenix conversation channel.

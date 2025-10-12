@@ -36,6 +36,15 @@ defmodule Messngr.Connectors.TelegramBridgeTest do
     assert message.payload.trace_id == "out"
   end
 
+  test "send_message/3 can target a bridge instance", %{bridge: bridge, agent: agent} do
+    params = %{chat_id: 42, message: "hei"}
+    assert :ok = TelegramBridge.send_message(bridge, params, instance: :mtproto_norway)
+
+    assert [message] = QueueRecorder.published(agent)
+    assert message.topic == "bridge/telegram/mtproto_norway/outbound_message"
+    assert message.payload.payload.metadata == %{}
+  end
+
   test "ack_update/3 notifies the worker", %{bridge: bridge, agent: agent} do
     params = %{update_id: 1001, status: :processed}
     assert :ok = TelegramBridge.ack_update(bridge, params, trace_id: "ack")
