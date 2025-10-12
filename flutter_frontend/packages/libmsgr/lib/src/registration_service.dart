@@ -66,17 +66,20 @@ class RegistrationService extends RegistrationServiceCore {
     return teams.map((e) => Team.fromJson(e)).toList();
   }
 
-  Future<Map<String, dynamic>?> selectTeam(String teamName, String token) {
+  Future<Map<String, dynamic>?> selectTeamForToken({
+    required String teamName,
+    required String token,
+  }) {
     return super.selectTeam(teamName: teamName, token: token);
   }
 
-  Future<Profile?> createProfile(
-    String teamName,
-    String token,
-    String username,
-    String firstName,
-    String lastName,
-  ) async {
+  Future<Profile?> createProfileForTeam({
+    required String teamName,
+    required String token,
+    required String username,
+    required String firstName,
+    required String lastName,
+  }) async {
     final result = await super.createProfile(
       teamName: teamName,
       token: token,

@@ -21,12 +21,13 @@ void Function(
   return (store, action, next) async {
     next(action);
     // TODO: Calling RegistrationService service directly is not good. Refactor this.
-    final result = await RegistrationService().createProfile(
-        store.state.authState.currentTeamName!,
-        store.state.authState.teamAccessToken!,
-        action.username,
-        action.firstName,
-        action.lastName);
+    final result = await RegistrationService().createProfileForTeam(
+      teamName: store.state.authState.currentTeamName!,
+      token: store.state.authState.teamAccessToken!,
+      username: action.username,
+      firstName: action.firstName,
+      lastName: action.lastName,
+    );
     if (result != null) {
       store.dispatch(OnCreateProfileSuccessAction(profile: result));
       store.dispatch(SelectAndAuthWithTeamAction(

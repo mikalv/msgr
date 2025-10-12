@@ -49,7 +49,10 @@ class AuthRepository extends BaseRepository<User> {
   }
 
   Future<Map<String, dynamic>?> selectTeam(String teamName, String token) {
-    return _registration.selectTeam(teamName, token);
+    return _registration.selectTeamForToken(
+      teamName: teamName,
+      token: token,
+    );
   }
 
   Future<Profile?> createProfile(
@@ -59,12 +62,12 @@ class AuthRepository extends BaseRepository<User> {
     String firstName,
     String lastName,
   ) async {
-    return _registration.createProfile(
-      teamName,
-      token,
-      username,
-      firstName,
-      lastName,
+    return _registration.createProfileForTeam(
+      teamName: teamName,
+      token: token,
+      username: username,
+      firstName: firstName,
+      lastName: lastName,
     );
   }
 
