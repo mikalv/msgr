@@ -15,7 +15,7 @@
 - ✅ **Non-OAuth credential hand-off** – Password/device credential submissions land in an ETS-backed inbox with field-level
   summaries stored on the session metadata so daemons can dequeue secrets without exposing them to the client.
 - ⚠️ **Daemon progress events** – Websocket push events, StoneMQ job signalling, and observability hooks are still TODO.
-- ⚠️ **Client UX** – Bridge list, wizard surfaces, websocket listeners, and analytics instrumentation have not started.
+- ✅ **Client UX (phase 1)** – Flutter client now ships a bridge catalog, filterable settings entry, and a multi-step wizard with embedded browser, credential forms, and status polling hooks. Websocket listeners and analytics remain TODO.
 - ⚠️ **Self-hosted/tunnel egress** – Both future IP mitigation options require design/implementation work and documentation.
 
 ## Guiding Principles

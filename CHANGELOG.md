@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added a Flutter bridge center with catalog filters, embedded browser wizard,
+  and credential forms backed by a new Bridge API client and widget tests so
+  end users can link chat networks without technical setup.
 - Implemented bridge OAuth browser endpoints, PKCE metadata handling, and an in-memory
   credential vault/inbox so sessions can complete start/callback flows and password-based
   connectors queue scrubbed credentials for daemon pickup, including controller and context tests.
