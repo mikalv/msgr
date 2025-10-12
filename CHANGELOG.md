@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- Extended the Telegram bridge daemon with outbound edit/delete handlers and richer inbound
+  normalisation so replies, entities, and media descriptors flow through to Msgr alongside
+  acknowledgements.
+- Added attachment upload support to the Signal REST client, including multipart handling for
+  inline data, pre-uploaded attachment IDs, and regression tests covering both code paths.
 - Implemented read acknowledgement tracking in the Telegram bridge so Telethon clients send
   `send_read_acknowledge` calls when Msgr emits `ack_update`, and expanded unit tests to cover
   stored contexts and unknown-update behaviour.

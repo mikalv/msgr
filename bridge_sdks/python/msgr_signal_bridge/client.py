@@ -5,12 +5,16 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import mimetypes
+import os
+from io import BytesIO
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Awaitable, Callable, Dict, Mapping, MutableMapping, Optional, Protocol
 from urllib import error as urlerror
 from urllib import parse as urlparse
 from urllib import request as urlrequest
+from uuid import uuid4
 
 UpdateHandler = Callable[[Mapping[str, object]], Awaitable[None]]
 
@@ -124,6 +128,8 @@ class HttpTransport(Protocol):
         *,
         params: Optional[Mapping[str, object]] = None,
         json_body: Optional[Mapping[str, object]] = None,
+        data: Optional[bytes] = None,
+        headers: Optional[Mapping[str, str]] = None,
     ) -> HttpResponse:
         ...
 
@@ -142,9 +148,11 @@ class UrlLibTransport:
         *,
         params: Optional[Mapping[str, object]] = None,
         json_body: Optional[Mapping[str, object]] = None,
+        data: Optional[bytes] = None,
+        headers: Optional[Mapping[str, str]] = None,
     ) -> HttpResponse:
         return await asyncio.to_thread(
-            self._execute_request, method.upper(), path, params, json_body
+            self._execute_request, method.upper(), path, params, json_body, data, headers
         )
 
     def _execute_request(
@@ -153,16 +161,22 @@ class UrlLibTransport:
         path: str,
         params: Optional[Mapping[str, object]],
         json_body: Optional[Mapping[str, object]],
+        data: Optional[bytes],
+        headers: Optional[Mapping[str, str]],
     ) -> HttpResponse:
         query = f"?{urlparse.urlencode(params)}" if params else ""
         url = f"{self._base_url}{path}{query}"
-        data: Optional[bytes] = None
-        headers = {"Content-Type": "application/json"}
+        body: Optional[bytes] = data
+        header_map = {"Content-Type": "application/json"}
+        if headers:
+            header_map.update(headers)
         if json_body is not None:
-            data = json.dumps(json_body).encode("utf-8")
+            if body is not None:
+                raise ValueError("cannot provide both json_body and raw data")
+            body = json.dumps(json_body).encode("utf-8")
 
-        request = urlrequest.Request(url, data=data, method=method)
-        for header, value in headers.items():
+        request = urlrequest.Request(url, data=body, method=method)
+        for header, value in header_map.items():
             request.add_header(header, value)
 
         try:
@@ -315,7 +329,19 @@ class SignalRestClient(SignalClientProtocol):
             "account": self._account,
         }
         if attachments:
-            payload["attachments"] = attachments
+            attachment_ids: list[str] = []
+            for attachment in attachments:
+                attachment_id: Optional[str] = None
+                if isinstance(attachment, Mapping):
+                    attachment_id = _preuploaded_attachment_id(attachment)
+                    if attachment_id is None:
+                        attachment_id = await self._upload_attachment(attachment)
+                elif isinstance(attachment, str):
+                    attachment_id = attachment
+                if attachment_id is not None:
+                    attachment_ids.append(str(attachment_id))
+            if attachment_ids:
+                payload["attachments"] = attachment_ids
         if metadata:
             payload["metadata"] = metadata
 
@@ -334,6 +360,48 @@ class SignalRestClient(SignalClientProtocol):
             if "message_id" in body:
                 result["message_id"] = body["message_id"]
         return result
+
+    async def _upload_attachment(
+        self, attachment: Mapping[str, object]
+    ) -> Optional[str]:
+        data = _attachment_bytes(attachment)
+        if data is None:
+            return None
+
+        filename = _attachment_filename(attachment)
+        content_type = _attachment_content_type(attachment)
+
+        boundary = f"----MsgrSignalBoundary{uuid4().hex}"
+        body = BytesIO()
+        body.write(f"--{boundary}\r\n".encode("utf-8"))
+        body.write(
+            (
+                f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
+                f"Content-Type: {content_type}\r\n\r\n"
+            ).encode("utf-8")
+        )
+        body.write(data)
+        body.write("\r\n".encode("utf-8"))
+        body.write(f"--{boundary}--\r\n".encode("utf-8"))
+
+        response = await self._transport.request(
+            "POST",
+            "/v1/attachments",
+            data=body.getvalue(),
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        )
+
+        if response.status not in (200, 201):
+            raise SignalServiceError(
+                f"failed to upload attachment for {self._account}: {response.status}"
+            )
+
+        payload = _safe_json(response.body)
+        if isinstance(payload, Mapping):
+            for key in ("id", "attachmentId", "attachment_id", "attachment"):
+                if key in payload:
+                    return str(payload[key])
+        raise SignalServiceError("attachment upload did not return an identifier")
 
     def add_event_handler(self, handler: UpdateHandler) -> None:
         self._handlers[handler] = handler
@@ -409,6 +477,51 @@ class SignalRestClient(SignalClientProtocol):
             json.dumps(self._session_cache, ensure_ascii=False, sort_keys=True),
             encoding="utf-8",
         )
+
+
+def _attachment_bytes(attachment: Mapping[str, object]) -> Optional[bytes]:
+    if "data" in attachment:
+        raw = attachment["data"]
+        if isinstance(raw, bytes):
+            return raw
+        if isinstance(raw, str):
+            try:
+                return base64.b64decode(raw.encode("ascii"))
+            except (ValueError, UnicodeEncodeError):
+                return raw.encode("utf-8")
+    path_value = attachment.get("path") or attachment.get("file")
+    if isinstance(path_value, (str, os.PathLike)):
+        path = Path(path_value)
+        if path.exists():
+            return path.read_bytes()
+    return None
+
+
+def _preuploaded_attachment_id(attachment: Mapping[str, object]) -> Optional[str]:
+    for key in ("id", "attachment", "attachment_id", "attachmentId"):
+        value = attachment.get(key)
+        if isinstance(value, (str, int)):
+            return str(value)
+    return None
+
+
+def _attachment_filename(attachment: Mapping[str, object]) -> str:
+    name = attachment.get("filename") or attachment.get("name")
+    if isinstance(name, str) and name:
+        return name
+    path_value = attachment.get("path") or attachment.get("file")
+    if isinstance(path_value, (str, os.PathLike)):
+        return Path(path_value).name
+    return "attachment.bin"
+
+
+def _attachment_content_type(attachment: Mapping[str, object]) -> str:
+    content_type = attachment.get("content_type") or attachment.get("mime_type")
+    if isinstance(content_type, str) and content_type:
+        return content_type
+    filename = _attachment_filename(attachment)
+    guess, _ = mimetypes.guess_type(filename)
+    return guess or "application/octet-stream"
 
 
 def _safe_json(body: bytes) -> object:

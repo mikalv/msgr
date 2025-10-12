@@ -32,6 +32,8 @@ class TelegramBridgeDaemon:
         self._ack_state: Dict[int, Mapping[str, object]] = {}
 
         self._client.register("outbound_message", self._handle_outbound_message)
+        self._client.register("outbound_edit_message", self._handle_edit_message)
+        self._client.register("outbound_delete_message", self._handle_delete_message)
         self._client.register("ack_update", self._handle_ack_update)
         self._client.register_request("link_account", self._handle_link_account)
 
@@ -128,6 +130,45 @@ class TelegramBridgeDaemon:
             reply_to=reply_to,
             media=media,
         )
+
+    async def _handle_edit_message(self, envelope: Envelope) -> None:
+        payload = envelope.payload
+        metadata = envelope.metadata
+        user_id = metadata.get("user_id", self._default_user_id)
+        if user_id is None:
+            raise RuntimeError("user_id metadata required for edit messages")
+
+        chat_id = int(payload["chat_id"])
+        message_id = int(payload["message_id"])
+        message = str(payload.get("message", ""))
+        entities = payload.get("entities")
+
+        client = await self._sessions.ensure_client(str(user_id))
+        await client.edit_text_message(
+            chat_id,
+            message_id,
+            message,
+            entities=entities,
+        )
+
+    async def _handle_delete_message(self, envelope: Envelope) -> None:
+        payload = envelope.payload
+        metadata = envelope.metadata
+        user_id = metadata.get("user_id", self._default_user_id)
+        if user_id is None:
+            raise RuntimeError("user_id metadata required for delete messages")
+
+        chat_id = int(payload["chat_id"])
+        message_ids_raw = payload.get("message_ids")
+        revoke = bool(payload.get("revoke", True))
+
+        if isinstance(message_ids_raw, (list, tuple)):
+            message_ids = [int(mid) for mid in message_ids_raw]
+        else:
+            message_ids = [int(payload["message_id"])]
+
+        client = await self._sessions.ensure_client(str(user_id))
+        await client.delete_messages(chat_id, message_ids, revoke=revoke)
 
     async def _handle_ack_update(self, envelope: Envelope) -> None:
         payload = envelope.payload

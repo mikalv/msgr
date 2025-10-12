@@ -1,4 +1,6 @@
 import asyncio
+import asyncio
+import base64
 import json
 from collections import deque
 from pathlib import Path
@@ -12,7 +14,16 @@ from msgr_signal_bridge import (
 
 class FakeTransport:
     def __init__(self) -> None:
-        self.requests: deque[Tuple[str, str, Optional[Mapping[str, object]], Optional[Mapping[str, object]]]] = deque()
+        self.requests: deque[
+            Tuple[
+                str,
+                str,
+                Optional[Mapping[str, object]],
+                Optional[Mapping[str, object]],
+                Optional[bytes],
+                Optional[Mapping[str, str]],
+            ]
+        ] = deque()
         self.responses: deque[HttpResponse] = deque()
 
     def queue_response(
@@ -41,8 +52,10 @@ class FakeTransport:
         *,
         params: Optional[Mapping[str, object]] = None,
         json_body: Optional[Mapping[str, object]] = None,
+        data: Optional[bytes] = None,
+        headers: Optional[Mapping[str, str]] = None,
     ) -> HttpResponse:
-        self.requests.append((method, path, params, json_body))
+        self.requests.append((method, path, params, json_body, data, headers))
         if not self.responses:
             raise AssertionError("no response queued for request")
         return self.responses.popleft()
@@ -133,7 +146,38 @@ def test_send_text_message(tmp_path: Path) -> None:
         payload = transport.requests[0][3]
         assert payload is not None
         assert payload["recipient"] == "+4798765432"
-        assert payload["attachments"] == [{"attachment": "id"}]
+        assert payload["attachments"] == ["id"]
+
+    _run(scenario)
+
+
+def test_send_text_message_with_inline_attachment(tmp_path: Path) -> None:
+    transport = FakeTransport()
+    transport.queue_response(201, {"id": 42})
+    transport.queue_response(200, {"timestamp": 456})
+    client = SignalRestClient(
+        "+4700000000",
+        transport=transport,
+        session_path=tmp_path / "session.json",
+    )
+
+    async def scenario() -> None:
+        await client.connect()
+        await client.send_text_message(
+            "+4711111111",
+            "photo",
+            attachments=[{"data": base64.b64encode(b"test").decode("ascii"), "filename": "pic.jpg"}],
+        )
+
+        assert len(transport.requests) == 2
+        upload_request = transport.requests[0]
+        assert upload_request[:2] == ("POST", "/v1/attachments")
+        assert upload_request[4] is not None
+        assert upload_request[5] and "multipart/form-data" in upload_request[5]["Content-Type"]
+        message_request = transport.requests[1]
+        assert message_request[:2] == ("POST", "/v1/messages")
+        payload = message_request[3]
+        assert payload is not None and payload["attachments"] == ["42"]
 
     _run(scenario)
 

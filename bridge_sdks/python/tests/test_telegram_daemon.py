@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, Mapping, Optional
+from types import SimpleNamespace
+from typing import Awaitable, Callable, Dict, Mapping, Optional, Sequence
 
 from msgr_bridge_sdk import StoneMQClient, build_envelope
 from msgr_telegram_bridge import SessionManager, SessionStore, TelegramBridgeDaemon
@@ -41,6 +42,8 @@ class FakeTelegramClient:
         self.profile = UserProfile(id=100, username="alice", first_name="Alice", last_name=None)
         self.connected = False
         self.sent_messages: list[Mapping[str, object]] = []
+        self.edited_messages: list[Mapping[str, object]] = []
+        self.deleted_messages: list[Mapping[str, object]] = []
         self.handlers: list[Callable[[Mapping[str, object]], Awaitable[None]]] = []
         self.login_requests: list[str] = []
         self.sign_in_attempts: list[tuple[str, str, Optional[str]]] = []
@@ -94,6 +97,38 @@ class FakeTelegramClient:
         self.sent_messages.append(payload)
         return {"chat_id": chat_id, "message_id": len(self.sent_messages)}
 
+    async def edit_text_message(
+        self,
+        chat_id: int,
+        message_id: int,
+        message: str,
+        *,
+        entities: Optional[list] = None,
+    ) -> Mapping[str, object]:
+        payload = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "message": message,
+            "entities": entities,
+        }
+        self.edited_messages.append(payload)
+        return payload
+
+    async def delete_messages(
+        self,
+        chat_id: int,
+        message_ids: Sequence[int],
+        *,
+        revoke: bool = True,
+    ) -> None:
+        self.deleted_messages.append(
+            {
+                "chat_id": chat_id,
+                "message_ids": list(message_ids),
+                "revoke": revoke,
+            }
+        )
+
     def add_update_handler(self, handler: Callable[[Mapping[str, object]], Awaitable[None]]) -> None:
         self.handlers.append(handler)
 
@@ -114,13 +149,59 @@ class FakeTelegramClient:
     async def send_read_acknowledge(self, peer: object, *, max_id: int) -> None:
         self.read_receipts.append((peer, max_id))
 
-    async def dispatch_update(self, update: Mapping[str, object]) -> None:
-        update_id = int(update.get("update_id", 0))
-        message_id = int(update.get("message_id", update_id))
-        peer = update.get("peer", update.get("chat_id"))
+    async def dispatch_update(self, update) -> None:
+        peer_obj = None
+        if isinstance(update, Mapping):
+            payload = dict(update)
+        else:
+            message = getattr(update, "message", None)
+            peer = getattr(message, "peer_id", None)
+            peer_obj = peer
+            chat_id = None
+            if isinstance(peer, Mapping):
+                chat_id = peer.get("chat_id") or peer.get("channel_id") or peer.get("user_id")
+            else:
+                for attr in ("channel_id", "chat_id", "user_id"):
+                    value = getattr(peer, attr, None)
+                    if value is not None:
+                        chat_id = value
+                        break
+            payload = {
+                "update_id": getattr(update, "pts", getattr(message, "id", 0)),
+                "chat_id": chat_id,
+                "message": getattr(message, "message", ""),
+                "sender": getattr(message, "from_id", None),
+                "message_id": getattr(message, "id", None),
+                "update_type": update.__class__.__name__,
+            }
+            reply = getattr(message, "reply_to_msg_id", None)
+            if reply is not None:
+                payload["reply_to"] = reply
+            entities = getattr(message, "entities", None)
+            if entities is not None:
+                payload["entities"] = [
+                    getattr(entity, "__dict__", dict(entity)) if isinstance(entity, Mapping) else {
+                        "type": entity.__class__.__name__,
+                        "offset": getattr(entity, "offset", None),
+                        "length": getattr(entity, "length", None),
+                    }
+                    for entity in entities
+                ]
+            media = getattr(message, "media", None)
+            if media is not None:
+                if hasattr(media, "to_dict"):
+                    payload["media"] = media.to_dict()
+                elif isinstance(media, Mapping):
+                    payload["media"] = dict(media)
+                else:
+                    payload["media"] = {"type": media.__class__.__name__}
+
+        update_id = int(payload.get("update_id", 0) or 0)
+        message_id = int(payload.get("message_id", update_id) or 0)
+        peer = peer_obj if peer_obj is not None else payload.get("peer", payload.get("chat_id"))
         self.pending_ack[update_id] = {"peer": peer, "message_id": message_id}
         for handler in list(self.handlers):
-            await handler(update)
+            await handler({k: v for k, v in payload.items() if k != "peer"})
 
 
 class FakeClientFactory:
@@ -264,6 +345,129 @@ def test_outbound_message_routes_to_client(tmp_path: Path) -> None:
         ]
 
     _run(scenario)
+
+
+def test_edit_message_routes_to_client(tmp_path: Path) -> None:
+    client = FakeTelegramClient()
+    daemon, transport, _, _ = _build_daemon(tmp_path, client)
+
+    async def scenario() -> None:
+        await daemon.start()
+        request = _link_payload(b"seed-session")
+        topic = "bridge/telegram/link_account"
+        await transport.request(topic, request.to_json().encode("utf-8"))
+
+        outbound = build_envelope(
+            "telegram",
+            "outbound_edit_message",
+            {"chat_id": 200, "message_id": 10, "message": "Hei", "entities": [{"type": "bold"}]},
+            metadata={"user_id": "42"},
+        )
+        outbound_topic = "bridge/telegram/outbound_edit_message"
+        await transport.publish(outbound_topic, outbound.to_json().encode("utf-8"))
+
+        assert client.edited_messages == [
+            {
+                "chat_id": 200,
+                "message_id": 10,
+                "message": "Hei",
+                "entities": [{"type": "bold"}],
+            }
+        ]
+
+    _run(scenario)
+
+
+def test_delete_message_routes_to_client(tmp_path: Path) -> None:
+    client = FakeTelegramClient()
+    daemon, transport, _, _ = _build_daemon(tmp_path, client)
+
+    async def scenario() -> None:
+        await daemon.start()
+        request = _link_payload(b"seed-session")
+        topic = "bridge/telegram/link_account"
+        await transport.request(topic, request.to_json().encode("utf-8"))
+
+        outbound = build_envelope(
+            "telegram",
+            "outbound_delete_message",
+            {"chat_id": 200, "message_ids": [10, 11], "revoke": False},
+            metadata={"user_id": "42"},
+        )
+        outbound_topic = "bridge/telegram/outbound_delete_message"
+        await transport.publish(outbound_topic, outbound.to_json().encode("utf-8"))
+
+        assert client.deleted_messages == [
+            {"chat_id": 200, "message_ids": [10, 11], "revoke": False}
+        ]
+
+    _run(scenario)
+
+
+def test_inbound_update_from_object(tmp_path: Path) -> None:
+    client = FakeTelegramClient()
+    daemon, transport, _, _ = _build_daemon(tmp_path, client)
+
+    from msgr_telegram_bridge import client as telegram_client_module
+
+    original_types = telegram_client_module.types
+
+    class StubPeer:
+        def __init__(self) -> None:
+            self.user_id = 321
+
+    class StubEntity:
+        def __init__(self) -> None:
+            self.offset = 0
+            self.length = 4
+
+    class StubMedia:
+        def to_dict(self) -> Mapping[str, object]:
+            return {"type": "photo", "id": "media-1"}
+
+    class StubMessage:
+        def __init__(self) -> None:
+            self.id = 12
+            self.message = "Ping"
+            self.peer_id = StubPeer()
+            self.from_id = 777
+            self.reply_to_msg_id = 5
+            self.entities = [StubEntity()]
+            self.media = StubMedia()
+
+    class StubUpdate:
+        def __init__(self) -> None:
+            self.message = StubMessage()
+            self.pts = 200
+
+    telegram_client_module.types = SimpleNamespace(
+        UpdateNewMessage=StubUpdate,
+        UpdateNewChannelMessage=None,
+        UpdateEditMessage=None,
+        UpdateEditChannelMessage=None,
+    )
+
+    async def scenario() -> None:
+        await daemon.start()
+        request = _link_payload(b"seed-session")
+        topic = "bridge/telegram/link_account"
+        await transport.request(topic, request.to_json().encode("utf-8"))
+
+        await client.dispatch_update(StubUpdate())
+
+        update_topic = "bridge/telegram/inbound_update"
+        assert update_topic in transport.published
+        envelope = json.loads(transport.published[update_topic].decode("utf-8"))
+        payload = envelope["payload"]
+        assert payload["update_type"] == "StubUpdate"
+        assert payload["entities"]
+        assert payload["media"]["type"] == "photo"
+        assert payload["reply_to"] == 5
+
+    try:
+        _run(scenario)
+    finally:
+        telegram_client_module.types = original_types
 
 
 def test_ack_update_marks_state(tmp_path: Path) -> None:

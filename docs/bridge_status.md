@@ -21,14 +21,15 @@ before we can run them against the real networks.
 
 ## Telegram
 - **Code status**: The MTProto daemon in `bridge_sdks/python/msgr_telegram_bridge` now records
-  message identifiers and issues Telethon read acknowledgements when the backend publishes
-  `ack_update`. Login, session persistence, outbound messaging, and inbound update forwarding are
-  implemented, but rich media/file transfer is still deferred.
-- **Missing work**: Flesh out media handling, test acknowledgements against channels/supergroups,
-  and exercise the Telethon adapter with live integration tests plus runtime configuration
-  management.
-- **Operational blockers**: Requires Telethon dependencies and API credentials; without media
-  support we will drop attachments on the floor.
+  message identifiers, issues Telethon read acknowledgements when the backend publishes
+  `ack_update`, supports outbound edits/deletions, and normalises inbound updates with reply
+  metadata, entities, and media descriptors. Login, session persistence, outbound messaging, and
+  inbound update forwarding are implemented.
+- **Missing work**: Flesh out rich media uploads (videos/documents), test acknowledgements against
+  channels/supergroups, and exercise the Telethon adapter with live integration tests plus runtime
+  configuration management.
+- **Operational blockers**: Requires Telethon dependencies and API credentials; media uploads beyond
+  inline photos/files are still deferred.
 
 ## WhatsApp
 - **Code status**: Only protocol interfaces and session helpers exist in
@@ -42,11 +43,12 @@ before we can run them against the real networks.
 
 ## Signal
 - **Code status**: The bridge now ships with a REST client that targets `signal-cli-rest-api`,
-  handling account linking, outbound messaging, inbound polling, and acknowledgement cleanup while
-  persisting session hints to disk. The daemon wiring from previous work remains and now has a
-  concrete client implementation.
-- **Missing work**: Harden the REST client with attachment uploads, error retry/backoff, device slot
-  management, and end-to-end integration tests against a running `signal-cli` deployment.
+  handling account linking, outbound messaging with attachment uploads, inbound polling, and
+  acknowledgement cleanup while persisting session hints to disk. The daemon wiring from previous
+  work remains and now has a concrete client implementation.
+- **Missing work**: Harden the REST client with streaming uploads for large media, error
+  retry/backoff, device slot management, and end-to-end integration tests against a running
+  `signal-cli` deployment.
 - **Operational blockers**: Operators must deploy and secure the REST API, provision device slots,
   and feed credentials before the bridge can join the real network.
 

@@ -5,7 +5,17 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Awaitable, Callable, Dict, Mapping, Optional, Protocol, Tuple
+from typing import (
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    Mapping,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+)
 
 UpdateHandler = Callable[[Mapping[str, object]], Awaitable[None]]
 
@@ -98,6 +108,25 @@ class TelegramClientProtocol(Protocol):
         reply_to: Optional[int] = None,
         media: Optional[Mapping[str, object]] = None,
     ) -> Mapping[str, object]:
+        ...
+
+    async def edit_text_message(
+        self,
+        chat_id: int,
+        message_id: int,
+        message: str,
+        *,
+        entities: Optional[list] = None,
+    ) -> Mapping[str, object]:
+        ...
+
+    async def delete_messages(
+        self,
+        chat_id: int,
+        message_ids: Sequence[int],
+        *,
+        revoke: bool = True,
+    ) -> None:
         ...
 
     def add_update_handler(self, handler: UpdateHandler) -> None:
@@ -211,6 +240,32 @@ class _TelethonClient(TelegramClientProtocol):  # pragma: no cover - requires te
             "chat_id": chat_id,
         }
 
+    async def edit_text_message(
+        self,
+        chat_id: int,
+        message_id: int,
+        message: str,
+        *,
+        entities: Optional[list] = None,
+    ) -> Mapping[str, object]:
+        kwargs: Dict[str, object] = {"message": message}
+        if entities is not None:
+            kwargs["entities"] = entities
+        message_obj = await self._client.edit_message(chat_id, message_id, **kwargs)
+        return {
+            "message_id": getattr(message_obj, "id", message_id),
+            "chat_id": chat_id,
+        }
+
+    async def delete_messages(
+        self,
+        chat_id: int,
+        message_ids: Sequence[int],
+        *,
+        revoke: bool = True,
+    ) -> None:
+        await self._client.delete_messages(chat_id, list(message_ids), revoke=revoke)
+
     def add_update_handler(self, handler: UpdateHandler) -> None:
         async def _wrapped(event) -> None:
             payload, ack_context = await _normalise_update(self._client, event)
@@ -256,37 +311,83 @@ def _normalise_user(user) -> UserProfile:
 async def _normalise_update(client, event) -> Tuple[Optional[Dict[str, object]], Optional[_AckContext]]:
     update = getattr(event, "update", event)
 
-    if types is None:
-        return None, None
-
-    if isinstance(update, types.UpdateNewMessage):  # type: ignore[attr-defined]
-        message = update.message
-        update_id = getattr(update, "pts", None) or getattr(message, "id", None)
-        peer = getattr(message, "peer_id", None)
-        chat_id = _extract_peer_id(peer)
-        if chat_id is None:
-            return None, None
-        text = getattr(message, "message", "")
-        message_id = getattr(message, "id", None)
+    if isinstance(update, Mapping):
+        payload = dict(update)
+        payload.setdefault("update_type", "mapping")
+        message_id = payload.get("message_id")
+        peer = payload.get("peer")
         ack_context = None
         if peer is not None and message_id is not None:
             try:
-                input_peer = await client.get_input_entity(peer)
-            except Exception:  # pragma: no cover - Telethon raises rich errors
-                input_peer = None
-            if input_peer is not None:
-                ack_context = _AckContext(peer=input_peer, message_id=int(message_id))
-        payload: Dict[str, object] = {
-            "update_id": update_id,
-            "chat_id": chat_id,
-            "message": text,
-            "sender": getattr(message, "from_id", None),
-        }
-        if message_id is not None:
-            payload["message_id"] = int(message_id)
+                ack_context = _AckContext(peer=peer, message_id=int(message_id))
+            except (TypeError, ValueError):
+                ack_context = None
         return payload, ack_context
 
+    if types is None:
+        return None, None
+
+    message_update_classes = [
+        getattr(types, "UpdateNewMessage", None),
+        getattr(types, "UpdateNewChannelMessage", None),
+        getattr(types, "UpdateEditMessage", None),
+        getattr(types, "UpdateEditChannelMessage", None),
+    ]
+
+    for klass in message_update_classes:
+        if klass is not None and isinstance(update, klass):
+            return await _normalise_message_update(client, update)
+
     return None, None
+
+
+async def _normalise_message_update(client, update) -> Tuple[Optional[Dict[str, object]], Optional[_AckContext]]:
+    message = getattr(update, "message", None)
+    if message is None:
+        return None, None
+
+    update_id = getattr(update, "pts", None) or getattr(message, "id", None)
+    peer = getattr(message, "peer_id", None)
+    chat_id = _extract_peer_id(peer)
+    if chat_id is None:
+        return None, None
+
+    text = getattr(message, "message", "") or ""
+    message_id = getattr(message, "id", None)
+    ack_context = None
+    if peer is not None and message_id is not None:
+        try:
+            input_peer = await client.get_input_entity(peer)
+        except Exception:  # pragma: no cover - Telethon raises rich errors
+            input_peer = None
+        if input_peer is not None:
+            ack_context = _AckContext(peer=input_peer, message_id=int(message_id))
+
+    payload: Dict[str, object] = {
+        "update_id": int(update_id) if update_id is not None else None,
+        "chat_id": chat_id,
+        "message": text,
+        "sender": getattr(message, "from_id", None),
+        "update_type": type(update).__name__,
+    }
+    if message_id is not None:
+        payload["message_id"] = int(message_id)
+
+    reply_to = _extract_reply_to(message)
+    if reply_to is not None:
+        payload["reply_to"] = reply_to
+
+    entities = getattr(message, "entities", None)
+    if isinstance(entities, Iterable):
+        serialised = [_serialise_entity(entity) for entity in entities]
+        payload["entities"] = [entity for entity in serialised if entity is not None]
+
+    media = getattr(message, "media", None)
+    serialised_media = _serialise_media(media)
+    if serialised_media is not None:
+        payload["media"] = serialised_media
+
+    return payload, ack_context
 
 
 def _extract_peer_id(peer) -> Optional[int]:
@@ -298,6 +399,72 @@ def _extract_peer_id(peer) -> Optional[int]:
         if value is not None:
             return int(value)
     return None
+
+
+def _extract_reply_to(message) -> Optional[int]:
+    reply = getattr(message, "reply_to_msg_id", None)
+    if reply is not None:
+        try:
+            return int(reply)
+        except (TypeError, ValueError):
+            return None
+    reply_obj = getattr(message, "reply_to", None)
+    if reply_obj is not None:
+        for attr in ("reply_to_msg_id", "reply_to_msgid", "mid"):
+            value = getattr(reply_obj, attr, None)
+            if value is not None:
+                try:
+                    return int(value)
+                except (TypeError, ValueError):
+                    return None
+    return None
+
+
+def _serialise_entity(entity) -> Optional[Dict[str, object]]:
+    if entity is None:
+        return None
+    if isinstance(entity, Mapping):
+        return dict(entity)
+    if hasattr(entity, "to_dict"):
+        try:
+            data = entity.to_dict()
+            if isinstance(data, dict):
+                data.setdefault("type", entity.__class__.__name__)
+                return data
+        except Exception:  # pragma: no cover - defensive conversion
+            pass
+    payload: Dict[str, object] = {"type": entity.__class__.__name__}
+    for attr in ("offset", "length", "user_id"):
+        value = getattr(entity, attr, None)
+        if value is not None:
+            payload[attr] = value
+    return payload
+
+
+def _serialise_media(media) -> Optional[Dict[str, object]]:
+    if media is None:
+        return None
+    if isinstance(media, Mapping):
+        return dict(media)
+    if hasattr(media, "to_dict"):
+        try:
+            data = media.to_dict()
+            if isinstance(data, dict):
+                data.setdefault("type", media.__class__.__name__)
+                return data
+        except Exception:  # pragma: no cover - Telethon-specific conversions
+            pass
+    payload: Dict[str, object] = {"type": media.__class__.__name__}
+    document = getattr(media, "document", None)
+    if document is not None:
+        for attr in ("id", "access_hash", "file_reference"):
+            value = getattr(document, attr, None)
+            if value is not None:
+                payload.setdefault("document", {})[attr] = value
+    photo = getattr(media, "photo", None)
+    if photo is not None:
+        payload.setdefault("photo", {"id": getattr(photo, "id", None)})
+    return payload
 
 
 def decode_session_blob(blob: str) -> bytes:
