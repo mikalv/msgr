@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Drafted a bridge authentication and client experience plan covering OAuth/OIDC flows, UI wizard design, and future IP egress mitigation options.
 - Documented Snapchat web protocol capture details in `reverse/docs/snapchat.protocol.md` and outlined bridge implications.
 - Added a Snapchat service bridge facade with session refresh, messaging, and sync helpers plus test coverage.
 - Expanded the Snapchat protocol notes with techniques for extracting bundled protobuf descriptors from the web client so the
