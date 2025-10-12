@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Documented Snapchat web protocol capture details in `reverse/docs/snapchat.protocol.md` and outlined bridge implications.
+- Added a Snapchat service bridge facade with session refresh, messaging, and sync helpers plus test coverage.
 - Added MVP-plan for chat-klient i `docs/chat_client_mvp_plan.md`.
 - Added per-recipient message delivery receipts with database schema, REST and
   WebSocket acknowledgement flows, status propagation to messages, and test
