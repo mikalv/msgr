@@ -67,7 +67,8 @@ class ContactDao {
       'last_name': contact.lastName,
       'status': contact.status,
       'avatar_url': contact.avatarUrl,
-      'settings': contact.settings == null ? null : jsonEncode(contact.settings),
+      'settings':
+          contact.settings == null ? null : jsonEncode(contact.settings),
       'roles': jsonEncode(contact.roles),
       'inserted_at': contact.createdAt.toIso8601String(),
       'updated_at': contact.updatedAt.toIso8601String(),

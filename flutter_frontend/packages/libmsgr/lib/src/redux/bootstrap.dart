@@ -21,4 +21,3 @@ class OnBootstrapAction {
         'conversations: $conversations, rooms: $rooms, messages: $messages}';
   }
 }
-
