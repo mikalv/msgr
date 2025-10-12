@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- Introduced a WhatsApp bridge daemon skeleton with client-protocol abstractions, disk-backed
+  session management, StoneMQ queue wiring, and unit tests covering QR pairing flows, outbound
+  messaging, and acknowledgement handling.
+- Documented WhatsApp support in the multi-bridge blueprint with queue contracts, lifecycle notes,
+  URL mappings, and failure-handling guidance so deployments can plan for multi-device pairing.
 - Implemented the first Telegram MTProto bridge daemon with a Telethon-compatible
   client factory, disk-backed session store, StoneMQ queue wiring, and tests for
   linking flows, outbound messaging, and update acknowledgements.
