@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Documented the current bridge implementation gaps in `docs/bridge_status.md` so we know which
+  services still need real protocol clients before the deployments can run.
 - Implemented a Signal bridge daemon skeleton with device-link queue handlers, disk-backed session
   management, and unit tests covering account linking, outbound messaging, and acknowledgement
   workflows to mirror the WhatsApp/Telegram bridges.
