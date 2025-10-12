@@ -27,12 +27,14 @@
    - Daemons stream results and update tokens; Elixir writes checkpoints and notifies subscribers.
 
 ## Service Action Map
-| Service  | Outbound Actions                                   | Inbound Actions                     | Ack/Control Actions                 |
-|----------|----------------------------------------------------|-------------------------------------|-------------------------------------|
-| Matrix   | `outbound_message`, `outbound_event`, `typing`      | `inbound_message`, membership feeds | `ack_sync`, `link_account` replies  |
-| IRC      | `outbound_message`, `outbound_command`             | `inbound_message`, `membership`     | `ack_offset`, `configure_identity`  |
-| XMPP     | `outbound_stanza`, `presence_update`               | `inbound_stanza`, roster snapshots  | `ack_receipt`, `link_account`       |
-| Telegram | `outbound_message`, `typing_update`, `media_stub`  | `inbound_update`, `state_update`    | `ack_update`, `link_account`        |
+| Service  | Outbound Actions                                   | Inbound Actions                     | Ack/Control Actions                  |
+|----------|----------------------------------------------------|-------------------------------------|--------------------------------------|
+| Matrix   | `outbound_message`, `outbound_event`, `typing`      | `inbound_message`, membership feeds | `ack_sync`, `link_account` replies   |
+| IRC      | `outbound_message`, `outbound_command`             | `inbound_message`, `membership`     | `ack_offset`, `configure_identity`   |
+| XMPP     | `outbound_stanza`, `presence_update`               | `inbound_stanza`, roster snapshots  | `ack_receipt`, `link_account`        |
+| Telegram | `outbound_message`, `typing_update`, `media_stub`  | `inbound_update`, `state_update`    | `ack_update`, `link_account`         |
+| WhatsApp | `outbound_message`, `typing_placeholder`           | `inbound_event`, `state_update`     | `ack_event`, `link_account`          |
+| Signal   | `outbound_message`, `profile_sync`                 | `inbound_event`, `receipt_update`   | `ack_event`, `link_account`          |
 
 The table captures the canonical actions our queue contracts use per service. Each bridge daemon
 implements a subset tailored to the network's capabilities and gradually expands coverage as new

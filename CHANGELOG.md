@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+- Implemented a Signal bridge daemon skeleton with device-link queue handlers, disk-backed session
+  management, and unit tests covering account linking, outbound messaging, and acknowledgement
+  workflows to mirror the WhatsApp/Telegram bridges.
+- Documented Signal support across the multi-bridge blueprint, architecture overview, and
+  integration kick-off notes, expanding the `msgr://` scheme, service action map, and lifecycle
+  guidance for device linking and sealed-sender handling.
 - Introduced a WhatsApp bridge daemon skeleton with client-protocol abstractions, disk-backed
   session management, StoneMQ queue wiring, and unit tests covering QR pairing flows, outbound
   messaging, and acknowledgement handling.

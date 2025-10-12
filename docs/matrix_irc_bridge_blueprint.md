@@ -1,10 +1,10 @@
-# Matrix, IRC, XMPP, Telegram, and WhatsApp Bridge Blueprint
+# Matrix, IRC, XMPP, Telegram, WhatsApp, and Signal Bridge Blueprint
 
 ## Purpose
-This document defines the first wave of Msgr bridges, targeting Matrix, IRC, XMPP, Telegram, and
-WhatsApp. It covers the minimum viable transport features, queue mappings, and operational
-constraints so that
-each bridge can move plaintext chat traffic between Msgr and the external networks without media
+This document defines the first wave of Msgr bridges, targeting Matrix, IRC, XMPP, Telegram,
+WhatsApp, and Signal. It covers the minimum viable transport features, queue mappings, and
+operational constraints so that each bridge can move plaintext chat traffic between Msgr and the
+external networks without media
 payload support. The intent is to let Msgr users continue chatting with existing contacts on the
 open networks while those communities migrate. The blueprint also introduces a canonical `msgr://`
 URL scheme we can reuse to reference channels, identities, bridge resources, and individual
@@ -27,8 +27,12 @@ messages across the product.
 - **WhatsApp Bridge**: Implements WhatsApp multi-device client emulation (Web socket transport) so
   Msgr accounts can keep chatting with contacts that still rely on Meta's network. We focus on
   login pairing flows, message relay, receipt acknowledgements, and placeholder handling for media.
+- **Signal Bridge**: Uses the open-source Signal protocol stack to link Msgr accounts as additional
+  Signal devices. The bridge performs device-link handshakes, relays message payloads (text,
+  attachments as placeholders), and acknowledges delivery receipts while respecting the Signal
+  service's rate and device limits.
 
-All five bridges share the Msgr StoneMQ envelope contracts defined in `bridge_architecture.md` and
+All six bridges share the Msgr StoneMQ envelope contracts defined in `bridge_architecture.md` and
 rely on the Go bridge SDK for queue integration.
 
 ## Functional Goals
@@ -95,17 +99,33 @@ rely on the Go bridge SDK for queue integration.
 | inbound_update  <----|--------- | mtprotoPoller          |<--------| updates.getDifference |
 | ack_update    --------<---------| ackWorker              |         |                       |
 +----------------------+          +------------------------+         +-----------------------+
+
++----------------------+          +------------------------+         +-----------------------+
+|   Msgr StoneMQ       |          | WhatsApp Bridge Daemon |         |     WhatsApp Cloud    |
+|----------------------|          |------------------------|         |-----------------------|
+| outbound_message ----|--------->| websocketSender        |-------->| WebSocket sessions    |
+| inbound_event   <----|--------- | eventListener          |<--------| Multi-device updates  |
+| ack_event      --------<---------| ackWorker              |         |                       |
++----------------------+          +------------------------+         +-----------------------+
+
++----------------------+          +-----------------------+          +-----------------------+
+|   Msgr StoneMQ       |          | Signal Bridge Daemon  |          |     Signal Service    |
+|----------------------|          |-----------------------|          |-----------------------|
+| outbound_message ----|--------->| deviceLinkSender      |--------->| gRPC/WebSocket APIs   |
+| inbound_event   <----|--------- | deviceEventListener   |<---------| message sync          |
+| ack_event      --------<---------| ackWorker             |          |                       |
++----------------------+          +-----------------------+          +-----------------------+
 ```
 
 ## Data Model Contracts
 ### Msgr Configuration Records
-| Field | Matrix | IRC | XMPP | Telegram | WhatsApp | Notes |
-|-------|--------|-----|------|----------|----------|-------|
-| `bridge_id` | `matrix` | `irc` | `xmpp` | `telegram` | `whatsapp` | Identifies daemon deployment and maps to queue topics (`bridge/<service>/<bridge_id>/<action>`). |
-| `channel_ref` | `msgr://channels/<workspace>/bridge/matrix/<room_id>` | `msgr://channels/<workspace>/bridge/irc/<server>/<channel>` | `msgr://channels/<workspace>/bridge/xmpp/<jid>` | `msgr://channels/<workspace>/bridge/telegram/<chat_id>` | `msgr://channels/<workspace>/bridge/whatsapp/<jid>` | Canonical Msgr channel URL. |
-| `remote_pointer` | Fully qualified room ID (`!room:server`) | `{network}/{channel}` | Bare/full JID pair | `{dc}/{peer_id}` tuple | WhatsApp JID (`<phone>@s.whatsapp.net`) and device fingerprint | Used when reconnecting or auditing. |
-| `puppet_mode` | `relay` or `full` | `relay` | `relay` | `full` (client emulation) | `full` (client emulation) | Telegram starts with user-level puppeting, IRC/XMPP default to relays until per-user sessions are available. |
-| `capabilities` | JSON map of supported Matrix feature flags | IRC capability list (e.g., `sasl`, `message-tags`) | Advertised XMPP XEP support (stream management, carbons, MAM) | MTProto feature toggles (premium reactions, story support) | Multi-device flags (history sync, ephemeral keepalive cadence) | Reported by the daemon at runtime. |
+| Field | Matrix | IRC | XMPP | Telegram | WhatsApp | Signal | Notes |
+|-------|--------|-----|------|----------|----------|--------|-------|
+| `bridge_id` | `matrix` | `irc` | `xmpp` | `telegram` | `whatsapp` | `signal` | Identifies daemon deployment and maps to queue topics (`bridge/<service>/<bridge_id>/<action>`). |
+| `channel_ref` | `msgr://channels/<workspace>/bridge/matrix/<room_id>` | `msgr://channels/<workspace>/bridge/irc/<server>/<channel>` | `msgr://channels/<workspace>/bridge/xmpp/<jid>` | `msgr://channels/<workspace>/bridge/telegram/<chat_id>` | `msgr://channels/<workspace>/bridge/whatsapp/<jid>` | `msgr://channels/<workspace>/bridge/signal/<uuid>` | Canonical Msgr channel URL. |
+| `remote_pointer` | Fully qualified room ID (`!room:server`) | `{network}/{channel}` | Bare/full JID pair | `{dc}/{peer_id}` tuple | WhatsApp JID (`<phone>@s.whatsapp.net`) and device fingerprint | Signal ACI/device ID tuple | Used when reconnecting or auditing. |
+| `puppet_mode` | `relay` or `full` | `relay` | `relay` | `full` (client emulation) | `full` (client emulation) | `full` (device link) | Telegram starts with user-level puppeting, IRC/XMPP default to relays until per-user sessions are available. |
+| `capabilities` | JSON map of supported Matrix feature flags | IRC capability list (e.g., `sasl`, `message-tags`) | Advertised XMPP XEP support (stream management, carbons, MAM) | MTProto feature toggles (premium reactions, story support) | Multi-device flags (history sync, ephemeral keepalive cadence) | Device-link flags (sealed sender, profile key version) | Reported by the daemon at runtime. |
 
 ### Queue Envelope Payloads
 - **Matrix**
@@ -128,6 +148,10 @@ rely on the Go bridge SDK for queue integration.
   - `outbound_message`: `chat_id`, `message`, optional `metadata` map for previews/pins.
   - `inbound_event`: `event_id`, normalized message payload, sender metadata, optional `media` placeholders.
   - `ack_event`: `event_id`, `status`, optional `received_at` timestamps for update cursors.
+- **Signal**
+  - `outbound_message`: `chat_id`, `message`, optional `attachments` metadata, `metadata` for sealed-sender hints.
+  - `inbound_event`: `event_id`, normalized payload (message body, sender UUID, attachments, timestamps).
+  - `ack_event`: `event_id`, `status`, optional `received_at` used for syncing device read state.
 
 ## Connection Lifecycle
 ### Matrix
@@ -174,6 +198,16 @@ rely on the Go bridge SDK for queue integration.
 4. Publish acknowledgement envelopes once events are applied so the daemon can release processed
    update IDs.
 
+### Signal
+1. Use the stored device-link blob (or newly provided linking code) to register the bridge as a
+   companion device via the open-source Signal Service gRPC/WebSocket APIs.
+2. Resume message sync using the Signal Service data API (envelope stream) and persist the latest
+   envelope timestamps/offsets per bridge shard.
+3. Relay outbound messages with sealed-sender metadata when available, falling back to plaintext
+   routing when the contact does not support sealed sender.
+4. Emit acknowledgement envelopes after the Signal service confirms delivery receipts or read sync
+   events so Msgr can advance its cursors.
+
 ## Failure Handling
 - Matrix sync token persistence stored per channel to resume after restarts.
 - IRC reconnection with exponential backoff and channel rejoin tracking.
@@ -183,6 +217,8 @@ rely on the Go bridge SDK for queue integration.
   reconnects.
 - WhatsApp pairing blobs rotated automatically when devices unlink; QR requests are rate limited and
   cached per user so we avoid spamming the remote device roster.
+- Signal device-link secrets rotated when devices are revoked; envelope offsets are checkpointed
+  locally to avoid replaying on reconnect.
 - Bridge daemons publish heartbeat metrics (`bridge.health`) consumed by Msgr monitoring.
 
 ## `msgr://` URL Scheme Proposal
@@ -202,6 +238,7 @@ msgr://<resource>/<namespace>/<...>
 - **XMPP chat**: `msgr://channels/<workspace>/bridge/xmpp/user@example.org`
 - **Telegram chat**: `msgr://channels/<workspace>/bridge/telegram/123456789`
 - **WhatsApp chat**: `msgr://channels/<workspace>/bridge/whatsapp/12345@s.whatsapp.net`
+- **Signal chat**: `msgr://channels/<workspace>/bridge/signal/<uuid>`
 
 ### Identity References
 - **Msgr native user**: `msgr://identity/msgr/<user_id>`
@@ -210,6 +247,7 @@ msgr://<resource>/<namespace>/<...>
 - **XMPP identity**: `msgr://identity/bridges/xmpp/user@example.org`
 - **Telegram user**: `msgr://identity/bridges/telegram/<user_id>`
 - **WhatsApp identity**: `msgr://identity/bridges/whatsapp/12345@s.whatsapp.net`
+- **Signal identity**: `msgr://identity/bridges/signal/<uuid>`
 
 ### Message References
 - **Msgr message**: `msgr://messages/msgr/<conversation_id>/<message_id>`
