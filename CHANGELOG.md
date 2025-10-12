@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Added MVP-plan for chat-klient i `docs/chat_client_mvp_plan.md`.
 - Added Markdown-lenkeformatering i chat-komponistens verktøylinje og et drahåndtak for høydejustering med nye widgettester og oppdatert paritetsplan.
 - Hardened chat composer phase A/B work: added autosave snapshot persistence with background sync manager, pessimistic send/queue states with retry UI, refreshed accessibility (focus order, semantics) and documented design & research updates.
 - Split the Flutter chat composer into a modular library with dedicated files
