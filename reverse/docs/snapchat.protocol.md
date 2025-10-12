@@ -93,3 +93,35 @@ static asset noise).
 - **Telemetry hooks** can optionally forward Snapchat’s analytics events to
   msgr’s observability pipeline (they already include experiment IDs and device
   context that may help debugging bridge issues).
+
+## 6. Recovering Snapchat’s protobuf message definitions
+
+Most of the high-value endpoints in the capture exchange opaque
+`application/x-protobuf` payloads. Because Snapchat has not published public
+`.proto` schema files, the bridge must infer the wire format at runtime. The
+web client bundles everything required to do so:
+
+1. **Look for bundled descriptors** – the production web build ships protobuf
+   descriptors as binary blobs that are fed to `protobufjs` during runtime.
+   Search the `https://web.snapchat.com/` JavaScript bundles for base64 strings
+   passed into `protobufjs.Root.fromDescriptor` / `fromJSON`, or for calls to
+   helper functions such as `Object(_n.generate)` / `t.fromBinary`. These blobs
+   decode into the full message schema. Dumping the bundle (e.g. using
+   `node --experimental-fetch` and `esbuild --deobfuscate`) will surface those
+   descriptors so they can be saved as canonical `.proto` files.
+2. **Instrument the browser** – open DevTools on the web client and hook into
+   the global `protobufjs` registry (e.g. `window.protobuf.Root`) after the app
+   loads. The registry exposes the resolved message types and fields. Serialised
+   `Type.toJSON()` output is enough to reconstruct `.proto` files for the bridge.
+3. **Observe request payloads** – the capture already shows structure hints
+   (strings that look like UUIDs, repeated message IDs, timestamps). Feeding the
+   recorded binary payloads into `protobufjs.Root.lookupType("…")` after loading
+   the descriptors lets us confirm field numbers/types.
+4. **Handle schema churn** – keep the dumped descriptors in git and re-run the
+   extraction whenever Snapchat ships a new `version.json` build ID. The bridge
+   can pin the descriptor hash in the attestation bootstrap to detect drifts.
+
+If an automated dump is not yet available, an interim workaround is to capture
+the raw `ArrayBuffer` payloads from `fetch` and expose them to a dedicated
+reverse engineering script; however, locating the `protobufjs` descriptor blob
+is the fastest path to a complete schema map.
