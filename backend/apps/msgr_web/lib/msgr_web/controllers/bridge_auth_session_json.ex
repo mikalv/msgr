@@ -18,7 +18,7 @@ defmodule MessngrWeb.BridgeAuthSessionJSON do
       "login_method" => session.login_method,
       "auth_surface" => session.auth_surface,
       "client_context" => session.client_context,
-      "metadata" => session.metadata,
+      "metadata" => Auth.public_metadata(session),
       "catalog_snapshot" => session.catalog_snapshot,
       "expires_at" => encode_datetime(session.expires_at),
       "last_transition_at" => encode_datetime(session.last_transition_at),

@@ -3,6 +3,7 @@ defmodule Messngr.Bridges.AuthTest do
 
   alias Messngr.Accounts
   alias Messngr.Bridges.Auth
+  alias Messngr.Bridges.Auth.CredentialVault
   alias Messngr.Bridges.AuthSession
 
   describe "list_catalog/1" do
@@ -52,6 +53,76 @@ defmodule Messngr.Bridges.AuthTest do
 
       {:ok, other_account} = Accounts.create_account(%{"display_name" => "Other"})
       assert {:error, :forbidden} = Auth.fetch_session(other_account, session.id)
+    end
+  end
+
+  describe "initiate_oauth_redirect/1 and complete_oauth_callback/2" do
+    setup do
+      {:ok, account} = Accounts.create_account(%{"display_name" => "OAuth Owner"})
+      {:ok, session} = Auth.start_session(account, "telegram", %{})
+
+      %{session: session}
+    end
+
+    test "persists pkce metadata and returns redirect", %{session: session} do
+      assert {:ok, updated, redirect_url} = Auth.initiate_oauth_redirect(session)
+      assert redirect_url =~ Auth.session_callback_path(session)
+
+      oauth_meta = updated.metadata["oauth"]
+      assert oauth_meta["state"]
+      assert oauth_meta["code_verifier"]
+      assert oauth_meta["code_challenge"]
+      assert oauth_meta["redirect_url"] == redirect_url
+    end
+
+    test "completes callback and stores credential ref", %{session: session} do
+      {:ok, session, redirect_url} = Auth.initiate_oauth_redirect(session)
+
+      %URI{query: query} = URI.parse(redirect_url)
+      params = URI.decode_query(query)
+
+      assert {:ok, updated, %{credential_ref: ref}} = Auth.complete_oauth_callback(session, params)
+      assert updated.state == "completing"
+      assert updated.metadata["oauth"]["credential_ref"] == ref
+
+      assert {:ok, record} = CredentialVault.fetch(ref)
+      assert record["tokens"]["access_token"]
+
+      public_meta = Auth.public_metadata(updated)
+      refute Map.get(public_meta["oauth"], "state")
+      refute Map.get(public_meta["oauth"], "code_verifier")
+      assert public_meta["oauth"]["status"] == "token_stored"
+    end
+  end
+
+  describe "submit_credentials/4" do
+    setup do
+      {:ok, account} = Accounts.create_account(%{"display_name" => "Credential Owner"})
+      {:ok, session} = Auth.start_session(account, "matrix", %{})
+
+      %{account: account, session: session}
+    end
+
+    test "queues credentials and stores summary", %{account: account, session: session} do
+      credentials = %{username: "matrix-user", password: "hunter2"}
+
+      assert {:ok, updated, summary} =
+               Auth.submit_credentials(account, "matrix", session.id, credentials)
+
+      assert updated.state == "completing"
+      assert summary["fields"] == ["password", "username"]
+
+      public_meta = Auth.public_metadata(updated)
+      assert public_meta["credential_submission"]["fields"] == ["password", "username"]
+
+      assert {:ok, stored} = Auth.checkout_credentials(session.id)
+      assert stored["password"] == "hunter2"
+      assert {:error, :not_found} = Auth.checkout_credentials(session.id)
+    end
+
+    test "rejects credentials for mismatched connector", %{account: account, session: session} do
+      assert {:error, :connector_mismatch} =
+               Auth.submit_credentials(account, "telegram", session.id, %{token: "abc"})
     end
   end
 end

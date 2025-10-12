@@ -91,12 +91,38 @@ defmodule Messngr.Bridges.AuthSession do
     |> ensure_map_fields([:client_context, :metadata, :catalog_snapshot])
   end
 
+  @doc """
+  Changeset for updating an existing session (state transitions, metadata).
+  """
+  @spec update_changeset(t(), map()) :: Ecto.Changeset.t()
+  def update_changeset(session, attrs) do
+    session
+    |> cast(attrs, [:state, :metadata, :expires_at, :last_transition_at])
+    |> validate_optional_state()
+    |> ensure_map_fields([:metadata])
+  end
+
+  defp validate_optional_state(%Ecto.Changeset{} = changeset) do
+    case get_change(changeset, :state) do
+      nil -> changeset
+      _state ->
+        changeset
+        |> validate_required([:state])
+        |> validate_inclusion(:state, @states)
+        |> validate_length(:state, min: 1)
+    end
+  end
+
   defp ensure_map_fields(%Ecto.Changeset{} = changeset, fields) do
     Enum.reduce(fields, changeset, fn field, acc ->
-      validate_change(acc, field, fn
-        ^field, value when is_map(value) -> []
-        ^field, value -> [{field, {"must be a map", [kind: :map, value: value]}}]
-      end)
+      if Map.has_key?(acc.changes, field) do
+        validate_change(acc, field, fn
+          ^field, value when is_map(value) -> []
+          ^field, value -> [{field, {"must be a map", [kind: :map, value: value]}}]
+        end)
+      else
+        acc
+      end
     end)
   end
 end

@@ -7,6 +7,7 @@ defmodule Messngr.Bridges.Auth do
   """
 
   alias Messngr.Accounts.Account
+  alias Messngr.Bridges.Auth.{CredentialInbox, CredentialVault}
   alias Messngr.Bridges.AuthSession
   alias Messngr.Repo
 
@@ -212,6 +213,10 @@ defmodule Messngr.Bridges.Auth do
 
   alias __MODULE__.CatalogEntry
 
+  @default_oauth_provider Messngr.Bridges.Auth.Providers.Mock
+  @pkce_verifier_bytes 32
+  @credential_submission_ttl_seconds 300
+
   @catalog [
     CatalogEntry.telegram(),
     CatalogEntry.signal(),
@@ -317,6 +322,367 @@ defmodule Messngr.Bridges.Auth do
   """
   @spec session_callback_path(AuthSession.t()) :: String.t()
   def session_callback_path(%AuthSession{id: id}), do: "/auth/bridge/#{id}/callback"
+
+  @doc """
+  Retrieves a session by identifier without validating ownership. This is used
+  for the browser-based OAuth flows where the embedded webview can only supply
+  the session token.
+  """
+  @spec get_session(Ecto.UUID.t()) :: {:ok, AuthSession.t()} | {:error, term()}
+  def get_session(session_id) when is_binary(session_id) do
+    case Repo.get(AuthSession, session_id) do
+      %AuthSession{} = session -> ensure_not_expired(session)
+      nil -> {:error, :not_found}
+    end
+  end
+
+  def get_session(_session_id), do: {:error, :not_found}
+
+  @doc """
+  Initiates the OAuth/OIDC redirect for a session, generating PKCE material and
+  recording provider metadata. The caller is expected to redirect the user to
+  the returned URL.
+  """
+  @spec initiate_oauth_redirect(AuthSession.t()) ::
+          {:ok, AuthSession.t(), String.t()} | {:error, term()}
+  def initiate_oauth_redirect(%AuthSession{} = session) do
+    with :ok <- ensure_oauth_session(session),
+         {:ok, _} <- ensure_not_expired(session),
+         {provider, provider_opts} <- resolve_oauth_provider(session.service),
+         state <- random_token(),
+         code_verifier <- pkce_verifier(),
+         code_challenge <- pkce_challenge(code_verifier),
+         callback_path <- session_callback_path(session),
+         {:ok, redirect_url, provider_metadata} <-
+           provider.authorization_url(session, state,
+             code_challenge: code_challenge,
+             callback_path: callback_path,
+             provider_opts: provider_opts
+           ) do
+      now = current_timestamp()
+
+      oauth_metadata =
+        session.metadata
+        |> Map.get("oauth", %{})
+        |> Map.merge(%{
+          "state" => state,
+          "code_verifier" => code_verifier,
+          "code_challenge" => code_challenge,
+          "redirect_url" => redirect_url,
+          "provider" => stringify_map(provider_metadata || %{}),
+          "initiated_at" => DateTime.to_iso8601(now)
+        })
+
+      metadata = Map.put(session.metadata, "oauth", oauth_metadata)
+
+      session
+      |> AuthSession.update_changeset(%{metadata: metadata, last_transition_at: now})
+      |> Repo.update()
+      |> case do
+        {:ok, updated} -> {:ok, updated, redirect_url}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  def initiate_oauth_redirect(_session), do: {:error, :invalid_session}
+
+  @doc """
+  Completes the OAuth callback by validating the state parameter, exchanging the
+  code for tokens, and storing the credential reference in the session
+  metadata.
+  """
+  @spec complete_oauth_callback(AuthSession.t(), map()) ::
+          {:ok, AuthSession.t(), map()} | {:error, term()}
+  def complete_oauth_callback(%AuthSession{} = session, params) when is_map(params) do
+    with :ok <- ensure_oauth_session(session),
+         {:ok, _} <- ensure_not_expired(session),
+         {:ok, oauth_metadata} <- fetch_oauth_metadata(session),
+         {:ok, state} <- fetch_required(oauth_metadata, "state"),
+         {:ok, verifier} <- fetch_required(oauth_metadata, "code_verifier"),
+         {:ok, provided_state} <- fetch_param(params, "state"),
+         :ok <- verify_state(state, provided_state),
+         {:ok, code} <- fetch_param(params, "code"),
+         {provider, provider_opts} <- resolve_oauth_provider(session.service),
+         {:ok, tokens} <-
+           provider.exchange_code(session, code,
+             code_verifier: verifier,
+             callback_path: session_callback_path(session),
+             provider_opts: provider_opts,
+             provider_metadata: oauth_metadata["provider"] || %{}
+           ),
+         {:ok, credential_ref} <-
+           CredentialVault.store_tokens(session.service, session.id, stringify_map(tokens)) do
+      now = current_timestamp()
+
+      oauth_metadata =
+        oauth_metadata
+        |> Map.put("authorization_code", code)
+        |> Map.put("credential_ref", credential_ref)
+        |> Map.put("completed_at", DateTime.to_iso8601(now))
+        |> Map.put("status", "token_stored")
+        |> Map.delete("code_verifier")
+        |> Map.delete("code_challenge")
+
+      metadata = Map.put(session.metadata, "oauth", oauth_metadata)
+
+      attrs = %{state: "completing", metadata: metadata, last_transition_at: now}
+
+      session
+      |> AuthSession.update_changeset(attrs)
+      |> Repo.update()
+      |> case do
+        {:ok, updated} -> {:ok, updated, %{credential_ref: credential_ref}}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  def complete_oauth_callback(_session, _params), do: {:error, :invalid_session}
+
+  @doc """
+  Queues credentials for non-OAuth flows. Secrets are placed in the credential
+  inbox for daemons to retrieve while only a scrubbed summary is stored on the
+  session metadata.
+  """
+  @spec submit_credentials(Account.t() | Ecto.UUID.t(), String.t(), Ecto.UUID.t(), map()) ::
+          {:ok, AuthSession.t(), map()} | {:error, term()}
+  def submit_credentials(account, connector_id, session_id, credentials) do
+    ttl = @credential_submission_ttl_seconds
+
+    with {:ok, session} <- fetch_session(account, session_id),
+         :ok <- ensure_connector_match(session, connector_id),
+         :ok <- ensure_non_oauth_session(session),
+         {:ok, credential_map} <- normalise_credentials(credentials),
+         :ok <- CredentialInbox.put(session.id, credential_map, ttl: ttl) do
+      now = current_timestamp()
+      summary = credential_summary(credential_map, ttl, now)
+
+      metadata = Map.put(session.metadata, "credential_submission", summary)
+
+      attrs = %{state: "completing", metadata: metadata, last_transition_at: now}
+
+      session
+      |> AuthSession.update_changeset(attrs)
+      |> Repo.update()
+      |> case do
+        {:ok, updated} -> {:ok, updated, summary}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  @doc """
+  Allows bridge daemons to dequeue credential payloads. Returns an error if the
+  payload is missing or expired.
+  """
+  @spec checkout_credentials(Ecto.UUID.t()) :: {:ok, map()} | {:error, term()}
+  def checkout_credentials(session_id) when is_binary(session_id) do
+    CredentialInbox.checkout(session_id)
+  end
+
+  def checkout_credentials(_session_id), do: {:error, :not_found}
+
+  @doc """
+  Returns session metadata with sensitive fields removed so it can be exposed to
+  the Msgr client safely.
+  """
+  @spec public_metadata(AuthSession.t() | map()) :: map()
+  def public_metadata(%AuthSession{metadata: metadata}), do: public_metadata(metadata)
+
+  def public_metadata(metadata) when is_map(metadata) do
+    metadata
+    |> Enum.reduce(%{}, fn {key, value}, acc ->
+      Map.put(acc, key, scrub_metadata(key, value))
+    end)
+  end
+
+  def public_metadata(_other), do: %{}
+
+  defp ensure_connector_match(%AuthSession{} = session, connector_id) when is_binary(connector_id) do
+    connector = session.catalog_snapshot["id"] || session.service
+
+    if connector == connector_id do
+      :ok
+    else
+      {:error, :connector_mismatch}
+    end
+  end
+
+  defp ensure_connector_match(_session, _connector_id), do: {:error, :connector_mismatch}
+
+  defp ensure_oauth_session(%AuthSession{login_method: "oauth"}), do: :ok
+  defp ensure_oauth_session(%AuthSession{}), do: {:error, :unsupported_login_method}
+
+  defp ensure_non_oauth_session(%AuthSession{login_method: "oauth"}), do: {:error, :unsupported_login_method}
+  defp ensure_non_oauth_session(%AuthSession{}), do: :ok
+
+  defp ensure_not_expired(%AuthSession{expires_at: nil} = session), do: {:ok, session}
+
+  defp ensure_not_expired(%AuthSession{expires_at: expires_at} = session) do
+    case DateTime.compare(expires_at, DateTime.utc_now()) do
+      :lt -> {:error, :session_expired}
+      _ -> {:ok, session}
+    end
+  end
+
+  defp resolve_oauth_provider(service) do
+    providers =
+      :msgr
+      |> Application.get_env(:bridge_auth, [])
+      |> Keyword.get(:providers, %{})
+
+    providers =
+      Enum.reduce(providers, %{}, fn {key, value}, acc ->
+        Map.put(acc, normalise_provider_key(key), normalise_provider(value))
+      end)
+
+    Map.get(providers, normalise_provider_key(service), normalise_provider(@default_oauth_provider))
+  end
+
+  defp normalise_provider({module, opts}) when is_atom(module) and is_list(opts), do: {module, opts}
+  defp normalise_provider(module) when is_atom(module), do: {module, []}
+
+  defp normalise_provider(%{module: module} = map) when is_atom(module) do
+    opts = Map.get(map, :opts) || Map.get(map, "opts") || []
+    {module, normalise_provider_opts(opts)}
+  end
+
+  defp normalise_provider(_other), do: {@default_oauth_provider, []}
+
+  defp normalise_provider_opts(opts) when is_list(opts), do: opts
+  defp normalise_provider_opts(opts) when is_map(opts), do: Map.to_list(opts)
+  defp normalise_provider_opts(opts), do: List.wrap(opts)
+
+  defp normalise_provider_key(value) when is_binary(value), do: value
+  defp normalise_provider_key(value) when is_atom(value), do: Atom.to_string(value)
+  defp normalise_provider_key(value), do: to_string(value)
+
+  defp fetch_oauth_metadata(%AuthSession{} = session) do
+    metadata = Map.get(session.metadata, "oauth") || %{}
+
+    if metadata == %{} do
+      {:error, :oauth_not_initiated}
+    else
+      {:ok, metadata}
+    end
+  end
+
+  defp fetch_required(map, key) when is_map(map) do
+    cond do
+      Map.has_key?(map, key) -> {:ok, map[key]}
+      true ->
+        case maybe_atom_key(key) do
+          nil -> {:error, {:missing_value, key}}
+          atom when Map.has_key?(map, atom) -> {:ok, map[atom]}
+          _ -> {:error, {:missing_value, key}}
+        end
+    end
+  end
+
+  defp fetch_required(_map, key), do: {:error, {:missing_value, key}}
+
+  defp maybe_atom_key(key) when is_binary(key) do
+    try do
+      String.to_existing_atom(key)
+    rescue
+      ArgumentError -> nil
+    end
+  end
+
+  defp maybe_atom_key(_), do: nil
+
+  defp fetch_param(params, key) when is_map(params) do
+    case Map.fetch(params, key) do
+      {:ok, value} when value in [nil, ""] -> {:error, {:missing_param, key}}
+      {:ok, value} -> {:ok, value}
+      :error -> {:error, {:missing_param, key}}
+    end
+  end
+
+  defp fetch_param(_params, key), do: {:error, {:missing_param, key}}
+
+  defp verify_state(expected, provided) when expected == provided, do: :ok
+  defp verify_state(_expected, _provided), do: {:error, :state_mismatch}
+
+  defp random_token(bytes \\ 24) do
+    bytes
+    |> :crypto.strong_rand_bytes()
+    |> Base.url_encode64(padding: false)
+  end
+
+  defp pkce_verifier, do: random_token(@pkce_verifier_bytes)
+
+  defp pkce_challenge(verifier) when is_binary(verifier) do
+    :crypto.hash(:sha256, verifier)
+    |> Base.url_encode64(padding: false)
+  end
+
+  defp pkce_challenge(_verifier), do: nil
+
+  defp current_timestamp, do: DateTime.utc_now() |> DateTime.truncate(:second)
+
+  defp stringify_map(value) when is_map(value) do
+    value
+    |> Enum.map(fn {key, val} ->
+      string_key =
+        cond do
+          is_binary(key) -> key
+          is_atom(key) -> Atom.to_string(key)
+          true -> to_string(key)
+        end
+
+      normalised_val =
+        cond do
+          is_map(val) -> stringify_map(val)
+          is_list(val) -> Enum.map(val, &stringify_map/1)
+          true -> val
+        end
+
+      {string_key, normalised_val}
+    end)
+    |> Map.new()
+  end
+
+  defp stringify_map(value) when is_list(value), do: Enum.map(value, &stringify_map/1)
+  defp stringify_map(value), do: value
+
+  defp normalise_credentials(credentials) when is_map(credentials) do
+    credentials
+    |> stringify_map()
+    |> case do
+      %{} = map when map == %{} -> {:error, :invalid_credentials_payload}
+      %{} = map -> {:ok, map}
+      _ -> {:error, :invalid_credentials_payload}
+    end
+  end
+
+  defp normalise_credentials(_), do: {:error, :invalid_credentials_payload}
+
+  defp credential_summary(credentials, ttl, timestamp) do
+    fields =
+      credentials
+      |> Map.keys()
+      |> Enum.map(&to_string/1)
+      |> Enum.filter(&(&1 != ""))
+      |> Enum.sort()
+
+    %{
+      "fields" => fields,
+      "submitted_at" => DateTime.to_iso8601(timestamp),
+      "ttl_seconds" => ttl,
+      "status" => "queued"
+    }
+  end
+
+  defp scrub_metadata("oauth", value) when is_map(value) do
+    value
+    |> stringify_map()
+    |> Map.drop(["state", "code_verifier", "code_challenge", "authorization_code"])
+    |> Map.update("provider", %{}, fn provider -> stringify_map(provider) end)
+  end
+
+  defp scrub_metadata(_key, value), do: value
 
   defp build_metadata(%CatalogEntry{} = entry, attrs) do
     base_metadata = ensure_map(Map.get(attrs, :metadata) || Map.get(attrs, "metadata"))

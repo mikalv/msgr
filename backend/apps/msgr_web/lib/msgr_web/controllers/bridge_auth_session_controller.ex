@@ -24,4 +24,13 @@ defmodule MessngrWeb.BridgeAuthSessionController do
       render(conn, :show, session: session)
     end
   end
+
+  def submit_credentials(conn, %{"bridge_id" => bridge_id, "id" => session_id} = params) do
+    account = conn.assigns.current_account
+    credentials = Map.get(params, "credentials", %{})
+
+    with {:ok, session, _summary} <- Auth.submit_credentials(account, bridge_id, session_id, credentials) do
+      render(conn, :show, session: session)
+    end
+  end
 end

@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Implemented bridge OAuth browser endpoints, PKCE metadata handling, and an in-memory
+  credential vault/inbox so sessions can complete start/callback flows and password-based
+  connectors queue scrubbed credentials for daemon pickup, including controller and context tests.
 - Added bridge catalog metadata, authentication session storage, and REST endpoints so clients can list bridges and bootstrap login flows with embedded browser/device-link guidance.
 - Documented the current implementation status of the bridge authentication/UI plan so remaining backend, daemon, and client work is tracked explicitly.
 - Drafted a bridge authentication and client experience plan covering OAuth/OIDC flows, UI wizard design, and future IP egress mitigation options.

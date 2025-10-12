@@ -38,6 +38,25 @@ defmodule MessngrWeb.BridgeAuthSessionControllerTest do
     assert %{"error" => "unknown_connector"} = json_response(conn, 400)
   end
 
+  test "submits credentials for manual flow", %{conn: conn, account: account} do
+    conn = post(conn, ~p"/api/bridges/matrix/sessions", %{})
+    %{"data" => %{"id" => session_id}} = json_response(conn, 200)
+
+    payload = %{credentials: %{username: "neo", password: "trinity"}}
+
+    conn =
+      post(conn, ~p"/api/bridges/matrix/sessions/#{session_id}/credentials", payload)
+
+    assert %{"data" => data} = json_response(conn, 200)
+    assert data["metadata"]["credential_submission"]["fields"] == ["password", "username"]
+
+    assert {:ok, %{"password" => "trinity"}} =
+             Messngr.Bridges.Auth.checkout_credentials(session_id)
+
+    # Credentials are removed after checkout
+    assert {:error, :not_found} = Messngr.Bridges.Auth.checkout_credentials(session_id)
+  end
+
   test "requires authentication" do
     conn = build_conn()
     conn = post(conn, ~p"/api/bridges/telegram/sessions", %{})
