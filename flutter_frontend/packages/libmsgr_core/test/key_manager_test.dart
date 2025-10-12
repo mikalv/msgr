@@ -19,12 +19,13 @@ void main() {
 
     test('creates new device when storage is empty', () async {
       when(storage.containsKey('deviceId')).thenAnswer((_) async => false);
-      when(storage.writeValue(any, any)).thenAnswer((_) async {});
+      when(storage.writeValue(any<String>(), any<String>()))
+          .thenAnswer((_) async {});
 
       await keyManager.getOrGenerateDeviceId();
 
-      verify(storage.writeValue('deviceId', any)).called(1);
-      verify(storage.writeValue('deviceKeys', any)).called(1);
+      verify(storage.writeValue('deviceId', any<String>())).called(1);
+      verify(storage.writeValue('deviceKeys', any<String>())).called(1);
       expect(keyManager.deviceId, isNotEmpty);
       expect(keyManager.isLoading, isFalse);
     });

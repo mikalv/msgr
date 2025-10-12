@@ -36,7 +36,7 @@ class RegistrationApi {
     required Map<String, dynamic> deviceInfo,
     Map<String, dynamic>? appInfo,
   }) async {
-    final url = _resolver.getAuthServer('/api/v1/device/register');
+    final url = _resolver.resolveAuth('/api/v1/device/register');
     final body = {
       'from': deviceId,
       'payload': {
@@ -59,7 +59,7 @@ class RegistrationApi {
     required Map<String, dynamic> deviceInfo,
     Map<String, dynamic>? appInfo,
   }) async {
-    final url = _resolver.getAuthServer('/api/v1/device/context');
+    final url = _resolver.resolveAuth('/api/v1/device/context');
     final payload = {
       'from': deviceId,
       'deviceInfo': deviceInfo,
@@ -78,7 +78,7 @@ class RegistrationApi {
     required String identifier,
     required String deviceId,
   }) async {
-    final url = _resolver.getAuthServer('/api/auth/challenge');
+    final url = _resolver.resolveAuth('/api/auth/challenge');
     final body = {
       'channel': channel,
       'identifier': identifier,
@@ -101,7 +101,7 @@ class RegistrationApi {
     required String code,
     String? displayName,
   }) async {
-    final url = _resolver.getAuthServer('/api/auth/verify');
+    final url = _resolver.resolveAuth('/api/auth/verify');
     final payload = {
       'challenge_id': challengeId,
       'code': code,
@@ -125,7 +125,7 @@ class RegistrationApi {
     String? email,
     String? name,
   }) async {
-    final url = _resolver.getAuthServer('/api/auth/oidc');
+    final url = _resolver.resolveAuth('/api/auth/oidc');
     final payload = {
       'provider': provider,
       'subject': subject,
@@ -148,7 +148,7 @@ class RegistrationApi {
     required String token,
     required Map<String, dynamic> body,
   }) async {
-    final url = _resolver.getTeamServer(teamName, '/v1/api/profiles');
+    final url = _resolver.resolveTeam(teamName, '/v1/api/profiles');
     final response = await _client.post(
       url,
       headers: _jsonHeaders(
@@ -168,7 +168,7 @@ class RegistrationApi {
     required String token,
     required String uid,
   }) async {
-    final url = _resolver.getMainServer('/public/v1/api/teams');
+    final url = _resolver.resolveMain('/public/v1/api/teams');
     final payload = {
       'team_name': teamName,
       'description': description,
@@ -191,7 +191,7 @@ class RegistrationApi {
     required String teamName,
     required String token,
   }) async {
-    final url = _resolver.getMainServer('/public/v1/api/select/team/$teamName');
+    final url = _resolver.resolveMain('/public/v1/api/select/team/$teamName');
     final response = await _client.post(
       url,
       headers: _jsonHeaders(
@@ -205,7 +205,7 @@ class RegistrationApi {
   }
 
   Future<List<dynamic>> listTeams({required String token}) async {
-    final url = _resolver.getMainServer('/public/v1/api/teams');
+    final url = _resolver.resolveMain('/public/v1/api/teams');
     final response = await _client.get(
       url,
       headers: _jsonHeaders(
@@ -230,7 +230,7 @@ class RegistrationApi {
     required String deviceId,
     required String refreshToken,
   }) async {
-    final url = _resolver.getAuthServer('/api/v1/refresh_token');
+    final url = _resolver.resolveAuth('/api/v1/refresh_token');
     final payload = {
       'from': deviceId,
       'token': refreshToken,

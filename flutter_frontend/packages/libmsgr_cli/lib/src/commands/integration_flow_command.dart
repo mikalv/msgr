@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:args/args.dart';
 import 'package:args/command_runner.dart';
 import 'package:libmsgr_core/libmsgr_core.dart';
 
@@ -113,11 +114,11 @@ class IntegrationFlowCommand extends Command<void> {
         (selection['profile'] as Map<String, dynamic>?)?['id'] as String?;
     if (profileId == null) {
       final createProfileResponse = await registration.createProfile(
-        resolvedTeamName,
-        teamAccessToken,
-        resolvedUsername,
-        resolvedDisplayName.split(' ').first,
-        resolvedDisplayName.split(' ').last,
+        teamName: resolvedTeamName,
+        token: teamAccessToken,
+        username: resolvedUsername,
+        firstName: resolvedDisplayName.split(' ').first,
+        lastName: resolvedDisplayName.split(' ').last,
       );
       if (createProfileResponse == null || createProfileResponse.id == null) {
         throw StateError('Failed to create profile for team ${teamResult.team['name']}');
@@ -130,11 +131,16 @@ class IntegrationFlowCommand extends Command<void> {
         ? '${teamResult.team['name']}.${MsgrHosts.localApiServer}'
         : '${teamResult.team['name']}.${MsgrHosts.apiServer}';
 
+    final resolvedProfileId = profileId;
+    if (resolvedProfileId == null) {
+      throw StateError('Unable to resolve profile id for ${teamResult.team['name']}');
+    }
+
     final result = IntegrationFlowResult(
       email: resolvedEmail,
       user: session,
       team: teamResult.team,
-      profileId: profileId,
+      profileId: resolvedProfileId,
       teamAccessToken: teamAccessToken,
       teamHost: host,
       teamsCount: teams.length,

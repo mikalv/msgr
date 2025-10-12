@@ -19,8 +19,8 @@ class KeyManager {
   final SignatureAlgorithm signAlgorithm = Ed25519();
   final KeyExchangeAlgorithm dhAlgorithm = X25519();
 
-  late KeyPair signingKeyPair;
-  late KeyPair dhKeyPair;
+  late SimpleKeyPair signingKeyPair;
+  late SimpleKeyPair dhKeyPair;
   late String deviceId;
   bool isLoading = true;
 
@@ -41,13 +41,13 @@ class KeyManager {
       throw StateError('KeyManager is still loading keys');
     }
 
-    final signature = await signAlgorithm.signString(
-      deviceId,
+    final signature = await signAlgorithm.sign(
+      utf8.encode(deviceId),
       keyPair: signingKeyPair,
     );
 
-    final publicKey = await signingKeyPair.extractPublicKey() as SimplePublicKey;
-    final dhPublicKey = await dhKeyPair.extractPublicKey() as SimplePublicKey;
+    final SimplePublicKey publicKey = await signingKeyPair.extractPublicKey();
+    final SimplePublicKey dhPublicKey = await dhKeyPair.extractPublicKey();
 
     return <String, dynamic>{
       'pubkey': base64.encode(publicKey.bytes),
@@ -81,13 +81,21 @@ class KeyManager {
     final signingKeys = decoded['signingKeys'] as Map<String, dynamic>;
     final dhKeys = decoded['dhKeys'] as Map<String, dynamic>;
 
-    signingKeyPair = await signAlgorithm.newKeyPairFromSeed(
+    final signingPair = await signAlgorithm.newKeyPairFromSeed(
       base64.decode(signingKeys['privkey'] as String),
-    ) as KeyPair;
+    );
+    signingKeyPair = _requireSimpleKeyPair(
+      signingPair,
+      'signAlgorithm.newKeyPairFromSeed',
+    );
 
-    dhKeyPair = await dhAlgorithm.newKeyPairFromSeed(
+    final dhPair = await dhAlgorithm.newKeyPairFromSeed(
       base64.decode(dhKeys['privkey'] as String),
-    ) as KeyPair;
+    );
+    dhKeyPair = _requireSimpleKeyPair(
+      dhPair,
+      'dhAlgorithm.newKeyPairFromSeed',
+    );
   }
 
   Future<void> _createNewDevice() async {
@@ -114,9 +122,12 @@ class KeyManager {
   }
 
   Future<Map<String, Object>> _generateSigningKeyPair() async {
-    final keyPair = await signAlgorithm.newKeyPair();
+    final keyPair = _requireSimpleKeyPair(
+      await signAlgorithm.newKeyPair(),
+      'signAlgorithm.newKeyPair',
+    );
     final privKey = await keyPair.extractPrivateKeyBytes();
-    final publicKey = await keyPair.extractPublicKey();
+    final SimplePublicKey publicKey = await keyPair.extractPublicKey();
     signingKeyPair = keyPair;
     _log.fine('Generated signing key pair');
     return <String, Object>{
@@ -127,9 +138,12 @@ class KeyManager {
   }
 
   Future<Map<String, Object>> _generateDhKeyPair() async {
-    final keyPair = await dhAlgorithm.newKeyPair();
+    final keyPair = _requireSimpleKeyPair(
+      await dhAlgorithm.newKeyPair(),
+      'dhAlgorithm.newKeyPair',
+    );
     final privKey = await keyPair.extractPrivateKeyBytes();
-    final publicKey = await keyPair.extractPublicKey();
+    final SimplePublicKey publicKey = await keyPair.extractPublicKey();
     dhKeyPair = keyPair;
     _log.fine('Generated DH key pair');
     return <String, Object>{
@@ -137,5 +151,17 @@ class KeyManager {
       'privkey': privKey,
       'pubkey': publicKey.bytes,
     };
+  }
+
+  SimpleKeyPair _requireSimpleKeyPair(
+    KeyPair keyPair,
+    String context,
+  ) {
+    if (keyPair is SimpleKeyPair) {
+      return keyPair;
+    }
+    throw StateError(
+      '$context returned unsupported key pair type: ${keyPair.runtimeType}',
+    );
   }
 }
