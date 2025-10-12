@@ -42,6 +42,25 @@ The table captures the canonical actions our queue contracts use per service. Ea
 implements a subset tailored to the network's capabilities and gradually expands coverage as new
 features land (e.g., Telegram media uploads, XMPP MAM export streaming).
 
+## Share Link Service
+
+- **Purpose**: Some networks (notably IRC, SMS gateways, and legacy bots) can only receive plain
+  text. When a Msgr conversation contains media, location pins, or invites destined for those
+  bridges we persist a `share_link` record describing how the payload can be shared.
+- **Storage**: Share links live in Postgres (`share_links` table) with ownership (account,
+  optional profile, originating bridge account), expiry windows, view limits, and capability
+  profiles that outline how each downstream service should consume the payload (link-only vs
+  fetch-and-upload).
+- **URLs**: Each record exposes a stable HTTPS link (`https://msgr.no/s/<token>` by default) and a
+  `msgr://share/...` deep link. The tokenised URL is what IRC/XMPP bridges can paste into channels
+  when the native protocol lacks binary support.
+- **Payload Schema**: Bridges attach metadata such as `download` instructions, filenames, MIME
+  types, thumbnails, geo URIs, or invite codes. The capability profile lists which keys each target
+  needs (e.g., XMPP requires `download` + `content_type`, IRC only needs `public_url`).
+- **Access Control**: View counts are tracked transactionally so we can expire public links after a
+  limited number of fetches. When the limit is reached or the expiry timestamp passes the share
+  link becomes unavailable to bridges.
+
 ## Conversation History Streaming
 - Clients request historical windows by pushing `message:sync` on the Phoenix conversation channel.
 - The backend serves cursor-based pages (before/after/around IDs) and rebroadcasts the backlog via PubSub so every watcher receives the same slice.

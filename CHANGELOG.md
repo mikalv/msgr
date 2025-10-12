@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Introduced a Postgres-backed share link service with capability profiles,
+  msgr:// deep-link generation, and public URL helpers so bridges can share
+  media, locations, and invites with text-only networks while enforcing
+  expiry/view limits.
 - Added bridge contact profiles, match-key storage, and profile links so Msgr
   can aggregate the same person across bridge rosters and native Msgr contacts;
   includes new Postgres tables, context helpers, and regression tests for the

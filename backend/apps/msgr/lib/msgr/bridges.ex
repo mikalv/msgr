@@ -13,6 +13,7 @@ defmodule Messngr.Bridges do
   alias Ecto.Changeset
   alias Messngr.Accounts.Contact, as: MsgrContact
   alias Messngr.Bridges.{BridgeAccount, Channel, Contact, ContactProfile, ContactProfileKey, ProfileLink}
+  alias Messngr.ShareLinks
   alias Messngr.Repo
 
   @type service :: atom() | String.t()
@@ -27,6 +28,33 @@ defmodule Messngr.Bridges do
     Repo.get_by(BridgeAccount, account_id: account_id, service: normalise_service(service))
     |> maybe_preload()
   end
+
+  @doc """
+  Creates a share link tied to a bridge account so binary payloads can be
+  shared with low-capability networks (e.g. IRC).
+  """
+  @spec create_share_link(binary(), ShareLinks.ShareLink.kind() | atom() | String.t(), map()) ::
+          {:ok, ShareLinks.ShareLink.t()} | {:error, term()}
+  def create_share_link(bridge_account_id, kind, attrs \\ %{}) do
+    case Repo.get(BridgeAccount, bridge_account_id) do
+      nil -> {:error, :unknown_bridge_account}
+      %BridgeAccount{} = bridge_account -> ShareLinks.create_bridge_link(bridge_account, kind, attrs)
+    end
+  end
+
+  @doc """
+  Fetches an active share link by token, returning an error if it has expired or
+  exhausted its view limit.
+  """
+  @spec fetch_share_link(String.t(), keyword()) :: {:ok, ShareLinks.ShareLink.t()} | {:error, term()}
+  def fetch_share_link(token, opts \\ []) do
+    ShareLinks.fetch_active(token, opts)
+  end
+
+  defdelegate share_link_public_url(link), to: ShareLinks, as: :public_url
+  defdelegate share_link_msgr_url(link), to: ShareLinks, as: :msgr_url
+  defdelegate share_link_capabilities(kind), to: ShareLinks, as: :default_capabilities
+  defdelegate share_link_remaining_views(link), to: ShareLinks, as: :remaining_views
 
   @doc """
   Synchronises a bridge identity, replacing contacts/channels with the snapshot provided.

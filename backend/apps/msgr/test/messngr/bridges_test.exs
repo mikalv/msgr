@@ -3,6 +3,8 @@ defmodule Messngr.BridgesTest do
 
   alias Messngr.Accounts.{Account, Contact}
   alias Messngr.Bridges
+  alias Messngr.Bridges.BridgeAccount
+  alias Messngr.ShareLinks
   alias Messngr.Repo
 
   describe "sync_linked_identity/3" do
@@ -99,6 +101,36 @@ defmodule Messngr.BridgesTest do
       assert record.capabilities == %{}
       assert record.contacts == []
       assert record.channels == []
+    end
+  end
+
+  describe "create_share_link/3" do
+    setup do
+      account = insert_account!("Share Link Owner")
+
+      bridge_account =
+        %BridgeAccount{}
+        |> BridgeAccount.changeset(%{
+          account_id: account.id,
+          service: "irc",
+          external_id: "irc-user"
+        })
+        |> Repo.insert!()
+
+      %{account: account, bridge_account: bridge_account}
+    end
+
+    test "creates share link tied to bridge account", %{bridge_account: bridge_account} do
+      attrs = %{payload: %{"download" => %{"url" => "https://example/file"}}}
+
+      assert {:ok, link} = Bridges.create_share_link(bridge_account.id, :file, attrs)
+      assert link.bridge_account_id == bridge_account.id
+      assert link.account_id == bridge_account.account_id
+      assert ShareLinks.public_url(link) =~ link.token
+    end
+
+    test "returns error for unknown bridge account" do
+      assert {:error, :unknown_bridge_account} = Bridges.create_share_link(Ecto.UUID.generate(), :image, %{})
     end
   end
 
@@ -255,5 +287,11 @@ defmodule Messngr.BridgesTest do
       assert Enum.map(profile.contacts, & &1.external_id) == ["dora"]
       assert Enum.any?(profile.links, &(&1.source == "msgr_contact"))
     end
+  end
+
+  defp insert_account!(name) do
+    %Account{}
+    |> Account.changeset(%{display_name: name})
+    |> Messngr.Repo.insert!()
   end
 end

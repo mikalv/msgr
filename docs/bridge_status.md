@@ -14,6 +14,18 @@ before we can run them against the real networks.
 - **Operational blockers**: Schema migrations must be applied before linking accounts; operators
   should provision adequate disk space for per-user contact/channel snapshots.
 
+## Share Link Service
+- **Code status**: Implemented in `Messngr.ShareLinks` with a dedicated Postgres table. Bridges can
+  create share links for media, files, locations, and invites; the service generates `msgr://`
+  deep links, public HTTPS URLs, default capability profiles for target networks, and enforces
+  expiry/view-count limits. `Messngr.Bridges.create_share_link/3` wraps the context for bridge
+  callers.
+- **Missing work**: Hook share-link creation into outbound message flows, add storage for uploaded
+  binaries (MinIO/S3) when a bridge needs to fetch the file for re-upload, and expose REST endpoints
+  so the Flutter client can preview/manage published links.
+- **Operational blockers**: Requires migration deployment and configuration of the public base URL.
+  Production should place the static file host behind TLS/CDN before sharing links publicly.
+
 ## Matrix & IRC
 - **Code status**: Only planning material exists in `docs/matrix_irc_bridge_blueprint.md`; there are
   no daemon packages or protocol adapters in `bridge_sdks`. The queue helpers in the Go SDK are the
