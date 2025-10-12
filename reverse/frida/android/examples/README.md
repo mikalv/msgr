@@ -1,0 +1,1 @@
+Samples from real Frida sessions land here. Keep them small (trim personal data) and add a short note describing which script produced the capture and which findings it demonstrates (e.g. “Snapchat protobuf payload showing friend sync request”).
