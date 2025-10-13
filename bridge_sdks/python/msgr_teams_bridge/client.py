@@ -5,10 +5,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import datetime as dt
+import html
 import json
 import logging
 import time
 from dataclasses import dataclass
+from html.parser import HTMLParser
 from typing import (
     Awaitable,
     Callable,
@@ -20,6 +22,7 @@ from typing import (
     Protocol,
     Sequence,
 )
+from urllib.parse import urlparse
 
 try:  # pragma: no cover - optional dependency exercised in integration tests
     import aiohttp
@@ -247,7 +250,7 @@ class TeamsGraphClient(TeamsClientProtocol):
         reply_to_id: Optional[str] = None,
         metadata: Optional[Mapping[str, object]] = None,
     ) -> Mapping[str, object]:
-        payload = dict(message)
+        payload = _prepare_outbound_message(message)
         if metadata is not None:
             payload.setdefault("metadata", dict(metadata))
         if reply_to_id is not None:
@@ -559,6 +562,189 @@ def _normalise_channel_identity(identity: object) -> Optional[Dict[str, object]]
             "tenant_id": identity.get("tenantId"),
         }
     )
+
+
+def _prepare_outbound_message(message: Mapping[str, object]) -> Dict[str, object]:
+    payload = dict(message)
+
+    body = payload.get("body")
+    if isinstance(body, Mapping):
+        content_value = body.get("content")
+        content_text = str(content_value) if content_value is not None else ""
+        content_type_value = body.get("contentType")
+        content_type = str(content_type_value).lower() if isinstance(content_type_value, str) else "text"
+
+        if content_type in {"text", "plain", "text/plain"}:
+            payload["body"] = {
+                "contentType": "html",
+                "content": _render_plain_text(content_text),
+            }
+        else:
+            sanitised = _sanitise_html(content_text)
+            payload["body"] = {
+                "contentType": "html" if content_type in {"", "html"} else content_type,
+                "content": sanitised,
+            }
+    else:
+        payload["body"] = {
+            "contentType": "html",
+            "content": _render_plain_text(str(body) if body is not None else ""),
+        }
+
+    attachments = payload.get("attachments")
+    if isinstance(attachments, list):
+        cleaned: list[Dict[str, object]] = []
+        for attachment in attachments:
+            if not isinstance(attachment, Mapping):
+                continue
+            cleaned_attachment: Dict[str, object] = dict(attachment)
+            content = cleaned_attachment.get("content")
+            if isinstance(content, str):
+                cleaned_attachment["content"] = _sanitise_html(content)
+            cleaned.append(cleaned_attachment)
+        payload["attachments"] = cleaned
+
+    return payload
+
+
+class _TeamsHTMLSanitiser(HTMLParser):
+    _ALLOWED_TAGS = {
+        "a": {"href", "title"},
+        "b": set(),
+        "blockquote": set(),
+        "br": set(),
+        "code": {"class"},
+        "em": set(),
+        "i": set(),
+        "li": set(),
+        "ol": set(),
+        "p": set(),
+        "pre": {"class"},
+        "span": {"class"},
+        "strong": set(),
+        "ul": set(),
+    }
+    _VOID_TAGS = {"br"}
+    _ALLOWED_SCHEMES = {"http", "https", "mailto"}
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._parts: list[str] = []
+        self._stack: list[Optional[str]] = []
+        self._skip_depth = 0
+
+    def handle_starttag(self, tag: str, attrs) -> None:
+        tag_lower = tag.lower()
+        if self._skip_depth > 0:
+            if tag_lower not in self._VOID_TAGS:
+                self._skip_depth += 1
+                self._stack.append(None)
+            return
+        if tag_lower not in self._ALLOWED_TAGS:
+            if tag_lower not in self._VOID_TAGS:
+                self._skip_depth = 1
+                self._stack.append(None)
+            return
+
+        attrs_text = self._serialise_attrs(tag_lower, attrs)
+        if attrs_text is None:
+            self._stack.append(None)
+            return
+        if tag_lower in self._VOID_TAGS:
+            if attrs_text:
+                self._parts.append(f"<{tag_lower}{attrs_text} />")
+            else:
+                self._parts.append(f"<{tag_lower} />")
+            self._stack.append(None)
+            return
+
+        self._parts.append(f"<{tag_lower}{attrs_text}>")
+        self._stack.append(tag_lower)
+
+    def handle_startendtag(self, tag: str, attrs) -> None:  # pragma: no cover - handled via starttag
+        before = len(self._stack)
+        self.handle_starttag(tag, attrs)
+        if len(self._stack) > before:
+            entry = self._stack.pop()
+            if entry:
+                self._parts.append(f"</{entry}>")
+
+    def handle_endtag(self, tag: str) -> None:
+        tag_lower = tag.lower()
+        if not self._stack:
+            return
+        entry = self._stack.pop()
+        if entry is None:
+            if self._skip_depth > 0:
+                self._skip_depth -= 1
+            return
+        if entry == tag_lower:
+            self._parts.append(f"</{tag_lower}>")
+
+    def handle_data(self, data: str) -> None:
+        if self._skip_depth > 0:
+            return
+        self._parts.append(html.escape(data))
+
+    def handle_entityref(self, name: str) -> None:  # pragma: no cover - rare branch
+        if self._skip_depth > 0:
+            return
+        self._parts.append(f"&{name};")
+
+    def handle_charref(self, name: str) -> None:  # pragma: no cover - rare branch
+        if self._skip_depth > 0:
+            return
+        self._parts.append(f"&#{name};")
+
+    def _serialise_attrs(self, tag: str, attrs) -> Optional[str]:
+        allowed = self._ALLOWED_TAGS[tag]
+        parts: list[str] = []
+        has_href = False
+        for name, value in attrs:
+            if value is None:
+                continue
+            name_lower = name.lower()
+            if name_lower not in allowed:
+                continue
+            if name_lower == "href" and not _is_safe_href(value):
+                continue
+            escaped_value = html.escape(str(value), quote=True)
+            parts.append(f'{name_lower}="{escaped_value}"')
+            if name_lower == "href":
+                has_href = True
+        if tag == "a" and not has_href:
+            return None
+        if not parts:
+            return ""
+        return " " + " ".join(parts)
+
+    def get_html(self) -> str:
+        return "".join(self._parts)
+
+
+def _sanitise_html(content: str) -> str:
+    if not content:
+        return ""
+    parser = _TeamsHTMLSanitiser()
+    parser.feed(content)
+    parser.close()
+    return parser.get_html()
+
+
+def _render_plain_text(text: str) -> str:
+    if not text:
+        return ""
+    escaped = html.escape(text)
+    return "<p>" + escaped.replace("\n", "<br />") + "</p>"
+
+
+def _is_safe_href(value: str) -> bool:
+    if not value:
+        return False
+    parsed = urlparse(value)
+    if parsed.scheme:
+        return parsed.scheme.lower() in _TeamsHTMLSanitiser._ALLOWED_SCHEMES
+    return not value.lower().strip().startswith("javascript:")
 
 
 def _compact_dict(values: Mapping[str, object | None]) -> Dict[str, object]:

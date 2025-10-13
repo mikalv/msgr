@@ -1,7 +1,13 @@
 import asyncio
 import logging
 
-from msgr_slack_bridge.client import SlackRTMClient, SlackToken, _normalise_event
+from msgr_slack_bridge.client import (
+    SlackFileReference,
+    SlackFileUpload,
+    SlackRTMClient,
+    SlackToken,
+    _normalise_event,
+)
 
 
 class DummySlackClient(SlackRTMClient):
@@ -9,6 +15,9 @@ class DummySlackClient(SlackRTMClient):
         super().__init__(logger=logging.getLogger("dummy-slack"))
         self.responses: dict[str, list[dict[str, object]]] = {}
         self.calls: list[tuple[str, dict[str, object] | None, dict[str, object] | None]] = []
+        self.upload_requests: list[tuple[str, SlackFileUpload]] = []
+        self.completed_uploads: list[dict[str, object]] = []
+        self.upload_counter = 0
 
     async def _ensure_session(self) -> None:  # type: ignore[override]
         return None
@@ -57,9 +66,35 @@ class DummySlackClient(SlackRTMClient):
                 "channels": [{"id": "C1", "name": "general"}],
                 "response_metadata": {"next_cursor": ""},
             }
+        if method == "files.getUploadURLExternal":
+            upload_id = f"F{self.upload_counter}"
+            upload_url = f"https://uploads.example/{self.upload_counter}"
+            self.upload_counter += 1
+            return {"ok": True, "file_id": upload_id, "upload_url": upload_url}
+        if method == "files.completeUploadExternal":
+            payload_dict = payload or {}
+            self.completed_uploads.append(payload_dict)
+            files_payload = payload_dict.get("files") if isinstance(payload_dict.get("files"), list) else []
+            file_id = files_payload[0]["id"] if files_payload else f"F{self.upload_counter}"
+            return {
+                "ok": True,
+                "files": [
+                    {
+                        "id": file_id,
+                        "permalink": f"https://files.slack.com/{file_id}",
+                        "title": files_payload[0].get("title") if files_payload else None,
+                    }
+                ],
+            }
         if method == "chat.postMessage":
             return {"ok": True, "ts": "123.456"}
         return {"ok": True}
+
+    async def _upload_external_file(  # type: ignore[override]
+        self, upload_url: str, upload: SlackFileUpload
+    ) -> None:
+        self.upload_requests.append((upload_url, upload))
+        return None
 
 
 def test_fetch_identity_and_capabilities() -> None:
@@ -109,6 +144,46 @@ def test_post_message_invokes_web_api() -> None:
             "reply_broadcast": True,
             "thread_ts": "123",
         }
+
+    asyncio.run(_run())
+
+
+def test_post_message_uploads_files_and_references_blocks() -> None:
+    async def _run() -> None:
+        client = DummySlackClient()
+        client._token = SlackToken(value="xoxp-test")  # type: ignore[protected-access]
+
+        upload = SlackFileUpload(
+            filename="report.pdf",
+            content=b"%PDF-1.4",
+            content_type="application/pdf",
+            title="Quarterly Report",
+        )
+
+        response = await client.post_message(
+            "C1",
+            "Here is the latest report",
+            thread_ts="THREAD1",
+            file_uploads=[upload],
+            file_references=[SlackFileReference(external_id="F999")],
+        )
+
+        assert "uploaded_files" in response
+        uploaded = response["uploaded_files"][0]
+        assert uploaded["id"] == "F0"
+        assert uploaded["permalink"] == "https://files.slack.com/F0"
+
+        assert client.upload_requests[0][0] == "https://uploads.example/0"
+        assert client.completed_uploads[0]["channel_id"] == "C1"
+        assert client.completed_uploads[0]["thread_ts"] == "THREAD1"
+
+        method, params, payload = client.calls[-1]
+        assert method == "chat.postMessage"
+        assert payload["channel"] == "C1"
+        assert payload["blocks"] == [
+            {"type": "file", "source": "remote", "external_id": "F999"},
+            {"type": "file", "source": "remote", "external_id": "F0"},
+        ]
 
     asyncio.run(_run())
 

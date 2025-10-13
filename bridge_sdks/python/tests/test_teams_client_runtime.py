@@ -187,6 +187,50 @@ def test_send_message_and_poll_event(monkeypatch) -> None:
     asyncio.run(_run())
 
 
+def test_send_message_sanitises_html_content() -> None:
+    async def _run() -> None:
+        client = DummyTeamsClient()
+        client._tenant = TeamsTenant(id="tenant")  # type: ignore[protected-access]
+        client._token = TeamsToken(access_token="token")  # type: ignore[protected-access]
+
+        await client.send_message(
+            "chat1",
+            {
+                "body": {
+                    "contentType": "html",
+                    "content": (
+                        "<script>alert(1)</script><p>Hello <b>World</b></p>"
+                        '<a href="javascript:bad">bad</a><a href="https://ok">ok</a>'
+                    ),
+                }
+            },
+        )
+
+        _, payload = client.posts[-1]
+        assert payload["body"]["contentType"] == "html"
+        assert payload["body"]["content"] == '<p>Hello <b>World</b></p>bad<a href="https://ok">ok</a>'
+
+    asyncio.run(_run())
+
+
+def test_send_message_renders_plain_text_as_html() -> None:
+    async def _run() -> None:
+        client = DummyTeamsClient()
+        client._tenant = TeamsTenant(id="tenant")  # type: ignore[protected-access]
+        client._token = TeamsToken(access_token="token")  # type: ignore[protected-access]
+
+        await client.send_message(
+            "chat1",
+            {"body": {"contentType": "text", "content": "Line1\nLine2"}},
+        )
+
+        _, payload = client.posts[-1]
+        assert payload["body"]["content"] == "<p>Line1<br />Line2</p>"
+        assert payload["body"]["contentType"] == "html"
+
+    asyncio.run(_run())
+
+
 def test_teams_oauth_payload(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, object] = {}
 

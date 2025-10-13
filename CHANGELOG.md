@@ -1,6 +1,14 @@
 # Changelog
 
 ## Unreleased
+- Added Slack outbound file upload support that stages remote files via
+  `files.getUploadURLExternal`, appends file blocks to `chat.postMessage`, and
+  returns upload metadata so bridge workers can share attachments alongside
+  text. Introduced unit coverage for file uploads and block composition.
+- Sanitised Microsoft Teams outbound messages by normalising plain-text bodies
+  into HTML, stripping disallowed tags/links from HTML payloads, and ensuring
+  attachments are cleaned before POSTing to Graph. Added regression tests to
+  verify the sanitiser output.
 - Normalised Slack RTM and Microsoft Teams Graph events into Msgr's canonical
   message schema, covering message edits, deletions, reactions, attachments,
   mentions, and thread metadata so downstream consumers receive structured

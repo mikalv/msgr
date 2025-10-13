@@ -18,6 +18,7 @@ from typing import (
     Optional,
     Protocol,
     Sequence,
+    Union,
 )
 
 try:  # pragma: no cover - optional runtime dependency
@@ -101,6 +102,60 @@ class SlackToken:
         return payload
 
 
+@dataclass(frozen=True)
+class SlackFileReference:
+    """Represents a Slack file block that should be referenced in a message."""
+
+    external_id: str
+    source: str = "remote"
+
+    def to_block(self) -> Optional[Dict[str, object]]:
+        if not self.external_id:
+            return None
+        block: Dict[str, object] = {
+            "type": "file",
+            "source": self.source,
+            "external_id": self.external_id,
+        }
+        return block
+
+
+@dataclass(frozen=True)
+class SlackFileUpload:
+    """Represents a new file that should be uploaded to Slack."""
+
+    filename: str
+    content: bytes
+    content_type: str = "application/octet-stream"
+    title: Optional[str] = None
+    alt_text: Optional[str] = None
+    snippet_type: Optional[str] = None
+
+    def content_length(self) -> int:
+        return len(self.content)
+
+
+@dataclass(frozen=True)
+class SlackUploadedFile:
+    """Metadata returned by Slack after a file upload completes."""
+
+    file_id: str
+    title: Optional[str] = None
+    permalink: Optional[str] = None
+    source: str = "remote"
+
+    def to_reference(self) -> SlackFileReference:
+        return SlackFileReference(external_id=self.file_id, source=self.source)
+
+    def to_dict(self) -> Dict[str, object]:
+        payload: Dict[str, object] = {"id": self.file_id, "source": self.source}
+        if self.title is not None:
+            payload["title"] = self.title
+        if self.permalink is not None:
+            payload["permalink"] = self.permalink
+        return payload
+
+
 class SlackClientProtocol(Protocol):
     """Protocol implemented by the concrete Slack RTM/Web API client."""
 
@@ -135,6 +190,8 @@ class SlackClientProtocol(Protocol):
         thread_ts: Optional[str] = None,
         reply_broadcast: bool = False,
         metadata: Optional[Mapping[str, object]] = None,
+        file_uploads: Optional[Sequence[Union[SlackFileUpload, Mapping[str, object]]]] = None,
+        file_references: Optional[Sequence[Union[SlackFileReference, Mapping[str, object]]]] = None,
     ) -> Mapping[str, object]:
         """Send a message to Slack and return the resulting Slack payload."""
 
@@ -274,17 +331,53 @@ class SlackRTMClient(SlackClientProtocol):
         thread_ts: Optional[str] = None,
         reply_broadcast: bool = False,
         metadata: Optional[Mapping[str, object]] = None,
+        file_uploads: Optional[Sequence[Union[SlackFileUpload, Mapping[str, object]]]] = None,
+        file_references: Optional[Sequence[Union[SlackFileReference, Mapping[str, object]]]] = None,
     ) -> Mapping[str, object]:
-        payload: Dict[str, object] = {"channel": channel, "text": text, "reply_broadcast": reply_broadcast}
+        payload: Dict[str, object] = {
+            "channel": channel,
+            "text": text,
+            "reply_broadcast": reply_broadcast,
+        }
+        message_blocks: list[Mapping[str, object]] = []
         if blocks is not None:
-            payload["blocks"] = list(blocks)
+            message_blocks.extend(list(blocks))
         if attachments is not None:
             payload["attachments"] = list(attachments)
         if thread_ts is not None:
             payload["thread_ts"] = thread_ts
         if metadata is not None:
             payload["metadata"] = dict(metadata)
-        return await self._api_call("chat.postMessage", http_method="POST", payload=payload)
+
+        uploads: list[SlackUploadedFile] = []
+        if file_uploads:
+            for upload_candidate in file_uploads:
+                upload = _coerce_file_upload(upload_candidate)
+                if upload is None:
+                    continue
+                uploaded_file = await self._upload_file(channel, upload, thread_ts=thread_ts)
+                uploads.append(uploaded_file)
+
+        references: list[SlackFileReference] = []
+        if file_references:
+            for ref_candidate in file_references:
+                reference = _coerce_file_reference(ref_candidate)
+                if reference is not None:
+                    references.append(reference)
+        references.extend(upload.to_reference() for upload in uploads)
+
+        if references:
+            file_blocks = _build_file_blocks(references)
+            if file_blocks:
+                message_blocks.extend(file_blocks)
+        if message_blocks:
+            payload["blocks"] = message_blocks
+
+        response = await self._api_call("chat.postMessage", http_method="POST", payload=payload)
+        if uploads:
+            response = dict(response)
+            response["uploaded_files"] = [upload.to_dict() for upload in uploads]
+        return response
 
     async def acknowledge_event(self, event_id: str) -> None:
         if not event_id:
@@ -371,6 +464,64 @@ class SlackRTMClient(SlackClientProtocol):
         if not data.get("ok", True):
             raise RuntimeError(f"Slack API error for {method}: {data.get('error')}")
         return data
+
+    async def _upload_file(
+        self, channel: str, upload: SlackFileUpload, *, thread_ts: Optional[str] = None
+    ) -> SlackUploadedFile:
+        params: Dict[str, object] = {"filename": upload.filename, "length": upload.content_length()}
+        if upload.snippet_type:
+            params["snippet_type"] = upload.snippet_type
+
+        response = await self._api_call("files.getUploadURLExternal", params=params)
+        upload_url = response.get("upload_url")
+        file_id = response.get("file_id")
+        if not isinstance(upload_url, str) or not isinstance(file_id, str):
+            raise RuntimeError("Slack did not return upload metadata")
+
+        await self._upload_external_file(upload_url, upload)
+
+        file_payload: Dict[str, object] = {
+            "id": file_id,
+            "title": upload.title or upload.filename,
+            "alt_text": upload.alt_text or upload.filename,
+            "mimetype": upload.content_type,
+        }
+        complete_payload: Dict[str, object] = {"files": [file_payload], "channel_id": channel}
+        if thread_ts:
+            complete_payload["thread_ts"] = thread_ts
+        completion = await self._api_call(
+            "files.completeUploadExternal",
+            http_method="POST",
+            payload=complete_payload,
+        )
+
+        file_info: Optional[Mapping[str, object]] = None
+        files_data = completion.get("files")
+        if isinstance(files_data, list):
+            for entry in files_data:
+                if isinstance(entry, Mapping):
+                    file_info = entry
+                    break
+
+        title = upload.title or upload.filename
+        permalink: Optional[str] = None
+        if file_info is not None:
+            info_title = file_info.get("title")
+            if isinstance(info_title, str):
+                title = info_title
+            info_link = file_info.get("permalink")
+            if isinstance(info_link, str):
+                permalink = info_link
+
+        return SlackUploadedFile(file_id=file_id, title=title, permalink=permalink)
+
+    async def _upload_external_file(self, upload_url: str, upload: SlackFileUpload) -> None:
+        await self._ensure_session()
+        if self._session is None:
+            raise RuntimeError("Slack HTTP session not initialised")
+        headers = {"Content-Type": upload.content_type or "application/octet-stream"}
+        async with self._session.put(upload_url, data=upload.content, headers=headers) as response:
+            response.raise_for_status()
 
     async def _paginate(
         self,
@@ -804,6 +955,77 @@ def _normalise_message_reactions(reactions: object) -> Optional[list[Mapping[str
         if normalised_reaction:
             normalised.append(normalised_reaction)
     return normalised or None
+
+
+def _coerce_file_upload(
+    upload: Union[SlackFileUpload, Mapping[str, object]]
+) -> Optional[SlackFileUpload]:
+    if isinstance(upload, SlackFileUpload):
+        return upload
+    if not isinstance(upload, Mapping):
+        return None
+
+    filename = upload.get("filename") or upload.get("name")
+    if not isinstance(filename, str) or not filename:
+        return None
+
+    content_value = upload.get("content")
+    if content_value is None:
+        content_value = upload.get("data")
+    if isinstance(content_value, memoryview):
+        content_bytes = content_value.tobytes()
+    elif isinstance(content_value, (bytes, bytearray)):
+        content_bytes = bytes(content_value)
+    else:
+        return None
+
+    content_type = (
+        upload.get("content_type")
+        or upload.get("mimetype")
+        or upload.get("mime_type")
+        or "application/octet-stream"
+    )
+    content_type_str = str(content_type) if isinstance(content_type, str) else "application/octet-stream"
+
+    title = upload.get("title") if isinstance(upload.get("title"), str) else None
+    alt_text_value = upload.get("alt_text") or upload.get("altText")
+    alt_text = alt_text_value if isinstance(alt_text_value, str) else None
+    snippet_type_value = upload.get("snippet_type")
+    snippet_type = snippet_type_value if isinstance(snippet_type_value, str) else None
+
+    return SlackFileUpload(
+        filename=filename,
+        content=content_bytes,
+        content_type=content_type_str,
+        title=title,
+        alt_text=alt_text,
+        snippet_type=snippet_type,
+    )
+
+
+def _coerce_file_reference(
+    reference: Union[SlackFileReference, Mapping[str, object]]
+) -> Optional[SlackFileReference]:
+    if isinstance(reference, SlackFileReference):
+        return reference
+    if not isinstance(reference, Mapping):
+        return None
+
+    external_id = reference.get("external_id") or reference.get("id")
+    if not isinstance(external_id, str) or not external_id:
+        return None
+    source_value = reference.get("source")
+    source = source_value if isinstance(source_value, str) and source_value else "remote"
+    return SlackFileReference(external_id=external_id, source=source)
+
+
+def _build_file_blocks(references: Sequence[SlackFileReference]) -> list[Mapping[str, object]]:
+    blocks: list[Mapping[str, object]] = []
+    for reference in references:
+        block = reference.to_block()
+        if block:
+            blocks.append(block)
+    return blocks
 
 
 def _compact(values: Mapping[str, object | None]) -> Dict[str, object]:
