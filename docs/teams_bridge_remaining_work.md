@@ -26,10 +26,10 @@ production tenant.
   data store.
 
 ## Message Surface & Attachments
-- Normalise Teams chat/channel payloads into Msgr's canonical schema, including replies, mentions,
-  reactions, and meeting-specific metadata.
-- Implement outbound file uploads and adaptive-card/HTML sanitisation so rich Teams messages round-trip
-  correctly.
+- Expand contract fixtures that exercise the new canonical normaliser across message edits,
+  multi-tenant channel threads, and compliance copies so regressions are caught before releases.
+- Harden the adaptive-card pipeline by validating card templates, localised text rendering, and
+  large file uploads in integration environments before enabling production tenants.
 
 ## Operational Hardening
 - Document deployment topologies for sharding by tenant or geography and how to handle dedicated

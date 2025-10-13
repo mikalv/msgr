@@ -16,7 +16,7 @@ _DEFAULT_CAPABILITIES: Mapping[str, object] = {
     "messaging": {
         "text": True,
         "mentions": True,
-        "attachments": ["file", "image"],
+        "attachments": ["file", "image", "adaptive_card"],
     },
     "presence": {"typing": True, "read_receipts": True},
     "threads": {"supported": True},
@@ -170,18 +170,46 @@ class TeamsBridgeDaemon:
 
         message_body = payload.get("message")
         if isinstance(message_body, str):
-            message_body = {"body": {"contentType": "text", "content": message_body}}
-        elif not isinstance(message_body, Mapping):
+            message_map: Dict[str, object] = {"body": {"contentType": "text", "content": message_body}}
+        elif isinstance(message_body, Mapping):
+            message_map = dict(message_body)
+        else:
             raise ValueError("message payload must be a string or mapping")
+
+        attachments_payload = payload.get("attachments")
+        if isinstance(attachments_payload, list):
+            existing = (
+                list(message_map.get("attachments", []))
+                if isinstance(message_map.get("attachments"), list)
+                else []
+            )
+            additional = [dict(item) for item in attachments_payload if isinstance(item, Mapping)]
+            if additional:
+                message_map["attachments"] = existing + additional
+
+        mentions_payload = payload.get("mentions")
+        if isinstance(mentions_payload, list):
+            existing_mentions = (
+                list(message_map.get("mentions", []))
+                if isinstance(message_map.get("mentions"), list)
+                else []
+            )
+            additional_mentions = [dict(item) for item in mentions_payload if isinstance(item, Mapping)]
+            if additional_mentions:
+                message_map["mentions"] = existing_mentions + additional_mentions
 
         reply_to = payload.get("reply_to") or payload.get("reply_to_id")
         metadata_payload = payload.get("metadata") if isinstance(payload.get("metadata"), Mapping) else None
 
+        file_uploads_payload = payload.get("file_uploads")
+        file_uploads = list(file_uploads_payload) if isinstance(file_uploads_payload, list) else None
+
         await client.send_message(
             conversation_id,
-            message_body,  # type: ignore[arg-type]
+            message_map,
             reply_to_id=str(reply_to) if isinstance(reply_to, str) else None,
             metadata=metadata_payload,
+            file_uploads=file_uploads,
         )
 
     async def _handle_ack_event(self, envelope: Envelope) -> None:

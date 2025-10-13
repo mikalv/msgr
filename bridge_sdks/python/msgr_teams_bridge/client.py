@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import contextlib
 import datetime as dt
 import html
@@ -23,6 +24,7 @@ from typing import (
     Protocol,
     Sequence,
     Tuple,
+    Union,
 )
 from urllib.parse import urlparse
 
@@ -107,6 +109,64 @@ class TeamsToken:
         return payload
 
 
+@dataclass(frozen=True)
+class TeamsUploadedFile:
+    """Metadata describing a file that was uploaded alongside a Teams message."""
+
+    name: str
+    content_type: Optional[str] = None
+    size: Optional[int] = None
+    content_id: Optional[str] = None
+    inline: bool = False
+
+    def to_dict(self) -> MutableMapping[str, object]:
+        payload: Dict[str, object] = {"name": self.name, "inline": self.inline}
+        if self.content_type:
+            payload["content_type"] = self.content_type
+        if self.size is not None:
+            payload["size"] = int(self.size)
+        if self.content_id:
+            payload["content_id"] = self.content_id
+        return payload
+
+
+@dataclass(frozen=True)
+class TeamsFileUpload:
+    """Represents an outbound file that should be attached to a Teams message."""
+
+    filename: str
+    content: bytes
+    content_type: Optional[str] = None
+    inline: bool = False
+    content_id: Optional[str] = None
+    description: Optional[str] = None
+
+    def content_length(self) -> int:
+        return len(self.content)
+
+    def to_attachment(self) -> Tuple[Dict[str, object], TeamsUploadedFile]:
+        encoded = base64.b64encode(self.content).decode("ascii")
+        attachment = _compact_dict(
+            {
+                "@odata.type": "#microsoft.graph.fileAttachment",
+                "name": self.filename,
+                "contentType": self.content_type or "application/octet-stream",
+                "contentBytes": encoded,
+                "contentId": self.content_id,
+                "isInline": True if self.inline else None,
+                "description": self.description,
+            }
+        )
+        uploaded = TeamsUploadedFile(
+            name=self.filename,
+            content_type=self.content_type,
+            size=self.content_length(),
+            content_id=self.content_id,
+            inline=self.inline,
+        )
+        return attachment, uploaded
+
+
 class TeamsClientProtocol(Protocol):
     """Protocol implemented by the concrete Teams Graph/Websocket client."""
 
@@ -138,6 +198,7 @@ class TeamsClientProtocol(Protocol):
         *,
         reply_to_id: Optional[str] = None,
         metadata: Optional[Mapping[str, object]] = None,
+        file_uploads: Optional[Sequence[Union[TeamsFileUpload, Mapping[str, object]]]] = None,
     ) -> Mapping[str, object]:
         """Send a Teams message and return the resulting Graph payload."""
 
@@ -286,7 +347,11 @@ class TeamsGraphClient(TeamsClientProtocol):
     async def describe_capabilities(self) -> Mapping[str, object]:
         if self._capabilities is None:
             self._capabilities = {
-                "messaging": {"text": True, "mentions": True, "attachments": ["file", "image"]},
+                "messaging": {
+                    "text": True,
+                    "mentions": True,
+                    "attachments": ["file", "image", "adaptive_card"],
+                },
                 "presence": {"typing": True, "read_receipts": True},
                 "threads": {"supported": True},
             }
@@ -311,13 +376,18 @@ class TeamsGraphClient(TeamsClientProtocol):
         *,
         reply_to_id: Optional[str] = None,
         metadata: Optional[Mapping[str, object]] = None,
+        file_uploads: Optional[Sequence[Union[TeamsFileUpload, Mapping[str, object]]]] = None,
     ) -> Mapping[str, object]:
-        payload = _prepare_outbound_message(message)
+        payload, uploads = _prepare_outbound_message(message, file_uploads=file_uploads)
         if metadata is not None:
             payload.setdefault("metadata", dict(metadata))
         if reply_to_id is not None:
             payload.setdefault("replyToId", reply_to_id)
-        return await self._post(f"/chats/{conversation_id}/messages", payload)
+        response = await self._post(f"/chats/{conversation_id}/messages", payload)
+        if uploads:
+            response = dict(response)
+            response["uploaded_files"] = [upload.to_dict() for upload in uploads]
+        return response
 
     async def acknowledge_event(self, event_id: str) -> None:
         if not event_id:
@@ -729,21 +799,112 @@ def _normalise_chat_event(
         return None
     message_id_str = str(message_id)
 
+    message_payload, channel_identity = _normalise_graph_message(
+        message,
+        tenant=tenant,
+        chat_id=chat_id,
+    )
+
+    conversation = _normalise_conversation_context(
+        tenant,
+        chat_id,
+        message,
+        channel_identity,
+        message_payload.get("thread") if isinstance(message_payload, Mapping) else None,
+    )
+
+    event = _compact_dict(
+        {
+            "event_id": message_id_str,
+            "event_type": _determine_event_type(message_payload.get("message_type")),
+            "tenant_id": tenant.id if tenant else None,
+            "chat_id": chat_id,
+            "conversation": conversation if conversation else None,
+            "message": message_payload if message_payload else None,
+        }
+    )
+    return event if event else None
+
+
+def _determine_event_type(message_type: object) -> str:
+    if not isinstance(message_type, str):
+        return "message"
+    lowered = message_type.lower()
+    if lowered in {"systemeventmessage", "system"}:
+        return "system_event"
+    if lowered in {"meetingmessage", "meeting"}:
+        return "meeting"
+    if lowered in {"announcement", "channelannouncement"}:
+        return "announcement"
+    return "message"
+
+
+def _normalise_conversation_context(
+    tenant: Optional[TeamsTenant],
+    chat_id: str,
+    message: Mapping[str, object],
+    channel_identity: Optional[Mapping[str, object]],
+    thread_summary: Optional[Mapping[str, object]],
+) -> Optional[Dict[str, object]]:
+    conversation_type = "channel" if channel_identity else "chat"
+    chat_type = message.get("chatType") or message.get("chat_type")
+    topic = message.get("topic") or message.get("subject")
+
     conversation = _compact_dict(
         {
             "id": chat_id,
             "tenant_id": tenant.id if tenant else None,
-            "channel_identity": _normalise_channel_identity(message.get("channelIdentity")),
+            "type": conversation_type,
+            "chat_type": chat_type,
+            "topic": topic,
+            "channel_identity": dict(channel_identity) if channel_identity else None,
         }
     )
 
-    message_payload = _compact_dict(
+    if conversation and isinstance(thread_summary, Mapping) and thread_summary:
+        conversation["thread"] = dict(thread_summary)
+
+    return conversation or None
+
+
+def _normalise_graph_message(
+    message: Mapping[str, object],
+    *,
+    tenant: Optional[TeamsTenant],
+    chat_id: Optional[str],
+    channel_identity: Optional[Mapping[str, object]] = None,
+) -> Tuple[Dict[str, object], Optional[Dict[str, object]]]:
+    if not isinstance(message, Mapping):
+        return {}, None
+
+    resolved_channel = channel_identity or _normalise_channel_identity(
+        message.get("channelIdentity")
+    )
+
+    message_id = _as_str(message.get("id") or message.get("messageId"))
+    reply_to_id = _as_str(message.get("replyToId"))
+
+    replies = _normalise_graph_replies(
+        message.get("replies"),
+        tenant=tenant,
+        chat_id=chat_id,
+        channel_identity=resolved_channel,
+    )
+    reply_reference = _build_reply_reference(
+        reply_to_id,
+        tenant=tenant,
+        chat_id=chat_id,
+        channel_identity=resolved_channel,
+    )
+    thread_summary = _build_thread_summary(message_id, reply_reference, replies)
+
+    payload = _compact_dict(
         {
-            "id": message_id_str,
+            "id": message_id,
             "message_type": message.get("messageType"),
             "subject": message.get("subject"),
             "summary": message.get("summary"),
-            "reply_to_id": _as_str(message.get("replyToId")),
+            "reply_to_id": reply_to_id,
             "importance": message.get("importance"),
             "body": _normalise_graph_body(message.get("body")),
             "from": _normalise_graph_from(message.get("from")),
@@ -754,20 +915,140 @@ def _normalise_chat_event(
             "reactions": _normalise_graph_reactions(message.get("reactions")),
             "etag": message.get("etag"),
             "web_url": message.get("webUrl"),
+            "meeting": _normalise_meeting_metadata(message),
+            "thread": thread_summary,
         }
     )
 
-    event = _compact_dict(
+    if reply_reference:
+        payload["reply_to"] = reply_reference
+    if replies:
+        payload["replies"] = replies
+
+    return payload, resolved_channel
+
+
+def _build_reply_reference(
+    reply_to_id: Optional[str],
+    *,
+    tenant: Optional[TeamsTenant],
+    chat_id: Optional[str],
+    channel_identity: Optional[Mapping[str, object]],
+) -> Optional[Dict[str, object]]:
+    if not reply_to_id:
+        return None
+    reference = _compact_dict(
         {
-            "event_id": message_id_str,
-            "event_type": "message",
+            "id": reply_to_id,
             "tenant_id": tenant.id if tenant else None,
             "chat_id": chat_id,
-            "conversation": conversation if conversation else None,
-            "message": message_payload if message_payload else None,
+            "channel_identity": dict(channel_identity) if channel_identity else None,
         }
     )
-    return event if event else None
+    return reference or None
+
+
+def _build_thread_summary(
+    message_id: Optional[str],
+    reply_reference: Optional[Mapping[str, object]],
+    replies: Optional[Sequence[Mapping[str, object]]],
+) -> Optional[Dict[str, object]]:
+    if not message_id and not reply_reference and not replies:
+        return None
+
+    summary: Dict[str, object] = {}
+    if message_id:
+        if reply_reference and isinstance(reply_reference.get("id"), str):
+            summary["root_id"] = reply_reference["id"]  # type: ignore[index]
+        else:
+            summary["root_id"] = message_id
+    if reply_reference and isinstance(reply_reference.get("id"), str):
+        summary["parent_id"] = reply_reference["id"]  # type: ignore[index]
+    if replies:
+        summary["has_replies"] = True
+        summary["reply_count"] = len(replies)
+
+    return _compact_dict(summary) or None
+
+
+def _normalise_graph_replies(
+    replies: object,
+    *,
+    tenant: Optional[TeamsTenant],
+    chat_id: Optional[str],
+    channel_identity: Optional[Mapping[str, object]],
+) -> Optional[list[Mapping[str, object]]]:
+    if not isinstance(replies, list):
+        return None
+    normalised: list[Mapping[str, object]] = []
+    for entry in replies:
+        if not isinstance(entry, Mapping):
+            continue
+        reply_payload, reply_channel = _normalise_graph_message(
+            entry,
+            tenant=tenant,
+            chat_id=chat_id,
+            channel_identity=channel_identity or _normalise_channel_identity(entry.get("channelIdentity")),
+        )
+        if reply_payload:
+            normalised.append(reply_payload)
+        channel_identity = channel_identity or reply_channel
+    return normalised or None
+
+
+def _normalise_meeting_metadata(message: Mapping[str, object]) -> Optional[Dict[str, object]]:
+    meeting_info = message.get("meetingInfo") or message.get("meeting_info")
+    online_info = message.get("onlineMeetingInfo") or message.get("online_meeting_info")
+    event_detail = message.get("eventDetail") or message.get("event_detail")
+    call_id = message.get("callId") or message.get("call_id")
+    meeting = _compact_dict(
+        {
+            "message_type": message.get("meetingMessageType") or message.get("meeting_message_type"),
+            "call_id": call_id,
+            "event_detail": dict(event_detail) if isinstance(event_detail, Mapping) else None,
+            "info": _normalise_meeting_info(meeting_info),
+            "online_meeting": _normalise_online_meeting_info(online_info),
+        }
+    )
+    return meeting or None
+
+
+def _normalise_meeting_info(info: object) -> Optional[Dict[str, object]]:
+    if not isinstance(info, Mapping):
+        return None
+    join_url = info.get("joinUrl") or info.get("join_url")
+    normalised = _compact_dict(
+        {
+            "id": info.get("id"),
+            "subject": info.get("subject"),
+            "join_url": join_url if isinstance(join_url, str) and _is_safe_href(join_url) else None,
+            "organizer": _compact_dict(
+                {
+                    "id": organizer.get("id"),
+                    "display_name": organizer.get("displayName") or organizer.get("display_name"),
+                    "user_identity_type": organizer.get("userIdentityType")
+                    or organizer.get("user_identity_type"),
+                }
+            )
+            if isinstance(organizer := info.get("organizer"), Mapping)
+            else None,
+        }
+    )
+    return normalised or None
+
+
+def _normalise_online_meeting_info(info: object) -> Optional[Dict[str, object]]:
+    if not isinstance(info, Mapping):
+        return None
+    join_url = info.get("joinUrl") or info.get("join_url")
+    return _compact_dict(
+        {
+            "calendar_event_id": info.get("calendarEventId") or info.get("calendar_event_id"),
+            "conference_id": info.get("conferenceId") or info.get("conference_id"),
+            "external_id": info.get("externalId") or info.get("external_id"),
+            "join_url": join_url if isinstance(join_url, str) and _is_safe_href(join_url) else None,
+        }
+    )
 
 
 def _normalise_graph_body(body: object) -> Optional[Dict[str, object]]:
@@ -913,7 +1194,11 @@ def _normalise_channel_identity(identity: object) -> Optional[Dict[str, object]]
     )
 
 
-def _prepare_outbound_message(message: Mapping[str, object]) -> Dict[str, object]:
+def _prepare_outbound_message(
+    message: Mapping[str, object],
+    *,
+    file_uploads: Optional[Sequence[Union[TeamsFileUpload, Mapping[str, object]]]] = None,
+) -> Tuple[Dict[str, object], list[TeamsUploadedFile]]:
     payload = dict(message)
 
     body = payload.get("body")
@@ -940,20 +1225,213 @@ def _prepare_outbound_message(message: Mapping[str, object]) -> Dict[str, object
             "content": _render_plain_text(str(body) if body is not None else ""),
         }
 
+    cleaned_attachments: list[Dict[str, object]] = []
     attachments = payload.get("attachments")
     if isinstance(attachments, list):
-        cleaned: list[Dict[str, object]] = []
         for attachment in attachments:
             if not isinstance(attachment, Mapping):
                 continue
-            cleaned_attachment: Dict[str, object] = dict(attachment)
-            content = cleaned_attachment.get("content")
-            if isinstance(content, str):
-                cleaned_attachment["content"] = _sanitise_html(content)
-            cleaned.append(cleaned_attachment)
-        payload["attachments"] = cleaned
+            cleaned_attachment = _sanitise_outbound_attachment(attachment)
+            if cleaned_attachment:
+                cleaned_attachments.append(cleaned_attachment)
 
-    return payload
+    uploads: list[TeamsUploadedFile] = []
+    if file_uploads:
+        for candidate in file_uploads:
+            upload = _coerce_file_upload(candidate)
+            if upload is None:
+                continue
+            attachment, uploaded = upload.to_attachment()
+            cleaned_attachments.append(attachment)
+            uploads.append(uploaded)
+
+    if cleaned_attachments:
+        payload["attachments"] = cleaned_attachments
+    elif "attachments" in payload:
+        payload.pop("attachments")
+
+    return payload, uploads
+
+
+def _sanitise_outbound_attachment(attachment: Mapping[str, object]) -> Optional[Dict[str, object]]:
+    mapping = _ensure_mapping(attachment)
+    if not mapping:
+        return None
+
+    cleaned: Dict[str, object] = {}
+
+    def _copy_field(target: str, *candidates: str) -> None:
+        for candidate in candidates:
+            if candidate not in mapping:
+                continue
+            value = mapping[candidate]
+            if value is None:
+                continue
+            cleaned[target] = value
+            return
+
+    _copy_field("id", "id")
+    _copy_field("name", "name", "filename", "title")
+    _copy_field("description", "description", "text")
+    _copy_field("contentType", "contentType", "content_type")
+    _copy_field("contentBytes", "contentBytes", "content_bytes")
+    _copy_field("contentLocation", "contentLocation", "content_location")
+    _copy_field("thumbnailUrl", "thumbnailUrl", "thumbnail_url")
+    _copy_field("@odata.type", "@odata.type", "odata_type")
+
+    url_value = mapping.get("contentUrl") or mapping.get("content_url")
+    if isinstance(url_value, str) and _is_safe_href(url_value):
+        cleaned["contentUrl"] = url_value
+
+    thumbnail = mapping.get("thumbnailUrl") or mapping.get("thumbnail_url")
+    if isinstance(thumbnail, str) and _is_safe_href(thumbnail):
+        cleaned["thumbnailUrl"] = thumbnail
+
+    content_type = cleaned.get("contentType")
+    content_value = mapping.get("content")
+    if _is_adaptive_card_content_type(content_type):
+        cleaned["content"] = _sanitise_adaptive_card(content_value)
+    elif isinstance(content_value, str):
+        cleaned["content"] = _sanitise_html(content_value)
+    elif isinstance(content_value, Mapping):
+        cleaned["content"] = _sanitise_adaptive_card(content_value)
+    elif content_value is not None:
+        cleaned["content"] = content_value
+
+    return _compact_dict(cleaned)
+
+
+def _coerce_file_upload(
+    upload: Union[TeamsFileUpload, Mapping[str, object]],
+) -> Optional[TeamsFileUpload]:
+    if isinstance(upload, TeamsFileUpload):
+        return upload
+    if not isinstance(upload, Mapping):
+        return None
+
+    filename_value = upload.get("filename") or upload.get("name")
+    if not isinstance(filename_value, str) or not filename_value.strip():
+        return None
+    filename = filename_value.strip()
+
+    content_value = (
+        upload.get("content")
+        or upload.get("data")
+        or upload.get("bytes")
+        or upload.get("body")
+    )
+    content_bytes: Optional[bytes]
+    if hasattr(content_value, "read"):
+        try:
+            read_result = content_value.read()  # type: ignore[call-arg]
+        except Exception:  # pragma: no cover - defensive
+            return None
+        content_bytes = bytes(read_result)
+    elif isinstance(content_value, (bytes, bytearray, memoryview)):
+        content_bytes = bytes(content_value)
+    elif isinstance(content_value, str):
+        content_bytes = content_value.encode("utf-8")
+    else:
+        content_bytes = None
+
+    if content_bytes is None:
+        return None
+
+    content_type_value = (
+        upload.get("content_type")
+        or upload.get("contentType")
+        or upload.get("mimetype")
+        or upload.get("mime_type")
+    )
+    content_type = (
+        str(content_type_value).strip()
+        if isinstance(content_type_value, str) and content_type_value.strip()
+        else None
+    )
+
+    inline_flag = upload.get("inline")
+    inline = bool(inline_flag) if inline_flag is not None else False
+
+    content_id_value = upload.get("content_id") or upload.get("contentId")
+    content_id = (
+        str(content_id_value).strip()
+        if isinstance(content_id_value, (str, int)) and str(content_id_value).strip()
+        else None
+    )
+
+    description_value = upload.get("description") or upload.get("alt_text")
+    description = (
+        str(description_value).strip()
+        if isinstance(description_value, str) and description_value.strip()
+        else None
+    )
+
+    return TeamsFileUpload(
+        filename=filename,
+        content=content_bytes,
+        content_type=content_type,
+        inline=inline,
+        content_id=content_id,
+        description=description,
+    )
+
+
+def _is_adaptive_card_content_type(content_type: object) -> bool:
+    if not content_type:
+        return False
+    value = str(content_type).strip().lower()
+    return value in {
+        "application/vnd.microsoft.card.adaptive",
+        "application/vnd.microsoft.card.hero",
+        "application/vnd.microsoft.card.thumbnail",
+    }
+
+
+def _sanitise_adaptive_card(content: object) -> str:
+    if isinstance(content, str) and content.strip():
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError:
+            data = {"type": "AdaptiveCard", "body": [{"type": "TextBlock", "text": content}]}
+    elif isinstance(content, Mapping):
+        data = dict(content)
+    else:
+        data = {}
+
+    cleaned = _clean_adaptive_card(data)
+    if cleaned is None:
+        cleaned = {}
+    return json.dumps(cleaned, ensure_ascii=False)
+
+
+def _clean_adaptive_card(value: object) -> Optional[object]:
+    if isinstance(value, Mapping):
+        cleaned_mapping: Dict[str, object] = {}
+        for key, entry in value.items():
+            if entry is None:
+                continue
+            key_lower = key.lower()
+            if key_lower in {"url", "href", "iconurl", "image"}:
+                if isinstance(entry, str) and _is_safe_href(entry):
+                    cleaned_mapping[key] = entry
+                continue
+            if key_lower in {"text", "title", "speak"} and isinstance(entry, str):
+                cleaned_mapping[key] = html.escape(entry)
+                continue
+            cleaned_value = _clean_adaptive_card(entry)
+            if cleaned_value is not None:
+                cleaned_mapping[key] = cleaned_value
+        return cleaned_mapping
+    if isinstance(value, list):
+        cleaned_list = []
+        for item in value:
+            cleaned_item = _clean_adaptive_card(item)
+            if cleaned_item is not None:
+                cleaned_list.append(cleaned_item)
+        return cleaned_list
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    return None
 
 
 class _TeamsHTMLSanitiser(HTMLParser):

@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- Normalised Microsoft Teams chat and channel events into the canonical Msgr schema, capturing
+  reply hierarchies, mentions, reactions, and meeting metadata while extending runtime tests to
+  cover the richer payloads alongside webhook and poller dispatch flows. Introduced adaptive-card
+  sanitisation and file-upload helpers so outbound Teams messages safely render HTML/cards and
+  upload binary attachments with accompanying metadata for downstream consumers.
 - Replaced the Microsoft Teams Graph poller with a webhook-driven change-notification pipeline,
   including reusable notification source abstractions, an in-memory transport for tests, and
   runtime coverage that validates real-time event delivery, acknowledgements, and token refresh

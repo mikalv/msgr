@@ -92,12 +92,14 @@ class FakeTeamsClient:
         *,
         reply_to_id: Optional[str] = None,
         metadata: Optional[Mapping[str, object]] = None,
+        file_uploads: Optional[list[Mapping[str, object]]] = None,
     ) -> Mapping[str, object]:
         payload = {
             "conversation_id": conversation_id,
             "message": dict(message),
             "reply_to_id": reply_to_id,
             "metadata": metadata,
+            "file_uploads": list(file_uploads) if file_uploads is not None else None,
         }
         self.sent_messages.append(payload)
         return {"id": "msg-1"}
@@ -270,6 +272,15 @@ def test_outbound_message_dispatch(tmp_path: Path) -> None:
             {
                 "conversation_id": "chat-1",
                 "message": {"body": {"contentType": "text", "content": "Hei"}},
+                "attachments": [
+                    {
+                        "contentType": "application/vnd.microsoft.card.adaptive",
+                        "content": {"type": "AdaptiveCard", "body": [{"type": "TextBlock", "text": "<b>hi</b>"}]},
+                    }
+                ],
+                "file_uploads": [
+                    {"filename": "hello.txt", "content": "aGk=", "content_type": "text/plain"}
+                ],
             },
             metadata={"user_id": "acct-1", "tenant_id": "tenant-1"},
         )
@@ -277,6 +288,8 @@ def test_outbound_message_dispatch(tmp_path: Path) -> None:
         await transport.publish(topic, envelope.to_json().encode("utf-8"))
 
         assert client.sent_messages[0]["message"]["body"]["content"] == "Hei"
+        assert client.sent_messages[0]["message"]["attachments"][0]["contentType"] == "application/vnd.microsoft.card.adaptive"
+        assert client.sent_messages[0]["file_uploads"][0]["filename"] == "hello.txt"
         await daemon.shutdown()
 
     _run(scenario)

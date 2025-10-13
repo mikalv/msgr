@@ -2,12 +2,14 @@
 
 from .client import (
     TeamsClientProtocol,
+    TeamsFileUpload,
     TeamsGraphClient,
     TeamsIdentity,
     TeamsOAuthClient,
     TeamsOAuthClientProtocol,
     TeamsTenant,
     TeamsToken,
+    TeamsUploadedFile,
     TeamsUser,
     UpdateHandler,
 )
@@ -22,9 +24,11 @@ from .session import SessionData, SessionManager, SessionStore
 __all__ = [
     "TeamsClientProtocol",
     "TeamsGraphClient",
+    "TeamsFileUpload",
     "TeamsIdentity",
     "TeamsOAuthClient",
     "TeamsOAuthClientProtocol",
+    "TeamsUploadedFile",
     "TeamsNotificationSource",
     "TeamsWebhookNotificationSource",
     "MemoryNotificationTransport",

@@ -217,6 +217,8 @@ def test_send_message_and_poll_event(monkeypatch) -> None:
                 "value": [
                     {
                         "id": "msg1",
+                        "chatId": "chat1",
+                        "messageType": "meetingMessage",
                         "createdDateTime": "2024-01-01T00:00:00Z",
                         "lastModifiedDateTime": "2024-01-01T00:00:10Z",
                         "body": {"content": "<p>hi</p>", "contentType": "html"},
@@ -246,6 +248,26 @@ def test_send_message_and_poll_event(monkeypatch) -> None:
                                 "user": {"user": {"id": "user3", "displayName": "Charlie"}},
                             }
                         ],
+                        "replies": [
+                            {
+                                "id": "msg1-reply",
+                                "createdDateTime": "2024-01-01T00:00:20Z",
+                                "body": {"content": "<p>Reply</p>", "contentType": "html"},
+                                "from": {"user": {"id": "user4", "displayName": "Dana"}},
+                            }
+                        ],
+                        "meetingMessageType": "meeting",
+                        "meetingInfo": {
+                            "id": "meet-1",
+                            "subject": "Weekly sync",
+                            "joinUrl": "https://teams.example/join",
+                            "organizer": {"id": "user2", "displayName": "Bob"},
+                        },
+                        "onlineMeetingInfo": {
+                            "conferenceId": "conf-1",
+                            "joinUrl": "javascript:alert('x')",
+                        },
+                        "eventDetail": {"topic": "Weekly"},
                     }
                 ]
             },
@@ -263,10 +285,17 @@ def test_send_message_and_poll_event(monkeypatch) -> None:
         await client.send_message("chat1", {"body": {"contentType": "text", "content": "reply"}})
 
         assert events[0]["event_id"] == "msg1"
-        assert events[0]["event_type"] == "message"
+        assert events[0]["event_type"] == "meeting"
         assert events[0]["message"]["body"]["content_type"] == "html"
         assert events[0]["message"]["attachments"][0]["name"] == "img.png"
         assert events[0]["message"]["mentions"][0]["text"] == "@Alice"
+        assert events[0]["message"]["reply_to"]["id"] == "parent1"
+        assert events[0]["message"]["thread"]["parent_id"] == "parent1"
+        assert events[0]["message"]["thread"]["reply_count"] == 1
+        assert events[0]["message"]["replies"][0]["id"] == "msg1-reply"
+        assert events[0]["message"]["meeting"]["info"]["join_url"] == "https://teams.example/join"
+        assert "join_url" not in events[0]["message"]["meeting"]["online_meeting"]
+        assert events[0]["conversation"]["thread"]["parent_id"] == "parent1"
         assert client.posts[-1][0] == "/chats/chat1/messages"
 
     asyncio.run(_run())
@@ -324,6 +353,55 @@ def test_change_notifications_dispatch_events() -> None:
         assert health["subscription_id"] == subscription_id
 
         await client.disconnect()
+
+    asyncio.run(_run())
+
+
+def test_send_message_sanitises_cards_and_uploads() -> None:
+    async def _run() -> None:
+        client = DummyTeamsClient()
+        message = {
+            "body": {"contentType": "text", "content": "Hello\nWorld"},
+            "attachments": [
+                {
+                    "contentType": "application/vnd.microsoft.card.adaptive",
+                    "content": {
+                        "type": "AdaptiveCard",
+                        "body": [{"type": "TextBlock", "text": "<script>bad</script>"}],
+                        "actions": [
+                            {"type": "Action.OpenUrl", "url": "javascript:alert(1)"},
+                            {"type": "Action.OpenUrl", "url": "https://example.com"},
+                        ],
+                    },
+                    "contentUrl": "javascript:alert('x')",
+                }
+            ],
+        }
+
+        result = await client.send_message(
+            "chat1",
+            message,
+            file_uploads=[{"filename": "hello.txt", "content": b"hello", "content_type": "text/plain"}],
+        )
+
+        path, payload = client.posts[-1]
+        assert path == "/chats/chat1/messages"
+        assert payload["body"]["content"].startswith("<p>Hello")
+
+        attachments = payload["attachments"]
+        assert len(attachments) == 2
+
+        card_attachment = attachments[0]
+        assert card_attachment["contentType"] == "application/vnd.microsoft.card.adaptive"
+        assert "javascript" not in card_attachment.get("content", "")
+        assert "contentUrl" not in card_attachment
+
+        file_attachment = attachments[1]
+        assert file_attachment["name"] == "hello.txt"
+        assert file_attachment["contentType"] == "text/plain"
+        assert "contentBytes" in file_attachment
+
+        assert result["uploaded_files"][0]["name"] == "hello.txt"
 
     asyncio.run(_run())
 
