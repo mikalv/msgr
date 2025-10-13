@@ -20,8 +20,8 @@ production tenant.
   controls for operators.
 
 ## Real-time Event Delivery
-- Replace the current long-polling loop with Microsoft Graph change notifications delivered via a
-  webhook relay or websocket gateway so message latency matches other bridges.
+- Harden the new change-notification pipeline by persisting Graph webhook subscription state and
+  running the relay across multiple bridge workers so message fan-out survives process restarts.
 - Backfill missed events during webhook outages by reconciling Graph delta queries against the bridge
   data store.
 

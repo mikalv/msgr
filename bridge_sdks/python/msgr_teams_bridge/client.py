@@ -8,6 +8,7 @@ import datetime as dt
 import html
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -21,6 +22,7 @@ from typing import (
     Optional,
     Protocol,
     Sequence,
+    Tuple,
 )
 from urllib.parse import urlparse
 
@@ -32,6 +34,8 @@ except ImportError:  # pragma: no cover - aiohttp not available during unit test
     ClientSession = None  # type: ignore
 
 UpdateHandler = Callable[[Mapping[str, object]], Awaitable[None]]
+
+from .notifications import TeamsNotificationSource
 
 
 @dataclass(frozen=True)
@@ -183,6 +187,7 @@ class TeamsGraphClient(TeamsClientProtocol):
         logger: Optional[logging.Logger] = None,
         poll_interval: float = 15.0,
         token_refresh_margin: float = 120.0,
+        notification_source: Optional[TeamsNotificationSource] = None,
     ) -> None:
         if session is not None and ClientSession is not None and not isinstance(session, ClientSession):
             raise RuntimeError("session must be an aiohttp.ClientSession instance")
@@ -198,6 +203,8 @@ class TeamsGraphClient(TeamsClientProtocol):
         self._capabilities: Optional[Mapping[str, object]] = None
         self._handlers: list[UpdateHandler] = []
         self._poll_task: Optional[asyncio.Task[None]] = None
+        self._notification_source = notification_source
+        self._notifications_active = False
         self._last_message_ts: Dict[str, str] = {}
         self._inflight: Dict[str, float] = {}
         self._last_event_at: Optional[float] = None
@@ -232,12 +239,20 @@ class TeamsGraphClient(TeamsClientProtocol):
             },
         )
 
-        if self._poll_task is None or self._poll_task.done():
+        if self._notification_source is not None:
+            await self._notification_source.start(tenant, token, self._handle_change_notification)
+            self._notifications_active = True
+            self._poll_task = None
+        elif self._poll_task is None or self._poll_task.done():
             self._poll_task = asyncio.create_task(self._poll_loop(), name="teams-graph-poller")
         self._last_connect_at = time.time()
         self._consecutive_errors = 0
 
     async def disconnect(self) -> None:
+        if self._notification_source is not None and self._notifications_active:
+            await self._notification_source.stop()
+            self._notifications_active = False
+
         if self._poll_task is not None:
             self._poll_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -259,6 +274,8 @@ class TeamsGraphClient(TeamsClientProtocol):
         )
 
     async def is_connected(self) -> bool:
+        if self._notification_source is not None:
+            return self._notification_source.active
         return bool(self._poll_task is not None and not self._poll_task.done())
 
     async def fetch_identity(self) -> TeamsIdentity:
@@ -310,6 +327,8 @@ class TeamsGraphClient(TeamsClientProtocol):
         if dispatched_at is not None:
             self._last_ack_latency = max(0.0, now - dispatched_at)
         self._last_ack_at = now
+        if self._notification_source is not None:
+            await self._notification_source.acknowledge(event_id)
 
     def add_event_handler(self, handler: UpdateHandler) -> None:
         if handler not in self._handlers:
@@ -384,6 +403,9 @@ class TeamsGraphClient(TeamsClientProtocol):
 
             self._token = refreshed
 
+            if self._notification_source is not None:
+                await self._notification_source.refresh(refreshed)
+
             if self._token_update_handler is not None:
                 await self._token_update_handler(refreshed)
 
@@ -446,16 +468,73 @@ class TeamsGraphClient(TeamsClientProtocol):
             except Exception:  # pragma: no cover - handler failures logged for ops
                 self._logger.exception("Teams handler raised")
 
+    async def _handle_change_notification(self, payload: Mapping[str, object]) -> None:
+        try:
+            chat_id, message = await self._fetch_notification_message(payload)
+        except Exception:  # pragma: no cover - defensive logging for ops
+            self._logger.exception("Failed to process Teams change notification")
+            return
+
+        if chat_id is None or message is None:
+            return
+
+        await self._dispatch_event(chat_id, message)
+
+    async def _fetch_notification_message(
+        self, payload: Mapping[str, object]
+    ) -> Tuple[Optional[str], Optional[Mapping[str, object]]]:
+        context = _extract_notification_context(payload)
+        message_id = context.get("message_id")
+        if not message_id:
+            return None, None
+
+        chat_id = context.get("chat_id")
+        team_id = context.get("team_id")
+        channel_id = context.get("channel_id")
+
+        path: Optional[str]
+        if chat_id:
+            path = f"/chats/{chat_id}/messages/{message_id}"
+        elif team_id and channel_id:
+            path = f"/teams/{team_id}/channels/{channel_id}/messages/{message_id}"
+            chat_id = channel_id
+        else:
+            path = None
+
+        if path is None:
+            return None, None
+
+        message = await self._get(path)
+        if not isinstance(message, Mapping):
+            return None, None
+
+        if chat_id is None:
+            chat_id = _extract_chat_id_from_message(message)
+
+        if chat_id is None:
+            return None, None
+
+        return chat_id, message
+
     async def health(self) -> Mapping[str, object]:
         connected = await self.is_connected()
         now = time.time()
         oldest_inflight: Optional[float] = None
         if self._inflight:
             oldest_inflight = min(self._inflight.values())
+        delivery_mode = "change_notifications" if self._notification_source is not None else "polling"
+        poll_interval = self._poll_interval if self._notification_source is None else None
+        subscription_id = (
+            self._notification_source.subscription_id
+            if self._notification_source is not None
+            else None
+        )
         health = _compact_dict(
             {
                 "connected": connected,
-                "poll_interval": self._poll_interval,
+                "delivery_mode": delivery_mode,
+                "subscription_id": subscription_id,
+                "poll_interval": poll_interval,
                 "handler_count": len(self._handlers),
                 "pending_events": len(self._inflight),
                 "oldest_pending_age": max(0.0, now - oldest_inflight)
@@ -543,6 +622,100 @@ class TeamsGraphClient(TeamsClientProtocol):
                     if isinstance(item, Mapping):
                         yield item
             next_link = data.get("@odata.nextLink") if isinstance(data.get("@odata.nextLink"), str) else None
+
+
+_CHAT_RESOURCE_PATTERN = re.compile(r"/chats\(([\"'])([^\"']+)\1\)/messages\(([\"'])([^\"']+)\3\)", re.IGNORECASE)
+_CHANNEL_RESOURCE_PATTERN = re.compile(
+    r"/teams\(([\"'])([^\"']+)\1\)/channels\(([\"'])([^\"']+)\3\)/messages\(([\"'])([^\"']+)\5\)",
+    re.IGNORECASE,
+)
+
+
+def _extract_notification_context(payload: Mapping[str, object]) -> Dict[str, Optional[str]]:
+    context: Dict[str, Optional[str]] = {
+        "chat_id": None,
+        "message_id": None,
+        "team_id": None,
+        "channel_id": None,
+        "tenant_id": None,
+    }
+
+    resource_data = _ensure_mapping(
+        payload.get("resourceData") or payload.get("resource_data")
+    )
+    if resource_data:
+        message_id = resource_data.get("id")
+        if isinstance(message_id, (str, int)):
+            context["message_id"] = str(message_id)
+
+        chat_id = resource_data.get("chatId") or resource_data.get("chat_id")
+        if isinstance(chat_id, (str, int)):
+            context["chat_id"] = str(chat_id)
+
+        channel_identity = _ensure_mapping(
+            resource_data.get("channelIdentity") or resource_data.get("channel_identity")
+        )
+        if channel_identity:
+            channel_id = channel_identity.get("channelId") or channel_identity.get("channel_id")
+            if isinstance(channel_id, (str, int)):
+                context["channel_id"] = str(channel_id)
+
+            team_id = channel_identity.get("teamId") or channel_identity.get("team_id")
+            if isinstance(team_id, (str, int)):
+                context["team_id"] = str(team_id)
+
+    resource = payload.get("resource")
+    if isinstance(resource, str):
+        parsed = _parse_resource_path(resource)
+        for key, value in parsed.items():
+            if context.get(key) is None and value is not None:
+                context[key] = value
+
+    tenant_id = payload.get("tenantId") or payload.get("tenant_id")
+    if isinstance(tenant_id, (str, int)):
+        context["tenant_id"] = str(tenant_id)
+
+    return context
+
+
+def _parse_resource_path(resource: str) -> Dict[str, Optional[str]]:
+    channel_match = _CHANNEL_RESOURCE_PATTERN.search(resource)
+    if channel_match:
+        return {
+            "team_id": channel_match.group(2),
+            "channel_id": channel_match.group(4),
+            "message_id": channel_match.group(6),
+        }
+
+    chat_match = _CHAT_RESOURCE_PATTERN.search(resource)
+    if chat_match:
+        return {
+            "chat_id": chat_match.group(2),
+            "message_id": chat_match.group(4),
+        }
+
+    return {}
+
+
+def _ensure_mapping(value: object) -> Dict[str, object]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    return {}
+
+
+def _extract_chat_id_from_message(message: Mapping[str, object]) -> Optional[str]:
+    chat_id = message.get("chatId") or message.get("chat_id")
+    if isinstance(chat_id, (str, int)):
+        return str(chat_id)
+
+    channel_identity = _ensure_mapping(
+        message.get("channelIdentity") or message.get("channel_identity")
+    )
+    channel_id = channel_identity.get("channelId") or channel_identity.get("channel_id")
+    if isinstance(channel_id, (str, int)):
+        return str(channel_id)
+
+    return None
 
 
 def _normalise_chat_event(

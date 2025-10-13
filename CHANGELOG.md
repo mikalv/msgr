@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Replaced the Microsoft Teams Graph poller with a webhook-driven change-notification pipeline,
+  including reusable notification source abstractions, an in-memory transport for tests, and
+  runtime coverage that validates real-time event delivery, acknowledgements, and token refresh
+  integration.
 - Added Microsoft Teams OAuth refresh handling that renews access tokens before expiry via the
   bridge daemon, persists refreshed credentials through the session manager, and exercises the
   new refresh flow with runtime tests covering the client, daemon, and credential vault updates.

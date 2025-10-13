@@ -12,6 +12,11 @@ from msgr_teams_bridge.client import (
     TeamsTenant,
     TeamsToken,
     TeamsUser,
+    UpdateHandler,
+)
+from msgr_teams_bridge.notifications import (
+    MemoryNotificationTransport,
+    TeamsWebhookNotificationSource,
 )
 
 
@@ -86,6 +91,82 @@ class DummyTeamsClient(TeamsGraphClient):
         self.posts.append((path, payload))
         return {"id": "m1"}
 
+
+class NotificationEnabledClient(TeamsGraphClient):
+    def __init__(self, source: TeamsWebhookNotificationSource) -> None:
+        super().__init__(logger=logging.getLogger("teams-notify"), notification_source=source)
+        self._responses: Dict[Tuple[str, Optional[Tuple[Tuple[str, object], ...]]], Mapping[str, object]] = {}
+
+    def queue_response(
+        self,
+        path: str,
+        response: Mapping[str, object],
+        *,
+        params: Optional[Mapping[str, object]] = None,
+    ) -> None:
+        key = (path, tuple(sorted((params or {}).items())) if params else None)
+        self._responses[key] = response
+
+    async def _ensure_session(self) -> None:  # type: ignore[override]
+        return None
+
+    async def _get(  # type: ignore[override]
+        self,
+        path: str,
+        params: Optional[Mapping[str, object]] = None,
+    ) -> Mapping[str, object]:
+        key = (path, tuple(sorted((params or {}).items())) if params else None)
+        return self._responses.get(key, {"value": []})
+
+    async def connect(self, tenant: TeamsTenant, token: TeamsToken) -> None:  # type: ignore[override]
+        self._tenant = tenant
+        self._token = token
+        me = await self._get("/me")
+        user = TeamsUser(
+            id=str(me.get("id")),
+            display_name=me.get("displayName"),
+            user_principal_name=me.get("userPrincipalName"),
+            mail=me.get("mail"),
+        )
+        self._identity = TeamsIdentity(tenant=tenant, user=user)
+        if self._notification_source is not None:
+            await self._notification_source.start(tenant, token, self._handle_change_notification)
+            self._notifications_active = True
+
+
+class SpyNotificationSource:
+    def __init__(self) -> None:
+        self.started = False
+        self.dispatch: Optional[UpdateHandler] = None
+        self.refreshed: list[str] = []
+        self.acknowledged: list[str] = []
+        self._subscription_id = "spy-sub"
+
+    async def start(
+        self,
+        tenant: TeamsTenant,
+        token: TeamsToken,
+        dispatch: UpdateHandler,
+    ) -> None:
+        self.started = True
+        self.dispatch = dispatch
+
+    async def stop(self) -> None:
+        self.started = False
+
+    async def acknowledge(self, event_id: str) -> None:
+        self.acknowledged.append(event_id)
+
+    async def refresh(self, token: TeamsToken) -> None:
+        self.refreshed.append(token.access_token)
+
+    @property
+    def active(self) -> bool:
+        return self.started
+
+    @property
+    def subscription_id(self) -> Optional[str]:
+        return self._subscription_id
 
 def test_connect_fetches_identity(monkeypatch) -> None:
     async def _run() -> None:
@@ -191,6 +272,62 @@ def test_send_message_and_poll_event(monkeypatch) -> None:
     asyncio.run(_run())
 
 
+def test_change_notifications_dispatch_events() -> None:
+    async def _run() -> None:
+        transport = MemoryNotificationTransport()
+        source = TeamsWebhookNotificationSource(transport, renewal_window=3600.0)
+        client = NotificationEnabledClient(source)
+
+        tenant = TeamsTenant(id="tenant", display_name="Acme")
+        token = TeamsToken(access_token="token")
+
+        client.queue_response("/me", {"id": "user1", "displayName": "Alice"})
+        client.queue_response(
+            "/chats/chat-1/messages/msg-99",
+            {
+                "id": "msg-99",
+                "chatId": "chat-1",
+                "createdDateTime": "2024-01-01T00:00:00Z",
+                "body": {"content": "<p>Hello</p>", "contentType": "html"},
+                "from": {"user": {"id": "user2", "displayName": "Bob"}},
+            },
+        )
+
+        await client.connect(tenant, token)
+
+        events: list[Mapping[str, object]] = []
+
+        async def handler(payload: Mapping[str, object]) -> None:
+            events.append(payload)
+
+        client.add_event_handler(handler)
+
+        subscription_id = source.subscription_id
+        assert subscription_id is not None
+
+        notification = {
+            "subscriptionId": subscription_id,
+            "resource": "/chats('chat-1')/messages('msg-99')",
+            "resourceData": {"id": "msg-99", "chatId": "chat-1"},
+        }
+
+        await transport.dispatch(subscription_id, notification)
+
+        assert events and events[0]["event_id"] == "msg-99"
+        assert events[0]["message"]["body"]["content_type"] == "html"
+
+        await client.acknowledge_event("msg-99")
+        assert (subscription_id, "msg-99") in transport.acknowledged
+
+        health = await client.health()
+        assert health["delivery_mode"] == "change_notifications"
+        assert health["subscription_id"] == subscription_id
+
+        await client.disconnect()
+
+    asyncio.run(_run())
+
+
 def test_send_message_sanitises_html_content() -> None:
     async def _run() -> None:
         client = DummyTeamsClient()
@@ -247,6 +384,38 @@ def test_token_refresh_invoked_when_expiring() -> None:
         assert client._token.access_token == "new"  # type: ignore[union-attr]
         assert refreshed_tokens and refreshed_tokens[0].access_token == "old"
         assert updated_tokens and updated_tokens[0].access_token == "new"
+
+    asyncio.run(_run())
+
+
+def test_notification_source_receives_token_refresh() -> None:
+    async def _run() -> None:
+        source = SpyNotificationSource()
+        client = TeamsGraphClient(
+            logger=logging.getLogger("notify-refresh"),
+            token_refresh_margin=45.0,
+            notification_source=source,  # type: ignore[arg-type]
+        )
+        client._token = TeamsToken(  # type: ignore[protected-access]
+            access_token="old",
+            refresh_token="refresh",
+            expires_at=time.time() + 10,
+        )
+
+        async def refresher(current: TeamsToken) -> TeamsToken:
+            return TeamsToken(
+                access_token="new",
+                refresh_token="refresh-2",
+                expires_at=time.time() + 3600,
+            )
+
+        async def on_update(updated: TeamsToken) -> None:
+            return None
+
+        client.configure_token_refresh(refresher, on_update, margin=30.0)
+        await client._ensure_valid_token()  # type: ignore[attr-defined]
+
+        assert source.refreshed and source.refreshed[0] == "new"
 
     asyncio.run(_run())
 
@@ -344,6 +513,8 @@ def test_health_reports_teams_runtime_state() -> None:
 
         snapshot = await client.health()
         assert snapshot["connected"] is True
+        assert snapshot["delivery_mode"] == "polling"
+        assert snapshot.get("subscription_id") is None
         assert snapshot["pending_events"] == 1
         assert snapshot["last_event_id"] == "msg-1"
 

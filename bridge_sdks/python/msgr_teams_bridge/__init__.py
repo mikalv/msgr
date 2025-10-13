@@ -9,8 +9,14 @@ from .client import (
     TeamsTenant,
     TeamsToken,
     TeamsUser,
+    UpdateHandler,
 )
 from .daemon import TeamsBridgeDaemon
+from .notifications import (
+    MemoryNotificationTransport,
+    TeamsNotificationSource,
+    TeamsWebhookNotificationSource,
+)
 from .session import SessionData, SessionManager, SessionStore
 
 __all__ = [
@@ -19,9 +25,13 @@ __all__ = [
     "TeamsIdentity",
     "TeamsOAuthClient",
     "TeamsOAuthClientProtocol",
+    "TeamsNotificationSource",
+    "TeamsWebhookNotificationSource",
+    "MemoryNotificationTransport",
     "TeamsTenant",
     "TeamsToken",
     "TeamsUser",
+    "UpdateHandler",
     "TeamsBridgeDaemon",
     "SessionData",
     "SessionManager",
