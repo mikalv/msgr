@@ -38,12 +38,14 @@ defmodule Messngr.MediaTest do
 
     sha = String.duplicate("a", 64)
     assert %{"method" => "PUT", "url" => upload_url, "headers" => headers} = instructions["upload"]
-    assert headers["content-type"] == "video/mp4"
+    assert headers["content-type"] == "image/png"
     assert headers["x-amz-server-side-encryption"] == "AES256"
     assert upload_url =~ "signature="
     assert %{"url" => download_url} = instructions["download"]
     assert download_url =~ upload.object_key
     assert %DateTime{} = instructions["retentionUntil"]
+
+    thumbnail_pointer = instructions["thumbnailUpload"]
 
     {:ok, payload} =
       Media.consume_upload(upload.id, conversation.id, profile.id, %{
@@ -51,7 +53,12 @@ defmodule Messngr.MediaTest do
           "width" => 1920,
           "height" => 1080,
           "caption" => "  Sommerferie  ",
-          "thumbnail" => %{"url" => "https://cdn/thumb.png", "width" => 320, "height" => 180},
+          "thumbnail" => %{
+            "bucket" => thumbnail_pointer["bucket"],
+            "objectKey" => thumbnail_pointer["objectKey"],
+            "width" => 320,
+            "height" => 180
+          },
           "sha256" => sha
         }
       })
@@ -61,7 +68,9 @@ defmodule Messngr.MediaTest do
     assert media_payload["height"] == 1080
     assert media_payload["caption"] == "Sommerferie"
     assert media_payload["sha256"] == sha
-    assert %{"url" => "https://cdn/thumb.png"} = media_payload["thumbnail"]
+    assert %{"url" => url, "bucket" => bucket, "objectKey" => thumb_key} = media_payload["thumbnail"]
+    assert url =~ thumb_key
+    assert bucket == thumbnail_pointer["bucket"]
     assert payload["body"] == "Sommerferie"
 
     assert %Upload{status: :consumed, width: 1920, height: 1080, sha256: ^sha} = Repo.get!(Upload, upload.id)
@@ -100,7 +109,7 @@ defmodule Messngr.MediaTest do
   test "creation_changeset validates checksum format", %{profile: profile, conversation: conversation} do
     params = %{
       "kind" => "image",
-      "bucket" => "media",
+      "bucket" => Storage.bucket(),
       "object_key" => "conversations/#{conversation.id}/image/test.png",
       "content_type" => "image/png",
       "byte_size" => 1024,
@@ -113,6 +122,53 @@ defmodule Messngr.MediaTest do
     changeset = Upload.creation_changeset(%Upload{}, params)
     refute changeset.valid?
     assert %{checksum: ["must be a hexadecimal digest"]} = errors_on(changeset)
+  end
+
+  test "creation_changeset rejects buckets that do not match storage config", %{profile: profile, conversation: conversation} do
+    params = %{
+      "kind" => "image",
+      "bucket" => "public-cdn",
+      "object_key" => "conversations/#{conversation.id}/image/test.png",
+      "content_type" => "image/png",
+      "byte_size" => 1024,
+      "expires_at" => DateTime.utc_now(),
+      "conversation_id" => conversation.id,
+      "profile_id" => profile.id
+    }
+
+    changeset = Upload.creation_changeset(%Upload{}, params)
+    refute changeset.valid?
+    assert %{bucket: ["is not allowed"]} = errors_on(changeset)
+  end
+
+  test "consume_upload rejects thumbnails pointing at foreign buckets", %{profile: profile, conversation: conversation} do
+    {:ok, upload, _} =
+      Media.create_upload(conversation.id, profile.id, %{
+        "kind" => "image",
+        "content_type" => "image/png",
+        "byte_size" => 1024
+      })
+
+    assert {:error, :thumbnail_bucket_invalid} =
+             Media.consume_upload(upload.id, conversation.id, profile.id, %{
+               "media" => %{
+                 "thumbnail" => %{"bucket" => "public-cdn", "objectKey" => "images/remote.jpg"}
+               }
+             })
+  end
+
+  test "consume_upload rejects thumbnails without an object key", %{profile: profile, conversation: conversation} do
+    {:ok, upload, _} =
+      Media.create_upload(conversation.id, profile.id, %{
+        "kind" => "image",
+        "content_type" => "image/png",
+        "byte_size" => 1024
+      })
+
+    assert {:error, :thumbnail_object_key_invalid} =
+             Media.consume_upload(upload.id, conversation.id, profile.id, %{
+               "media" => %{"thumbnail" => %{"bucket" => Storage.bucket()}}
+             })
   end
 
   test "presign_upload includes kms headers when configured" do

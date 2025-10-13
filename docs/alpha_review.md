@@ -17,14 +17,14 @@
 - ✅ Chat persistence now retries receipt fan-out, guards pagination pivots, and sweeps idle watchers.
 
 ### Still outstanding
-- 🔲 Lock down media thumbnails and family/bridge controllers before exposing non-chat features.
+- 🔲 Tighten family/bridge controllers before exposing non-chat features to testers.
 - 🔲 Stabilise the Flutter onboarding/navigation flow and cover offline/error recovery with tests.
 - 🔲 Improve contributor experience with toolchain docs, integration tests, and StoneMQ/daemon smoke checks.
 
 ### Immediate implementation queue
 
 1. **Media & ancillary hardening**
-   - Validate thumbnail sources in `Messngr.Media.Upload` and refuse presigned URLs that do not match the configured storage bucket.
+   - ✅ Validate thumbnail sources in `Messngr.Media.Upload` and refuse presigned URLs that do not match the configured storage bucket.
    - Add authorisation guards to family space controllers so household data cannot be fetched without explicit membership/role checks.
    - Ship StoneMQ/bridge daemons in the alpha docker-compose profile and add smoke tests that fail fast when the queue layer is missing.
 2. **Flutter client readiness**

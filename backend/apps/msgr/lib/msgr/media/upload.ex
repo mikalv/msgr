@@ -76,6 +76,7 @@ defmodule Messngr.Media.Upload do
     |> validate_change(:sha256, &validate_sha256/2)
     |> validate_retention_window()
     |> validate_checksum()
+    |> validate_bucket()
     |> unique_constraint(:object_key)
   end
 
@@ -225,28 +226,44 @@ defmodule Messngr.Media.Upload do
     end
   end
   defp maybe_presign_thumbnail(%{"media" => %{"thumbnail" => %{} = thumbnail}} = payload) do
-    bucket = Map.get(thumbnail, "bucket") || Map.get(thumbnail, "bucketName")
-    object_key = Map.get(thumbnail, "object_key") || Map.get(thumbnail, "objectKey")
+    bucket =
+      thumbnail
+      |> Map.get("bucket")
+      |> case do
+        nil -> Map.get(thumbnail, "bucketName")
+        value -> value
+      end
+
+    object_key = Map.get(thumbnail, "objectKey") || Map.get(thumbnail, "object_key")
 
     cond do
-      is_binary(bucket) and is_binary(object_key) ->
-        download = Messngr.Media.Storage.presign_download(bucket, object_key)
+      not allowed_bucket?(bucket) -> drop_thumbnail(payload)
+      not is_binary(object_key) or object_key == "" -> drop_thumbnail(payload)
+      true ->
+        resolved_bucket = bucket || Messngr.Media.Storage.bucket()
+        download = Messngr.Media.Storage.presign_download(resolved_bucket, object_key)
 
-        updated =
+        sanitized =
           thumbnail
-          |> Map.put_new("bucket", bucket)
+          |> Map.put("bucket", resolved_bucket)
           |> Map.put("objectKey", object_key)
+          |> Map.delete("bucketName")
+          |> Map.delete("object_key")
           |> Map.put("url", download.url)
           |> Map.put("urlExpiresAt", download.expires_at)
 
-        put_in(payload, ["media", "thumbnail"], updated)
-
-      true ->
-        payload
+        put_in(payload, ["media", "thumbnail"], sanitized)
     end
   end
 
   defp maybe_presign_thumbnail(payload), do: payload
+
+  defp drop_thumbnail(payload) do
+    update_in(payload, ["media"], fn
+      %{} = media -> Map.delete(media, "thumbnail")
+      other -> other
+    end)
+  end
 
   defp validate_checksum(changeset) do
     checksum = get_field(changeset, :checksum)
@@ -257,4 +274,22 @@ defmodule Messngr.Media.Upload do
       true -> add_error(changeset, :checksum, "must be a hexadecimal digest")
     end
   end
+
+  defp validate_bucket(changeset) do
+    bucket = get_field(changeset, :bucket)
+
+    cond do
+      is_nil(bucket) -> changeset
+      allowed_bucket?(bucket) -> changeset
+      true -> add_error(changeset, :bucket, "is not allowed")
+    end
+  end
+
+  defp allowed_bucket?(nil), do: true
+
+  defp allowed_bucket?(bucket) when is_binary(bucket) do
+    bucket == Messngr.Media.Storage.bucket()
+  end
+
+  defp allowed_bucket?(_bucket), do: false
 end

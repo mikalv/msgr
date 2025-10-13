@@ -267,41 +267,37 @@ defmodule Messngr.Media do
 
     {media_from_top_level, remaining} = extract_media_from_top_level(normalized)
 
-    media =
-      normalized
-      |> Map.get("media")
-      |> normalize_media()
-      |> Map.merge(media_from_top_level)
-      |> maybe_downcase_checksum()
-
-    attrs = %{}
-    attrs = maybe_put_attr(attrs, :width, Map.get(media, "width"))
-    attrs = maybe_put_attr(attrs, :height, Map.get(media, "height"))
-    attrs = maybe_put_attr(attrs, :checksum, Map.get(media, "checksum"))
-
-    with :ok <- validate_checksum(Map.get(media, "checksum")) do
-      normalized_media = maybe_put(remaining, "media", media)
+    with {:ok, media} <-
+           normalized
+           |> Map.get("media")
+           |> normalize_media(),
+         merged_media <-
+           media
+           |> Map.merge(media_from_top_level)
+           |> maybe_downcase_checksum(),
+         attrs <-
+           %{}
+           |> maybe_put_attr(:width, Map.get(merged_media, "width"))
+           |> maybe_put_attr(:height, Map.get(merged_media, "height"))
+           |> maybe_put_attr(:checksum, Map.get(merged_media, "checksum")),
+         :ok <- validate_checksum(Map.get(merged_media, "checksum")) do
+      normalized_media = maybe_put(remaining, "media", merged_media)
       {:ok, normalized_media, attrs}
     end
   end
 
-  defp normalize_metadata(_), do: {:ok, %{}, %{} }
+  defp normalize_metadata(_), do: {:ok, %{}, %{}}
 
-  defp normalize_media(nil), do: %{}
+  defp normalize_media(nil), do: {:ok, %{}}
 
   defp normalize_media(%{} = media) do
     media
     |> string_keys()
-    |> normalize_thumbnail()
     |> normalize_waveform()
+    |> sanitize_thumbnail()
   end
 
-  defp normalize_thumbnail(media) do
-    case Map.get(media, "thumbnail") do
-      %{} = thumbnail -> Map.put(media, "thumbnail", string_keys(thumbnail))
-      _ -> media
-    end
-  end
+  defp normalize_media(_), do: {:error, :invalid_media_payload}
 
   defp normalize_waveform(media) do
     case Map.get(media, "waveform") do
@@ -353,6 +349,50 @@ defmodule Messngr.Media do
   end
 
   defp validate_checksum(_), do: {:error, :checksum_invalid}
+
+  defp sanitize_thumbnail(media) do
+    case Map.get(media, "thumbnail") do
+      nil -> {:ok, media}
+      %{} = thumbnail ->
+        normalized = string_keys(thumbnail)
+
+        bucket =
+          normalized["bucket"] ||
+            normalized["bucketName"]
+
+        object_key =
+          normalized["objectKey"] ||
+            normalized["object_key"]
+
+        cond do
+          not allowed_thumbnail_bucket?(bucket) -> {:error, :thumbnail_bucket_invalid}
+          not is_binary(object_key) or String.trim(object_key) == "" -> {:error, :thumbnail_object_key_invalid}
+          true ->
+            sanitized =
+              normalized
+              |> Map.put("bucket", bucket || Storage.bucket())
+              |> Map.put("objectKey", object_key)
+              |> Map.delete("bucketName")
+              |> Map.delete("object_key")
+              |> Map.delete("url")
+              |> Map.delete("urlExpiresAt")
+              |> Map.delete("publicUrl")
+
+            {:ok, Map.put(media, "thumbnail", sanitized)}
+        end
+
+      _ ->
+        {:error, :thumbnail_invalid}
+    end
+  end
+
+  defp allowed_thumbnail_bucket?(nil), do: true
+
+  defp allowed_thumbnail_bucket?(bucket) when is_binary(bucket) do
+    bucket == Storage.bucket()
+  end
+
+  defp allowed_thumbnail_bucket?(_), do: false
 
   defp extract_media_from_top_level(map) do
     Enum.reduce(map, {%{}, %{}}, fn

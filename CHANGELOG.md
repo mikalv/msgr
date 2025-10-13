@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Locked down media thumbnails by validating storage buckets/object keys during
+  upload consumption, stripping untrusted pointers, and covering the flow with
+  regression tests ahead of the alpha cut.
 - Expanded the alpha readiness review with an actionable implementation queue covering backend, frontend, and DevEx blockers remaining before alpha.
 - Updated the alpha readiness review with a status tracker that highlights the remaining backend, frontend, and DevEx work before inviting testers.
 - Added a media retention pruner that periodically deletes expired uploads and
