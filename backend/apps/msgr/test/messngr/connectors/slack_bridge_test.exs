@@ -80,6 +80,17 @@ defmodule Messngr.Connectors.SlackBridgeTest do
     assert ack.payload.payload == %{event_id: "evt-1", status: :processed}
   end
 
+  test "health_snapshot/3 requests runtime telemetry", %{agent: agent} do
+    responder = fn -> {:ok, %{"status" => "ok", "summary" => %{"total_clients" => 1}}} end
+    bridge = SlackBridge.new(queue: QueueRecorder, queue_opts: [agent: agent, responder: responder])
+
+    assert {:ok, %{"status" => "ok"}} = SlackBridge.health_snapshot(bridge, %{instance: "T123"})
+
+    assert [request] = QueueRecorder.requests(agent)
+    assert request.topic == "bridge/slack/health_snapshot"
+    assert request.payload.payload[:instance] == "T123"
+  end
+
   test "link_account/3 persists workspace snapshot", %{agent: agent, account: account} do
     response = %{
       "status" => "linked",

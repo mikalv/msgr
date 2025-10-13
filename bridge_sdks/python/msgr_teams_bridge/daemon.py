@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 from typing import Dict, Mapping, MutableMapping, Optional
 
 from msgr_bridge_sdk import Envelope, StoneMQClient, build_envelope
@@ -40,10 +41,12 @@ class TeamsBridgeDaemon:
         self._instance = instance
         self._event_handlers: Dict[str, object] = {}
         self._ack_state: Dict[str, Mapping[str, object]] = {}
+        self._logger = logging.getLogger(__name__)
 
         self._client.register("outbound_message", self._handle_outbound_message)
         self._client.register("ack_event", self._handle_ack_event)
         self._client.register_request("link_account", self._handle_link_account)
+        self._client.register_request("health_snapshot", self._handle_health_snapshot)
 
     async def start(self) -> None:
         await self._client.start()
@@ -173,6 +176,65 @@ class TeamsBridgeDaemon:
         await client.acknowledge_event(str(event_id))
         self._ack_state[str(event_id)] = dict(payload)
 
+    async def _handle_health_snapshot(self, envelope: Envelope) -> Mapping[str, object]:
+        payload = envelope.payload
+        filter_tenant = payload.get("tenant_id") or payload.get("instance")
+        filter_user = payload.get("user_id")
+
+        entries: list[Mapping[str, object]] = []
+        connected = 0
+        pending_events = 0
+
+        for tenant_id, user_id, client, session in self._sessions.active_entries():
+            if filter_tenant is not None and str(filter_tenant) != tenant_id:
+                continue
+            if filter_user and str(filter_user) != (user_id or ""):
+                continue
+
+            try:
+                runtime = await client.health()
+            except Exception:  # pragma: no cover - defensive logging for ops
+                self._logger.exception(
+                    "Teams health snapshot failed",
+                    extra={"tenant_id": tenant_id, "user_id": user_id},
+                )
+                runtime = {"status": "error"}
+
+            client_connected = bool(runtime.get("connected"))
+            if client_connected:
+                connected += 1
+
+            client_pending = _coerce_int(runtime.get("pending_events"))
+            pending_events += client_pending
+
+            entry: Dict[str, object] = {
+                "tenant_id": tenant_id,
+                "user_id": user_id,
+                "connected": client_connected,
+                "pending_events": client_pending,
+                "runtime": dict(runtime),
+            }
+            session_payload = session.to_dict() if session is not None else None
+            if session_payload is not None:
+                entry["session"] = session_payload
+
+            entries.append(_compact_snapshot(entry))
+
+        acked_events = [dict(value) for value in self._ack_state.values()]
+        summary = {
+            "total_clients": len(entries),
+            "connected_clients": connected,
+            "pending_events": pending_events,
+            "acked_events": len(acked_events),
+        }
+
+        return {
+            "status": "ok",
+            "summary": summary,
+            "clients": entries,
+            "acked_events": acked_events,
+        }
+
     async def _register_event_handler(
         self,
         identity: TeamsIdentity,
@@ -278,6 +340,16 @@ def _ensure_list(value: Mapping[str, object] | list[Mapping[str, object]]) -> li
     if isinstance(value, Mapping):
         return [dict(value)]
     return []
+
+
+def _coerce_int(value: object) -> int:
+    if isinstance(value, (int, float)):
+        return int(value)
+    return 0
+
+
+def _compact_snapshot(values: Mapping[str, object | None]) -> Dict[str, object]:
+    return {key: value for key, value in values.items() if value is not None}
 
 
 def _browser_consent_plan(tenant: TeamsTenant) -> Dict[str, object]:

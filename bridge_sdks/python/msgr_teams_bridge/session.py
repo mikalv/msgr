@@ -7,7 +7,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Mapping, Optional, Tuple
+from typing import Callable, Dict, List, Mapping, Optional, Tuple
 
 from .client import TeamsClientProtocol, TeamsTenant, TeamsToken
 
@@ -165,6 +165,16 @@ class SessionManager:
     def get_session(self, tenant_id: str, user_id: Optional[str]) -> Optional[SessionData]:
         key = self._key(tenant_id, user_id)
         return self._sessions.get(key)
+
+    def active_entries(self) -> List[Tuple[str, Optional[str], TeamsClientProtocol, Optional[SessionData]]]:
+        """Return a snapshot of active Teams clients and their sessions."""
+
+        entries: List[Tuple[str, Optional[str], TeamsClientProtocol, Optional[SessionData]]] = []
+        for key, client in self._clients.items():
+            tenant_id, user_token = key.split("::", 1)
+            user_id = None if user_token == "user" else user_token
+            entries.append((tenant_id, user_id, client, self._sessions.get(key)))
+        return entries
 
     async def export_session(self, tenant_id: str, user_id: Optional[str]) -> Optional[SessionData]:
         key = self._key(tenant_id, user_id)

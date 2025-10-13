@@ -55,6 +55,8 @@ class FakeSlackClient:
         self.sent_messages: list[Mapping[str, object]] = []
         self.handlers: list[Callable[[Mapping[str, object]], Awaitable[None]]] = []
         self.acked: list[str] = []
+        self.pending_events = 0
+        self.health_calls = 0
 
     async def connect(self, token: SlackToken) -> None:
         self.connected = True
@@ -103,6 +105,8 @@ class FakeSlackClient:
 
     async def acknowledge_event(self, event_id: str) -> None:
         self.acked.append(event_id)
+        if self.pending_events > 0:
+            self.pending_events -= 1
 
     def add_event_handler(self, handler: Callable[[Mapping[str, object]], Awaitable[None]]) -> None:
         self.handlers.append(handler)
@@ -114,6 +118,15 @@ class FakeSlackClient:
     async def dispatch_event(self, event: Mapping[str, object]) -> None:
         for handler in list(self.handlers):
             await handler(event)
+        self.pending_events += 1
+
+    async def health(self) -> Mapping[str, object]:
+        self.health_calls += 1
+        return {
+            "connected": self.connected,
+            "pending_events": self.pending_events,
+            "last_event_id": self.acked[-1] if self.acked else None,
+        }
 
 
 class FakeClientFactory:
@@ -242,6 +255,40 @@ def test_ack_event_invokes_client(tmp_path: Path) -> None:
         await transport.publish(topic, envelope.to_json().encode("utf-8"))
 
         assert client.acked == ["evt-1"]
+        await daemon.shutdown()
+
+    _run(scenario)
+
+
+def test_health_snapshot_reports_runtime_state(tmp_path: Path) -> None:
+    client = FakeSlackClient()
+    daemon, transport = _build_daemon(tmp_path, client)
+
+    async def scenario() -> None:
+        await _link_account(daemon, transport)
+
+        ack_envelope = build_envelope(
+            "slack",
+            "ack_event",
+            {"event_id": "evt-2", "status": "accepted"},
+            metadata={"user_id": "acct-1", "instance": "T999"},
+        )
+        await transport.publish("bridge/slack/T999/ack_event", ack_envelope.to_json().encode("utf-8"))
+        client.pending_events = 3
+
+        health_envelope = build_envelope("slack", "health_snapshot", {"instance": "T999"})
+        response_raw = await transport.request(
+            "bridge/slack/T999/health_snapshot",
+            health_envelope.to_json().encode("utf-8"),
+        )
+        snapshot = json.loads(response_raw.decode("utf-8"))
+
+        assert snapshot["summary"]["total_clients"] == 1
+        assert snapshot["summary"]["pending_events"] == 3
+        assert snapshot["summary"]["acked_events"] == 1
+        assert snapshot["clients"][0]["instance"] == "T999"
+        assert snapshot["clients"][0]["pending_events"] == 3
+
         await daemon.shutdown()
 
     _run(scenario)

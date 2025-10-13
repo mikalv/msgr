@@ -55,6 +55,8 @@ class FakeTeamsClient:
         self.sent_messages: list[Mapping[str, object]] = []
         self.handlers: list[Callable[[Mapping[str, object]], Awaitable[None]]] = []
         self.acked: list[str] = []
+        self.pending_events = 0
+        self.health_calls = 0
 
     async def connect(self, tenant: TeamsTenant, token: TeamsToken) -> None:
         self.connected = True
@@ -98,6 +100,8 @@ class FakeTeamsClient:
 
     async def acknowledge_event(self, event_id: str) -> None:
         self.acked.append(event_id)
+        if self.pending_events > 0:
+            self.pending_events -= 1
 
     def add_event_handler(self, handler: Callable[[Mapping[str, object]], Awaitable[None]]) -> None:
         self.handlers.append(handler)
@@ -109,6 +113,15 @@ class FakeTeamsClient:
     async def dispatch_event(self, event: Mapping[str, object]) -> None:
         for handler in list(self.handlers):
             await handler(event)
+        self.pending_events += 1
+
+    async def health(self) -> Mapping[str, object]:
+        self.health_calls += 1
+        return {
+            "connected": self.connected,
+            "pending_events": self.pending_events,
+            "last_event_id": self.acked[-1] if self.acked else None,
+        }
 
 
 class FakeClientFactory:
@@ -239,6 +252,44 @@ def test_ack_event_invokes_client(tmp_path: Path) -> None:
         await transport.publish(topic, envelope.to_json().encode("utf-8"))
 
         assert client.acked == ["evt-1"]
+        await daemon.shutdown()
+
+    _run(scenario)
+
+
+def test_health_snapshot_reports_runtime_state(tmp_path: Path) -> None:
+    client = FakeTeamsClient()
+    daemon, transport = _build_daemon(tmp_path, client)
+
+    async def scenario() -> None:
+        await _link_account(daemon, transport)
+
+        ack_envelope = build_envelope(
+            "teams",
+            "ack_event",
+            {"event_id": "evt-2", "status": "accepted"},
+            metadata={"tenant_id": "tenant-1", "user_id": "acct-1"},
+        )
+        await transport.publish("bridge/teams/tenant-1/ack_event", ack_envelope.to_json().encode("utf-8"))
+        client.pending_events = 2
+
+        health_envelope = build_envelope(
+            "teams",
+            "health_snapshot",
+            {"tenant_id": "tenant-1"},
+        )
+        response_raw = await transport.request(
+            "bridge/teams/tenant-1/health_snapshot",
+            health_envelope.to_json().encode("utf-8"),
+        )
+        snapshot = json.loads(response_raw.decode("utf-8"))
+
+        assert snapshot["summary"]["total_clients"] == 1
+        assert snapshot["summary"]["pending_events"] == 2
+        assert snapshot["summary"]["acked_events"] == 1
+        assert snapshot["clients"][0]["tenant_id"] == "tenant-1"
+        assert snapshot["clients"][0]["pending_events"] == 2
+
         await daemon.shutdown()
 
     _run(scenario)

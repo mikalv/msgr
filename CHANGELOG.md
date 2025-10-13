@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Wired the Slack and Microsoft Teams bridge health snapshots into queue request handlers,
+  exposed connector helpers for retrieving runtime metrics, and introduced an Elixir
+  `Messngr.Bridges.HealthReporter` that polls bridges and emits telemetry so operations
+  dashboards receive per-client pending-event and connectivity data.
 - Added Slack RTM runtime health snapshots and structured logging so operators can monitor
   websocket status, pending acknowledgements, and event freshness; added unit tests that
   exercise the diagnostics surface.

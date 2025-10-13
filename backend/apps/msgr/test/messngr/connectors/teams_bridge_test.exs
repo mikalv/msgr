@@ -70,6 +70,17 @@ defmodule Messngr.Connectors.TeamsBridgeTest do
     assert ack.payload.payload == %{event_id: "evt-2", status: :processed}
   end
 
+  test "health_snapshot/3 requests runtime telemetry", %{agent: agent} do
+    responder = fn -> {:ok, %{"status" => "ok", "summary" => %{"total_clients" => 2}}} end
+    bridge = TeamsBridge.new(queue: QueueRecorder, queue_opts: [agent: agent, responder: responder])
+
+    assert {:ok, %{"status" => "ok"}} = TeamsBridge.health_snapshot(bridge, %{tenant_id: "tenant-a"})
+
+    assert [request] = QueueRecorder.requests(agent)
+    assert request.topic == "bridge/teams/health_snapshot"
+    assert request.payload.payload[:tenant_id] == "tenant-a"
+  end
+
   test "link_account/3 persists tenant roster", %{agent: agent, account: account} do
     response = %{
       "status" => "linked",

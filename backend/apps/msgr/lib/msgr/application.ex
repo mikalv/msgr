@@ -19,7 +19,9 @@ defmodule Messngr.Application do
         {Finch, name: Messngr.Finch}
         # Start a worker by calling: Messngr.Worker.start_link(arg)
         # {Messngr.Worker, arg}
-      ] ++ maybe_noise_registry_child()
+      ]
+      |> Kernel.++(maybe_noise_registry_child())
+      |> Kernel.++(maybe_bridge_health_child())
 
     Supervisor.start_link(children, strategy: :one_for_one, name: Messngr.Supervisor)
   end
@@ -32,6 +34,17 @@ defmodule Messngr.Application do
       [{Messngr.Transport.Noise.Registry, registry_opts}]
     else
       []
+    end
+  end
+
+  defp maybe_bridge_health_child do
+    case Application.get_env(:msgr, :bridge_health_reporter) do
+      opts when is_list(opts) and Keyword.get(opts, :enabled, false) ->
+        reporter_opts = Keyword.drop(opts, [:enabled])
+        [{Messngr.Bridges.HealthReporter, reporter_opts}]
+
+      _other ->
+        []
     end
   end
 end
