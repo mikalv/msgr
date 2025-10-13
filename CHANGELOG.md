@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Added Python Slack and Microsoft Teams bridge daemons with session managers,
+  queue handlers, and comprehensive unit tests alongside documentation covering
+  Slack token capture and Teams API behaviour so the new connectors have working
+  end-to-end bridge workers ready for integration.
 - Added Slack and Microsoft Teams bridge connectors with multi-instance routing,
   catalog updates, and queue facades so multiple workspaces/tenants can link to
   a single Msgr account with full test coverage.
