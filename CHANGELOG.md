@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Documented outstanding Slack and Microsoft Teams bridge work in `docs/bridge_status.md` so the
+  new connectors have clear next steps before production rollout.
 - Added Python Slack and Microsoft Teams bridge daemons with session managers,
   queue handlers, and comprehensive unit tests alongside documentation covering
   Slack token capture and Teams API behaviour so the new connectors have working
