@@ -111,6 +111,23 @@ npm run blobs -- --dir tmp/resources --top 20 --json tmp/blob-report.json
 
 `client-recorder-blobs` scans the directory, classifies files (JSON/JS/protobuf/etc.), reports the largest artefacts, and highlights likely protobuf definitions. The optional `--json` flag persists the full report for further digging.
 
+## WebAssembly Automation
+
+Once the recorder (or extractor) gives you a resource directory, identify and decompile every WASM module:
+
+```bash
+npm run wasm -- --dir tmp/resources --out tmp/wasm
+```
+
+`client-recorder-wasm`:
+- Recursively locates `.wasm`, `.wasm.gz`, `.wasm.br` files.
+- Decompresses when needed and writes canonical `<name>.wasm` copies.
+- Emits `.wat` text via the embedded `wabt` toolkit.
+- Calls `wasm-decompile` / `wasm-objdump` when they’re available on your PATH (override with `--wasm-decompile` / `--wasm-objdump`).
+- Produces a JSON manifest listing every artefact.
+
+Use `--map-only` to just enumerate modules, or `--keep-temp` to retain intermediate files.
+
 Run with `--help` to see the full option set.
 
 ### Rules & Noise Filtering
