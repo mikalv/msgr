@@ -2,8 +2,31 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
+import datetime as dt
+import json
+import logging
+import time
 from dataclasses import dataclass
-from typing import Awaitable, Callable, Mapping, MutableMapping, Optional, Protocol, Sequence
+from typing import (
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Protocol,
+    Sequence,
+)
+
+try:  # pragma: no cover - optional dependency exercised in integration tests
+    import aiohttp
+    from aiohttp import ClientSession
+except ImportError:  # pragma: no cover - aiohttp not available during unit tests
+    aiohttp = None  # type: ignore
+    ClientSession = None  # type: ignore
 
 UpdateHandler = Callable[[Mapping[str, object]], Awaitable[None]]
 
@@ -132,3 +155,328 @@ class TeamsOAuthClientProtocol(Protocol):
         code_verifier: Optional[str] = None,
     ) -> Mapping[str, object]:
         """Return a mapping containing ``token`` and optional identity fields."""
+
+
+class TeamsGraphClient(TeamsClientProtocol):
+    """Microsoft Graph implementation that polls chats for new messages."""
+
+    _GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+
+    def __init__(
+        self,
+        *,
+        session: Optional[ClientSession] = None,
+        logger: Optional[logging.Logger] = None,
+        poll_interval: float = 15.0,
+    ) -> None:
+        if session is not None and ClientSession is not None and not isinstance(session, ClientSession):
+            raise RuntimeError("session must be an aiohttp.ClientSession instance")
+
+        self._session = session
+        self._owns_session = session is None
+        self._logger = logger or logging.getLogger(__name__)
+        self._poll_interval = max(5.0, poll_interval)
+        self._token: Optional[TeamsToken] = None
+        self._tenant: Optional[TeamsTenant] = None
+        self._identity: Optional[TeamsIdentity] = None
+        self._capabilities: Optional[Mapping[str, object]] = None
+        self._handlers: list[UpdateHandler] = []
+        self._poll_task: Optional[asyncio.Task[None]] = None
+        self._last_message_ts: Dict[str, str] = {}
+        self._acked: Dict[str, float] = {}
+
+    async def connect(self, tenant: TeamsTenant, token: TeamsToken) -> None:
+        if aiohttp is None:  # pragma: no cover - exercised in integration tests
+            raise RuntimeError("aiohttp is required to connect to Microsoft Graph")
+
+        await self._ensure_session()
+        self._token = token
+        self._tenant = tenant
+
+        me = await self._get("/me")
+        self._identity = _build_identity(me, tenant)
+
+        if self._poll_task is None or self._poll_task.done():
+            self._poll_task = asyncio.create_task(self._poll_loop(), name="teams-graph-poller")
+
+    async def disconnect(self) -> None:
+        if self._poll_task is not None:
+            self._poll_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._poll_task
+            self._poll_task = None
+
+        if self._owns_session and self._session is not None:
+            await self._session.close()
+            self._session = None
+
+    async def is_connected(self) -> bool:
+        return bool(self._poll_task is not None and not self._poll_task.done())
+
+    async def fetch_identity(self) -> TeamsIdentity:
+        if self._identity is None:
+            raise RuntimeError("Teams client not connected")
+        return self._identity
+
+    async def describe_capabilities(self) -> Mapping[str, object]:
+        if self._capabilities is None:
+            self._capabilities = {
+                "messaging": {"text": True, "mentions": True, "attachments": ["file", "image"]},
+                "presence": {"typing": True, "read_receipts": True},
+                "threads": {"supported": True},
+            }
+        return self._capabilities
+
+    async def list_members(self) -> Sequence[Mapping[str, object]]:
+        members: list[Mapping[str, object]] = []
+        async for item in self._paged_get("/me/people"):
+            members.append(item)
+        return members
+
+    async def list_conversations(self) -> Sequence[Mapping[str, object]]:
+        conversations: list[Mapping[str, object]] = []
+        async for item in self._paged_get("/me/chats"):
+            conversations.append(item)
+        return conversations
+
+    async def send_message(
+        self,
+        conversation_id: str,
+        message: Mapping[str, object],
+        *,
+        reply_to_id: Optional[str] = None,
+        metadata: Optional[Mapping[str, object]] = None,
+    ) -> Mapping[str, object]:
+        payload = dict(message)
+        if metadata is not None:
+            payload.setdefault("metadata", dict(metadata))
+        if reply_to_id is not None:
+            payload.setdefault("replyToId", reply_to_id)
+        return await self._post(f"/chats/{conversation_id}/messages", payload)
+
+    async def acknowledge_event(self, event_id: str) -> None:
+        if not event_id:
+            return
+        self._acked[event_id] = time.time()
+
+    def add_event_handler(self, handler: UpdateHandler) -> None:
+        if handler not in self._handlers:
+            self._handlers.append(handler)
+
+    def remove_event_handler(self, handler: UpdateHandler) -> None:
+        if handler in self._handlers:
+            self._handlers.remove(handler)
+
+    async def _ensure_session(self) -> None:
+        if self._session is None:
+            if aiohttp is None:  # pragma: no cover
+                raise RuntimeError("aiohttp is required to create a Teams HTTP session")
+            timeout = aiohttp.ClientTimeout(total=60)
+            self._session = aiohttp.ClientSession(timeout=timeout)
+
+    async def _poll_loop(self) -> None:
+        try:
+            while True:
+                try:
+                    chats = await self.list_conversations()
+                    for chat in chats:
+                        chat_id = str(chat.get("id"))
+                        if chat_id:
+                            await self._poll_chat(chat_id)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:  # pragma: no cover - network errors logged
+                    self._logger.exception("Teams polling iteration failed")
+                await asyncio.sleep(self._poll_interval)
+        except asyncio.CancelledError:  # pragma: no cover - cancellation path
+            pass
+
+    async def _poll_chat(self, chat_id: str) -> None:
+        params = {"$top": 20, "$orderby": "lastModifiedDateTime asc"}
+        data = await self._get(f"/chats/{chat_id}/messages", params=params)
+        messages = data.get("value") if isinstance(data.get("value"), list) else []
+        last_seen = self._last_message_ts.get(chat_id)
+        for message in messages:
+            if not isinstance(message, Mapping):
+                continue
+            timestamp = message.get("lastModifiedDateTime") or message.get("createdDateTime")
+            if last_seen and _compare_timestamp(timestamp, last_seen) <= 0:
+                continue
+            await self._dispatch_event(chat_id, message)
+            if isinstance(timestamp, str):
+                self._last_message_ts[chat_id] = timestamp
+
+    async def _dispatch_event(self, chat_id: str, message: Mapping[str, object]) -> None:
+        payload: Dict[str, object] = dict(message)
+        payload.setdefault("event_id", str(message.get("id") or f"{chat_id}:{message.get('createdDateTime')}") )
+        payload.setdefault("chat_id", chat_id)
+        payload.setdefault("tenant_id", self._tenant.id if self._tenant else None)
+        for handler in list(self._handlers):
+            try:
+                await handler(payload)
+            except Exception:  # pragma: no cover - handler failures logged for ops
+                self._logger.exception("Teams handler raised")
+
+    async def _get(
+        self,
+        path: str,
+        params: Optional[Mapping[str, object]] = None,
+    ) -> Mapping[str, object]:
+        if self._session is None or self._token is None:
+            raise RuntimeError("Teams client is not connected")
+
+        url = f"{self._GRAPH_BASE}{path}"
+        headers = {
+            "Authorization": f"Bearer {self._token.access_token}",
+            "Content-Type": "application/json",
+        }
+        async with self._session.get(url, params=params, headers=headers) as response:
+            response.raise_for_status()
+            text = await response.text()
+            data = json.loads(text)
+        if not isinstance(data, Mapping):
+            raise RuntimeError("Teams Graph returned non-mapping payload")
+        return data
+
+    async def _post(self, path: str, payload: Mapping[str, object]) -> Mapping[str, object]:
+        if self._session is None or self._token is None:
+            raise RuntimeError("Teams client is not connected")
+
+        url = f"{self._GRAPH_BASE}{path}"
+        headers = {
+            "Authorization": f"Bearer {self._token.access_token}",
+            "Content-Type": "application/json",
+        }
+        async with self._session.post(url, json=payload, headers=headers) as response:
+            response.raise_for_status()
+            data = await response.json()
+        if not isinstance(data, Mapping):
+            raise RuntimeError("Teams Graph returned non-mapping payload")
+        return data
+
+    async def _paged_get(self, path: str) -> Iterable[Mapping[str, object]]:
+        url = f"{self._GRAPH_BASE}{path}"
+        next_link: Optional[str] = url
+        while next_link:
+            data = await self._get(next_link.replace(self._GRAPH_BASE, ""))
+            values = data.get("value")
+            if isinstance(values, list):
+                for item in values:
+                    if isinstance(item, Mapping):
+                        yield item
+            next_link = data.get("@odata.nextLink") if isinstance(data.get("@odata.nextLink"), str) else None
+
+
+class TeamsOAuthClient(TeamsOAuthClientProtocol):
+    """OAuth helper that exchanges Microsoft authorization codes for tokens."""
+
+    def __init__(
+        self,
+        client_id: str,
+        *,
+        client_secret: Optional[str] = None,
+        tenant: str = "common",
+        scope: Optional[Sequence[str]] = None,
+        session: Optional[ClientSession] = None,
+        logger: Optional[logging.Logger] = None,
+    ) -> None:
+        if session is not None and ClientSession is not None and not isinstance(session, ClientSession):
+            raise RuntimeError("session must be an aiohttp.ClientSession instance")
+
+        self._client_id = client_id
+        self._client_secret = client_secret
+        self._tenant = tenant
+        self._scope = " ".join(scope) if scope else "https://graph.microsoft.com/.default"
+        self._session = session
+        self._owns_session = session is None
+        self._logger = logger or logging.getLogger(__name__)
+
+    async def exchange_code(
+        self,
+        code: str,
+        *,
+        redirect_uri: Optional[str] = None,
+        code_verifier: Optional[str] = None,
+    ) -> Mapping[str, object]:
+        if aiohttp is None and self._session is None:  # pragma: no cover - exercised in integration tests
+            raise RuntimeError("aiohttp is required to exchange Microsoft OAuth codes")
+
+        await self._ensure_session()
+
+        payload: Dict[str, object] = {
+            "client_id": self._client_id,
+            "scope": self._scope,
+            "code": code,
+            "grant_type": "authorization_code",
+        }
+        if redirect_uri:
+            payload["redirect_uri"] = redirect_uri
+        if code_verifier:
+            payload["code_verifier"] = code_verifier
+        if self._client_secret:
+            payload["client_secret"] = self._client_secret
+
+        token_endpoint = f"https://login.microsoftonline.com/{self._tenant}/oauth2/v2.0/token"
+        data = await self._post(token_endpoint, payload)
+        return data
+
+    async def close(self) -> None:
+        if self._owns_session and self._session is not None:
+            await self._session.close()
+            self._session = None
+
+    async def _ensure_session(self) -> None:
+        if self._session is None:
+            if aiohttp is None:  # pragma: no cover
+                raise RuntimeError("aiohttp is required to initialise the Teams OAuth client")
+            timeout = aiohttp.ClientTimeout(total=60)
+            self._session = aiohttp.ClientSession(timeout=timeout)
+
+    async def _post(self, url: str, payload: Mapping[str, object]) -> Mapping[str, object]:
+        if self._session is None:
+            raise RuntimeError("OAuth session is not initialised")
+
+        async with self._session.post(url, data=payload) as response:
+            response.raise_for_status()
+            data = await response.json()
+
+        if not isinstance(data, Mapping):
+            raise RuntimeError("Teams OAuth returned non-mapping payload")
+        if "access_token" not in data:
+            raise RuntimeError("Teams OAuth response missing access_token")
+        return data
+
+
+def _build_identity(me_payload: Mapping[str, object], tenant: TeamsTenant) -> TeamsIdentity:
+    user = TeamsUser(
+        id=str(me_payload.get("id")),
+        display_name=me_payload.get("displayName"),
+        user_principal_name=me_payload.get("userPrincipalName"),
+        mail=me_payload.get("mail"),
+    )
+    return TeamsIdentity(tenant=tenant, user=user)
+
+
+def _compare_timestamp(current: Optional[object], previous: Optional[str]) -> int:
+    if not isinstance(previous, str):
+        return 1
+    current_dt = _parse_datetime(current)
+    previous_dt = _parse_datetime(previous)
+    if current_dt is None or previous_dt is None:
+        return 1
+    if current_dt > previous_dt:
+        return 1
+    if current_dt == previous_dt:
+        return 0
+    return -1
+
+
+def _parse_datetime(value: Optional[object]) -> Optional[dt.datetime]:
+    if not isinstance(value, str):
+        return None
+    try:
+        if value.endswith("Z"):
+            value = value[:-1] + "+00:00"
+        return dt.datetime.fromisoformat(value)
+    except ValueError:
+        return None

@@ -245,6 +245,17 @@
 - La til Cupertino-inspirerte kontaktvisninger i Flutter-klienten (liste, detalj og redigering),
   systemkontakt-import via `flutter_contacts` og nye widgettester for flyten.
 ## [Unreleased]
+
+### Added
+- Introduced production-ready Slack RTM bridge client with Web API integrations,
+  websocket event streaming, and OAuth code exchange helpers.
+- Added Microsoft Teams Graph bridge client with polling-based change
+  notifications, messaging helpers, and OAuth exchange support.
+
+### Changed
+- Extended bridge SDK test coverage with runtime unit tests for the Slack and
+  Teams clients, verifying identity sync, messaging, and inbound event
+  propagation behaviour.
 ### Added
 - Konsolidert produktplan og forskningsoppsummering med fokus på chat-MVP, identitet og arkitektur.
 - Ny domenemodell på backend for kontoer, profiler, samtaler og meldinger med REST API for chat.

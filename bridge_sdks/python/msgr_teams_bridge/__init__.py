@@ -2,22 +2,26 @@
 
 from .client import (
     TeamsClientProtocol,
+    TeamsGraphClient,
     TeamsIdentity,
+    TeamsOAuthClient,
     TeamsOAuthClientProtocol,
+    TeamsTenant,
     TeamsToken,
     TeamsUser,
-    TeamsTenant,
 )
 from .daemon import TeamsBridgeDaemon
 from .session import SessionData, SessionManager, SessionStore
 
 __all__ = [
     "TeamsClientProtocol",
+    "TeamsGraphClient",
     "TeamsIdentity",
+    "TeamsOAuthClient",
     "TeamsOAuthClientProtocol",
+    "TeamsTenant",
     "TeamsToken",
     "TeamsUser",
-    "TeamsTenant",
     "TeamsBridgeDaemon",
     "SessionData",
     "SessionManager",
