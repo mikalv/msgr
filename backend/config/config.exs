@@ -12,7 +12,8 @@ config :msgr, Messngr.Auth.Notifier,
   sms_adapter: Messngr.Auth.Notifier.LogSmsAdapter
 
 config :msgr, :rate_limits,
-  auth_challenge: [limit: 5, period: :timer.minutes(10)]
+  auth_challenge: [limit: 5, period: :timer.minutes(10)],
+  conversation_message_event: [limit: 60, period: :timer.minutes(1)]
 
 config :msgr, :llm_client, Messngr.AI.LlmGatewayClient
 

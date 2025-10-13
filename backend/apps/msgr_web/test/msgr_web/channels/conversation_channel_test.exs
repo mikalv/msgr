@@ -60,6 +60,41 @@ defmodule MessngrWeb.ConversationChannelTest do
     assert_push "message_created", %{"data" => %{"body" => "Hei på deg", "id" => ^message_id}}
   end
 
+  test "message:create rejects oversize payloads", %{account: account, profile: profile, conversation: conversation} do
+    {socket, _session} =
+      UserSocket
+      |> socket("user_id", %{})
+      |> attach_noise_socket(account, profile)
+
+    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
+
+    long_body = String.duplicate("a", 4_001)
+    ref = push(socket, "message:create", %{"body" => long_body})
+
+    assert_reply ref, :error, %{"errors" => ["body is too long (max 4000 characters)"]}
+  end
+
+  test "message:create enforces per-profile rate limits", %{account: account, profile: profile, conversation: conversation} do
+    original_limits = Application.get_env(:msgr, :rate_limits)
+    updated_limits = Keyword.put(original_limits || [], :conversation_message_event, [limit: 1, period: 60_000])
+    Application.put_env(:msgr, :rate_limits, updated_limits)
+
+    on_exit(fn -> Application.put_env(:msgr, :rate_limits, original_limits) end)
+
+    {socket, _session} =
+      UserSocket
+      |> socket("user_id", %{})
+      |> attach_noise_socket(account, profile)
+
+    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
+
+    ref1 = push(socket, "message:create", %{"body" => "Hei"})
+    assert_reply ref1, :ok, %{"data" => %{"body" => "Hei"}}
+
+    ref2 = push(socket, "message:create", %{"body" => "Igjen"})
+    assert_reply ref2, :error, %{"errors" => ["rate limit exceeded"]}
+  end
+
   test "peer messages are broadcast to subscribers", %{account: account, profile: profile, peer_profile: peer_profile, conversation: conversation} do
     {socket, _session} =
       UserSocket
