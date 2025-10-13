@@ -152,6 +152,25 @@ defmodule Msgr.Connectors.SlackBridge do
 
   defp build_sync_attrs(_response, _service, _account_id, _instance), do: {:ok, %{}}
 
+    contacts =
+      response
+      |> fetch_list([:members, :users])
+
+    channels =
+      response
+      |> fetch_list([:channels, :conversations])
+
+    %{
+      external_id: extract_user_id(user),
+      display_name: extract_display_name(user),
+      metadata: build_metadata(workspace, user),
+      session: ensure_map(session),
+      capabilities: ensure_map(capabilities),
+      contacts: ensure_list(contacts),
+      channels: ensure_list(channels)
+    }
+  end
+
   defp fetch_workspace(data) when is_map(data) do
     fetch_map(data, :workspace) || fetch_map(data, :team) || %{}
   end
