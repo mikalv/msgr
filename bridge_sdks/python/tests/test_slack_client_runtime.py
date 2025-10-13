@@ -275,3 +275,36 @@ def test_normalise_reaction_event_maps_action() -> None:
     assert event["action"] == "added"
     assert event["item"]["channel"] == "C4"
     assert event["user_id"] == "U2"
+
+
+def test_health_reports_slack_runtime_state() -> None:
+    class StubWebSocket:
+        def __init__(self) -> None:
+            self.closed = False
+            self.sent: list[dict[str, object]] = []
+
+        async def send_json(self, payload: dict[str, object]) -> None:
+            self.sent.append(dict(payload))
+
+    async def _run() -> None:
+        client = DummySlackClient()
+        stub_ws = StubWebSocket()
+        client._websocket = stub_ws  # type: ignore[assignment]
+
+        await client._dispatch_event({"event_id": "evt-1"})  # type: ignore[arg-type]
+
+        snapshot = await client.health()
+        assert snapshot["connected"] is True
+        assert snapshot["pending_events"] == 1
+        assert snapshot["last_event_id"] == "evt-1"
+
+        await client.acknowledge_event("evt-1")
+
+        assert stub_ws.sent[0]["event_id"] == "evt-1"
+
+        snapshot_after = await client.health()
+        assert snapshot_after["pending_events"] == 0
+        assert snapshot_after["last_ack_event_id"] == "evt-1"
+        assert snapshot_after["last_ack_latency"] >= 0.0
+
+    asyncio.run(_run())

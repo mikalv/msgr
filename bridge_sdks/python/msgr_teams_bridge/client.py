@@ -146,6 +146,9 @@ class TeamsClientProtocol(Protocol):
     def remove_event_handler(self, handler: UpdateHandler) -> None:
         """Unregister a previously registered event handler."""
 
+    async def health(self) -> Mapping[str, object]:
+        """Return runtime health information for operational dashboards."""
+
 
 class TeamsOAuthClientProtocol(Protocol):
     """Protocol that exchanges Microsoft identity platform codes for tokens."""
@@ -186,7 +189,15 @@ class TeamsGraphClient(TeamsClientProtocol):
         self._handlers: list[UpdateHandler] = []
         self._poll_task: Optional[asyncio.Task[None]] = None
         self._last_message_ts: Dict[str, str] = {}
-        self._acked: Dict[str, float] = {}
+        self._inflight: Dict[str, float] = {}
+        self._last_event_at: Optional[float] = None
+        self._last_event_id: Optional[str] = None
+        self._last_ack_at: Optional[float] = None
+        self._last_ack_latency: Optional[float] = None
+        self._last_connect_at: Optional[float] = None
+        self._last_disconnect_at: Optional[float] = None
+        self._last_poll_at: Optional[float] = None
+        self._consecutive_errors: int = 0
 
     async def connect(self, tenant: TeamsTenant, token: TeamsToken) -> None:
         if aiohttp is None:  # pragma: no cover - exercised in integration tests
@@ -199,8 +210,19 @@ class TeamsGraphClient(TeamsClientProtocol):
         me = await self._get("/me")
         self._identity = _build_identity(me, tenant)
 
+        identity = self._identity
+        self._logger.info(
+            "Teams Graph poller connected",
+            extra={
+                "tenant": identity.tenant.id if identity else None,
+                "user": identity.user.id if identity else None,
+            },
+        )
+
         if self._poll_task is None or self._poll_task.done():
             self._poll_task = asyncio.create_task(self._poll_loop(), name="teams-graph-poller")
+        self._last_connect_at = time.time()
+        self._consecutive_errors = 0
 
     async def disconnect(self) -> None:
         if self._poll_task is not None:
@@ -212,6 +234,16 @@ class TeamsGraphClient(TeamsClientProtocol):
         if self._owns_session and self._session is not None:
             await self._session.close()
             self._session = None
+
+        self._last_disconnect_at = time.time()
+        identity = self._identity
+        self._logger.info(
+            "Teams Graph poller disconnected",
+            extra={
+                "tenant": identity.tenant.id if identity else None,
+                "user": identity.user.id if identity else None,
+            },
+        )
 
     async def is_connected(self) -> bool:
         return bool(self._poll_task is not None and not self._poll_task.done())
@@ -260,7 +292,11 @@ class TeamsGraphClient(TeamsClientProtocol):
     async def acknowledge_event(self, event_id: str) -> None:
         if not event_id:
             return
-        self._acked[event_id] = time.time()
+        now = time.time()
+        dispatched_at = self._inflight.pop(event_id, None)
+        if dispatched_at is not None:
+            self._last_ack_latency = max(0.0, now - dispatched_at)
+        self._last_ack_at = now
 
     def add_event_handler(self, handler: UpdateHandler) -> None:
         if handler not in self._handlers:
@@ -281,15 +317,20 @@ class TeamsGraphClient(TeamsClientProtocol):
         try:
             while True:
                 try:
+                    self._logger.debug("Teams poll iteration starting")
                     chats = await self.list_conversations()
                     for chat in chats:
                         chat_id = str(chat.get("id"))
                         if chat_id:
                             await self._poll_chat(chat_id)
+                    self._consecutive_errors = 0
                 except asyncio.CancelledError:
                     raise
                 except Exception:  # pragma: no cover - network errors logged
+                    self._consecutive_errors += 1
                     self._logger.exception("Teams polling iteration failed")
+                finally:
+                    self._last_poll_at = time.time()
                 await asyncio.sleep(self._poll_interval)
         except asyncio.CancelledError:  # pragma: no cover - cancellation path
             pass
@@ -313,11 +354,52 @@ class TeamsGraphClient(TeamsClientProtocol):
         event = _normalise_chat_event(self._tenant, chat_id, message)
         if event is None:
             return
+        now = time.time()
+        event_id = event.get("event_id")
+        if isinstance(event_id, (str, int)):
+            event_id_str = str(event_id)
+            self._inflight.setdefault(event_id_str, now)
+            self._last_event_id = event_id_str
+            self._trim_inflight()
+        self._last_event_at = now
+        self._logger.debug(
+            "Teams event received",
+            extra={"chat_id": chat_id, "event_id": event.get("event_id")},
+        )
         for handler in list(self._handlers):
             try:
                 await handler(event)
             except Exception:  # pragma: no cover - handler failures logged for ops
                 self._logger.exception("Teams handler raised")
+
+    async def health(self) -> Mapping[str, object]:
+        connected = await self.is_connected()
+        now = time.time()
+        oldest_inflight: Optional[float] = None
+        if self._inflight:
+            oldest_inflight = min(self._inflight.values())
+        health = _compact_dict(
+            {
+                "connected": connected,
+                "poll_interval": self._poll_interval,
+                "handler_count": len(self._handlers),
+                "pending_events": len(self._inflight),
+                "oldest_pending_age": max(0.0, now - oldest_inflight)
+                if oldest_inflight is not None
+                else None,
+                "last_event_id": self._last_event_id,
+                "last_event_age": max(0.0, now - self._last_event_at)
+                if self._last_event_at is not None
+                else None,
+                "last_ack_at": self._last_ack_at,
+                "last_ack_latency": self._last_ack_latency,
+                "last_connect_at": self._last_connect_at,
+                "last_disconnect_at": self._last_disconnect_at,
+                "last_poll_at": self._last_poll_at,
+                "consecutive_errors": self._consecutive_errors,
+            }
+        )
+        return health
 
     async def _get(
         self,
@@ -355,6 +437,22 @@ class TeamsGraphClient(TeamsClientProtocol):
         if not isinstance(data, Mapping):
             raise RuntimeError("Teams Graph returned non-mapping payload")
         return data
+
+    def _trim_inflight(self, *, max_entries: int = 1000, max_age: float = 3600.0) -> None:
+        if not self._inflight:
+            return
+        now = time.time()
+        stale_keys = [
+            event_id
+            for event_id, dispatched_at in self._inflight.items()
+            if now - dispatched_at > max_age
+        ]
+        for event_id in stale_keys:
+            self._inflight.pop(event_id, None)
+        if len(self._inflight) > max_entries:
+            overflow = len(self._inflight) - max_entries
+            for event_id in sorted(self._inflight, key=self._inflight.get)[:overflow]:
+                self._inflight.pop(event_id, None)
 
     async def _paged_get(self, path: str) -> Iterable[Mapping[str, object]]:
         url = f"{self._GRAPH_BASE}{path}"

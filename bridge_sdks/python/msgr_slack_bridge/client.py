@@ -204,6 +204,9 @@ class SlackClientProtocol(Protocol):
     def remove_event_handler(self, handler: UpdateHandler) -> None:
         """Unregister a previously registered event handler."""
 
+    async def health(self) -> Mapping[str, object]:
+        """Return runtime health information for operational dashboards."""
+
 
 class SlackOAuthClientProtocol(Protocol):
     """Protocol that exchanges Slack OAuth codes for RTM tokens."""
@@ -241,7 +244,14 @@ class SlackRTMClient(SlackClientProtocol):
         self._handlers: list[UpdateHandler] = []
         self._identity: Optional[SlackIdentity] = None
         self._capabilities: Optional[Mapping[str, object]] = None
-        self._acked: Dict[str, float] = {}
+        self._inflight: Dict[str, float] = {}
+        self._last_event_at: Optional[float] = None
+        self._last_event_id: Optional[str] = None
+        self._last_ack_at: Optional[float] = None
+        self._last_ack_latency: Optional[float] = None
+        self._last_ack_event_id: Optional[str] = None
+        self._last_connect_at: Optional[float] = None
+        self._last_disconnect_at: Optional[float] = None
 
     async def connect(self, token: SlackToken) -> None:
         if aiohttp is None:  # pragma: no cover - exercised in integration tests
@@ -259,9 +269,19 @@ class SlackRTMClient(SlackClientProtocol):
         if identity is not None:
             self._identity = identity
 
+        identity = self._identity
+        self._logger.info(
+            "Slack RTM connected",
+            extra={
+                "workspace": identity.workspace.id if identity else None,
+                "user": identity.user.id if identity else None,
+            },
+        )
+
         assert self._session is not None
         self._websocket = await self._session.ws_connect(url, heartbeat=20)
         self._reader_task = asyncio.create_task(self._consume_events(), name="slack-rtm")
+        self._last_connect_at = time.time()
 
     async def disconnect(self) -> None:
         if self._reader_task is not None:
@@ -277,6 +297,16 @@ class SlackRTMClient(SlackClientProtocol):
         if self._owns_session and self._session is not None:
             await self._session.close()
             self._session = None
+
+        self._last_disconnect_at = time.time()
+        identity = self._identity
+        self._logger.info(
+            "Slack RTM disconnected",
+            extra={
+                "workspace": identity.workspace.id if identity else None,
+                "user": identity.user.id if identity else None,
+            },
+        )
 
     async def is_connected(self) -> bool:
         return bool(self._websocket is not None and not self._websocket.closed)
@@ -382,7 +412,12 @@ class SlackRTMClient(SlackClientProtocol):
     async def acknowledge_event(self, event_id: str) -> None:
         if not event_id:
             return
-        self._acked[event_id] = time.time()
+        now = time.time()
+        dispatched_at = self._inflight.pop(event_id, None)
+        if dispatched_at is not None:
+            self._last_ack_latency = max(0.0, now - dispatched_at)
+        self._last_ack_at = now
+        self._last_ack_event_id = event_id
         if self._websocket is not None and not self._websocket.closed:
             try:
                 await self._websocket.send_json({"type": "ack", "event_id": event_id})
@@ -422,16 +457,57 @@ class SlackRTMClient(SlackClientProtocol):
             payload = json.loads(message.data)
             event = _normalise_event(payload)
             if event is not None:
+                event_type = event.get("type") or event.get("callback_type")
+                event_id = event.get("event_id")
+                self._logger.debug(
+                    "Slack event received",
+                    extra={"event_type": event_type, "event_id": event_id},
+                )
                 await self._dispatch_event(event)
         elif message.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.ERROR):
             self._logger.debug("Slack websocket closed: %s", message.type)
 
     async def _dispatch_event(self, event: Mapping[str, object]) -> None:
+        now = time.time()
+        event_id = event.get("event_id")
+        if isinstance(event_id, (str, int)):
+            event_id_str = str(event_id)
+            self._inflight.setdefault(event_id_str, now)
+            self._last_event_id = event_id_str
+            self._trim_inflight()
+        self._last_event_at = now
         for handler in list(self._handlers):
             try:
                 await handler(event)
             except Exception:  # pragma: no cover - handler failures logged for ops
                 self._logger.exception("Slack handler raised")
+
+    async def health(self) -> Mapping[str, object]:
+        connected = await self.is_connected()
+        now = time.time()
+        oldest_inflight: Optional[float] = None
+        if self._inflight:
+            oldest_inflight = min(self._inflight.values())
+        health = _compact(
+            {
+                "connected": connected,
+                "handler_count": len(self._handlers),
+                "pending_events": len(self._inflight),
+                "oldest_pending_age": max(0.0, now - oldest_inflight)
+                if oldest_inflight is not None
+                else None,
+                "last_event_id": self._last_event_id,
+                "last_event_age": max(0.0, now - self._last_event_at)
+                if self._last_event_at is not None
+                else None,
+                "last_ack_at": self._last_ack_at,
+                "last_ack_event_id": self._last_ack_event_id,
+                "last_ack_latency": self._last_ack_latency,
+                "last_connect_at": self._last_connect_at,
+                "last_disconnect_at": self._last_disconnect_at,
+            }
+        )
+        return health
 
     async def _api_call(
         self,
@@ -522,6 +598,22 @@ class SlackRTMClient(SlackClientProtocol):
         headers = {"Content-Type": upload.content_type or "application/octet-stream"}
         async with self._session.put(upload_url, data=upload.content, headers=headers) as response:
             response.raise_for_status()
+
+    def _trim_inflight(self, *, max_entries: int = 1000, max_age: float = 3600.0) -> None:
+        if not self._inflight:
+            return
+        now = time.time()
+        stale_keys = [
+            event_id
+            for event_id, dispatched_at in self._inflight.items()
+            if now - dispatched_at > max_age
+        ]
+        for event_id in stale_keys:
+            self._inflight.pop(event_id, None)
+        if len(self._inflight) > max_entries:
+            overflow = len(self._inflight) - max_entries
+            for event_id in sorted(self._inflight, key=self._inflight.get)[:overflow]:
+                self._inflight.pop(event_id, None)
 
     async def _paginate(
         self,

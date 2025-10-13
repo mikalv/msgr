@@ -29,8 +29,9 @@ The lists below capture what is still missing before we can confidently bridge l
   to the queue so retry logic can react appropriately.
 
 ## Reliability & Operations
-- Add health checks and structured logging for the daemon so operators can monitor websocket
-  lifecycle events, reconnection loops, and API rate limiting.
+- Wire the new runtime health snapshot into the bridge supervisor and export metrics to the
+  monitoring stack so operators receive alerts for websocket reconnect storms, stale pending
+  events, and growing acknowledgement latency.
 - Document scaling guidance for running multiple RTM sessions per daemon instance and how to shard
   workspaces when reaching Slack's connection caps.
 

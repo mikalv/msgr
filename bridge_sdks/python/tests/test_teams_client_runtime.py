@@ -17,14 +17,17 @@ from msgr_teams_bridge.client import (
 class DummyTask:
     def __init__(self) -> None:
         self._cancelled = False
+        self._done = False
 
     def cancel(self) -> None:
         self._cancelled = True
+        self._done = True
 
     def done(self) -> bool:
-        return True
+        return self._done
 
     def __await__(self):  # pragma: no cover - simple awaitable shim
+        self._done = True
         async def _noop() -> None:
             return None
 
@@ -263,3 +266,29 @@ def test_teams_oauth_payload(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result["access_token"] == "token"
     assert captured["url"].startswith("https://login.microsoftonline.com")
     assert captured["data"]["client_secret"] == "secret"
+
+
+def test_health_reports_teams_runtime_state() -> None:
+    async def _run() -> None:
+        tenant = TeamsTenant(id="tenant")
+        token = TeamsToken(access_token="token")
+        client = DummyTeamsClient()
+        client.queue_response("/me", {"id": "user1"})
+
+        await client.connect(tenant, token)
+
+        await client._dispatch_event("chat1", {"id": "msg-1"})  # type: ignore[arg-type]
+
+        snapshot = await client.health()
+        assert snapshot["connected"] is True
+        assert snapshot["pending_events"] == 1
+        assert snapshot["last_event_id"] == "msg-1"
+
+        await client.acknowledge_event("msg-1")
+
+        snapshot_after = await client.health()
+        assert snapshot_after["pending_events"] == 0
+        assert snapshot_after["last_ack_latency"] >= 0.0
+        assert snapshot_after["consecutive_errors"] == 0
+
+    asyncio.run(_run())

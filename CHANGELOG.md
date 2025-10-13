@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- Added Slack RTM runtime health snapshots and structured logging so operators can monitor
+  websocket status, pending acknowledgements, and event freshness; added unit tests that
+  exercise the diagnostics surface.
+- Added Microsoft Teams Graph poller health reporting with consecutive error tracking, poll
+  timestamps, and telemetry logging, plus runtime tests covering the health snapshot contract.
 - Added Slack outbound file upload support that stages remote files via
   `files.getUploadURLExternal`, appends file blocks to `chat.postMessage`, and
   returns upload metadata so bridge workers can share attachments alongside

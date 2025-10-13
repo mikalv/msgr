@@ -31,8 +31,8 @@ production tenant.
   correctly.
 
 ## Operational Hardening
-- Add structured logging, metrics, and alerting hooks to observe webhook renewal status, throttling,
-  and Graph error codes.
+- Integrate the poller health snapshot with the bridge supervisor and emit metrics/alerts covering
+  webhook renewal status, throttling, and consecutive polling failures surfaced by the runtime.
 - Document deployment topologies for sharding by tenant or geography and how to handle dedicated
   resource mailboxes where Teams stores compliance copies.
 
