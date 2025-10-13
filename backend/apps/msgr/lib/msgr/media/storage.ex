@@ -75,11 +75,13 @@ defmodule Messngr.Media.Storage do
         }
   def presign_download(bucket, object_key, opts \\ []) do
     content_type = Keyword.get(opts, :content_type)
+    checksum = Keyword.get(opts, :checksum)
     expires_at = expires_at(:download)
 
     url =
       presigned_url(:get, public_endpoint(), bucket, object_key, expires_at,
-        content_type: content_type
+        content_type: content_type,
+        checksum: checksum
       )
 
     %{
@@ -89,8 +91,61 @@ defmodule Messngr.Media.Storage do
     }
   end
 
+  @doc """
+  Generates a signed delete request for removing media objects from storage.
+  """
+  @spec presign_delete(String.t(), String.t()) :: %{
+          required(:method) => String.t(),
+          required(:url) => String.t(),
+          required(:expires_at) => DateTime.t(),
+          required(:headers) => map()
+        }
+  def presign_delete(bucket, object_key) do
+    expires_at = expires_at(:delete)
+
+    url =
+      presigned_url(:delete, endpoint(), bucket, object_key, expires_at,
+        headers: %{}
+      )
+
+    %{
+      method: "DELETE",
+      url: url,
+      expires_at: expires_at,
+      headers: %{}
+    }
+  end
+
+  @doc """
+  Deletes an object from storage using the configured HTTP client.
+  """
+  @spec delete_object(String.t(), String.t()) :: :ok | {:error, term()}
+  def delete_object(bucket, object_key) do
+    %{url: url, headers: headers} = presign_delete(bucket, object_key)
+
+    request = Finch.build("DELETE", url, headers)
+
+    case http_client().(request) do
+      {:ok, %{status: status}} when status in 200..299 -> :ok
+      {:ok, %{status: 404}} -> :ok
+      {:ok, %{status: status}} -> {:error, {:http_error, status}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp config do
     Application.get_env(:msgr, __MODULE__, [])
+  end
+
+  defp http_client do
+    case Keyword.get(config(), :http_client) do
+      fun when is_function(fun, 1) -> fun
+      _ -> &default_http_client/1
+    end
+  end
+
+  defp default_http_client(request) do
+    Finch.request(request, Messngr.Finch)
   end
 
   defp presigned_url(method, base, bucket, object_key, expires_at, opts) do
@@ -98,19 +153,21 @@ defmodule Messngr.Media.Storage do
     expires = DateTime.to_unix(expires_at)
     content_type = Keyword.get(opts, :content_type)
     headers = Keyword.get(opts, :headers, %{})
-    signature = sign(method, uri.path || "/", expires, content_type, headers)
+    checksum = Keyword.get(opts, :checksum)
+    signature = sign(method, uri.path || "/", expires, content_type, headers, checksum)
 
     query_params =
       %{expires: expires, signature: signature}
       |> maybe_put_content_type(content_type)
+      |> maybe_put_checksum(checksum)
 
     uri
     |> Map.put(:query, URI.encode_query(query_params))
     |> to_string()
   end
 
-  defp sign(method, path, expires, content_type, headers) do
-    secret = config() |> Keyword.get(:signing_secret, "dev-secret")
+  defp sign(method, path, expires, content_type, headers, checksum) do
+    secret = signing_secret!()
     canonical_headers = canonical_headers(headers)
 
     payload =
@@ -119,7 +176,8 @@ defmodule Messngr.Media.Storage do
         path,
         Integer.to_string(expires),
         content_type || "",
-        canonical_headers
+        canonical_headers,
+        checksum || ""
       ]
       |> Enum.join(":")
 
@@ -150,6 +208,12 @@ defmodule Messngr.Media.Storage do
     Map.put(params, :content_type, content_type)
   end
 
+  defp maybe_put_checksum(params, nil), do: params
+
+  defp maybe_put_checksum(params, checksum) do
+    Map.put(params, :checksum, checksum)
+  end
+
   defp encryption_headers do
     config = config()
 
@@ -169,11 +233,19 @@ defmodule Messngr.Media.Storage do
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value
 
+  defp signing_secret! do
+    case config() |> Keyword.get(:signing_secret) |> blank_to_nil() do
+      nil -> raise ArgumentError, "media signing secret is not configured"
+      secret -> secret
+    end
+  end
+
   defp expires_at(kind) do
     seconds =
       case kind do
         :upload -> config() |> Keyword.get(:upload_expiry_seconds, 600)
         :download -> config() |> Keyword.get(:download_expiry_seconds, 1200)
+        :delete -> config() |> Keyword.get(:delete_expiry_seconds, 60)
       end
 
     DateTime.add(DateTime.utc_now(), seconds, :second)

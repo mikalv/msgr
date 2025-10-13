@@ -1,4 +1,5 @@
 {:ok, _} = Application.ensure_all_started(:mox)
+{:ok, _} = Application.ensure_all_started(:hammer)
 case Application.ensure_all_started(:enacl) do
   {:ok, _} -> :ok
   {:error, _} -> :ok

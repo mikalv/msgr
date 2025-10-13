@@ -9,10 +9,12 @@ defmodule MessngrWeb.ConversationChannel do
   alias Messngr
   alias Messngr.Accounts.Profile
   alias Messngr.Chat
+  alias Messngr.RateLimiter
   alias MessngrWeb.Presence
 
   @typing_timeout_ms 5_000
   @watcher_timeout_ms 30_000
+  @message_body_max_length 4_000
   alias MessngrWeb.{ConversationJSON, MessageJSON}
 
   @impl true
@@ -43,7 +45,8 @@ defmodule MessngrWeb.ConversationChannel do
   def handle_in("message:create", payload, socket) when is_map(payload) do
     socket = touch_activity(socket)
 
-    with {:ok, body} <- extract_body(payload),
+    with :ok <- enforce_rate_limit(socket, :conversation_message_event),
+         {:ok, body} <- extract_body(payload),
          {:ok, message} <-
            Messngr.send_message(socket.assigns.conversation_id, socket.assigns.current_profile.id, %{
              "body" => body
@@ -62,7 +65,8 @@ defmodule MessngrWeb.ConversationChannel do
   def handle_in("message:update", payload, socket) when is_map(payload) do
     socket = touch_activity(socket)
 
-    with {:ok, message_id} <- require_message_id(payload),
+    with :ok <- enforce_rate_limit(socket, :conversation_message_event),
+         {:ok, message_id} <- require_message_id(payload),
          attrs <- Map.take(payload, ["body", "payload", "metadata"]),
          {:ok, message} <-
            Messngr.update_message(
@@ -80,7 +84,8 @@ defmodule MessngrWeb.ConversationChannel do
   def handle_in("message:delete", payload, socket) when is_map(payload) do
     socket = touch_activity(socket)
 
-    with {:ok, message_id} <- require_message_id(payload),
+    with :ok <- enforce_rate_limit(socket, :conversation_message_event),
+         {:ok, message_id} <- require_message_id(payload),
          opts <- Map.take(payload, ["metadata"]),
          {:ok, message} <-
            Messngr.delete_message(
@@ -132,7 +137,8 @@ defmodule MessngrWeb.ConversationChannel do
   def handle_in("reaction:add", payload, socket) when is_map(payload) do
     socket = touch_activity(socket)
 
-    with {:ok, message_id} <- require_message_id(payload),
+    with :ok <- enforce_rate_limit(socket, :conversation_message_event),
+         {:ok, message_id} <- require_message_id(payload),
          {:ok, emoji} <- require_emoji(payload),
          {:ok, metadata} <- fetch_metadata(payload),
          {:ok, reaction} <-
@@ -152,7 +158,8 @@ defmodule MessngrWeb.ConversationChannel do
   def handle_in("reaction:remove", payload, socket) when is_map(payload) do
     socket = touch_activity(socket)
 
-    with {:ok, message_id} <- require_message_id(payload),
+    with :ok <- enforce_rate_limit(socket, :conversation_message_event),
+         {:ok, message_id} <- require_message_id(payload),
          {:ok, emoji} <- require_emoji(payload),
          {:ok, result} <-
            Messngr.remove_reaction(
@@ -170,7 +177,8 @@ defmodule MessngrWeb.ConversationChannel do
   def handle_in("message:pin", payload, socket) when is_map(payload) do
     socket = touch_activity(socket)
 
-    with {:ok, message_id} <- require_message_id(payload),
+    with :ok <- enforce_rate_limit(socket, :conversation_message_event),
+         {:ok, message_id} <- require_message_id(payload),
          {:ok, metadata} <- fetch_metadata(payload),
          {:ok, pinned} <-
            Messngr.pin_message(
@@ -188,7 +196,8 @@ defmodule MessngrWeb.ConversationChannel do
   def handle_in("message:unpin", payload, socket) when is_map(payload) do
     socket = touch_activity(socket)
 
-    with {:ok, message_id} <- require_message_id(payload),
+    with :ok <- enforce_rate_limit(socket, :conversation_message_event),
+         {:ok, message_id} <- require_message_id(payload),
          {:ok, status} <-
            Messngr.unpin_message(
              socket.assigns.conversation_id,
@@ -394,10 +403,18 @@ defmodule MessngrWeb.ConversationChannel do
   defp extract_body(%{"body" => body}) when is_binary(body) do
     trimmed = String.trim(body)
 
-    if trimmed == "" do
-      {:error, %{errors: ["body can't be blank"]}}
-    else
-      {:ok, trimmed}
+    cond do
+      trimmed == "" ->
+        {:error, %{errors: ["body can't be blank"]}}
+
+      String.length(trimmed) > @message_body_max_length ->
+        {:error,
+         %{
+           errors: ["body is too long (max #{@message_body_max_length} characters)"]
+         }}
+
+      true ->
+        {:ok, trimmed}
     end
   end
 
@@ -453,6 +470,16 @@ defmodule MessngrWeb.ConversationChannel do
   defp reply_reason_error(socket, reason) do
     {:reply, {:error, %{errors: [inspect(reason)]}}, socket}
   end
+
+  defp enforce_rate_limit(socket, name) do
+    bucket = "#{socket.assigns.conversation_id}:#{socket.assigns.current_profile.id}"
+
+    case RateLimiter.check(name, bucket) do
+      :ok -> :ok
+      {:error, :rate_limited} -> {:error, :rate_limited}
+      {:error, reason} -> {:error, reason}
+    end
+  end
   defp build_sync_opts(params) do
     []
     |> maybe_put(:limit, params["limit"])
@@ -487,6 +514,7 @@ defmodule MessngrWeb.ConversationChannel do
   defp translate_reason(:message_not_found), do: "message not found"
   defp translate_reason(:message_deleted), do: "message deleted"
   defp translate_reason(:invalid_payload), do: "invalid payload"
+  defp translate_reason(:rate_limited), do: "rate limit exceeded"
   defp translate_reason(other), do: to_string(other)
 
   defp touch_activity(socket) do

@@ -6,6 +6,7 @@ defmodule Messngr.Media do
 
   alias Messngr.Media.{Storage, Upload}
   alias Messngr.Repo
+  import Ecto.Query
 
   @type upload_instructions :: map()
 
@@ -67,6 +68,40 @@ defmodule Messngr.Media do
           end
       end
     end)
+  end
+
+  @doc """
+  Deletes uploads whose retention window has expired and removes their storage
+  objects. Returns a map describing how many uploads were scanned, deleted, and
+  any errors encountered.
+  """
+  @spec prune_expired_uploads(keyword()) :: %{scanned: non_neg_integer(), deleted: non_neg_integer(), errors: list()}
+  def prune_expired_uploads(opts \\ []) do
+    now = Keyword.get(opts, :now, DateTime.utc_now())
+    limit = Keyword.get(opts, :limit, 100)
+
+    query =
+      from upload in Upload,
+        where:
+          not is_nil(upload.retention_expires_at) and
+            upload.retention_expires_at <= ^now,
+        order_by: [asc: upload.retention_expires_at],
+        limit: ^limit
+
+    uploads = Repo.all(query)
+
+    {deleted, errors} =
+      Enum.reduce(uploads, {0, []}, fn upload, {deleted_acc, errors_acc} ->
+        case purge_upload(upload) do
+          :ok ->
+            {deleted_acc + 1, errors_acc}
+
+          {:error, reason} ->
+            {deleted_acc, [%{id: upload.id, reason: reason} | errors_acc]}
+        end
+      end)
+
+    %{scanned: length(uploads), deleted: deleted, errors: Enum.reverse(errors)}
   end
 
   defp normalise_kind(attrs) do
@@ -156,6 +191,61 @@ defmodule Messngr.Media do
   end
 
   defp build_thumbnail_instructions(_upload), do: nil
+
+  defp purge_upload(%Upload{} = upload) do
+    with :ok <- Storage.delete_object(upload.bucket, upload.object_key),
+         :ok <- maybe_delete_thumbnail(upload),
+         {:ok, _} <- Repo.delete(upload) do
+      :ok
+    else
+      {:error, %Ecto.Changeset{} = changeset} -> {:error, {:repo_delete_failed, changeset}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp maybe_delete_thumbnail(%Upload{} = upload) do
+    case thumbnail_location(upload) do
+      nil -> :ok
+      {bucket, object_key} -> Storage.delete_object(bucket, object_key)
+    end
+  end
+
+  defp thumbnail_location(%Upload{} = upload) do
+    metadata =
+      case upload.metadata do
+        %{} = map -> string_keys(map)
+        _ -> %{}
+      end
+
+    cond do
+      is_map(metadata["thumbnail"]) -> extract_thumbnail_pointer(metadata["thumbnail"], upload.bucket)
+      is_map(get_in(metadata, ["media", "thumbnail"])) ->
+        extract_thumbnail_pointer(get_in(metadata, ["media", "thumbnail"]), upload.bucket)
+      upload.kind in [:image, :video] -> {upload.bucket, Upload.thumbnail_object_key(upload.object_key)}
+      true -> nil
+    end
+  end
+
+  defp extract_thumbnail_pointer(thumbnail, default_bucket) when is_map(thumbnail) do
+    normalized = string_keys(thumbnail)
+
+    bucket =
+      normalized["bucket"] ||
+        normalized["bucketName"] ||
+        default_bucket
+
+    object_key =
+      normalized["objectKey"] ||
+        normalized["object_key"]
+
+    if is_binary(bucket) and is_binary(object_key) do
+      {bucket, object_key}
+    else
+      nil
+    end
+  end
+
+  defp extract_thumbnail_pointer(_thumbnail, _default_bucket), do: nil
 
   defp config do
     Application.get_env(:msgr, __MODULE__, [])

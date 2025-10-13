@@ -13,7 +13,12 @@ defmodule Messngr.Noise.SessionStoreTest do
 
   describe "issue/2" do
     test "stores the session and actor metadata", %{registry: registry} do
-      actor = %{account_id: Ecto.UUID.generate(), profile_id: Ecto.UUID.generate(), device_id: Ecto.UUID.generate(), device_public_key: "noise-#{System.unique_integer([:positive])}"}
+      actor = %{
+        account_id: Ecto.UUID.generate(),
+        profile_id: Ecto.UUID.generate(),
+        device_id: Ecto.UUID.generate(),
+        device_public_key: Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
+      }
 
       {:ok, session} = SessionStore.issue(actor, registry: registry)
       assert %Session{} = session
@@ -27,7 +32,11 @@ defmodule Messngr.Noise.SessionStoreTest do
   describe "register/3" do
     test "attaches actor metadata to an existing session", %{registry: registry} do
       session = Session.established_session(actor: %{account_id: Ecto.UUID.generate(), profile_id: Ecto.UUID.generate()})
-      actor = %{account_id: Ecto.UUID.generate(), profile_id: Ecto.UUID.generate(), device_public_key: "pk-#{System.unique_integer([:positive])}"}
+      actor = %{
+        account_id: Ecto.UUID.generate(),
+        profile_id: Ecto.UUID.generate(),
+        device_public_key: Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
+      }
 
       assert {:ok, %Session{} = stored} = SessionStore.register(session, actor, registry: registry)
       {:ok, fetched, %Actor{} = stored_actor} = SessionStore.fetch(Session.token(stored), registry: registry)

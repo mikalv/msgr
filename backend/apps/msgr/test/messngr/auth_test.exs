@@ -2,6 +2,12 @@ defmodule Messngr.AuthTest do
   use Messngr.DataCase
 
   alias Messngr.Auth.Challenge
+  alias Swoosh.Adapters.Local.Storage.Memory
+
+  setup do
+    Memory.clear()
+    :ok
+  end
 
   describe "start_auth_challenge/1" do
     test "creates and returns code" do
@@ -12,6 +18,34 @@ defmodule Messngr.AuthTest do
       assert challenge.channel == :email
       assert String.length(code) == 6
       assert challenge.code_hash != code
+    end
+
+    test "delivers email challenge" do
+      identifier = "deliver-#{System.unique_integer([:positive])}@example.com"
+
+      assert {:ok, %Challenge{}, code} =
+               Messngr.start_auth_challenge(%{"channel" => "email", "identifier" => identifier})
+
+      assert [email] = Memory.all()
+      assert email.to == [{nil, identifier}]
+      assert email.subject =~ "login code"
+      assert String.contains?(email.text_body, code)
+    end
+
+    test "rate limits repeated requests" do
+      identifier = "limit-#{System.unique_integer([:positive])}@example.com"
+      limit =
+        Application.get_env(:msgr, :rate_limits)
+        |> Keyword.fetch!(:auth_challenge)
+        |> Keyword.fetch!(:limit)
+
+      for _ <- 1..limit do
+        assert {:ok, %Challenge{}, _code} =
+                 Messngr.start_auth_challenge(%{"channel" => "email", "identifier" => identifier})
+      end
+
+      assert {:error, :too_many_requests} =
+               Messngr.start_auth_challenge(%{"channel" => "email", "identifier" => identifier})
     end
   end
 

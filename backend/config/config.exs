@@ -4,9 +4,16 @@ config :msgr,
   ecto_repos: [Messngr.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]
 
-config :msgr, :feature_flags, noise_handshake_required: false
+config :msgr, :feature_flags, noise_handshake_required: true
 
 config :msgr, Messngr.Mailer, adapter: Swoosh.Adapters.Local
+config :msgr, Messngr.Auth.Notifier,
+  email_sender: {"Messngr", System.get_env("MSGR_AUTH_EMAIL_FROM", "login@messngr.local")},
+  sms_adapter: Messngr.Auth.Notifier.LogSmsAdapter
+
+config :msgr, :rate_limits,
+  auth_challenge: [limit: 5, period: :timer.minutes(10)],
+  conversation_message_event: [limit: 60, period: :timer.minutes(1)]
 
 config :msgr, :llm_client, Messngr.AI.LlmGatewayClient
 
@@ -37,7 +44,7 @@ config :msgr, Messngr.Media.Storage,
   bucket: System.get_env("MEDIA_BUCKET", "msgr-media"),
   endpoint: System.get_env("MEDIA_ENDPOINT", "http://localhost:9000"),
   public_endpoint: System.get_env("MEDIA_PUBLIC_ENDPOINT"),
-  signing_secret: System.get_env("MEDIA_SIGNING_SECRET", "dev-secret"),
+  signing_secret: System.get_env("MEDIA_SIGNING_SECRET"),
   upload_expiry_seconds: String.to_integer(System.get_env("MEDIA_UPLOAD_EXPIRY", "600")),
   download_expiry_seconds: String.to_integer(System.get_env("MEDIA_DOWNLOAD_EXPIRY", "1200")),
   server_side_encryption: media_sse_algorithm,
@@ -46,6 +53,15 @@ config :msgr, Messngr.Media.Storage,
 config :msgr, Messngr.Media,
   upload_ttl_seconds: String.to_integer(System.get_env("MEDIA_UPLOAD_TTL", "900")),
   retention_ttl_seconds: String.to_integer(System.get_env("MEDIA_RETENTION_TTL", "604800"))
+
+config :msgr, Messngr.Media.RetentionPruner,
+  enabled: true,
+  interval_ms: :timer.minutes(10),
+  batch_size: 100
+
+config :msgr, Messngr.Chat.WatcherPruner,
+  enabled: true,
+  interval_ms: :timer.minutes(1)
 
 config :msgr, Messngr.ShareLinks,
   public_base_url: System.get_env("SHARE_LINK_PUBLIC_BASE_URL", "https://msgr.no"),
@@ -96,7 +112,7 @@ config :logger, :console,
 config :logger, backends: [:console]
 
 config :msgr_web, :prometheus,
-  enabled: false,
+  enabled: true,
   port: 9568,
   name: :prometheus_metrics
 

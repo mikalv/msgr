@@ -7,7 +7,7 @@ defmodule Messngr.Chat do
 
   alias Phoenix.PubSub
 
-  alias Messngr.{Accounts, Media, Repo}
+  alias Messngr.{Accounts, Media, Repo, Retry}
   alias Messngr.Chat.{
     Conversation,
     Message,
@@ -494,42 +494,43 @@ defmodule Messngr.Chat do
   end
 
   defp list_messages_around(conversation_id, message_id, limit) do
-    with %Message{conversation_id: ^conversation_id} = pivot <- Repo.get(Message, message_id) do
-      pivot = Repo.preload(pivot, [:profile, receipts: [:recipient, :device]])
+    case fetch_pivot_message(conversation_id, message_id) do
+      {:ok, pivot} ->
+        before_limit = div(limit, 2)
+        after_limit = max(limit - before_limit - 1, 0)
 
-      before_limit = div(limit, 2)
-      after_limit = max(limit - before_limit - 1, 0)
+        before_page =
+          if before_limit > 0 do
+            list_messages_before(conversation_id, message_id, before_limit)
+          else
+            empty_page()
+          end
 
-      before_page =
-        if before_limit > 0 do
-          list_messages_before(conversation_id, message_id, before_limit)
-        else
-          empty_page()
-        end
+        after_page =
+          if after_limit > 0 do
+            list_messages_after(conversation_id, message_id, after_limit)
+          else
+            empty_page()
+          end
 
-      after_page =
-        if after_limit > 0 do
-          list_messages_after(conversation_id, message_id, after_limit)
-        else
-          empty_page()
-        end
+        entries = before_page.entries ++ [pivot] ++ after_page.entries
 
-      entries = before_page.entries ++ [pivot] ++ after_page.entries
-
-      meta = %{
-        start_cursor: cursor_id(List.first(entries)),
-        end_cursor: cursor_id(List.last(entries)),
-        has_more: %{
-          before:
-            before_page.meta.has_more.before || has_more(conversation_id, List.first(entries), :before),
-          after:
-            after_page.meta.has_more.after || has_more(conversation_id, List.last(entries), :after)
+        meta = %{
+          start_cursor: cursor_id(List.first(entries)),
+          end_cursor: cursor_id(List.last(entries)),
+          has_more: %{
+            before:
+              before_page.meta.has_more.before ||
+                has_more(conversation_id, List.first(entries), :before),
+            after:
+              after_page.meta.has_more.after || has_more(conversation_id, List.last(entries), :after)
+          }
         }
-      }
 
-      %{entries: entries, meta: meta}
-    else
-      _ -> list_messages_before(conversation_id, nil, limit)
+        %{entries: entries, meta: meta}
+
+      {:error, _reason} ->
+        list_messages_before(conversation_id, nil, limit)
     end
   end
 
@@ -971,6 +972,42 @@ defmodule Messngr.Chat do
     %{id: profile.id, name: profile.name, mode: profile.mode}
   end
 
+  @doc """
+  Removes expired watcher entries across all conversations and broadcasts
+  updated watcher payloads when changes occur.
+  """
+  @spec purge_stale_watchers() :: {:ok, %{conversations: non_neg_integer(), watchers: non_neg_integer()}}
+  def purge_stale_watchers do
+    table = ensure_watcher_table!()
+    ttl = watcher_ttl_ms()
+    now = current_time_ms()
+
+    removed =
+      table
+      |> :ets.tab2list()
+      |> Enum.reduce(%{}, fn
+        {conversation_id, profile_id, inserted_at}, acc ->
+          if expired_watcher?(inserted_at, now, ttl) do
+            :ets.delete_object(table, {conversation_id, profile_id, inserted_at})
+            Map.update(acc, conversation_id, 1, &(&1 + 1))
+          else
+            acc
+          end
+
+        _other, acc ->
+          acc
+      end)
+
+    Enum.each(Map.keys(removed), fn conversation_id ->
+      payload = watcher_payload(conversation_id)
+      broadcast_watchers(conversation_id, payload)
+    end)
+
+    watchers_removed = Enum.reduce(removed, 0, fn {_conversation_id, count}, acc -> acc + count end)
+
+    {:ok, %{conversations: map_size(removed), watchers: watchers_removed}}
+  end
+
   defp broadcast_watchers(conversation_id, payload) do
     PubSub.broadcast(
       Messngr.PubSub,
@@ -1019,6 +1056,22 @@ defmodule Messngr.Chat do
 
   defp current_time_ms do
     System.system_time(:millisecond)
+  end
+
+  defp fetch_pivot_message(conversation_id, message_id) do
+    case Repo.get(Message, message_id) do
+      %Message{conversation_id: ^conversation_id, deleted_at: nil} = pivot ->
+        {:ok, Repo.preload(pivot, [:profile, receipts: [:recipient, :device]])}
+
+      %Message{conversation_id: ^conversation_id} ->
+        {:error, :deleted}
+
+      %Message{} ->
+        {:error, :mismatched_conversation}
+
+      nil ->
+        {:error, :not_found}
+    end
   end
 
 
@@ -1685,8 +1738,10 @@ defmodule Messngr.Chat do
             }
           end)
 
-        Repo.insert_all(MessageReceipt, entries, on_conflict: :nothing)
-        :ok
+        Retry.run(fn ->
+          Repo.insert_all(MessageReceipt, entries, on_conflict: :nothing)
+          :ok
+        end)
     end
   end
 

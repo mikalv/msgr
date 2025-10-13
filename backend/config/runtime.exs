@@ -51,22 +51,118 @@ bool_env = fn
   value, _default -> String.downcase(value) in ["1", "true", "yes", "on"]
 end
 
-legacy_headers_env = System.get_env("MSGR_WEB_LEGACY_ACTOR_HEADERS")
-
-if legacy_headers_env do
-  allow_legacy_headers = bool_env.(legacy_headers_env, false)
-  config :msgr_web, :legacy_actor_headers, allow_legacy_headers
+blank_to_nil = fn
+  nil -> nil
+  "" -> nil
+  value -> value
 end
 
 port_env = fn
-  nil, default -> default
-  "", default -> default
-  value, _default ->
+  nil, default, _env_name -> default
+  "", default, _env_name -> default
+  value, _default, env_name ->
     case Integer.parse(value) do
       {port, ""} -> port
-      _ -> raise "NOISE_TRANSPORT_PORT must be an integer"
+      _ -> raise "#{env_name} must be an integer"
     end
 end
+
+int_env = fn
+  nil, default, _env_name -> default
+  "", default, _env_name -> default
+  value, _default, env_name ->
+    case Integer.parse(value) do
+      {int, ""} -> int
+      _ -> raise "#{env_name} must be an integer"
+    end
+end
+
+prometheus_config = Application.get_env(:msgr_web, :prometheus, [])
+
+prometheus_enabled =
+  bool_env.(
+    System.get_env("PROMETHEUS_ENABLED"),
+    Keyword.get(prometheus_config, :enabled, true)
+  )
+
+prometheus_port =
+  port_env.(
+    System.get_env("PROMETHEUS_PORT"),
+    Keyword.get(prometheus_config, :port, 9_568),
+    "PROMETHEUS_PORT"
+  )
+
+config :msgr_web, :prometheus,
+  prometheus_config
+  |> Keyword.put(:enabled, prometheus_enabled)
+  |> Keyword.put(:port, prometheus_port)
+
+media_storage_config = Application.get_env(:msgr, Messngr.Media.Storage, [])
+
+media_signing_secret =
+  case blank_to_nil.(System.get_env("MEDIA_SIGNING_SECRET")) do
+    nil ->
+      case blank_to_nil.(Keyword.get(media_storage_config, :signing_secret)) do
+        nil when env in [:dev, :test] -> "dev-secret"
+        nil ->
+          raise "MEDIA_SIGNING_SECRET environment variable is missing."
+
+        secret -> secret
+      end
+
+    secret -> secret
+  end
+
+config :msgr, Messngr.Media.Storage,
+  Keyword.put(media_storage_config, :signing_secret, media_signing_secret)
+
+retention_pruner_config = Application.get_env(:msgr, Messngr.Media.RetentionPruner, [])
+
+pruner_enabled =
+  bool_env.(
+    System.get_env("MEDIA_RETENTION_SWEEP_ENABLED"),
+    Keyword.get(retention_pruner_config, :enabled, true)
+  )
+
+pruner_interval =
+  int_env.(
+    System.get_env("MEDIA_RETENTION_SWEEP_INTERVAL_MS"),
+    Keyword.get(retention_pruner_config, :interval_ms, :timer.minutes(10)),
+    "MEDIA_RETENTION_SWEEP_INTERVAL_MS"
+  )
+
+pruner_batch_size =
+  int_env.(
+    System.get_env("MEDIA_RETENTION_SWEEP_BATCH_SIZE"),
+    Keyword.get(retention_pruner_config, :batch_size, 100),
+    "MEDIA_RETENTION_SWEEP_BATCH_SIZE"
+  )
+
+config :msgr, Messngr.Media.RetentionPruner,
+  retention_pruner_config
+  |> Keyword.put(:enabled, pruner_enabled)
+  |> Keyword.put(:interval_ms, pruner_interval)
+  |> Keyword.put(:batch_size, pruner_batch_size)
+
+watcher_pruner_config = Application.get_env(:msgr, Messngr.Chat.WatcherPruner, [])
+
+watcher_pruner_enabled =
+  bool_env.(
+    System.get_env("CONVERSATION_WATCHER_SWEEP_ENABLED"),
+    Keyword.get(watcher_pruner_config, :enabled, true)
+  )
+
+watcher_pruner_interval =
+  int_env.(
+    System.get_env("CONVERSATION_WATCHER_SWEEP_INTERVAL_MS"),
+    Keyword.get(watcher_pruner_config, :interval_ms, :timer.minutes(1)),
+    "CONVERSATION_WATCHER_SWEEP_INTERVAL_MS"
+  )
+
+config :msgr, Messngr.Chat.WatcherPruner,
+  watcher_pruner_config
+  |> Keyword.put(:enabled, watcher_pruner_enabled)
+  |> Keyword.put(:interval_ms, watcher_pruner_interval)
 
 noise_enabled =
   bool_env.(
@@ -77,7 +173,8 @@ noise_enabled =
 noise_port =
   port_env.(
     System.get_env("NOISE_TRANSPORT_PORT"),
-    Keyword.get(noise_config, :transport_port, 5_443)
+    Keyword.get(noise_config, :transport_port, 5_443),
+    "NOISE_TRANSPORT_PORT"
   )
 
 base_noise_config =

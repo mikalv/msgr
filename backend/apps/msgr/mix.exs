@@ -23,7 +23,7 @@ defmodule Messngr.MixProject do
   def application do
     [
       mod: {Messngr.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools, :hammer]
     ]
   end
 
@@ -50,6 +50,7 @@ defmodule Messngr.MixProject do
       {:postgrex, ">= 0.0.0"},
       {:jason, "~> 1.2"},
       {:swoosh, "~> 1.5"},
+      {:hammer, "~> 6.2"},
       {:finch, "~> 0.13"},
       {:guardian, "~> 2.3.2"},
       {:guardian_db, "~> 3.0"},
