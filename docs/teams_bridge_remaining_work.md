@@ -15,8 +15,9 @@ production tenant.
 ## OAuth & Consent Experience
 - Complete the embedded browser OAuth flow with resource-specific consent prompts when tenants
   require RSC scopes, and surface clear guidance/errors in the linking wizard.
-- Persist refresh tokens in the credential vault and implement automatic renewal with proactive
-  rotation before Graph's expiry window to prevent daemon downtime.
+- Refresh tokens are now persisted in the bridge credential vault and automatically renewed by the
+  Teams bridge daemon; continue wiring the consent UI to surface credential status and revocation
+  controls for operators.
 
 ## Real-time Event Delivery
 - Replace the current long-polling loop with Microsoft Graph change notifications delivered via a

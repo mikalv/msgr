@@ -162,6 +162,14 @@ class TeamsOAuthClientProtocol(Protocol):
     ) -> Mapping[str, object]:
         """Return a mapping containing ``token`` and optional identity fields."""
 
+    async def refresh_token(
+        self,
+        refresh_token: str,
+        *,
+        redirect_uri: Optional[str] = None,
+    ) -> Mapping[str, object]:
+        """Return a refreshed token payload for the supplied ``refresh_token``."""
+
 
 class TeamsGraphClient(TeamsClientProtocol):
     """Microsoft Graph implementation that polls chats for new messages."""
@@ -174,6 +182,7 @@ class TeamsGraphClient(TeamsClientProtocol):
         session: Optional[ClientSession] = None,
         logger: Optional[logging.Logger] = None,
         poll_interval: float = 15.0,
+        token_refresh_margin: float = 120.0,
     ) -> None:
         if session is not None and ClientSession is not None and not isinstance(session, ClientSession):
             raise RuntimeError("session must be an aiohttp.ClientSession instance")
@@ -182,6 +191,7 @@ class TeamsGraphClient(TeamsClientProtocol):
         self._owns_session = session is None
         self._logger = logger or logging.getLogger(__name__)
         self._poll_interval = max(5.0, poll_interval)
+        self._refresh_margin = max(30.0, float(token_refresh_margin))
         self._token: Optional[TeamsToken] = None
         self._tenant: Optional[TeamsTenant] = None
         self._identity: Optional[TeamsIdentity] = None
@@ -198,6 +208,9 @@ class TeamsGraphClient(TeamsClientProtocol):
         self._last_disconnect_at: Optional[float] = None
         self._last_poll_at: Optional[float] = None
         self._consecutive_errors: int = 0
+        self._token_refresher: Optional[Callable[[TeamsToken], Awaitable[TeamsToken]]] = None
+        self._token_update_handler: Optional[Callable[[TeamsToken], Awaitable[None]]] = None
+        self._refresh_lock = asyncio.Lock()
 
     async def connect(self, tenant: TeamsTenant, token: TeamsToken) -> None:
         if aiohttp is None:  # pragma: no cover - exercised in integration tests
@@ -306,12 +319,73 @@ class TeamsGraphClient(TeamsClientProtocol):
         if handler in self._handlers:
             self._handlers.remove(handler)
 
+    def configure_token_refresh(
+        self,
+        refresher: Callable[[TeamsToken], Awaitable[TeamsToken]],
+        on_update: Callable[[TeamsToken], Awaitable[None]],
+        *,
+        margin: Optional[float] = None,
+    ) -> None:
+        """Register callbacks used to refresh expiring OAuth tokens."""
+
+        self._token_refresher = refresher
+        self._token_update_handler = on_update
+        if margin is not None:
+            self._refresh_margin = max(30.0, float(margin))
+
     async def _ensure_session(self) -> None:
         if self._session is None:
             if aiohttp is None:  # pragma: no cover
                 raise RuntimeError("aiohttp is required to create a Teams HTTP session")
             timeout = aiohttp.ClientTimeout(total=60)
             self._session = aiohttp.ClientSession(timeout=timeout)
+
+    async def _ensure_valid_token(self) -> None:
+        token = self._token
+        if token is None or token.refresh_token is None:
+            return
+
+        expires_at = token.expires_at
+        if expires_at is None:
+            return
+
+        now = time.time()
+        if expires_at - now > self._refresh_margin:
+            return
+
+        refresher = self._token_refresher
+        if refresher is None:
+            return
+
+        async with self._refresh_lock:
+            latest = self._token
+            if latest is None:
+                return
+            expires_at = latest.expires_at
+            if expires_at is not None and expires_at - time.time() > self._refresh_margin:
+                return
+
+            try:
+                refreshed = await refresher(latest)
+            except Exception:
+                self._logger.exception("Teams token refresh failed")
+                raise
+
+            if not isinstance(refreshed, TeamsToken):
+                raise RuntimeError("Teams token refresher returned an invalid token payload")
+
+            if refreshed.refresh_token is None and latest.refresh_token is not None:
+                refreshed = TeamsToken(
+                    access_token=refreshed.access_token,
+                    refresh_token=latest.refresh_token,
+                    expires_at=refreshed.expires_at,
+                    token_type=refreshed.token_type,
+                )
+
+            self._token = refreshed
+
+            if self._token_update_handler is not None:
+                await self._token_update_handler(refreshed)
 
     async def _poll_loop(self) -> None:
         try:
@@ -409,6 +483,8 @@ class TeamsGraphClient(TeamsClientProtocol):
         if self._session is None or self._token is None:
             raise RuntimeError("Teams client is not connected")
 
+        await self._ensure_valid_token()
+
         url = f"{self._GRAPH_BASE}{path}"
         headers = {
             "Authorization": f"Bearer {self._token.access_token}",
@@ -425,6 +501,8 @@ class TeamsGraphClient(TeamsClientProtocol):
     async def _post(self, path: str, payload: Mapping[str, object]) -> Mapping[str, object]:
         if self._session is None or self._token is None:
             raise RuntimeError("Teams client is not connected")
+
+        await self._ensure_valid_token()
 
         url = f"{self._GRAPH_BASE}{path}"
         headers = {
@@ -913,6 +991,32 @@ class TeamsOAuthClient(TeamsOAuthClientProtocol):
             payload["redirect_uri"] = redirect_uri
         if code_verifier:
             payload["code_verifier"] = code_verifier
+        if self._client_secret:
+            payload["client_secret"] = self._client_secret
+
+        token_endpoint = f"https://login.microsoftonline.com/{self._tenant}/oauth2/v2.0/token"
+        data = await self._post(token_endpoint, payload)
+        return data
+
+    async def refresh_token(
+        self,
+        refresh_token: str,
+        *,
+        redirect_uri: Optional[str] = None,
+    ) -> Mapping[str, object]:
+        if aiohttp is None and self._session is None:  # pragma: no cover - exercised in integration tests
+            raise RuntimeError("aiohttp is required to refresh Microsoft OAuth tokens")
+
+        await self._ensure_session()
+
+        payload: Dict[str, object] = {
+            "client_id": self._client_id,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+            "scope": self._scope,
+        }
+        if redirect_uri:
+            payload["redirect_uri"] = redirect_uri
         if self._client_secret:
             payload["client_secret"] = self._client_secret
 

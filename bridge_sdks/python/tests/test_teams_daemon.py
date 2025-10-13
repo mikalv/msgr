@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+import time
 from pathlib import Path
 from typing import Awaitable, Callable, Dict, Mapping, Optional
 
@@ -57,6 +58,9 @@ class FakeTeamsClient:
         self.acked: list[str] = []
         self.pending_events = 0
         self.health_calls = 0
+        self.refresh_callback: Optional[Callable[[TeamsToken], Awaitable[TeamsToken]]] = None
+        self.update_callback: Optional[Callable[[TeamsToken], Awaitable[None]]] = None
+        self.refresh_margin: Optional[float] = None
 
     async def connect(self, tenant: TeamsTenant, token: TeamsToken) -> None:
         self.connected = True
@@ -110,6 +114,17 @@ class FakeTeamsClient:
         if handler in self.handlers:
             self.handlers.remove(handler)
 
+    def configure_token_refresh(
+        self,
+        refresher: Callable[[TeamsToken], Awaitable[TeamsToken]],
+        on_update: Callable[[TeamsToken], Awaitable[None]],
+        *,
+        margin: Optional[float] = None,
+    ) -> None:
+        self.refresh_callback = refresher
+        self.update_callback = on_update
+        self.refresh_margin = margin
+
     async def dispatch_event(self, event: Mapping[str, object]) -> None:
         for handler in list(self.handlers):
             await handler(event)
@@ -134,14 +149,45 @@ class FakeClientFactory:
         return self._client
 
 
-def _build_daemon(tmp_path: Path, client: FakeTeamsClient) -> tuple[TeamsBridgeDaemon, MemoryTransport]:
+class FakeOAuthClient:
+    def __init__(self) -> None:
+        self.refresh_calls: list[str] = []
+        self.next_response: Mapping[str, object] = {
+            "access_token": "token-2",
+            "refresh_token": "refresh-2",
+            "expires_in": 3600,
+        }
+
+    async def exchange_code(self, code: str, *, redirect_uri: Optional[str] = None, code_verifier: Optional[str] = None) -> Mapping[str, object]:
+        return {
+            "token": self.next_response,
+            "tenant": {"id": "tenant-1", "display_name": "Acme Corp"},
+        }
+
+    async def refresh_token(self, refresh_token: str, *, redirect_uri: Optional[str] = None) -> Mapping[str, object]:
+        self.refresh_calls.append(refresh_token)
+        return self.next_response
+
+
+def _build_daemon(
+    tmp_path: Path,
+    client: FakeTeamsClient,
+    *,
+    oauth: Optional[FakeOAuthClient] = None,
+) -> tuple[TeamsBridgeDaemon, MemoryTransport, SessionManager]:
     transport = MemoryTransport()
     queue_client = StoneMQClient("teams", transport, instance="tenant-1")
     store = SessionStore(tmp_path / "teams_sessions")
     factory = FakeClientFactory(client)
     sessions = SessionManager(store, factory.create)
-    daemon = TeamsBridgeDaemon(queue_client, sessions, default_user_id="acct-1", instance="tenant-1")
-    return daemon, transport
+    daemon = TeamsBridgeDaemon(
+        queue_client,
+        sessions,
+        default_user_id="acct-1",
+        oauth=oauth,
+        instance="tenant-1",
+    )
+    return daemon, transport, sessions
 
 
 def _run(async_fn: Callable[[], Awaitable[None]]) -> None:
@@ -166,7 +212,7 @@ async def _link_account(daemon: TeamsBridgeDaemon, transport: MemoryTransport) -
 
 def test_link_account_returns_snapshot(tmp_path: Path) -> None:
     client = FakeTeamsClient()
-    daemon, transport = _build_daemon(tmp_path, client)
+    daemon, transport, _sessions = _build_daemon(tmp_path, client)
 
     async def scenario() -> None:
         response = await _link_account(daemon, transport)
@@ -191,7 +237,7 @@ def test_link_account_returns_snapshot(tmp_path: Path) -> None:
 
 def test_link_account_without_token_requires_consent(tmp_path: Path) -> None:
     client = FakeTeamsClient()
-    daemon, transport = _build_daemon(tmp_path, client)
+    daemon, transport, _sessions = _build_daemon(tmp_path, client)
 
     async def scenario() -> None:
         await daemon.start()
@@ -214,7 +260,7 @@ def test_link_account_without_token_requires_consent(tmp_path: Path) -> None:
 
 def test_outbound_message_dispatch(tmp_path: Path) -> None:
     client = FakeTeamsClient()
-    daemon, transport = _build_daemon(tmp_path, client)
+    daemon, transport, _sessions = _build_daemon(tmp_path, client)
 
     async def scenario() -> None:
         await _link_account(daemon, transport)
@@ -238,7 +284,7 @@ def test_outbound_message_dispatch(tmp_path: Path) -> None:
 
 def test_ack_event_invokes_client(tmp_path: Path) -> None:
     client = FakeTeamsClient()
-    daemon, transport = _build_daemon(tmp_path, client)
+    daemon, transport, _sessions = _build_daemon(tmp_path, client)
 
     async def scenario() -> None:
         await _link_account(daemon, transport)
@@ -259,7 +305,7 @@ def test_ack_event_invokes_client(tmp_path: Path) -> None:
 
 def test_health_snapshot_reports_runtime_state(tmp_path: Path) -> None:
     client = FakeTeamsClient()
-    daemon, transport = _build_daemon(tmp_path, client)
+    daemon, transport, _sessions = _build_daemon(tmp_path, client)
 
     async def scenario() -> None:
         await _link_account(daemon, transport)
@@ -289,6 +335,36 @@ def test_health_snapshot_reports_runtime_state(tmp_path: Path) -> None:
         assert snapshot["summary"]["acked_events"] == 1
         assert snapshot["clients"][0]["tenant_id"] == "tenant-1"
         assert snapshot["clients"][0]["pending_events"] == 2
+
+        await daemon.shutdown()
+
+    _run(scenario)
+
+
+def test_token_refresh_updates_session(tmp_path: Path) -> None:
+    client = FakeTeamsClient()
+    oauth = FakeOAuthClient()
+    daemon, transport, sessions = _build_daemon(tmp_path, client, oauth=oauth)
+
+    async def scenario() -> None:
+        response = await _link_account(daemon, transport)
+        assert response["session"]["refresh_token"] == "refresh"
+
+        assert client.refresh_callback is not None
+        assert client.update_callback is not None
+        assert client.token is not None
+
+        refreshed = await client.refresh_callback(client.token)  # type: ignore[arg-type]
+        assert oauth.refresh_calls == ["refresh"]
+
+        await client.update_callback(refreshed)
+
+        stored = sessions.get_session("tenant-1", "acct-1")
+        assert stored is not None
+        assert stored.token.access_token == "token-2"
+        assert stored.token.refresh_token == "refresh-2"
+        assert stored.token.expires_at is not None
+        assert stored.token.expires_at - time.time() > 3000
 
         await daemon.shutdown()
 

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from typing import Dict, Mapping, Optional, Tuple
 
 import pytest
@@ -212,6 +213,68 @@ def test_send_message_sanitises_html_content() -> None:
         _, payload = client.posts[-1]
         assert payload["body"]["contentType"] == "html"
         assert payload["body"]["content"] == '<p>Hello <b>World</b></p>bad<a href="https://ok">ok</a>'
+
+    asyncio.run(_run())
+
+
+def test_token_refresh_invoked_when_expiring() -> None:
+    async def _run() -> None:
+        client = TeamsGraphClient(logger=logging.getLogger("refresh"), token_refresh_margin=45.0)
+        client._token = TeamsToken(  # type: ignore[protected-access]
+            access_token="old",
+            refresh_token="refresh",
+            expires_at=time.time() + 10,
+        )
+
+        refreshed_tokens: list[TeamsToken] = []
+        updated_tokens: list[TeamsToken] = []
+
+        async def refresher(current: TeamsToken) -> TeamsToken:
+            refreshed_tokens.append(current)
+            return TeamsToken(
+                access_token="new",
+                refresh_token="refresh-2",
+                expires_at=time.time() + 3600,
+            )
+
+        async def on_update(updated: TeamsToken) -> None:
+            updated_tokens.append(updated)
+
+        client.configure_token_refresh(refresher, on_update, margin=30.0)
+        await client._ensure_valid_token()  # type: ignore[attr-defined]
+
+        assert client._token is not None  # type: ignore[truthy-bool]
+        assert client._token.access_token == "new"  # type: ignore[union-attr]
+        assert refreshed_tokens and refreshed_tokens[0].access_token == "old"
+        assert updated_tokens and updated_tokens[0].access_token == "new"
+
+    asyncio.run(_run())
+
+
+def test_token_refresh_skipped_when_not_needed() -> None:
+    async def _run() -> None:
+        client = TeamsGraphClient(logger=logging.getLogger("refresh-skip"), token_refresh_margin=45.0)
+        client._token = TeamsToken(  # type: ignore[protected-access]
+            access_token="token",
+            refresh_token="refresh",
+            expires_at=time.time() + 3600,
+        )
+
+        refreshed: list[TeamsToken] = []
+
+        async def refresher(current: TeamsToken) -> TeamsToken:
+            refreshed.append(current)
+            return current
+
+        async def on_update(updated: TeamsToken) -> None:
+            raise AssertionError("token should not be updated when not expiring")
+
+        client.configure_token_refresh(refresher, on_update, margin=30.0)
+        await client._ensure_valid_token()  # type: ignore[attr-defined]
+
+        assert client._token is not None  # type: ignore[truthy-bool]
+        assert client._token.access_token == "token"  # type: ignore[union-attr]
+        assert refreshed == []
 
     asyncio.run(_run())
 

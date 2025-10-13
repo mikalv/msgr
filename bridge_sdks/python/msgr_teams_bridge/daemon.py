@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import time
 from typing import Dict, Mapping, MutableMapping, Optional
 
 from msgr_bridge_sdk import Envelope, StoneMQClient, build_envelope
@@ -42,6 +43,9 @@ class TeamsBridgeDaemon:
         self._event_handlers: Dict[str, object] = {}
         self._ack_state: Dict[str, Mapping[str, object]] = {}
         self._logger = logging.getLogger(__name__)
+
+        if oauth is not None:
+            sessions.set_token_refresher(self._refresh_session_token)
 
         self._client.register("outbound_message", self._handle_outbound_message)
         self._client.register("ack_event", self._handle_ack_event)
@@ -120,6 +124,27 @@ class TeamsBridgeDaemon:
         conversations = await client.list_conversations()
 
         return self._build_linked_response(identity, session, capabilities, members, conversations)
+
+    async def _refresh_session_token(self, tenant: TeamsTenant, token: TeamsToken) -> TeamsToken:
+        if self._oauth is None:
+            raise RuntimeError("Teams OAuth client is not configured for token refresh")
+        if token.refresh_token is None:
+            raise RuntimeError("Teams token does not include a refresh_token")
+
+        payload = await self._oauth.refresh_token(token.refresh_token)
+        refreshed = _extract_token(payload) if isinstance(payload, Mapping) else None
+        if refreshed is None:
+            raise RuntimeError("Teams OAuth refresh did not return a valid token")
+
+        if refreshed.refresh_token is None and token.refresh_token is not None:
+            refreshed = TeamsToken(
+                access_token=refreshed.access_token,
+                refresh_token=token.refresh_token,
+                expires_at=refreshed.expires_at,
+                token_type=refreshed.token_type,
+            )
+
+        return refreshed
 
     async def _handle_outbound_message(self, envelope: Envelope) -> None:
         metadata = envelope.metadata
@@ -291,13 +316,32 @@ def _extract_token(payload: Mapping[str, object]) -> Optional[TeamsToken]:
         token_map = payload.get("token") if isinstance(payload.get("token"), Mapping) else payload
         access_token = token_map.get("access_token") if isinstance(token_map, Mapping) else None
         refresh_token = token_map.get("refresh_token") if isinstance(token_map, Mapping) else None
+        expires_at_value = None
         expires_at = token_map.get("expires_at") if isinstance(token_map, Mapping) else None
+        expires_in = token_map.get("expires_in") if isinstance(token_map, Mapping) else None
+        ext_expires_in = token_map.get("ext_expires_in") if isinstance(token_map, Mapping) else None
+        expires_on = token_map.get("expires_on") if isinstance(token_map, Mapping) else None
+        now = time.time()
+
+        if isinstance(expires_at, (int, float)):
+            expires_at_value = float(expires_at)
+        elif isinstance(expires_at, str) and expires_at.isdigit():
+            expires_at_value = float(expires_at)
+
+        for candidate in (expires_in, ext_expires_in):
+            if isinstance(candidate, (int, float)):
+                expires_at_value = now + float(candidate)
+                break
+
+        if expires_at_value is None and isinstance(expires_on, str) and expires_on.isdigit():
+            expires_at_value = float(expires_on)
+
         token_type = token_map.get("token_type") if isinstance(token_map, Mapping) else None
         if isinstance(access_token, str) and access_token:
             return TeamsToken(
                 access_token=access_token,
                 refresh_token=str(refresh_token) if isinstance(refresh_token, str) else None,
-                expires_at=float(expires_at) if isinstance(expires_at, (int, float)) else None,
+                expires_at=expires_at_value,
                 token_type=str(token_type) if isinstance(token_type, str) else "Bearer",
             )
         if isinstance(payload.get("access_token"), str):

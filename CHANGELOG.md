@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added Microsoft Teams OAuth refresh handling that renews access tokens before expiry via the
+  bridge daemon, persists refreshed credentials through the session manager, and exercises the
+  new refresh flow with runtime tests covering the client, daemon, and credential vault updates.
 - Wired the Slack and Microsoft Teams bridge health snapshots into queue request handlers,
   exposed connector helpers for retrieving runtime metrics, and introduced an Elixir
   `Messngr.Bridges.HealthReporter` that polls bridges and emits telemetry so operations
