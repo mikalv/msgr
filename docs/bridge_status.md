@@ -26,6 +26,33 @@ before we can run them against the real networks.
 - **Operational blockers**: Requires migration deployment and configuration of the public base URL.
   Production should place the static file host behind TLS/CDN before sharing links publicly.
 
+## Slack
+- **Code status**: The Elixir connector in `Msgr.Connectors.SlackBridge` wires link, outbound, and
+  acknowledgement flows to StoneMQ while persisting workspace snapshots in `Messngr.Bridges` with
+  session secrets redirected into the credential vault; the Python daemon
+  (`bridge_sdks/python/msgr_slack_bridge`) ships a full RTM/Web API client, session manager, and
+  queue handlers with unit tests covering linking, messaging, and event delivery.
+- **Missing work**: Implement the embedded-browser token capture flow described in
+  `docs/slack_token_capture_plan.md`, translate RTM events into Msgr's canonical message schema, add
+  integration tests against live Slack workspaces, and productise session-vault rotation so
+  operators can revoke and refresh Slack authorisations without manual database surgery.
+- **Operational blockers**: Requires production Slack app credentials, daemon deployment with
+  `aiohttp`, and network egress approval; until the browser capture flow exists operators must mint
+  tokens manually.
+
+## Microsoft Teams
+- **Code status**: `Msgr.Connectors.TeamsBridge` exposes multi-instance linking/outbound routing and
+  syncs capabilities into the bridge store while storing OAuth session tokens in the credential
+  vault, and `bridge_sdks/python/msgr_teams_bridge` provides a Microsoft Graph client, polling
+  daemon, and session manager with unit coverage for link, send, and acknowledgement flows.
+- **Missing work**: Finish the OAuth consent UI/embedded browser handshake (resource-specific
+  consent when required), add scheduled renewal for vault-backed refresh tokens, replace long-polling
+  with change-notification/webhook ingestion, stand up proactive throttling/backoff for Graph API
+  limits, and add end-to-end tests against a tenant sandbox.
+- **Operational blockers**: Needs Azure AD application registration, tenant admin consent for the
+  required scopes, and hosted webhook infrastructure (or long-running pollers) before production
+  rollout.
+
 ## Matrix & IRC
 - **Code status**: Only planning material exists in `docs/matrix_irc_bridge_blueprint.md`; there are
   no daemon packages or protocol adapters in `bridge_sdks`. The queue helpers in the Go SDK are the
@@ -63,6 +90,15 @@ before we can run them against the real networks.
   media placeholders.
 - **Operational blockers**: Without a real client implementation the daemon cannot pair or send any
   WhatsApp traffic.
+
+## Slack and Teams readiness summary
+- **Current position**: Both connectors have queue-facing facades, daemons, and credential-vault
+  storage, enabling local unit tests to cover link, send, and acknowledgement flows.
+- **Remaining gaps before merge**: Browser-driven OAuth/token capture workstreams must land for both
+  services, runtime schemas require validation against production message formats, and we still lack
+  live integration tests exercising the bridges against real Slack workspaces or Microsoft 365
+  tenants. Operational runbooks for token rotation, throttling, and webhook/change-notification
+  infrastructure also need to be authored.
 
 - **Code status**: The bridge now ships with a REST client that targets `signal-cli-rest-api`,
   handling account linking, outbound messaging with attachment uploads, inbound polling, and

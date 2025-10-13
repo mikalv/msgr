@@ -1,6 +1,20 @@
 # Changelog
 
 ## Unreleased
+- Expanded `docs/bridge_status.md` with a Slack/Teams readiness summary and additional bridge
+  hardening tasks so stakeholders know what remains before the connectors can merge and ship.
+- Stored Slack and Microsoft Teams bridge session tokens in the credential vault via a shared
+  `Msgr.Connectors.SessionVault` helper so database snapshots no longer persist plaintext tokens and
+  connector tests verify credential vault usage.
+- Documented outstanding Slack and Microsoft Teams bridge work in `docs/bridge_status.md` so the
+  new connectors have clear next steps before production rollout.
+- Added Python Slack and Microsoft Teams bridge daemons with session managers,
+  queue handlers, and comprehensive unit tests alongside documentation covering
+  Slack token capture and Teams API behaviour so the new connectors have working
+  end-to-end bridge workers ready for integration.
+- Added Slack and Microsoft Teams bridge connectors with multi-instance routing,
+  catalog updates, and queue facades so multiple workspaces/tenants can link to
+  a single Msgr account with full test coverage.
 - Added a bridge unlink API with catalog status annotations and Flutter disconnect
   controls so users can safely log out of connected bridges and refresh the list
   of available connectors without technical steps.
@@ -238,6 +252,17 @@
 - La til Cupertino-inspirerte kontaktvisninger i Flutter-klienten (liste, detalj og redigering),
   systemkontakt-import via `flutter_contacts` og nye widgettester for flyten.
 ## [Unreleased]
+
+### Added
+- Introduced production-ready Slack RTM bridge client with Web API integrations,
+  websocket event streaming, and OAuth code exchange helpers.
+- Added Microsoft Teams Graph bridge client with polling-based change
+  notifications, messaging helpers, and OAuth exchange support.
+
+### Changed
+- Extended bridge SDK test coverage with runtime unit tests for the Slack and
+  Teams clients, verifying identity sync, messaging, and inbound event
+  propagation behaviour.
 ### Added
 - Konsolidert produktplan og forskningsoppsummering med fokus på chat-MVP, identitet og arkitektur.
 - Ny domenemodell på backend for kontoer, profiler, samtaler og meldinger med REST API for chat.

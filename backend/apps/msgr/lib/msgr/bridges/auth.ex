@@ -182,22 +182,53 @@ defmodule Messngr.Bridges.Auth do
     end
 
     @doc false
-    def slack_preview do
+    def slack do
       %__MODULE__{
         id: "slack",
         service: "slack",
-        display_name: "Slack (preview)",
-        description: "Preview connector for Slack workspaces focusing on channel mirroring.",
-        status: :coming_soon,
+        display_name: "Slack",
+        description: "Connect Slack workspaces with multi-channel sync and thread support.",
+        status: :available,
         categories: ["work"],
         prerequisites: ["Slack workspace admin consent"],
-        tags: ["oauth"],
+        tags: ["oauth", "multi-tenant"],
         auth: %{
           method: "oauth",
           auth_surface: "embedded_browser",
           oauth: %{
             scopes: ["channels:read", "channels:history", "chat:write"],
-            pkce: true
+            pkce: true,
+            allow_multiple: true
+          }
+        },
+        capabilities: %{
+          messaging: %{
+            directions: ["inbound", "outbound"],
+            media: ["text", "file"],
+            threads: true
+          }
+        }
+      }
+    end
+
+    @doc false
+    def teams do
+      %__MODULE__{
+        id: "teams",
+        service: "teams",
+        display_name: "Microsoft Teams",
+        description: "Sync Microsoft Teams chats and channels across tenants with Msgr.",
+        status: :available,
+        categories: ["work"],
+        prerequisites: ["Azure AD admin consent"],
+        tags: ["oauth", "multi-tenant"],
+        auth: %{
+          method: "oauth",
+          auth_surface: "embedded_browser",
+          oauth: %{
+            scopes: ["Chat.ReadWrite", "ChannelMessage.Send", "Group.Read.All"],
+            pkce: true,
+            allow_multiple: true
           }
         },
         capabilities: %{
@@ -222,7 +253,8 @@ defmodule Messngr.Bridges.Auth do
     CatalogEntry.signal(),
     CatalogEntry.matrix(),
     CatalogEntry.irc(),
-    CatalogEntry.slack_preview()
+    CatalogEntry.slack(),
+    CatalogEntry.teams()
   ]
 
   @catalog_lookup Map.new(@catalog, &{&1.id, &1})

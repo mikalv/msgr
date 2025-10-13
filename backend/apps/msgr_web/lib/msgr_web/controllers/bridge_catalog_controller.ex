@@ -28,7 +28,7 @@ defmodule MessngrWeb.BridgeCatalogController do
        when is_binary(account_id) do
     account_id
     |> Bridges.list_accounts()
-    |> Map.new(&{&1.service, &1})
+    |> Enum.group_by(& &1.service)
   end
 
   defp current_linked_accounts(_conn), do: %{}
