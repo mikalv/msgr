@@ -1,6 +1,11 @@
 # Changelog
 
 ## Unreleased
+- Normalised Slack RTM and Microsoft Teams Graph events into Msgr's canonical
+  message schema, covering message edits, deletions, reactions, attachments,
+  mentions, and thread metadata so downstream consumers receive structured
+  payloads with consistent fields across bridges. Added comprehensive unit
+  tests for the new event mappers.
 - Added `docs/slack_bridge_remaining_work.md` and `docs/teams_bridge_remaining_work.md` summarising
   the remaining Slack and Microsoft Teams bridge workstreams so contributors know which operational
   and product gaps to close before production pilots.

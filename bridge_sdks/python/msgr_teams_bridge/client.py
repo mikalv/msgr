@@ -307,13 +307,12 @@ class TeamsGraphClient(TeamsClientProtocol):
                 self._last_message_ts[chat_id] = timestamp
 
     async def _dispatch_event(self, chat_id: str, message: Mapping[str, object]) -> None:
-        payload: Dict[str, object] = dict(message)
-        payload.setdefault("event_id", str(message.get("id") or f"{chat_id}:{message.get('createdDateTime')}") )
-        payload.setdefault("chat_id", chat_id)
-        payload.setdefault("tenant_id", self._tenant.id if self._tenant else None)
+        event = _normalise_chat_event(self._tenant, chat_id, message)
+        if event is None:
+            return
         for handler in list(self._handlers):
             try:
-                await handler(payload)
+                await handler(event)
             except Exception:  # pragma: no cover - handler failures logged for ops
                 self._logger.exception("Teams handler raised")
 
@@ -365,6 +364,223 @@ class TeamsGraphClient(TeamsClientProtocol):
                     if isinstance(item, Mapping):
                         yield item
             next_link = data.get("@odata.nextLink") if isinstance(data.get("@odata.nextLink"), str) else None
+
+
+def _normalise_chat_event(
+    tenant: Optional[TeamsTenant], chat_id: str, message: Mapping[str, object]
+) -> Optional[Dict[str, object]]:
+    if not isinstance(message, Mapping):
+        return None
+
+    message_id = message.get("id") or message.get("messageId")
+    if not isinstance(message_id, (str, int)):
+        return None
+    message_id_str = str(message_id)
+
+    conversation = _compact_dict(
+        {
+            "id": chat_id,
+            "tenant_id": tenant.id if tenant else None,
+            "channel_identity": _normalise_channel_identity(message.get("channelIdentity")),
+        }
+    )
+
+    message_payload = _compact_dict(
+        {
+            "id": message_id_str,
+            "message_type": message.get("messageType"),
+            "subject": message.get("subject"),
+            "summary": message.get("summary"),
+            "reply_to_id": _as_str(message.get("replyToId")),
+            "importance": message.get("importance"),
+            "body": _normalise_graph_body(message.get("body")),
+            "from": _normalise_graph_from(message.get("from")),
+            "created_at": message.get("createdDateTime"),
+            "last_modified_at": message.get("lastModifiedDateTime"),
+            "attachments": _normalise_graph_attachments(message.get("attachments")),
+            "mentions": _normalise_graph_mentions(message.get("mentions")),
+            "reactions": _normalise_graph_reactions(message.get("reactions")),
+            "etag": message.get("etag"),
+            "web_url": message.get("webUrl"),
+        }
+    )
+
+    event = _compact_dict(
+        {
+            "event_id": message_id_str,
+            "event_type": "message",
+            "tenant_id": tenant.id if tenant else None,
+            "chat_id": chat_id,
+            "conversation": conversation if conversation else None,
+            "message": message_payload if message_payload else None,
+        }
+    )
+    return event if event else None
+
+
+def _normalise_graph_body(body: object) -> Optional[Dict[str, object]]:
+    if not isinstance(body, Mapping):
+        return None
+    return _compact_dict(
+        {
+            "content": body.get("content"),
+            "content_type": body.get("contentType"),
+        }
+    )
+
+
+def _normalise_graph_attachments(attachments: object) -> Optional[list[Mapping[str, object]]]:
+    if not isinstance(attachments, list):
+        return None
+    normalised: list[Mapping[str, object]] = []
+    for attachment in attachments:
+        if not isinstance(attachment, Mapping):
+            continue
+        normalised_attachment = _compact_dict(
+            {
+                "id": _as_str(attachment.get("id")),
+                "content_type": attachment.get("contentType"),
+                "content_url": attachment.get("contentUrl"),
+                "name": attachment.get("name"),
+                "content": attachment.get("content"),
+                "content_bytes": attachment.get("contentBytes"),
+                "content_location": attachment.get("contentLocation"),
+                "thumbnail_url": attachment.get("thumbnailUrl"),
+                "size": attachment.get("size"),
+            }
+        )
+        if normalised_attachment:
+            normalised.append(normalised_attachment)
+    return normalised or None
+
+
+def _normalise_graph_mentions(mentions: object) -> Optional[list[Mapping[str, object]]]:
+    if not isinstance(mentions, list):
+        return None
+    normalised: list[Mapping[str, object]] = []
+    for mention in mentions:
+        if not isinstance(mention, Mapping):
+            continue
+        mentioned = mention.get("mentioned")
+        mentioned_entity: Optional[Dict[str, object]] = None
+        if isinstance(mentioned, Mapping):
+            user = mentioned.get("user")
+            application = mentioned.get("application")
+            if isinstance(user, Mapping):
+                mentioned_entity = _compact_dict(
+                    {
+                        "type": "user",
+                        "id": user.get("id"),
+                        "display_name": user.get("displayName"),
+                        "user_identity_type": user.get("userIdentityType"),
+                    }
+                )
+            elif isinstance(application, Mapping):
+                mentioned_entity = _compact_dict(
+                    {
+                        "type": "application",
+                        "id": application.get("id"),
+                        "display_name": application.get("displayName"),
+                    }
+                )
+        normalised_mention = _compact_dict(
+            {
+                "id": _as_str(mention.get("id")),
+                "text": mention.get("mentionText"),
+                "mentioned": mentioned_entity,
+            }
+        )
+        if normalised_mention:
+            normalised.append(normalised_mention)
+    return normalised or None
+
+
+def _normalise_graph_reactions(reactions: object) -> Optional[list[Mapping[str, object]]]:
+    if not isinstance(reactions, list):
+        return None
+    normalised: list[Mapping[str, object]] = []
+    for reaction in reactions:
+        if not isinstance(reaction, Mapping):
+            continue
+        user_info = reaction.get("user")
+        normalised_user = _normalise_graph_from(user_info)
+        normalised_reaction = _compact_dict(
+            {
+                "type": reaction.get("reactionType"),
+                "created_at": reaction.get("createdDateTime"),
+                "user": normalised_user,
+            }
+        )
+        if normalised_reaction:
+            normalised.append(normalised_reaction)
+    return normalised or None
+
+
+def _normalise_graph_from(entity: object) -> Optional[Dict[str, object]]:
+    if not isinstance(entity, Mapping):
+        return None
+    user = entity.get("user")
+    application = entity.get("application")
+    device = entity.get("device")
+    normalised: Dict[str, object] = {}
+    if isinstance(user, Mapping):
+        normalised["user"] = _compact_dict(
+            {
+                "id": user.get("id"),
+                "display_name": user.get("displayName"),
+                "user_identity_type": user.get("userIdentityType"),
+                "tenant_id": user.get("tenantId"),
+            }
+        )
+    if isinstance(application, Mapping):
+        normalised["application"] = _compact_dict(
+            {
+                "id": application.get("id"),
+                "display_name": application.get("displayName"),
+            }
+        )
+    if isinstance(device, Mapping):
+        normalised["device"] = _compact_dict(
+            {
+                "id": device.get("id"),
+                "display_name": device.get("displayName"),
+            }
+        )
+    return normalised or None
+
+
+def _normalise_channel_identity(identity: object) -> Optional[Dict[str, object]]:
+    if not isinstance(identity, Mapping):
+        return None
+    return _compact_dict(
+        {
+            "team_id": identity.get("teamId"),
+            "channel_id": identity.get("channelId"),
+            "tenant_id": identity.get("tenantId"),
+        }
+    )
+
+
+def _compact_dict(values: Mapping[str, object | None]) -> Dict[str, object]:
+    compacted: Dict[str, object] = {}
+    for key, value in values.items():
+        if value is None:
+            continue
+        if isinstance(value, str) and value == "":
+            continue
+        if isinstance(value, (list, tuple)) and not value:
+            continue
+        if isinstance(value, Mapping) and not value:
+            continue
+        compacted[key] = value
+    return compacted
+
+
+def _as_str(value: object) -> Optional[str]:
+    if isinstance(value, (str, int, float)):
+        text = str(value)
+        return text if text else None
+    return None
 
 
 class TeamsOAuthClient(TeamsOAuthClientProtocol):

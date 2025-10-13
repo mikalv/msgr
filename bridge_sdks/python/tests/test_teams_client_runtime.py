@@ -130,7 +130,38 @@ def test_send_message_and_poll_event(monkeypatch) -> None:
             f"/chats/chat1/messages",
             {
                 "value": [
-                    {"id": "msg1", "createdDateTime": "2024-01-01T00:00:00Z", "body": {"content": "hi"}},
+                    {
+                        "id": "msg1",
+                        "createdDateTime": "2024-01-01T00:00:00Z",
+                        "lastModifiedDateTime": "2024-01-01T00:00:10Z",
+                        "body": {"content": "<p>hi</p>", "contentType": "html"},
+                        "summary": "hi",
+                        "replyToId": "parent1",
+                        "from": {"user": {"id": "user2", "displayName": "Bob"}},
+                        "attachments": [
+                            {
+                                "id": "att1",
+                                "contentType": "image/png",
+                                "contentUrl": "https://cdn.example/img.png",
+                                "name": "img.png",
+                                "size": 123,
+                            }
+                        ],
+                        "mentions": [
+                            {
+                                "id": 0,
+                                "mentionText": "@Alice",
+                                "mentioned": {"user": {"id": "user1", "displayName": "Alice"}},
+                            }
+                        ],
+                        "reactions": [
+                            {
+                                "reactionType": "like",
+                                "createdDateTime": "2024-01-01T00:00:05Z",
+                                "user": {"user": {"id": "user3", "displayName": "Charlie"}},
+                            }
+                        ],
+                    }
                 ]
             },
             params={"$top": 20, "$orderby": "lastModifiedDateTime asc"},
@@ -147,6 +178,10 @@ def test_send_message_and_poll_event(monkeypatch) -> None:
         await client.send_message("chat1", {"body": {"contentType": "text", "content": "reply"}})
 
         assert events[0]["event_id"] == "msg1"
+        assert events[0]["event_type"] == "message"
+        assert events[0]["message"]["body"]["content_type"] == "html"
+        assert events[0]["message"]["attachments"][0]["name"] == "img.png"
+        assert events[0]["message"]["mentions"][0]["text"] == "@Alice"
         assert client.posts[-1][0] == "/chats/chat1/messages"
 
     asyncio.run(_run())

@@ -524,22 +524,305 @@ def _normalise_event(payload: Mapping[str, object]) -> Optional[Dict[str, object
     if not isinstance(payload, Mapping):
         return None
 
-    event_payload: Mapping[str, object]
-    if isinstance(payload.get("event"), Mapping):
-        event_payload = payload["event"]  # type: ignore[index]
-    else:
-        event_payload = payload
-
+    event_payload = payload.get("event") if isinstance(payload.get("event"), Mapping) else payload
     if not isinstance(event_payload, Mapping):
         return None
 
-    event_id = event_payload.get("event_ts") or event_payload.get("ts") or payload.get("event_id")
-    if event_id is None:
-        event_id = str(time.time())
+    event_type = str(event_payload.get("type") or payload.get("type") or "")
 
-    event: Dict[str, object] = dict(event_payload)
-    event.setdefault("event_id", str(event_id))
-    event.setdefault("type", payload.get("type"))
-    if payload.get("team") and "team" not in event:
-        event["team"] = payload["team"]  # type: ignore[index]
+    if event_type == "message":
+        return _normalise_message_event(payload, event_payload)
+    if event_type in {"reaction_added", "reaction_removed"}:
+        return _normalise_reaction_event(payload, event_payload)
+
+    return _base_event(payload, event_payload)
+
+
+def _normalise_message_event(
+    wrapper: Mapping[str, object], event_payload: Mapping[str, object]
+) -> Optional[Dict[str, object]]:
+    message_payload = event_payload.get("message") if isinstance(event_payload.get("message"), Mapping) else event_payload
+    previous_message = event_payload.get("previous_message")
+
+    event = _base_event(wrapper, event_payload)
+    event["event_type"] = "message"
+
+    channel_id = _extract_channel_id(event_payload, message_payload)
+    team_id = _extract_team_id(wrapper, event_payload, message_payload)
+
+    message = _normalise_message_payload(message_payload)
+    if message:
+        event.setdefault("message", message)
+        if message.get("ts"):
+            event.setdefault("ts", message["ts"])  # type: ignore[index]
+        if message.get("thread_ts"):
+            event.setdefault("thread_ts", message["thread_ts"])  # type: ignore[index]
+
+    conversation = _compact(
+        {
+            "id": channel_id,
+            "team_id": team_id,
+            "type": event_payload.get("channel_type"),
+            "thread_ts": message.get("thread_ts") if message else None,
+        }
+    )
+    if conversation:
+        event["conversation"] = conversation
+
+    if channel_id:
+        event["channel_id"] = channel_id
+    if team_id:
+        event["team_id"] = team_id
+
+    subtype = event_payload.get("subtype")
+    if isinstance(subtype, str) and subtype:
+        event["subtype"] = subtype
+
+    if isinstance(previous_message, Mapping):
+        event["previous_message"] = _normalise_message_payload(previous_message)
+
+    if subtype == "message_changed":
+        event["change_type"] = "edited"
+    elif subtype == "message_deleted":
+        event["change_type"] = "deleted"
+        deleted_ts = event_payload.get("deleted_ts")
+        if deleted_ts is not None:
+            event["deleted_ts"] = str(deleted_ts)
+        if "message" not in event:
+            event["message"] = {}
+
+    return event if event else None
+
+
+def _normalise_reaction_event(
+    wrapper: Mapping[str, object], event_payload: Mapping[str, object]
+) -> Dict[str, object]:
+    event = _base_event(wrapper, event_payload)
+    event_type = str(event_payload.get("type") or "reaction")
+    event["event_type"] = "reaction"
+    event["reaction"] = event_payload.get("reaction")
+    event["action"] = "added" if event_type == "reaction_added" else "removed"
+    user_id = event_payload.get("user")
+    if isinstance(user_id, (str, int)):
+        event["user_id"] = str(user_id)
+    item_user = event_payload.get("item_user")
+    if isinstance(item_user, (str, int)):
+        event["item_user"] = str(item_user)
+
+    item = event_payload.get("item")
+    normalised_item = _compact(
+        {
+            "type": item.get("type") if isinstance(item, Mapping) else None,
+            "channel": _ensure_str(item.get("channel")) if isinstance(item, Mapping) else None,
+            "ts": _ensure_str(item.get("ts")) if isinstance(item, Mapping) else None,
+        }
+    )
+    if normalised_item:
+        event["item"] = normalised_item
+
+    channel_id = _extract_channel_id(event_payload, item if isinstance(item, Mapping) else None)
+    team_id = _extract_team_id(wrapper, event_payload)
+    if channel_id:
+        event["channel_id"] = channel_id
+    if team_id:
+        event["team_id"] = team_id
+
     return event
+
+
+def _base_event(
+    wrapper: Mapping[str, object], event_payload: Mapping[str, object]
+) -> Dict[str, object]:
+    event_id = _extract_event_id(wrapper, event_payload)
+    event: Dict[str, object] = {"event_id": event_id}
+    wrapper_type = wrapper.get("type")
+    if isinstance(wrapper_type, str) and wrapper_type:
+        event["callback_type"] = wrapper_type
+    team_id = _extract_team_id(wrapper, event_payload)
+    if team_id:
+        event["team_id"] = team_id
+    return event
+
+
+def _extract_event_id(
+    wrapper: Mapping[str, object], event_payload: Mapping[str, object]
+) -> str:
+    candidates: list[object] = [
+        event_payload.get("event_ts"),
+        event_payload.get("ts"),
+        wrapper.get("event_id"),
+    ]
+    message = event_payload.get("message")
+    if isinstance(message, Mapping):
+        candidates.extend(
+            [message.get("event_ts"), message.get("ts"), message.get("client_msg_id")]
+        )
+    for candidate in candidates:
+        if isinstance(candidate, (str, int, float)) and str(candidate):
+            return str(candidate)
+    return str(time.time())
+
+
+def _extract_team_id(
+    *sources: Mapping[str, object] | None,
+) -> Optional[str]:
+    for source in sources:
+        if not isinstance(source, Mapping):
+            continue
+        team = source.get("team") or source.get("team_id")
+        if isinstance(team, (str, int)) and str(team):
+            return str(team)
+    return None
+
+
+def _extract_channel_id(
+    event_payload: Mapping[str, object],
+    message_payload: Mapping[str, object] | None = None,
+) -> Optional[str]:
+    channel = event_payload.get("channel")
+    if isinstance(channel, Mapping):
+        channel = channel.get("id")
+    if not channel and isinstance(message_payload, Mapping):
+        channel = message_payload.get("channel")
+    item = event_payload.get("item")
+    if not channel and isinstance(item, Mapping):
+        channel = item.get("channel")
+    if isinstance(channel, (str, int)) and str(channel):
+        return str(channel)
+    return None
+
+
+def _normalise_message_payload(message: Mapping[str, object]) -> Dict[str, object]:
+    if not isinstance(message, Mapping):
+        return {}
+
+    payload = _compact(
+        {
+            "id": _ensure_str(
+                message.get("client_msg_id") or message.get("id") or message.get("ts")
+            ),
+            "ts": _ensure_str(message.get("ts")),
+            "text": message.get("text"),
+            "user": _ensure_str(message.get("user")),
+            "bot_id": _ensure_str(message.get("bot_id")),
+            "team": _ensure_str(message.get("team")),
+            "thread_ts": _ensure_str(message.get("thread_ts")),
+            "parent_user_id": _ensure_str(message.get("parent_user_id")),
+            "app_id": _ensure_str(message.get("app_id")),
+            "reply_broadcast": bool(message.get("reply_broadcast"))
+            if "reply_broadcast" in message
+            else None,
+            "metadata": dict(message.get("metadata", {}))
+            if isinstance(message.get("metadata"), Mapping)
+            else None,
+            "blocks": [block for block in message.get("blocks", []) if isinstance(block, Mapping)]
+            if isinstance(message.get("blocks"), list)
+            else None,
+            "attachments": _normalise_attachments(message.get("attachments")),
+            "files": _normalise_files(message.get("files")),
+            "reactions": _normalise_message_reactions(message.get("reactions")),
+            "edited": dict(message.get("edited"))
+            if isinstance(message.get("edited"), Mapping)
+            else None,
+        }
+    )
+    return payload
+
+
+def _normalise_attachments(attachments: object) -> Optional[list[Mapping[str, object]]]:
+    if not isinstance(attachments, list):
+        return None
+    normalised: list[Mapping[str, object]] = []
+    for attachment in attachments:
+        if not isinstance(attachment, Mapping):
+            continue
+        normalised_attachment = _compact(
+            {
+                "id": _ensure_str(attachment.get("id")),
+                "fallback": attachment.get("fallback"),
+                "text": attachment.get("text"),
+                "title": attachment.get("title"),
+                "pretext": attachment.get("pretext"),
+                "color": attachment.get("color"),
+                "fields": [field for field in attachment.get("fields", []) if isinstance(field, Mapping)]
+                if isinstance(attachment.get("fields"), list)
+                else None,
+                "author_name": attachment.get("author_name"),
+                "author_link": attachment.get("author_link"),
+                "author_icon": attachment.get("author_icon"),
+                "thumb_url": attachment.get("thumb_url") or attachment.get("thumb_360"),
+                "footer": attachment.get("footer"),
+                "ts": _ensure_str(attachment.get("ts")),
+            }
+        )
+        if normalised_attachment:
+            normalised.append(normalised_attachment)
+    return normalised or None
+
+
+def _normalise_files(files: object) -> Optional[list[Mapping[str, object]]]:
+    if not isinstance(files, list):
+        return None
+    normalised: list[Mapping[str, object]] = []
+    for entry in files:
+        if not isinstance(entry, Mapping):
+            continue
+        normalised_file = _compact(
+            {
+                "id": _ensure_str(entry.get("id")),
+                "name": entry.get("name"),
+                "title": entry.get("title"),
+                "mimetype": entry.get("mimetype"),
+                "filetype": entry.get("filetype"),
+                "size": entry.get("size"),
+                "permalink": entry.get("permalink"),
+                "url_private": entry.get("url_private"),
+                "url_private_download": entry.get("url_private_download"),
+                "thumb_url": entry.get("thumb_360"),
+            }
+        )
+        if normalised_file:
+            normalised.append(normalised_file)
+    return normalised or None
+
+
+def _normalise_message_reactions(reactions: object) -> Optional[list[Mapping[str, object]]]:
+    if not isinstance(reactions, list):
+        return None
+    normalised: list[Mapping[str, object]] = []
+    for reaction in reactions:
+        if not isinstance(reaction, Mapping):
+            continue
+        users = reaction.get("users") if isinstance(reaction.get("users"), list) else []
+        normalised_reaction = _compact(
+            {
+                "name": reaction.get("name"),
+                "count": reaction.get("count"),
+                "users": [str(user) for user in users if isinstance(user, (str, int))],
+            }
+        )
+        if normalised_reaction:
+            normalised.append(normalised_reaction)
+    return normalised or None
+
+
+def _compact(values: Mapping[str, object | None]) -> Dict[str, object]:
+    compacted: Dict[str, object] = {}
+    for key, value in values.items():
+        if value is None:
+            continue
+        if isinstance(value, str) and value == "":
+            continue
+        if isinstance(value, (list, tuple)) and not value:
+            continue
+        if isinstance(value, Mapping) and not value:
+            continue
+        compacted[key] = value
+    return compacted
+
+
+def _ensure_str(value: object) -> Optional[str]:
+    if isinstance(value, (str, int, float)):
+        text = str(value)
+        return text if text else None
+    return None

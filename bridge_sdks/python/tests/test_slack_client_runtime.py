@@ -114,11 +114,89 @@ def test_post_message_invokes_web_api() -> None:
 
 
 def test_normalise_event_extracts_event_id() -> None:
-    event = _normalise_event({
-        "type": "event_callback",
-        "team": "T1",
-        "event": {"type": "message", "text": "hi", "event_ts": "123.0001"},
-    })
+    event = _normalise_event(
+        {
+            "type": "event_callback",
+            "team": "T1",
+            "event": {
+                "type": "message",
+                "text": "hi",
+                "event_ts": "123.0001",
+                "channel": "C1",
+            },
+        }
+    )
     assert event is not None
     assert event["event_id"] == "123.0001"
-    assert event["team"] == "T1"
+    assert event["team_id"] == "T1"
+    assert event["conversation"]["id"] == "C1"
+    assert event["message"]["text"] == "hi"
+
+
+def test_normalise_message_event_includes_files_and_reactions() -> None:
+    event = _normalise_event(
+        {
+            "event": {
+                "type": "message",
+                "event_ts": "456.0002",
+                "channel": "C2",
+                "channel_type": "channel",
+                "thread_ts": "456.0001",
+                "text": "Hello",
+                "attachments": [{"id": 1, "fallback": "image", "text": "caption"}],
+                "files": [
+                    {
+                        "id": "F1",
+                        "name": "report.pdf",
+                        "mimetype": "application/pdf",
+                        "size": 42,
+                        "permalink": "https://files.slack.com/F1",
+                    }
+                ],
+                "reactions": [{"name": "thumbsup", "count": 2, "users": ["U1", "U2"]}],
+            }
+        }
+    )
+    assert event is not None
+    assert event["event_type"] == "message"
+    assert event["conversation"]["thread_ts"] == "456.0001"
+    assert event["message"]["attachments"][0]["fallback"] == "image"
+    assert event["message"]["files"][0]["name"] == "report.pdf"
+    assert event["message"]["reactions"][0]["count"] == 2
+
+
+def test_normalise_message_change_event_captures_previous_message() -> None:
+    event = _normalise_event(
+        {
+            "event": {
+                "type": "message",
+                "subtype": "message_changed",
+                "channel": "C3",
+                "message": {"ts": "789.1", "text": "updated", "user": "U1"},
+                "previous_message": {"ts": "789.1", "text": "old", "user": "U1"},
+            }
+        }
+    )
+    assert event is not None
+    assert event["change_type"] == "edited"
+    assert event["previous_message"]["text"] == "old"
+
+
+def test_normalise_reaction_event_maps_action() -> None:
+    event = _normalise_event(
+        {
+            "event": {
+                "type": "reaction_added",
+                "user": "U2",
+                "reaction": "eyes",
+                "event_ts": "999.0",
+                "item_user": "U1",
+                "item": {"type": "message", "channel": "C4", "ts": "999.0"},
+            }
+        }
+    )
+    assert event is not None
+    assert event["event_type"] == "reaction"
+    assert event["action"] == "added"
+    assert event["item"]["channel"] == "C4"
+    assert event["user_id"] == "U2"
