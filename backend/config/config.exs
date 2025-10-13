@@ -59,6 +59,10 @@ config :msgr, Messngr.Media.RetentionPruner,
   interval_ms: :timer.minutes(10),
   batch_size: 100
 
+config :msgr, Messngr.Chat.WatcherPruner,
+  enabled: true,
+  interval_ms: :timer.minutes(1)
+
 config :msgr, Messngr.ShareLinks,
   public_base_url: System.get_env("SHARE_LINK_PUBLIC_BASE_URL", "https://msgr.no"),
   public_path: System.get_env("SHARE_LINK_PUBLIC_PATH", "/s"),

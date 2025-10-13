@@ -18,6 +18,10 @@
 - Validated Noise device keys by normalising to URL-safe base64, storing SHA-256
   fingerprints, and expanding attester metadata so compromised devices can be
   audited and revoked before inviting alpha testers.
+- Hardened chat persistence with retryable receipt fan-out, guarded pagination pivots,
+  and a supervised watcher sweep so realtime occupancy stays accurate for alpha testers.
+- Updated the alpha readiness review with the new chat persistence hardening milestones
+  documented alongside the remaining backend, frontend, and DevEx gaps.
 - Added an alpha readiness review in `docs/alpha_review.md` capturing backend, frontend, and DevEx
   gaps to close before inviting external testers.
 - Documented outstanding Slack and Microsoft Teams bridge work in `docs/bridge_status.md` so the

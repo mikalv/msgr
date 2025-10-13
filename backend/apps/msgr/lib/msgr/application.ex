@@ -12,6 +12,11 @@ defmodule Messngr.Application do
       |> Application.get_env(Messngr.Media.RetentionPruner, [])
       |> Messngr.Media.RetentionPruner.child_spec()
 
+    watcher_pruner_child =
+      :msgr
+      |> Application.get_env(Messngr.Chat.WatcherPruner, [])
+      |> Messngr.Chat.WatcherPruner.child_spec()
+
     children =
       [
         Messngr.FeatureFlags,
@@ -22,7 +27,8 @@ defmodule Messngr.Application do
         # {Guardian.DB.SweeperServer, []},
         # Start the Finch HTTP client for sending emails
         {Finch, name: Messngr.Finch},
-        retention_pruner_child
+        retention_pruner_child,
+        watcher_pruner_child
         # Start a worker by calling: Messngr.Worker.start_link(arg)
         # {Messngr.Worker, arg}
       ]

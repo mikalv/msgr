@@ -144,6 +144,26 @@ config :msgr, Messngr.Media.RetentionPruner,
   |> Keyword.put(:interval_ms, pruner_interval)
   |> Keyword.put(:batch_size, pruner_batch_size)
 
+watcher_pruner_config = Application.get_env(:msgr, Messngr.Chat.WatcherPruner, [])
+
+watcher_pruner_enabled =
+  bool_env.(
+    System.get_env("CONVERSATION_WATCHER_SWEEP_ENABLED"),
+    Keyword.get(watcher_pruner_config, :enabled, true)
+  )
+
+watcher_pruner_interval =
+  int_env.(
+    System.get_env("CONVERSATION_WATCHER_SWEEP_INTERVAL_MS"),
+    Keyword.get(watcher_pruner_config, :interval_ms, :timer.minutes(1)),
+    "CONVERSATION_WATCHER_SWEEP_INTERVAL_MS"
+  )
+
+config :msgr, Messngr.Chat.WatcherPruner,
+  watcher_pruner_config
+  |> Keyword.put(:enabled, watcher_pruner_enabled)
+  |> Keyword.put(:interval_ms, watcher_pruner_interval)
+
 noise_enabled =
   bool_env.(
     System.get_env("NOISE_TRANSPORT_ENABLED"),

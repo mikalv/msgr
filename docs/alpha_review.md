@@ -1,7 +1,7 @@
 # Alpha readiness review
 
 ## Executive summary
-- Core authentication, device onboarding, and media signing gaps have been closed, but chat persistence still needs retry/backoff work and watcher cleanup before day-to-day use feels resilient.
+- Core authentication, device onboarding, and chat persistence now cover retry/backoff and watcher cleanup so the remaining backend focus is on ancillary features and storage hardening.
 - The Flutter client requires navigation pruning, better bootstrap recovery, and clearer offline/error flows so alpha testers are not stranded on blank timelines or failed uploads.
 - Family/bridge surfaces still need stronger authorisation and environment validation to ensure non-chat features do not leak data or fail silently during early trials.
 - Developer experience gaps—toolchain documentation, end-to-end Flutter coverage, and bridge daemon smoke tests—remain blockers for contributors spinning up the stack quickly.
@@ -14,9 +14,9 @@
 - ✅ Conversation payload caps, per-profile rate limiting, and media retention pruning.
 - ✅ Prometheus exporter enabled by default with runtime overrides documented.
 - ✅ Media signing secrets sourced from the environment with checksum binding.
+- ✅ Chat persistence now retries receipt fan-out, guards pagination pivots, and sweeps idle watchers.
 
 ### Still outstanding
-- 🔲 Harden chat persistence: add retry-safe receipt insertion, guard pagination pivots, and clean up idle watchers.
 - 🔲 Lock down media thumbnails and family/bridge controllers before exposing non-chat features.
 - 🔲 Stabilise the Flutter onboarding/navigation flow and cover offline/error recovery with tests.
 - 🔲 Improve contributor experience with toolchain docs, integration tests, and StoneMQ/daemon smoke checks.
@@ -29,9 +29,9 @@
 
 ### Messaging & realtime
 - [x] The conversation channel now enforces per-message Hammer limits and payload caps, preventing alpha testers from spamming oversized messages while keeping edits, reactions, pins, and receipts responsive.【F:backend/apps/msgr_web/lib/msgr_web/channels/conversation_channel.ex†L18-L186】
-- [ ] `Chat.send_message/3` wraps media uploads but assumes successful `ensure_pending_receipts`; there is no retry path if `Repo.insert_all/3` fails (e.g., transient DB issue). Consider moving receipt insertion to a separate transaction with retries or background job so delivery state is reliable.【F:backend/apps/msgr/lib/msgr/chat.ex†L68-L142】【F:backend/apps/msgr/lib/msgr/chat.ex†L1659-L1696】
-- [ ] Message pagination defaults to 50 items and clamps to 200, yet there is no index on `(conversation_id, inserted_at)` beyond default? (verify migration). Also, `around_id` path fetches pivot via `Repo.get` without guarding deleted messages; if the pivot has been redacted the call returns `nil`. Handle `nil` to avoid crashing the client when navigating to removed pins.【F:backend/apps/msgr/lib/msgr/chat.ex†L410-L520】
-- [ ] WebSocket typing timers, watcher reschedules, and presence updates exist, but there is no heartbeat/idle cleanup persisted server-side. Watching `last_activity_at` purely in memory risks stale watchers after restarts; add periodic cleanup job writing to DB or presence to keep channel occupancy accurate.【F:backend/apps/msgr_web/lib/msgr_web/channels/conversation_channel.ex†L18-L75】
+- [x] `Chat.send_message/3` now wraps receipt fan-out in a retry helper so transient insert errors are retried before returning control to the caller.【F:backend/apps/msgr/lib/msgr/chat.ex†L78-L113】【F:backend/apps/msgr/lib/msgr/chat.ex†L1715-L1744】【F:backend/apps/msgr/lib/msgr/retry.ex†L1-L68】
+- [x] Message pagination still leverages the existing composite index but now guards deleted/foreign pivots so `around_id/3` gracefully falls back when a message disappears.【F:backend/apps/msgr/lib/msgr/chat.ex†L360-L520】【F:backend/apps/msgr/lib/msgr/chat.ex†L1061-L1074】
+- [x] Idle watchers are swept by a new ETS pruner and supervised `WatcherPruner` process so stale occupancy is broadcast out without manual intervention.【F:backend/apps/msgr/lib/msgr/chat.ex†L911-L1008】【F:backend/apps/msgr/lib/msgr/chat/watcher_pruner.ex†L1-L99】【F:backend/apps/msgr/lib/msgr/application.ex†L10-L37】
 
 ### Media & storage
 - [x] Media signing now pulls per-environment secrets, binds checksums into signatures, and documents the required configuration so downloads cannot be tampered with silently.【F:backend/apps/msgr/lib/msgr/media/storage.ex†L1-L120】
