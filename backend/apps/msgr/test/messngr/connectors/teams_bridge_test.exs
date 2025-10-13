@@ -5,8 +5,14 @@ defmodule Messngr.Connectors.TeamsBridgeTest do
   alias Msgr.Support.QueueRecorder
   alias Messngr.Accounts.Account
   alias Messngr.Bridges
+  alias Messngr.Bridges.Auth.CredentialVault
 
   setup do
+    case :ets.whereis(:bridge_auth_credential_vault) do
+      :undefined -> :ok
+      table -> :ets.delete_all_objects(table)
+    end
+
     {:ok, agent} = QueueRecorder.start_link([])
 
     account =
@@ -95,6 +101,17 @@ defmodule Messngr.Connectors.TeamsBridgeTest do
     assert bridge_account.instance == "tenant-z"
     assert bridge_account.external_id == "user-1"
     assert bridge_account.metadata["tenant"]["id"] == "tenant-z"
+
+    session = bridge_account.session
+    assert Map.has_key?(session, "credential_ref")
+    refute Map.has_key?(session, "refresh_token")
+
+    {:ok, record} = CredentialVault.fetch(session["credential_ref"])
+    assert record["service"] == "teams"
+    assert record["session_id"] == "#{account.id}::tenant-z"
+    assert record["tokens"]["refresh_token"] == "rt"
+
+    CredentialVault.delete(session["credential_ref"])
 
     [contact] = bridge_account.contacts
     assert contact.external_id == "user-2"

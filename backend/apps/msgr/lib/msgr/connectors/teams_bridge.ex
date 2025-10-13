@@ -9,7 +9,7 @@ defmodule Msgr.Connectors.TeamsBridge do
   installations per Msgr account.
   """
 
-  alias Msgr.Connectors.ServiceBridge
+  alias Msgr.Connectors.{ServiceBridge, SessionVault}
   alias Messngr.Bridges
 
   @type bridge :: ServiceBridge.t()
@@ -69,7 +69,7 @@ defmodule Msgr.Connectors.TeamsBridge do
 
     with :linked <- normalise_status(status),
          {:ok, account_id} <- fetch_account_id(params),
-         attrs <- build_sync_attrs(response),
+         {:ok, attrs} <- build_sync_attrs(response, bridge.service, account_id, instance),
          {:ok, _record} <- Bridges.sync_linked_identity(account_id, bridge.service, attrs, instance: instance) do
       :ok
     else
@@ -111,30 +111,35 @@ defmodule Msgr.Connectors.TeamsBridge do
     end
   end
 
-  defp build_sync_attrs(response) when is_map(response) do
+  defp build_sync_attrs(response, service, account_id, instance) when is_map(response) do
     tenant = fetch_tenant(response)
     user = fetch_user(response)
     session = fetch_map(response, :session)
     capabilities = fetch_map(response, :capabilities)
 
-    contacts =
-      response
-      |> fetch_list([:members, :contacts])
+    with {:ok, session_map} <- SessionVault.scrub_and_store(service, account_id, instance, session) do
+      contacts =
+        response
+        |> fetch_list([:members, :contacts])
 
-    channels =
-      response
-      |> fetch_list([:chats, :conversations, :teams])
+      channels =
+        response
+        |> fetch_list([:chats, :conversations, :teams])
 
-    %{
-      external_id: extract_user_id(user),
-      display_name: extract_display_name(user),
-      metadata: build_metadata(tenant, user),
-      session: ensure_map(session),
-      capabilities: ensure_map(capabilities),
-      contacts: ensure_list(contacts),
-      channels: ensure_list(channels)
-    }
+      {:ok,
+       %{
+         external_id: extract_user_id(user),
+         display_name: extract_display_name(user),
+         metadata: build_metadata(tenant, user),
+         session: ensure_map(session_map),
+         capabilities: ensure_map(capabilities),
+         contacts: ensure_list(contacts),
+         channels: ensure_list(channels)
+       }}
+    end
   end
+
+  defp build_sync_attrs(_response, _service, _account_id, _instance), do: {:ok, %{}}
 
   defp fetch_tenant(data) when is_map(data) do
     fetch_map(data, :tenant) || fetch_map(data, :organization) || %{}
