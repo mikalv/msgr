@@ -8,6 +8,8 @@ config :msgr, Messngr.Repo,
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: 10
 
+config :msgr, :feature_flags, noise_handshake_required: false
+
 config :msgr, :llm_client, Messngr.AI.LlmClientMock
 
 config :msgr_web, MessngrWeb.Endpoint,
@@ -22,6 +24,8 @@ config :msgr_web, :expose_otp_codes, true
 config :phoenix, :plug_init_mode, :runtime
 
 config :msgr, :noise_session_registry, enabled: false
+
+config :msgr, Messngr.Chat.WatcherPruner, enabled: false
 
 shared_repo_config =
   [

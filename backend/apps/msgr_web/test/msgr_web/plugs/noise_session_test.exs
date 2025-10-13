@@ -84,38 +84,6 @@ defmodule MessngrWeb.Plugs.NoiseSessionTest do
     assert conn.status == 401
   end
 
-  test "falls back to legacy headers when feature is enabled", %{conn: conn, account: account, profile: profile} do
-    original = Application.get_env(:msgr_web, :legacy_actor_headers, false)
-    Application.put_env(:msgr_web, :legacy_actor_headers, true)
-
-    on_exit(fn -> Application.put_env(:msgr_web, :legacy_actor_headers, original) end)
-
-    conn =
-      conn
-      |> put_req_header("x-account-id", account.id)
-      |> put_req_header("x-profile-id", profile.id)
-      |> NoiseSession.call(%{})
-
-    refute conn.halted
-    assert conn.assigns.current_profile.id == profile.id
-  end
-
-  test "legacy headers are rejected when feature flag is disabled", %{conn: conn, account: account, profile: profile} do
-    original = Application.get_env(:msgr_web, :legacy_actor_headers, false)
-    Application.put_env(:msgr_web, :legacy_actor_headers, false)
-
-    on_exit(fn -> Application.put_env(:msgr_web, :legacy_actor_headers, original) end)
-
-    conn =
-      conn
-      |> put_req_header("x-account-id", account.id)
-      |> put_req_header("x-profile-id", profile.id)
-      |> NoiseSession.call(%{})
-
-    assert conn.halted
-    assert conn.status == 401
-  end
-
   describe "verify_token/2" do
     test "returns actor metadata", %{account: account, profile: profile} do
       %{token: token} = noise_session_fixture(account, profile)

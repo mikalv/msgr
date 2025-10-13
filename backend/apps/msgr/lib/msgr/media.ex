@@ -6,6 +6,7 @@ defmodule Messngr.Media do
 
   alias Messngr.Media.{Storage, Upload}
   alias Messngr.Repo
+  import Ecto.Query
 
   @type upload_instructions :: map()
 
@@ -67,6 +68,40 @@ defmodule Messngr.Media do
           end
       end
     end)
+  end
+
+  @doc """
+  Deletes uploads whose retention window has expired and removes their storage
+  objects. Returns a map describing how many uploads were scanned, deleted, and
+  any errors encountered.
+  """
+  @spec prune_expired_uploads(keyword()) :: %{scanned: non_neg_integer(), deleted: non_neg_integer(), errors: list()}
+  def prune_expired_uploads(opts \\ []) do
+    now = Keyword.get(opts, :now, DateTime.utc_now())
+    limit = Keyword.get(opts, :limit, 100)
+
+    query =
+      from upload in Upload,
+        where:
+          not is_nil(upload.retention_expires_at) and
+            upload.retention_expires_at <= ^now,
+        order_by: [asc: upload.retention_expires_at],
+        limit: ^limit
+
+    uploads = Repo.all(query)
+
+    {deleted, errors} =
+      Enum.reduce(uploads, {0, []}, fn upload, {deleted_acc, errors_acc} ->
+        case purge_upload(upload) do
+          :ok ->
+            {deleted_acc + 1, errors_acc}
+
+          {:error, reason} ->
+            {deleted_acc, [%{id: upload.id, reason: reason} | errors_acc]}
+        end
+      end)
+
+    %{scanned: length(uploads), deleted: deleted, errors: Enum.reverse(errors)}
   end
 
   defp normalise_kind(attrs) do
@@ -157,6 +192,61 @@ defmodule Messngr.Media do
 
   defp build_thumbnail_instructions(_upload), do: nil
 
+  defp purge_upload(%Upload{} = upload) do
+    with :ok <- Storage.delete_object(upload.bucket, upload.object_key),
+         :ok <- maybe_delete_thumbnail(upload),
+         {:ok, _} <- Repo.delete(upload) do
+      :ok
+    else
+      {:error, %Ecto.Changeset{} = changeset} -> {:error, {:repo_delete_failed, changeset}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp maybe_delete_thumbnail(%Upload{} = upload) do
+    case thumbnail_location(upload) do
+      nil -> :ok
+      {bucket, object_key} -> Storage.delete_object(bucket, object_key)
+    end
+  end
+
+  defp thumbnail_location(%Upload{} = upload) do
+    metadata =
+      case upload.metadata do
+        %{} = map -> string_keys(map)
+        _ -> %{}
+      end
+
+    cond do
+      is_map(metadata["thumbnail"]) -> extract_thumbnail_pointer(metadata["thumbnail"], upload.bucket)
+      is_map(get_in(metadata, ["media", "thumbnail"])) ->
+        extract_thumbnail_pointer(get_in(metadata, ["media", "thumbnail"]), upload.bucket)
+      upload.kind in [:image, :video] -> {upload.bucket, Upload.thumbnail_object_key(upload.object_key)}
+      true -> nil
+    end
+  end
+
+  defp extract_thumbnail_pointer(thumbnail, default_bucket) when is_map(thumbnail) do
+    normalized = string_keys(thumbnail)
+
+    bucket =
+      normalized["bucket"] ||
+        normalized["bucketName"] ||
+        default_bucket
+
+    object_key =
+      normalized["objectKey"] ||
+        normalized["object_key"]
+
+    if is_binary(bucket) and is_binary(object_key) do
+      {bucket, object_key}
+    else
+      nil
+    end
+  end
+
+  defp extract_thumbnail_pointer(_thumbnail, _default_bucket), do: nil
+
   defp config do
     Application.get_env(:msgr, __MODULE__, [])
   end
@@ -177,41 +267,37 @@ defmodule Messngr.Media do
 
     {media_from_top_level, remaining} = extract_media_from_top_level(normalized)
 
-    media =
-      normalized
-      |> Map.get("media")
-      |> normalize_media()
-      |> Map.merge(media_from_top_level)
-      |> maybe_downcase_checksum()
-
-    attrs = %{}
-    attrs = maybe_put_attr(attrs, :width, Map.get(media, "width"))
-    attrs = maybe_put_attr(attrs, :height, Map.get(media, "height"))
-    attrs = maybe_put_attr(attrs, :checksum, Map.get(media, "checksum"))
-
-    with :ok <- validate_checksum(Map.get(media, "checksum")) do
-      normalized_media = maybe_put(remaining, "media", media)
+    with {:ok, media} <-
+           normalized
+           |> Map.get("media")
+           |> normalize_media(),
+         merged_media <-
+           media
+           |> Map.merge(media_from_top_level)
+           |> maybe_downcase_checksum(),
+         attrs <-
+           %{}
+           |> maybe_put_attr(:width, Map.get(merged_media, "width"))
+           |> maybe_put_attr(:height, Map.get(merged_media, "height"))
+           |> maybe_put_attr(:checksum, Map.get(merged_media, "checksum")),
+         :ok <- validate_checksum(Map.get(merged_media, "checksum")) do
+      normalized_media = maybe_put(remaining, "media", merged_media)
       {:ok, normalized_media, attrs}
     end
   end
 
-  defp normalize_metadata(_), do: {:ok, %{}, %{} }
+  defp normalize_metadata(_), do: {:ok, %{}, %{}}
 
-  defp normalize_media(nil), do: %{}
+  defp normalize_media(nil), do: {:ok, %{}}
 
   defp normalize_media(%{} = media) do
     media
     |> string_keys()
-    |> normalize_thumbnail()
     |> normalize_waveform()
+    |> sanitize_thumbnail()
   end
 
-  defp normalize_thumbnail(media) do
-    case Map.get(media, "thumbnail") do
-      %{} = thumbnail -> Map.put(media, "thumbnail", string_keys(thumbnail))
-      _ -> media
-    end
-  end
+  defp normalize_media(_), do: {:error, :invalid_media_payload}
 
   defp normalize_waveform(media) do
     case Map.get(media, "waveform") do
@@ -263,6 +349,50 @@ defmodule Messngr.Media do
   end
 
   defp validate_checksum(_), do: {:error, :checksum_invalid}
+
+  defp sanitize_thumbnail(media) do
+    case Map.get(media, "thumbnail") do
+      nil -> {:ok, media}
+      %{} = thumbnail ->
+        normalized = string_keys(thumbnail)
+
+        bucket =
+          normalized["bucket"] ||
+            normalized["bucketName"]
+
+        object_key =
+          normalized["objectKey"] ||
+            normalized["object_key"]
+
+        cond do
+          not allowed_thumbnail_bucket?(bucket) -> {:error, :thumbnail_bucket_invalid}
+          not is_binary(object_key) or String.trim(object_key) == "" -> {:error, :thumbnail_object_key_invalid}
+          true ->
+            sanitized =
+              normalized
+              |> Map.put("bucket", bucket || Storage.bucket())
+              |> Map.put("objectKey", object_key)
+              |> Map.delete("bucketName")
+              |> Map.delete("object_key")
+              |> Map.delete("url")
+              |> Map.delete("urlExpiresAt")
+              |> Map.delete("publicUrl")
+
+            {:ok, Map.put(media, "thumbnail", sanitized)}
+        end
+
+      _ ->
+        {:error, :thumbnail_invalid}
+    end
+  end
+
+  defp allowed_thumbnail_bucket?(nil), do: true
+
+  defp allowed_thumbnail_bucket?(bucket) when is_binary(bucket) do
+    bucket == Storage.bucket()
+  end
+
+  defp allowed_thumbnail_bucket?(_), do: false
 
   defp extract_media_from_top_level(map) do
     Enum.reduce(map, {%{}, %{}}, fn
