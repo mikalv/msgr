@@ -51,13 +51,6 @@ bool_env = fn
   value, _default -> String.downcase(value) in ["1", "true", "yes", "on"]
 end
 
-legacy_headers_env = System.get_env("MSGR_WEB_LEGACY_ACTOR_HEADERS")
-
-if legacy_headers_env do
-  allow_legacy_headers = bool_env.(legacy_headers_env, false)
-  config :msgr_web, :legacy_actor_headers, allow_legacy_headers
-end
-
 port_env = fn
   nil, default -> default
   "", default -> default

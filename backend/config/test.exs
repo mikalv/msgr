@@ -8,6 +8,8 @@ config :msgr, Messngr.Repo,
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: 10
 
+config :msgr, :feature_flags, noise_handshake_required: false
+
 config :msgr, :llm_client, Messngr.AI.LlmClientMock
 
 config :msgr_web, MessngrWeb.Endpoint,

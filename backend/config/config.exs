@@ -4,9 +4,15 @@ config :msgr,
   ecto_repos: [Messngr.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]
 
-config :msgr, :feature_flags, noise_handshake_required: false
+config :msgr, :feature_flags, noise_handshake_required: true
 
 config :msgr, Messngr.Mailer, adapter: Swoosh.Adapters.Local
+config :msgr, Messngr.Auth.Notifier,
+  email_sender: {"Messngr", System.get_env("MSGR_AUTH_EMAIL_FROM", "login@messngr.local")},
+  sms_adapter: Messngr.Auth.Notifier.LogSmsAdapter
+
+config :msgr, :rate_limits,
+  auth_challenge: [limit: 5, period: :timer.minutes(10)]
 
 config :msgr, :llm_client, Messngr.AI.LlmGatewayClient
 
