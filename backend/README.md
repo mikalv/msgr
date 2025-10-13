@@ -51,6 +51,8 @@ docker compose build stonemq --build-arg STONEMQ_REF=<commit-eller-branch>
 - **Prometheus** skraper metrikker fra Phoenix på `backend:9568` via
   `TelemetryMetricsPrometheus`. Bruk `http://localhost:9090` for å inspisere
   råmetrikker.
+- Sett `PROMETHEUS_ENABLED=false` dersom du vil skru av eksportøren i et
+  begrenset miljø. Porten kan overstyres med `PROMETHEUS_PORT`.
 - **Grafana** startes med en forhåndsprovisjonert Prometheus-datakilde og er
   tilgjengelig på `http://localhost:3000` (bruker/pass: `admin`/`admin`).
 - **OpenObserve** håndterer loggdata på `http://localhost:5080`. Standardbrukeren

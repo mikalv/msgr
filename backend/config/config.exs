@@ -103,7 +103,7 @@ config :logger, :console,
 config :logger, backends: [:console]
 
 config :msgr_web, :prometheus,
-  enabled: false,
+  enabled: true,
   port: 9568,
   name: :prometheus_metrics
 

@@ -6,6 +6,8 @@
   auth is safe to expose to alpha testers.
 - Added conversation channel payload caps and per-profile rate limiting so early testers
   cannot spam large messages or overwhelm realtime resources.
+- Enabled the Prometheus exporter by default with runtime toggles and coverage so
+  alpha operators can inspect latency and error metrics without manual config.
 - Added an alpha readiness review in `docs/alpha_review.md` capturing backend, frontend, and DevEx
   gaps to close before inviting external testers.
 - Documented outstanding Slack and Microsoft Teams bridge work in `docs/bridge_status.md` so the

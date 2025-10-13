@@ -52,14 +52,34 @@ bool_env = fn
 end
 
 port_env = fn
-  nil, default -> default
-  "", default -> default
-  value, _default ->
+  nil, default, _env_name -> default
+  "", default, _env_name -> default
+  value, _default, env_name ->
     case Integer.parse(value) do
       {port, ""} -> port
-      _ -> raise "NOISE_TRANSPORT_PORT must be an integer"
+      _ -> raise "#{env_name} must be an integer"
     end
 end
+
+prometheus_config = Application.get_env(:msgr_web, :prometheus, [])
+
+prometheus_enabled =
+  bool_env.(
+    System.get_env("PROMETHEUS_ENABLED"),
+    Keyword.get(prometheus_config, :enabled, true)
+  )
+
+prometheus_port =
+  port_env.(
+    System.get_env("PROMETHEUS_PORT"),
+    Keyword.get(prometheus_config, :port, 9_568),
+    "PROMETHEUS_PORT"
+  )
+
+config :msgr_web, :prometheus,
+  prometheus_config
+  |> Keyword.put(:enabled, prometheus_enabled)
+  |> Keyword.put(:port, prometheus_port)
 
 noise_enabled =
   bool_env.(
@@ -70,7 +90,8 @@ noise_enabled =
 noise_port =
   port_env.(
     System.get_env("NOISE_TRANSPORT_PORT"),
-    Keyword.get(noise_config, :transport_port, 5_443)
+    Keyword.get(noise_config, :transport_port, 5_443),
+    "NOISE_TRANSPORT_PORT"
   )
 
 base_noise_config =
