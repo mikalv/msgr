@@ -78,6 +78,24 @@ utviklingsmiljøet som er startet via `docker compose up`.
 - Sett `PHX_LISTEN_IP` om du ønsker å binde serveren til en annen adresse.
 - Legg til ekstra miljøvariabler i `docker-compose.yml` ved behov.
 
+## Media-signering
+
+Alle opplastings- og nedlastings-URLer signeres med en hemmelig nøkkel slik at
+ingen kan manipulere forespørsler til object storage. Sett
+`MEDIA_SIGNING_SECRET` i miljøet før du starter backenden (Docker Compose gjør
+det enkelt via `.env` eller direkte variabler). Hver installasjon bør bruke en
+unik verdi – du kan generere en ved å kjøre
+
+```bash
+openssl rand -hex 32
+```
+
+I utviklings- og testmiljø faller backenden tilbake til en midlertidig
+standardnøkkel dersom variabelen ikke er satt, men i staging/prod må den være
+eksplisitt konfigurert. Når du oppretter mediaopplastinger kan du sende med en
+checksum; den signeres nå sammen med URLen slik at klienter kan verifisere at
+innholdet ikke er tuklet med før det vises.
+
 ## Noise-konfigurasjon
 
 msgr-backenden har støtte for en Noise-basert transport som for tiden er

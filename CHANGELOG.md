@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Hardened media signing by requiring environment-provided secrets, binding
+  checksums into presigned URLs, and covering the behaviour with tests and
+  updated operator docs so alpha deployments can trust object storage links.
 - Enforced Noise handshake verification by default, removed legacy header fallbacks,
   and wired OTP challenges to rate limiting plus email/SMS delivery so passwordless
   auth is safe to expose to alpha testers.

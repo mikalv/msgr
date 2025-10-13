@@ -51,6 +51,12 @@ bool_env = fn
   value, _default -> String.downcase(value) in ["1", "true", "yes", "on"]
 end
 
+blank_to_nil = fn
+  nil -> nil
+  "" -> nil
+  value -> value
+end
+
 port_env = fn
   nil, default, _env_name -> default
   "", default, _env_name -> default
@@ -80,6 +86,25 @@ config :msgr_web, :prometheus,
   prometheus_config
   |> Keyword.put(:enabled, prometheus_enabled)
   |> Keyword.put(:port, prometheus_port)
+
+media_storage_config = Application.get_env(:msgr, Messngr.Media.Storage, [])
+
+media_signing_secret =
+  case blank_to_nil.(System.get_env("MEDIA_SIGNING_SECRET")) do
+    nil ->
+      case blank_to_nil.(Keyword.get(media_storage_config, :signing_secret)) do
+        nil when env in [:dev, :test] -> "dev-secret"
+        nil ->
+          raise "MEDIA_SIGNING_SECRET environment variable is missing."
+
+        secret -> secret
+      end
+
+    secret -> secret
+  end
+
+config :msgr, Messngr.Media.Storage,
+  Keyword.put(media_storage_config, :signing_secret, media_signing_secret)
 
 noise_enabled =
   bool_env.(

@@ -75,11 +75,13 @@ defmodule Messngr.Media.Storage do
         }
   def presign_download(bucket, object_key, opts \\ []) do
     content_type = Keyword.get(opts, :content_type)
+    checksum = Keyword.get(opts, :checksum)
     expires_at = expires_at(:download)
 
     url =
       presigned_url(:get, public_endpoint(), bucket, object_key, expires_at,
-        content_type: content_type
+        content_type: content_type,
+        checksum: checksum
       )
 
     %{
@@ -98,19 +100,21 @@ defmodule Messngr.Media.Storage do
     expires = DateTime.to_unix(expires_at)
     content_type = Keyword.get(opts, :content_type)
     headers = Keyword.get(opts, :headers, %{})
-    signature = sign(method, uri.path || "/", expires, content_type, headers)
+    checksum = Keyword.get(opts, :checksum)
+    signature = sign(method, uri.path || "/", expires, content_type, headers, checksum)
 
     query_params =
       %{expires: expires, signature: signature}
       |> maybe_put_content_type(content_type)
+      |> maybe_put_checksum(checksum)
 
     uri
     |> Map.put(:query, URI.encode_query(query_params))
     |> to_string()
   end
 
-  defp sign(method, path, expires, content_type, headers) do
-    secret = config() |> Keyword.get(:signing_secret, "dev-secret")
+  defp sign(method, path, expires, content_type, headers, checksum) do
+    secret = signing_secret!()
     canonical_headers = canonical_headers(headers)
 
     payload =
@@ -119,7 +123,8 @@ defmodule Messngr.Media.Storage do
         path,
         Integer.to_string(expires),
         content_type || "",
-        canonical_headers
+        canonical_headers,
+        checksum || ""
       ]
       |> Enum.join(":")
 
@@ -150,6 +155,12 @@ defmodule Messngr.Media.Storage do
     Map.put(params, :content_type, content_type)
   end
 
+  defp maybe_put_checksum(params, nil), do: params
+
+  defp maybe_put_checksum(params, checksum) do
+    Map.put(params, :checksum, checksum)
+  end
+
   defp encryption_headers do
     config = config()
 
@@ -168,6 +179,13 @@ defmodule Messngr.Media.Storage do
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value
+
+  defp signing_secret! do
+    case config() |> Keyword.get(:signing_secret) |> blank_to_nil() do
+      nil -> raise ArgumentError, "media signing secret is not configured"
+      secret -> secret
+    end
+  end
 
   defp expires_at(kind) do
     seconds =
