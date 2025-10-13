@@ -7,6 +7,11 @@ defmodule Messngr.Application do
 
   @impl true
   def start(_type, _args) do
+    retention_pruner_child =
+      :msgr
+      |> Application.get_env(Messngr.Media.RetentionPruner, [])
+      |> Messngr.Media.RetentionPruner.child_spec()
+
     children =
       [
         Messngr.FeatureFlags,
@@ -16,10 +21,13 @@ defmodule Messngr.Application do
         Messngr.Calls.CallRegistry,
         # {Guardian.DB.SweeperServer, []},
         # Start the Finch HTTP client for sending emails
-        {Finch, name: Messngr.Finch}
+        {Finch, name: Messngr.Finch},
+        retention_pruner_child
         # Start a worker by calling: Messngr.Worker.start_link(arg)
         # {Messngr.Worker, arg}
-      ] ++ maybe_noise_registry_child()
+      ]
+      |> Enum.reject(&is_nil/1)
+      |> Kernel.++(maybe_noise_registry_child())
 
     Supervisor.start_link(children, strategy: :one_for_one, name: Messngr.Supervisor)
   end

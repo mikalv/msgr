@@ -54,6 +54,11 @@ config :msgr, Messngr.Media,
   upload_ttl_seconds: String.to_integer(System.get_env("MEDIA_UPLOAD_TTL", "900")),
   retention_ttl_seconds: String.to_integer(System.get_env("MEDIA_RETENTION_TTL", "604800"))
 
+config :msgr, Messngr.Media.RetentionPruner,
+  enabled: true,
+  interval_ms: :timer.minutes(10),
+  batch_size: 100
+
 config :msgr, Messngr.ShareLinks,
   public_base_url: System.get_env("SHARE_LINK_PUBLIC_BASE_URL", "https://msgr.no"),
   public_path: System.get_env("SHARE_LINK_PUBLIC_PATH", "/s"),

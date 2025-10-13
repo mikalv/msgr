@@ -96,6 +96,25 @@ eksplisitt konfigurert. Når du oppretter mediaopplastinger kan du sende med en
 checksum; den signeres nå sammen med URLen slik at klienter kan verifisere at
 innholdet ikke er tuklet med før det vises.
 
+## Media-retensjon
+
+Backenden rydder nå jevnlig opp i opplastinger der `retention_expires_at` har
+passert. En bakgrunnsprosess (`Messngr.Media.RetentionPruner`) kjører som del av
+OTP-treet og sletter både database-rader og tilhørende objekter i storage.
+Standardintervallet er hvert tiende minutt og prosessen tar maks 100 rader om
+gangen for å unngå store batcher som kan påvirke IO.
+
+Konfigurasjon kan overstyres via miljøvariabler:
+
+- `MEDIA_RETENTION_SWEEP_ENABLED` (`true`/`false`) skrur jobben av/på.
+- `MEDIA_RETENTION_SWEEP_INTERVAL_MS` setter intervallet i millisekunder (default
+  600000).
+- `MEDIA_RETENTION_SWEEP_BATCH_SIZE` bestemmer hvor mange opplastinger som
+  behandles per kjøring (default 100).
+
+Alle verdier kan også settes direkte i `config/config.exs` eller via
+`runtime.exs` dersom du trenger forskjellige innstillinger per miljø.
+
 ## Noise-konfigurasjon
 
 msgr-backenden har støtte for en Noise-basert transport som for tiden er

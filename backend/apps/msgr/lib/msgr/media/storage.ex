@@ -91,8 +91,61 @@ defmodule Messngr.Media.Storage do
     }
   end
 
+  @doc """
+  Generates a signed delete request for removing media objects from storage.
+  """
+  @spec presign_delete(String.t(), String.t()) :: %{
+          required(:method) => String.t(),
+          required(:url) => String.t(),
+          required(:expires_at) => DateTime.t(),
+          required(:headers) => map()
+        }
+  def presign_delete(bucket, object_key) do
+    expires_at = expires_at(:delete)
+
+    url =
+      presigned_url(:delete, endpoint(), bucket, object_key, expires_at,
+        headers: %{}
+      )
+
+    %{
+      method: "DELETE",
+      url: url,
+      expires_at: expires_at,
+      headers: %{}
+    }
+  end
+
+  @doc """
+  Deletes an object from storage using the configured HTTP client.
+  """
+  @spec delete_object(String.t(), String.t()) :: :ok | {:error, term()}
+  def delete_object(bucket, object_key) do
+    %{url: url, headers: headers} = presign_delete(bucket, object_key)
+
+    request = Finch.build("DELETE", url, headers)
+
+    case http_client().(request) do
+      {:ok, %{status: status}} when status in 200..299 -> :ok
+      {:ok, %{status: 404}} -> :ok
+      {:ok, %{status: status}} -> {:error, {:http_error, status}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp config do
     Application.get_env(:msgr, __MODULE__, [])
+  end
+
+  defp http_client do
+    case Keyword.get(config(), :http_client) do
+      fun when is_function(fun, 1) -> fun
+      _ -> &default_http_client/1
+    end
+  end
+
+  defp default_http_client(request) do
+    Finch.request(request, Messngr.Finch)
   end
 
   defp presigned_url(method, base, bucket, object_key, expires_at, opts) do
@@ -192,6 +245,7 @@ defmodule Messngr.Media.Storage do
       case kind do
         :upload -> config() |> Keyword.get(:upload_expiry_seconds, 600)
         :download -> config() |> Keyword.get(:download_expiry_seconds, 1200)
+        :delete -> config() |> Keyword.get(:delete_expiry_seconds, 60)
       end
 
     DateTime.add(DateTime.utc_now(), seconds, :second)

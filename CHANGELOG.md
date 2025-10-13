@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added a media retention pruner that periodically deletes expired uploads and
+  their storage objects, with configurable sweep intervals and batch sizes plus
+  tests and docs so alpha deployments do not accumulate orphaned blobs.
 - Hardened media signing by requiring environment-provided secrets, binding
   checksums into presigned URLs, and covering the behaviour with tests and
   updated operator docs so alpha deployments can trust object storage links.

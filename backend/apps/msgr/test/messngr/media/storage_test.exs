@@ -46,4 +46,39 @@ defmodule Messngr.Media.StorageTest do
       Storage.presign_download("bucket", "object-key")
     end
   end
+
+  test "delete_object performs a signed DELETE request" do
+    parent = self()
+
+    client = fn %Finch.Request{method: "DELETE", url: url} = request ->
+      send(parent, {:delete_request, request})
+      assert url =~ "signature="
+      {:ok, %Finch.Response{status: 204, body: "", headers: []}}
+    end
+
+    Application.put_env(:msgr, Storage, Keyword.put(Application.get_env(:msgr, Storage, []), :http_client, client))
+
+    assert :ok = Storage.delete_object("media", "object-key")
+    assert_received {:delete_request, %Finch.Request{method: "DELETE"}}
+  end
+
+  test "delete_object treats 404 as success" do
+    client = fn _request ->
+      {:ok, %Finch.Response{status: 404, body: "", headers: []}}
+    end
+
+    Application.put_env(:msgr, Storage, Keyword.put(Application.get_env(:msgr, Storage, []), :http_client, client))
+
+    assert :ok = Storage.delete_object("media", "missing")
+  end
+
+  test "delete_object returns error for non-success responses" do
+    client = fn _request ->
+      {:ok, %Finch.Response{status: 500, body: "", headers: []}}
+    end
+
+    Application.put_env(:msgr, Storage, Keyword.put(Application.get_env(:msgr, Storage, []), :http_client, client))
+
+    assert {:error, {:http_error, 500}} = Storage.delete_object("media", "object-key")
+  end
 end

@@ -67,6 +67,16 @@ port_env = fn
     end
 end
 
+int_env = fn
+  nil, default, _env_name -> default
+  "", default, _env_name -> default
+  value, _default, env_name ->
+    case Integer.parse(value) do
+      {int, ""} -> int
+      _ -> raise "#{env_name} must be an integer"
+    end
+end
+
 prometheus_config = Application.get_env(:msgr_web, :prometheus, [])
 
 prometheus_enabled =
@@ -105,6 +115,34 @@ media_signing_secret =
 
 config :msgr, Messngr.Media.Storage,
   Keyword.put(media_storage_config, :signing_secret, media_signing_secret)
+
+retention_pruner_config = Application.get_env(:msgr, Messngr.Media.RetentionPruner, [])
+
+pruner_enabled =
+  bool_env.(
+    System.get_env("MEDIA_RETENTION_SWEEP_ENABLED"),
+    Keyword.get(retention_pruner_config, :enabled, true)
+  )
+
+pruner_interval =
+  int_env.(
+    System.get_env("MEDIA_RETENTION_SWEEP_INTERVAL_MS"),
+    Keyword.get(retention_pruner_config, :interval_ms, :timer.minutes(10)),
+    "MEDIA_RETENTION_SWEEP_INTERVAL_MS"
+  )
+
+pruner_batch_size =
+  int_env.(
+    System.get_env("MEDIA_RETENTION_SWEEP_BATCH_SIZE"),
+    Keyword.get(retention_pruner_config, :batch_size, 100),
+    "MEDIA_RETENTION_SWEEP_BATCH_SIZE"
+  )
+
+config :msgr, Messngr.Media.RetentionPruner,
+  retention_pruner_config
+  |> Keyword.put(:enabled, pruner_enabled)
+  |> Keyword.put(:interval_ms, pruner_interval)
+  |> Keyword.put(:batch_size, pruner_batch_size)
 
 noise_enabled =
   bool_env.(
