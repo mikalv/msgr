@@ -8,7 +8,7 @@ defmodule Msgr.Connectors.SlackBridge do
   requests through per-workspace bridge instances.
   """
 
-  alias Msgr.Connectors.ServiceBridge
+  alias Msgr.Connectors.{ServiceBridge, SessionVault}
   alias Messngr.Bridges
 
   @type bridge :: ServiceBridge.t()
@@ -80,7 +80,7 @@ defmodule Msgr.Connectors.SlackBridge do
 
     with :linked <- normalise_status(status),
          {:ok, account_id} <- fetch_account_id(params),
-         attrs <- build_sync_attrs(response),
+         {:ok, attrs} <- build_sync_attrs(response, bridge.service, account_id, instance),
          {:ok, _record} <- Bridges.sync_linked_identity(account_id, bridge.service, attrs, instance: instance) do
       :ok
     else
@@ -122,11 +122,35 @@ defmodule Msgr.Connectors.SlackBridge do
     end
   end
 
-  defp build_sync_attrs(response) when is_map(response) do
+  defp build_sync_attrs(response, service, account_id, instance) when is_map(response) do
     workspace = fetch_workspace(response)
     user = fetch_user(response)
     session = fetch_map(response, :session)
     capabilities = fetch_map(response, :capabilities)
+
+    with {:ok, session_map} <- SessionVault.scrub_and_store(service, account_id, instance, session) do
+      contacts =
+        response
+        |> fetch_list([:members, :users])
+
+      channels =
+        response
+        |> fetch_list([:channels, :conversations])
+
+      {:ok,
+       %{
+         external_id: extract_user_id(user),
+         display_name: extract_display_name(user),
+         metadata: build_metadata(workspace, user),
+         session: ensure_map(session_map),
+         capabilities: ensure_map(capabilities),
+         contacts: ensure_list(contacts),
+         channels: ensure_list(channels)
+       }}
+    end
+  end
+
+  defp build_sync_attrs(_response, _service, _account_id, _instance), do: {:ok, %{}}
 
     contacts =
       response

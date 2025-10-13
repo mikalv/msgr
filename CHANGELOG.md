@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Stored Slack and Microsoft Teams bridge session tokens in the credential vault via a shared
+  `Msgr.Connectors.SessionVault` helper so database snapshots no longer persist plaintext tokens and
+  connector tests verify credential vault usage.
 - Added `docs/libsignal_research.md` summarising libsignal protocol concepts, bridge
   considerations, and Rust client implications for future Msgr security work.
 - Documented outstanding Slack and Microsoft Teams bridge work in `docs/bridge_status.md` so the
