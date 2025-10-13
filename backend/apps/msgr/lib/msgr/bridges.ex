@@ -17,6 +17,8 @@ defmodule Messngr.Bridges do
   alias Messngr.ShareLinks
   alias Messngr.Repo
 
+  @default_instance "primary"
+
   @type service :: atom() | String.t()
   @type account_id :: binary()
   @type sync_attrs :: map()
@@ -24,10 +26,23 @@ defmodule Messngr.Bridges do
   @doc """
   Fetches a bridge account for the given service if one has been synced.
   """
-  @spec get_account(account_id(), service()) :: BridgeAccount.t() | nil
-  def get_account(account_id, service) do
-    Repo.get_by(BridgeAccount, account_id: account_id, service: normalise_service(service))
-    |> maybe_preload()
+  @spec get_account(account_id(), service(), keyword()) :: BridgeAccount.t() | nil
+  def get_account(account_id, service, opts \\ []) do
+    service = normalise_service(service)
+
+    instance =
+      opts
+      |> Keyword.get(:instance)
+      |> normalise_instance_default()
+
+    case instance do
+      {:ok, instance_value} ->
+        Repo.get_by(BridgeAccount, account_id: account_id, service: service, instance: instance_value)
+        |> maybe_preload()
+
+      {:error, _reason} ->
+        nil
+    end
   end
 
   @doc """
@@ -39,6 +54,12 @@ defmodule Messngr.Bridges do
   end
 
   def list_accounts(_account_id), do: []
+
+  @doc """
+  Returns the default bridge instance identifier used by single-tenant connectors.
+  """
+  @spec default_instance() :: String.t()
+  def default_instance, do: @default_instance
 
   @doc """
   Creates a share link tied to a bridge account so binary payloads can be
@@ -57,19 +78,24 @@ defmodule Messngr.Bridges do
   Unlinks a previously connected bridge account and cascades associated state.
   Returns `{:error, :not_found}` when the service has not been linked.
   """
-  @spec unlink_account(account_id() | Account.t(), service()) :: {:ok, BridgeAccount.t()} | {:error, term()}
-  def unlink_account(%Account{id: account_id}, service), do: unlink_account(account_id, service)
+  @spec unlink_account(account_id() | Account.t(), service(), keyword()) ::
+          {:ok, BridgeAccount.t()} | {:error, term()}
+  def unlink_account(account, service, opts \\ [])
 
-  def unlink_account(account_id, service) when is_binary(account_id) do
+  def unlink_account(%Account{id: account_id}, service, opts), do: unlink_account(account_id, service, opts)
+
+  def unlink_account(account_id, service, opts) when is_binary(account_id) and is_list(opts) do
     service = normalise_service(service)
 
-    case Repo.get_by(BridgeAccount, account_id: account_id, service: service) do
-      nil -> {:error, :not_found}
-      %BridgeAccount{} = account -> Repo.delete(account)
+    with {:ok, instance} <- normalise_instance_default(Keyword.get(opts, :instance)) do
+      case Repo.get_by(BridgeAccount, account_id: account_id, service: service, instance: instance) do
+        nil -> {:error, :not_found}
+        %BridgeAccount{} = account -> Repo.delete(account)
+      end
     end
   end
 
-  def unlink_account(_account_id, _service), do: {:error, :invalid_account}
+  def unlink_account(_account_id, _service, _opts), do: {:error, :invalid_account}
 
   @doc """
   Fetches an active share link by token, returning an error if it has expired or
@@ -88,32 +114,36 @@ defmodule Messngr.Bridges do
   @doc """
   Synchronises a bridge identity, replacing contacts/channels with the snapshot provided.
   """
-  @spec sync_linked_identity(account_id(), service(), sync_attrs()) ::
+  @spec sync_linked_identity(account_id(), service(), sync_attrs(), keyword()) ::
           {:ok, BridgeAccount.t()} | {:error, Changeset.t() | term()}
-  def sync_linked_identity(account_id, service, attrs \\ %{}) do
+  def sync_linked_identity(account_id, service, attrs \\ %{}, opts \\ []) do
     service = normalise_service(service)
-    timestamp = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    Repo.transaction(fn ->
-      params = %{
-        account_id: account_id,
-        service: service,
-        external_id: safe_string(fetch_attr(attrs, ["external_id", :external_id])),
-        display_name: safe_string(fetch_attr(attrs, ["display_name", :display_name])),
-        session: ensure_map(fetch_attr(attrs, ["session", :session])),
-        capabilities: ensure_map(fetch_attr(attrs, ["capabilities", :capabilities])),
-        metadata: ensure_map(fetch_attr(attrs, ["metadata", :metadata])),
-        last_synced_at: timestamp
-      }
+    with {:ok, instance} <- resolve_instance(attrs, opts) do
+      timestamp = DateTime.utc_now() |> DateTime.truncate(:second)
 
-      with {:ok, account} <- upsert_account(params),
-           :ok <- replace_contacts(account, attrs),
-           :ok <- replace_channels(account, attrs) do
-        maybe_preload(account)
-      else
-        {:error, reason} -> Repo.rollback(reason)
-      end
-    end)
+      Repo.transaction(fn ->
+        params = %{
+          account_id: account_id,
+          service: service,
+          instance: instance,
+          external_id: safe_string(fetch_attr(attrs, ["external_id", :external_id])),
+          display_name: safe_string(fetch_attr(attrs, ["display_name", :display_name])),
+          session: ensure_map(fetch_attr(attrs, ["session", :session])),
+          capabilities: ensure_map(fetch_attr(attrs, ["capabilities", :capabilities])),
+          metadata: ensure_map(fetch_attr(attrs, ["metadata", :metadata])),
+          last_synced_at: timestamp
+        }
+
+        with {:ok, account} <- upsert_account(params),
+             :ok <- replace_contacts(account, attrs),
+             :ok <- replace_channels(account, attrs) do
+          maybe_preload(account)
+        else
+          {:error, reason} -> Repo.rollback(reason)
+        end
+      end)
+    end
   end
 
   defp upsert_account(params) do
@@ -121,8 +151,17 @@ defmodule Messngr.Bridges do
     |> BridgeAccount.changeset(params)
     |> Repo.insert(
       on_conflict:
-        {:replace, [:external_id, :display_name, :session, :capabilities, :metadata, :last_synced_at, :updated_at]},
-      conflict_target: [:account_id, :service],
+        {:replace,
+         [
+           :external_id,
+           :display_name,
+           :session,
+           :capabilities,
+           :metadata,
+           :last_synced_at,
+           :updated_at
+         ]},
+      conflict_target: [:account_id, :service, :instance],
       returning: true
     )
   end
@@ -201,6 +240,56 @@ defmodule Messngr.Bridges do
   defp ensure_list(value) when is_list(value), do: value
   defp ensure_list(value) when is_nil(value), do: []
   defp ensure_list(_), do: []
+
+  defp resolve_instance(attrs, opts) do
+    candidate =
+      case Keyword.fetch(opts, :instance) do
+        {:ok, value} -> value
+        :error -> fetch_attr(attrs, ["instance", :instance])
+      end
+
+    candidate
+    |> maybe_extract_instance()
+    |> normalise_instance_default()
+  end
+
+  defp maybe_extract_instance(%{id: value}) when not is_nil(value), do: value
+  defp maybe_extract_instance(%{"id" => value}) when not is_nil(value), do: value
+  defp maybe_extract_instance(%{external_id: value}) when not is_nil(value), do: value
+  defp maybe_extract_instance(%{"external_id" => value}) when not is_nil(value), do: value
+  defp maybe_extract_instance(%{tenant: tenant}) when not is_nil(tenant), do: maybe_extract_instance(tenant)
+  defp maybe_extract_instance(%{"tenant" => tenant}) when not is_nil(tenant), do: maybe_extract_instance(tenant)
+  defp maybe_extract_instance(%{workspace: workspace}) when not is_nil(workspace),
+    do: maybe_extract_instance(workspace)
+
+  defp maybe_extract_instance(%{"workspace" => workspace}) when not is_nil(workspace),
+    do: maybe_extract_instance(workspace)
+
+  defp maybe_extract_instance(value), do: value
+
+  defp normalise_instance_default(nil), do: {:ok, @default_instance}
+  defp normalise_instance_default(value), do: normalise_instance(value)
+
+  defp normalise_instance(value) when is_atom(value), do: normalise_instance(Atom.to_string(value))
+  defp normalise_instance(value) when is_integer(value), do: normalise_instance(Integer.to_string(value))
+
+  defp normalise_instance(value) when is_binary(value) do
+    trimmed = String.trim(value)
+
+    cond do
+      trimmed == "" -> {:error, {:invalid_instance, value}}
+      String.contains?(trimmed, "/") -> {:error, {:invalid_instance, value}}
+      true -> {:ok, trimmed}
+    end
+  end
+
+  defp normalise_instance(%{} = value) do
+    value
+    |> maybe_extract_instance()
+    |> normalise_instance_default()
+  end
+
+  defp normalise_instance(value), do: {:error, {:invalid_instance, value}}
 
   defp normalise_contact(service, value) when is_map(value) do
     value = stringify_keys(value)

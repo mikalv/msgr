@@ -15,8 +15,8 @@ defmodule MessngrWeb.BridgeCatalogJSON do
 
   defp connector(%CatalogEntry{} = entry, linked_accounts) do
     map = CatalogEntry.to_map(entry)
-    account = Map.get(linked_accounts, map.service)
-    {link_status, link_payload} = link_payload(account)
+    accounts = Map.get(linked_accounts, map.service, [])
+    {link_status, link_payload} = link_payload(accounts)
 
     auth_details =
       map.auth
@@ -43,26 +43,42 @@ defmodule MessngrWeb.BridgeCatalogJSON do
     }
   end
 
-  defp link_payload(%BridgeAccount{} = account) do
+  defp link_payload([]), do: {"not_linked", nil}
+
+  defp link_payload(accounts) when is_list(accounts) do
+    accounts_sorted = Enum.sort_by(accounts, & &1.inserted_at, &>=/2)
+
+    connections = Enum.map(accounts_sorted, &account_payload/1)
+
+    [primary | _] = connections
+
     payload =
-      %{
-        "status" => "linked",
-        "service" => account.service,
-        "display_name" => account.display_name,
-        "external_id" => account.external_id,
-        "linked_at" => format_datetime(account.inserted_at),
-        "last_synced_at" => format_datetime(account.last_synced_at)
-      }
-      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
-      |> Map.new()
+      primary
+      |> Map.put("status", "linked")
+      |> Map.put("connections", connections)
 
     {"linked", payload}
   end
 
-  defp link_payload(_), do: {"not_linked", nil}
+  defp account_payload(%BridgeAccount{} = account) do
+    %{
+      "service" => account.service,
+      "instance" => account.instance,
+      "display_name" => account.display_name,
+      "external_id" => account.external_id,
+      "linked_at" => format_datetime(account.inserted_at),
+      "last_synced_at" => format_datetime(account.last_synced_at)
+    }
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new()
+  end
 
-  defp maybe_put_linked_at(auth_details, %{"linked_at" => linked_at}) do
+  defp maybe_put_linked_at(auth_details, %{"linked_at" => linked_at}) when not is_nil(linked_at) do
     Map.put(auth_details, :linked_at, linked_at)
+  end
+
+  defp maybe_put_linked_at(auth_details, %{"connections" => [first | _]}) do
+    maybe_put_linked_at(auth_details, first)
   end
 
   defp maybe_put_linked_at(auth_details, _link_payload), do: auth_details

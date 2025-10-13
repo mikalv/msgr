@@ -39,6 +39,24 @@ defmodule MessngrWeb.BridgeCatalogControllerTest do
     assert telegram["link"]["external_id"] == "tg-123"
   end
 
+  test "returns all linked instances for multi-tenant connectors", %{conn: conn, account: account} do
+    assert {:ok, _} =
+             Bridges.sync_linked_identity(account.id, :slack, %{external_id: "one"}, instance: "workspace-a")
+
+    assert {:ok, _} =
+             Bridges.sync_linked_identity(account.id, :slack, %{external_id: "two"}, instance: "workspace-b")
+
+    conn = get(conn, ~p"/api/bridges/catalog")
+
+    assert %{"data" => data} = json_response(conn, 200)
+    slack = Enum.find(data, &(&1["id"] == "slack"))
+
+    assert slack["auth"]["status"] == "linked"
+    assert slack["link"]["connections"] |> length() == 2
+    assert Enum.any?(slack["link"]["connections"], &(&1["instance"] == "workspace-a"))
+    assert Enum.any?(slack["link"]["connections"], &(&1["instance"] == "workspace-b"))
+  end
+
   test "requires authentication" do
     conn = build_conn()
 

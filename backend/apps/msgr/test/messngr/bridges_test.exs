@@ -46,6 +46,7 @@ defmodule Messngr.BridgesTest do
 
       assert {:ok, account_record} = Bridges.sync_linked_identity(account.id, :telegram, attrs)
       assert account_record.service == "telegram"
+      assert account_record.instance == Bridges.default_instance()
       assert account_record.external_id == "tg-101"
       assert account_record.capabilities["messaging"]["text"]
       assert account_record.session == %{"blob" => "deadbeef"}
@@ -83,6 +84,7 @@ defmodule Messngr.BridgesTest do
       }
 
       assert {:ok, updated} = Bridges.sync_linked_identity(account.id, :signal, update_attrs)
+      assert updated.instance == Bridges.default_instance()
       assert Enum.map(updated.contacts, & &1.external_id) == ["new"]
       assert Enum.map(updated.channels, & &1.external_id) == ["chat-2"]
       assert Enum.map(updated.channels, & &1.kind) == ["direct"]
@@ -97,10 +99,32 @@ defmodule Messngr.BridgesTest do
       }
 
       assert {:ok, record} = Bridges.sync_linked_identity(account.id, :telegram, attrs)
+      assert record.instance == Bridges.default_instance()
       assert record.external_id == "123"
       assert record.capabilities == %{}
       assert record.contacts == []
       assert record.channels == []
+    end
+
+    test "stores distinct bridge instances for the same service", %{account: account} do
+      assert {:ok, first} =
+               Bridges.sync_linked_identity(account.id, :slack, %{external_id: "one"}, instance: "workspace-a")
+
+      assert {:ok, second} =
+               Bridges.sync_linked_identity(account.id, :slack, %{external_id: "two"}, instance: "workspace-b")
+
+      assert first.instance == "workspace-a"
+      assert second.instance == "workspace-b"
+
+      accounts = Bridges.list_accounts(account.id)
+      assert Enum.count(accounts) == 2
+      assert Enum.any?(accounts, &(&1.instance == "workspace-a"))
+      assert Enum.any?(accounts, &(&1.instance == "workspace-b"))
+    end
+
+    test "rejects invalid instance identifiers", %{account: account} do
+      assert {:error, {:invalid_instance, _}} =
+               Bridges.sync_linked_identity(account.id, :slack, %{external_id: "oops"}, instance: "")
     end
   end
 
@@ -168,6 +192,7 @@ defmodule Messngr.BridgesTest do
     fetched = Bridges.get_account(account.id, :telegram)
     assert fetched.external_id == "lookup"
     assert fetched.service == "telegram"
+    assert fetched.instance == Bridges.default_instance()
   end
 
   describe "contact profile matching" do

@@ -1,0 +1,186 @@
+import asyncio
+import logging
+from typing import Dict, Mapping, Optional, Tuple
+
+import pytest
+
+from msgr_teams_bridge.client import (
+    TeamsGraphClient,
+    TeamsIdentity,
+    TeamsOAuthClient,
+    TeamsTenant,
+    TeamsToken,
+    TeamsUser,
+)
+
+
+class DummyTask:
+    def __init__(self) -> None:
+        self._cancelled = False
+
+    def cancel(self) -> None:
+        self._cancelled = True
+
+    def done(self) -> bool:
+        return True
+
+    def __await__(self):  # pragma: no cover - simple awaitable shim
+        async def _noop() -> None:
+            return None
+
+        return _noop().__await__()
+
+
+class DummyTeamsClient(TeamsGraphClient):
+    def __init__(self) -> None:
+        super().__init__(logger=logging.getLogger("dummy-teams"))
+        self._responses: Dict[Tuple[str, Optional[Tuple[Tuple[str, object], ...]]], Mapping[str, object]] = {}
+        self.posts: list[Tuple[str, Mapping[str, object]]] = []
+
+    def queue_response(
+        self,
+        path: str,
+        response: Mapping[str, object],
+        *,
+        params: Optional[Mapping[str, object]] = None,
+    ) -> None:
+        key = (path, tuple(sorted((params or {}).items())) if params else None)
+        self._responses[key] = response
+
+    async def _ensure_session(self) -> None:  # type: ignore[override]
+        return None
+
+    async def _poll_loop(self) -> None:  # type: ignore[override]
+        return None
+
+    async def connect(self, tenant: TeamsTenant, token: TeamsToken) -> None:  # type: ignore[override]
+        self._tenant = tenant
+        self._token = token
+        me = await self._get("/me")
+        user = TeamsUser(
+            id=str(me.get("id")),
+            display_name=me.get("displayName"),
+            user_principal_name=me.get("userPrincipalName"),
+            mail=me.get("mail"),
+        )
+        self._identity = TeamsIdentity(tenant=tenant, user=user)
+        self._poll_task = DummyTask()
+
+    async def _get(  # type: ignore[override]
+        self,
+        path: str,
+        params: Optional[Mapping[str, object]] = None,
+    ) -> Mapping[str, object]:
+        key = (path, tuple(sorted((params or {}).items())) if params else None)
+        return self._responses.get(key, {"value": []})
+
+    async def _post(  # type: ignore[override]
+        self,
+        path: str,
+        payload: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        self.posts.append((path, payload))
+        return {"id": "m1"}
+
+
+def test_connect_fetches_identity(monkeypatch) -> None:
+    async def _run() -> None:
+        tenant = TeamsTenant(id="tenant", display_name="Acme")
+        token = TeamsToken(access_token="token")
+        client = DummyTeamsClient()
+        client.queue_response("/me", {"id": "user1", "displayName": "Alice"})
+
+        await client.connect(tenant, token)
+        identity = await client.fetch_identity()
+
+        assert identity.user.id == "user1"
+        assert identity.tenant.id == "tenant"
+
+    asyncio.run(_run())
+
+
+def test_list_conversations_and_members() -> None:
+    async def _run() -> None:
+        client = DummyTeamsClient()
+        client._tenant = TeamsTenant(id="tenant")  # type: ignore[protected-access]
+        client._token = TeamsToken(access_token="token")  # type: ignore[protected-access]
+
+        client.queue_response("/me/chats", {"value": [{"id": "chat1"}]})
+        client.queue_response("/me/people", {"value": [{"id": "user2"}]})
+
+        conversations = await client.list_conversations()
+        members = await client.list_members()
+
+        assert conversations[0]["id"] == "chat1"
+        assert members[0]["id"] == "user2"
+
+    asyncio.run(_run())
+
+
+def test_send_message_and_poll_event(monkeypatch) -> None:
+    async def _run() -> None:
+        tenant = TeamsTenant(id="tenant")
+        token = TeamsToken(access_token="token")
+        client = DummyTeamsClient()
+        client.queue_response("/me", {"id": "user1"})
+
+        await client.connect(tenant, token)
+
+        client.queue_response(
+            f"/chats/chat1/messages",
+            {
+                "value": [
+                    {"id": "msg1", "createdDateTime": "2024-01-01T00:00:00Z", "body": {"content": "hi"}},
+                ]
+            },
+            params={"$top": 20, "$orderby": "lastModifiedDateTime asc"},
+        )
+
+        events: list[Mapping[str, object]] = []
+
+        async def recorder(payload: Mapping[str, object]) -> None:
+            events.append(payload)
+
+        client.add_event_handler(recorder)
+        await client._poll_chat("chat1")
+
+        await client.send_message("chat1", {"body": {"contentType": "text", "content": "reply"}})
+
+        assert events[0]["event_id"] == "msg1"
+        assert client.posts[-1][0] == "/chats/chat1/messages"
+
+    asyncio.run(_run())
+
+
+def test_teams_oauth_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class DummyResponse:
+        def __init__(self) -> None:
+            self._payload = {"access_token": "token", "refresh_token": "refresh"}
+
+        async def __aenter__(self) -> "DummyResponse":
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - no cleanup required
+            return None
+
+        async def json(self) -> Mapping[str, object]:
+            return self._payload
+
+        def raise_for_status(self) -> None:
+            return None
+
+    class DummySession:
+        def post(self, url: str, data: Mapping[str, object]) -> DummyResponse:
+            captured.update({"url": url, "data": dict(data)})
+            return DummyResponse()
+
+    session = DummySession()
+    client = TeamsOAuthClient("client-id", client_secret="secret", session=session)  # type: ignore[arg-type]
+
+    result = asyncio.run(client.exchange_code("code", redirect_uri="https://callback"))
+
+    assert result["access_token"] == "token"
+    assert captured["url"].startswith("https://login.microsoftonline.com")
+    assert captured["data"]["client_secret"] == "secret"
