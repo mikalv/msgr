@@ -6,10 +6,12 @@ defmodule Messngr.Auth do
   alias Messngr.Accounts
   alias Messngr.Accounts.Identity
   alias Messngr.Auth.Challenge
+  alias Messngr.Auth.Notifier
   alias Messngr.FeatureFlags
   alias Messngr.Noise.Handshake
   alias Messngr.Transport.Noise.Session
   alias Messngr.Repo
+  alias Messngr.RateLimiter
 
   @challenge_ttl_minutes 10
 
@@ -19,7 +21,9 @@ defmodule Messngr.Auth do
   def start_challenge(attrs) do
     with {:ok, channel} <- normalize_channel(Map.get(attrs, "channel")),
          {:ok, target} <- normalize_target(channel, Map.get(attrs, "identifier")),
-         {:ok, {challenge, code}} <- persist_challenge(channel, target, attrs) do
+         :ok <- throttle_challenge_requests(channel, target),
+         {:ok, {challenge, code}} <- persist_challenge(channel, target, attrs),
+         :ok <- deliver_challenge(challenge, code) do
       {:ok, challenge, code}
     end
   end
@@ -274,6 +278,25 @@ defmodule Messngr.Auth do
         {:error, reason} -> Repo.rollback(reason)
       end
     end)
+  end
+
+  defp throttle_challenge_requests(channel, target) do
+    bucket = "#{channel}:#{target}"
+
+    case RateLimiter.check(:auth_challenge, bucket) do
+      :ok -> :ok
+      {:error, :rate_limited} -> {:error, :too_many_requests}
+      {:error, reason} -> {:error, {:rate_limit_error, reason}}
+    end
+  end
+
+  defp deliver_challenge(challenge, code) do
+    case Notifier.deliver_challenge(challenge, code) do
+      :ok -> :ok
+      {:error, reason} ->
+        Repo.delete(challenge)
+        {:error, reason}
+    end
   end
 
   defp upsert_identity_from_challenge(challenge, attrs) do

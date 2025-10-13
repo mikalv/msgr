@@ -113,7 +113,8 @@ defmodule Messngr.Media.Upload do
   def payload(%__MODULE__{} = upload) do
     download =
       Messngr.Media.Storage.presign_download(upload.bucket, upload.object_key,
-        content_type: upload.content_type
+        content_type: upload.content_type,
+        checksum: upload.checksum
       )
 
     base_media =
