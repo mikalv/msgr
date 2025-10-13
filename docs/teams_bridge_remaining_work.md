@@ -13,11 +13,10 @@ The remaining work items below highlight what needs to ship before piloting the 
 production tenant.
 
 ## OAuth & Consent Experience
-- Complete the embedded browser OAuth flow with resource-specific consent prompts when tenants
-  require RSC scopes, and surface clear guidance/errors in the linking wizard.
-- Refresh tokens are now persisted in the bridge credential vault and automatically renewed by the
-  Teams bridge daemon; continue wiring the consent UI to surface credential status and revocation
-  controls for operators.
+- ✅ Completed the embedded browser OAuth flow with resource-specific consent prompts when tenants
+  require RSC scopes, and surfaced clear guidance/errors in the linking wizard.
+- ✅ Surfaced bridge credential status and revocation controls in the consent UI now that refresh
+  tokens are persisted in the credential vault and automatically renewed by the Teams bridge daemon.
 
 ## Real-time Event Delivery
 - Harden the new change-notification pipeline by persisting Graph webhook subscription state and

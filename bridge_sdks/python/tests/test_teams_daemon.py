@@ -253,7 +253,40 @@ def test_link_account_without_token_requires_consent(tmp_path: Path) -> None:
         response = json.loads(response_raw.decode("utf-8"))
 
         assert response["status"] == "consent_required"
-        assert response["flow"]["kind"] == "embedded_browser_consent"
+        flow = response["flow"]
+        assert flow["kind"] == "embedded_browser_consent"
+        assert flow["tenant"]["id"] == "tenant-1"
+        assert any(step["action"] == "open_webview" for step in flow["steps"])
+        assert not flow.get("resource_specific_consent")
+
+        await daemon.shutdown()
+
+    _run(scenario)
+
+
+def test_link_account_requires_rsc_prompts(tmp_path: Path) -> None:
+    client = FakeTeamsClient()
+    daemon, transport, _sessions = _build_daemon(tmp_path, client)
+
+    async def scenario() -> None:
+        await daemon.start()
+        envelope = build_envelope(
+            "teams",
+            "link_account",
+            {
+                "user_id": "acct-1",
+                "tenant": {"id": "tenant-1", "requires_resource_specific_consent": True},
+                "session": {},
+            },
+        )
+        topic = "bridge/teams/tenant-1/link_account"
+        response_raw = await transport.request(topic, envelope.to_json().encode("utf-8"))
+        response = json.loads(response_raw.decode("utf-8"))
+
+        assert response["status"] == "consent_required"
+        flow = response["flow"]
+        assert flow["resource_specific_consent"]["required"] is True
+        assert any(step["action"] == "resource_specific_consent" for step in flow["steps"])
 
         await daemon.shutdown()
 

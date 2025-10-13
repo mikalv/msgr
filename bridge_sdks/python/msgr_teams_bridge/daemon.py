@@ -391,10 +391,19 @@ def _extract_tenant(payload: Mapping[str, object]) -> Optional[Mapping[str, obje
 
 
 def _build_tenant(payload: Mapping[str, object]) -> TeamsTenant:
+    requires_rsc = payload.get("requires_resource_specific_consent")
+    if isinstance(requires_rsc, bool):
+        requires_resource_specific_consent = requires_rsc
+    elif isinstance(requires_rsc, str):
+        requires_resource_specific_consent = requires_rsc.lower() in {"true", "1", "yes"}
+    else:
+        requires_resource_specific_consent = False
+
     return TeamsTenant(
         id=str(payload.get("id") or payload.get("tenant_id")),
         display_name=str(payload.get("display_name")) if payload.get("display_name") else None,
         domain=str(payload.get("domain")) if payload.get("domain") else None,
+        requires_resource_specific_consent=requires_resource_specific_consent,
     )
 
 
@@ -425,26 +434,53 @@ def _compact_snapshot(values: Mapping[str, object | None]) -> Dict[str, object]:
 
 
 def _browser_consent_plan(tenant: TeamsTenant) -> Dict[str, object]:
-    return {
+    steps: list[Dict[str, object]] = [
+        {
+            "title": "Åpne Microsoft-innloggingen",
+            "action": "open_webview",
+            "url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+            "note": "Start autorisasjonskoden med de forhåndsdefinerte Teams-scope'ene.",
+        },
+        {
+            "title": "Fullfør påloggingen",
+            "action": "capture_redirect",
+            "note": "Når innloggingen er ferdig fanger Msgr opp omdirigeringen og koden inne i nettleseren.",
+        },
+        {
+            "title": "Veksle kode mot token",
+            "action": "exchange_code",
+            "note": "Msgrs Teams-bakdel utveksler koden for tilgangs- og oppfriskningstoken og lagrer dem sikkert.",
+        },
+    ]
+
+    plan: Dict[str, object] = {
         "status": "consent_required",
         "reason": "interactive_consent_required",
         "flow": {
             "kind": "embedded_browser_consent",
             "tenant": tenant.to_dict(),
-            "steps": [
-                {
-                    "action": "open_webview",
-                    "url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-                    "note": "Initiate the Microsoft identity platform authorization code flow for Teams scopes.",
-                },
-                {
-                    "action": "capture_redirect",
-                    "note": "Intercept the redirect URI inside the webview and extract the authorization code.",
-                },
-                {
-                    "action": "exchange_code",
-                    "note": "Use the captured code with the Teams bridge backend to obtain access/refresh tokens via Microsoft Graph.",
-                },
-            ],
+            "steps": steps,
         },
     }
+
+    if tenant.requires_resource_specific_consent:
+        rsc_details = {
+            "required": True,
+            "title": "Gi ressurs-spesifikt samtykke",
+            "note": (
+                "Denne leietakeren krever Microsoft Teams Resource-Specific Consent (RSC). "
+                "Velg teamet/kanalen når du blir bedt om det i samtykkedialogen og bekreft "
+                "tilgang for Msgr-appen."
+            ),
+        }
+        steps.insert(
+            1,
+            {
+                "title": "Behandle RSC-forespørselen",
+                "action": "resource_specific_consent",
+                "note": "Når dialogen spør om team/kanal-tilgang må du velge ressursene Msgr skal synkronisere.",
+            },
+        )
+        plan["flow"]["resource_specific_consent"] = rsc_details  # type: ignore[index]
+
+    return plan

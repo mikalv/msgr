@@ -1,6 +1,10 @@
 # Changelog
 
 ## Unreleased
+- Enhanced the Microsoft Teams OAuth consent experience with resource-specific consent prompts,
+  credential status surfacing, and revocation controls across the daemon, bridge metadata, and
+  Flutter linking wizard, including updated unit tests for the Teams SDK and bridge session
+  controller.
 - Normalised Microsoft Teams chat and channel events into the canonical Msgr schema, capturing
   reply hierarchies, mentions, reactions, and meeting metadata while extending runtime tests to
   cover the richer payloads alongside webhook and poller dispatch flows. Introduced adaptive-card

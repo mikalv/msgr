@@ -74,4 +74,22 @@ class BridgeSessionController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<void> unlink() async {
+    _busy = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await _api.unlink(
+        current: _identity,
+        bridgeId: bridgeId,
+      );
+      await refresh();
+    } catch (err) {
+      _error = err;
+    } finally {
+      _busy = false;
+      notifyListeners();
+    }
+  }
 }

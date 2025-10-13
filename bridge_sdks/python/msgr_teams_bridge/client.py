@@ -47,13 +47,17 @@ class TeamsTenant:
     id: str
     display_name: Optional[str] = None
     domain: Optional[str] = None
+    requires_resource_specific_consent: bool = False
 
-    def to_dict(self) -> MutableMapping[str, Optional[str]]:
-        return {
+    def to_dict(self) -> MutableMapping[str, object]:
+        payload: MutableMapping[str, object] = {
             "id": self.id,
             "display_name": self.display_name,
             "domain": self.domain,
         }
+        if self.requires_resource_specific_consent:
+            payload["requires_resource_specific_consent"] = True
+        return payload
 
 
 @dataclass(frozen=True)

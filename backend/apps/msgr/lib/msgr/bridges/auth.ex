@@ -228,7 +228,40 @@ defmodule Messngr.Bridges.Auth do
           oauth: %{
             scopes: ["Chat.ReadWrite", "ChannelMessage.Send", "Group.Read.All"],
             pkce: true,
-            allow_multiple: true
+            allow_multiple: true,
+            consent_plan: %{
+              "kind" => "embedded_browser",
+              "steps" => [
+                %{
+                  "title" => "Logg inn med en Teams-administrator",
+                  "description" =>
+                    "Msgr åpner en innebygd nettleser hvor du signerer inn med kontoen som " \
+                      "har lov til å gi samtykke for Teams.",
+                  "action" => "open_webview"
+                },
+                %{
+                  "title" => "Godkjenn Msgr-applikasjonen",
+                  "description" =>
+                    "Kontroller at Teams-scope'ene som listes opp samsvarer med Msgr sine behov og " \
+                      "trykk Godta.",
+                  "action" => "capture_redirect"
+                },
+                %{
+                  "title" => "Vent til Msgr bekrefter",
+                  "description" =>
+                    "Når samtykket er gitt fanger Msgr opp omdirigeringen og lagrer tokenene i " \
+                      "broens credential vault.",
+                  "action" => "exchange_code"
+                }
+              ],
+              "resource_specific_consent" => %{
+                "title" => "Gi ressurs-spesifikt samtykke",
+                "summary" =>
+                  "Noen leietakere viser en ekstra dialog for Resource-Specific Consent (RSC). " \
+                    "Velg hvilke team og kanaler Msgr skal ha tilgang til når du blir spurt.",
+                "action" => "resource_specific_consent"
+              }
+            }
           }
         },
         capabilities: %{
@@ -728,9 +761,20 @@ defmodule Messngr.Bridges.Auth do
 
     poll = Map.get(entry.auth, :polling)
 
+    consent_plan =
+      entry.auth
+      |> Map.get(:oauth, %{})
+      |> Map.get(:consent_plan)
+
     entry_metadata = %{}
     entry_metadata = if scopes == [], do: entry_metadata, else: Map.put(entry_metadata, "scopes", scopes)
     entry_metadata = if is_nil(poll), do: entry_metadata, else: Map.put(entry_metadata, "poll", poll)
+    entry_metadata =
+      if is_nil(consent_plan) do
+        entry_metadata
+      else
+        Map.put(entry_metadata, "consent_plan", consent_plan)
+      end
 
     Map.merge(entry_metadata, base_metadata)
   end
