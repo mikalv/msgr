@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from typing import Dict, Mapping, Optional, Tuple
 
 import pytest
@@ -11,20 +12,28 @@ from msgr_teams_bridge.client import (
     TeamsTenant,
     TeamsToken,
     TeamsUser,
+    UpdateHandler,
+)
+from msgr_teams_bridge.notifications import (
+    MemoryNotificationTransport,
+    TeamsWebhookNotificationSource,
 )
 
 
 class DummyTask:
     def __init__(self) -> None:
         self._cancelled = False
+        self._done = False
 
     def cancel(self) -> None:
         self._cancelled = True
+        self._done = True
 
     def done(self) -> bool:
-        return True
+        return self._done
 
     def __await__(self):  # pragma: no cover - simple awaitable shim
+        self._done = True
         async def _noop() -> None:
             return None
 
@@ -83,6 +92,82 @@ class DummyTeamsClient(TeamsGraphClient):
         return {"id": "m1"}
 
 
+class NotificationEnabledClient(TeamsGraphClient):
+    def __init__(self, source: TeamsWebhookNotificationSource) -> None:
+        super().__init__(logger=logging.getLogger("teams-notify"), notification_source=source)
+        self._responses: Dict[Tuple[str, Optional[Tuple[Tuple[str, object], ...]]], Mapping[str, object]] = {}
+
+    def queue_response(
+        self,
+        path: str,
+        response: Mapping[str, object],
+        *,
+        params: Optional[Mapping[str, object]] = None,
+    ) -> None:
+        key = (path, tuple(sorted((params or {}).items())) if params else None)
+        self._responses[key] = response
+
+    async def _ensure_session(self) -> None:  # type: ignore[override]
+        return None
+
+    async def _get(  # type: ignore[override]
+        self,
+        path: str,
+        params: Optional[Mapping[str, object]] = None,
+    ) -> Mapping[str, object]:
+        key = (path, tuple(sorted((params or {}).items())) if params else None)
+        return self._responses.get(key, {"value": []})
+
+    async def connect(self, tenant: TeamsTenant, token: TeamsToken) -> None:  # type: ignore[override]
+        self._tenant = tenant
+        self._token = token
+        me = await self._get("/me")
+        user = TeamsUser(
+            id=str(me.get("id")),
+            display_name=me.get("displayName"),
+            user_principal_name=me.get("userPrincipalName"),
+            mail=me.get("mail"),
+        )
+        self._identity = TeamsIdentity(tenant=tenant, user=user)
+        if self._notification_source is not None:
+            await self._notification_source.start(tenant, token, self._handle_change_notification)
+            self._notifications_active = True
+
+
+class SpyNotificationSource:
+    def __init__(self) -> None:
+        self.started = False
+        self.dispatch: Optional[UpdateHandler] = None
+        self.refreshed: list[str] = []
+        self.acknowledged: list[str] = []
+        self._subscription_id = "spy-sub"
+
+    async def start(
+        self,
+        tenant: TeamsTenant,
+        token: TeamsToken,
+        dispatch: UpdateHandler,
+    ) -> None:
+        self.started = True
+        self.dispatch = dispatch
+
+    async def stop(self) -> None:
+        self.started = False
+
+    async def acknowledge(self, event_id: str) -> None:
+        self.acknowledged.append(event_id)
+
+    async def refresh(self, token: TeamsToken) -> None:
+        self.refreshed.append(token.access_token)
+
+    @property
+    def active(self) -> bool:
+        return self.started
+
+    @property
+    def subscription_id(self) -> Optional[str]:
+        return self._subscription_id
+
 def test_connect_fetches_identity(monkeypatch) -> None:
     async def _run() -> None:
         tenant = TeamsTenant(id="tenant", display_name="Acme")
@@ -130,7 +215,60 @@ def test_send_message_and_poll_event(monkeypatch) -> None:
             f"/chats/chat1/messages",
             {
                 "value": [
-                    {"id": "msg1", "createdDateTime": "2024-01-01T00:00:00Z", "body": {"content": "hi"}},
+                    {
+                        "id": "msg1",
+                        "chatId": "chat1",
+                        "messageType": "meetingMessage",
+                        "createdDateTime": "2024-01-01T00:00:00Z",
+                        "lastModifiedDateTime": "2024-01-01T00:00:10Z",
+                        "body": {"content": "<p>hi</p>", "contentType": "html"},
+                        "summary": "hi",
+                        "replyToId": "parent1",
+                        "from": {"user": {"id": "user2", "displayName": "Bob"}},
+                        "attachments": [
+                            {
+                                "id": "att1",
+                                "contentType": "image/png",
+                                "contentUrl": "https://cdn.example/img.png",
+                                "name": "img.png",
+                                "size": 123,
+                            }
+                        ],
+                        "mentions": [
+                            {
+                                "id": 0,
+                                "mentionText": "@Alice",
+                                "mentioned": {"user": {"id": "user1", "displayName": "Alice"}},
+                            }
+                        ],
+                        "reactions": [
+                            {
+                                "reactionType": "like",
+                                "createdDateTime": "2024-01-01T00:00:05Z",
+                                "user": {"user": {"id": "user3", "displayName": "Charlie"}},
+                            }
+                        ],
+                        "replies": [
+                            {
+                                "id": "msg1-reply",
+                                "createdDateTime": "2024-01-01T00:00:20Z",
+                                "body": {"content": "<p>Reply</p>", "contentType": "html"},
+                                "from": {"user": {"id": "user4", "displayName": "Dana"}},
+                            }
+                        ],
+                        "meetingMessageType": "meeting",
+                        "meetingInfo": {
+                            "id": "meet-1",
+                            "subject": "Weekly sync",
+                            "joinUrl": "https://teams.example/join",
+                            "organizer": {"id": "user2", "displayName": "Bob"},
+                        },
+                        "onlineMeetingInfo": {
+                            "conferenceId": "conf-1",
+                            "joinUrl": "javascript:alert('x')",
+                        },
+                        "eventDetail": {"topic": "Weekly"},
+                    }
                 ]
             },
             params={"$top": 20, "$orderby": "lastModifiedDateTime asc"},
@@ -147,7 +285,261 @@ def test_send_message_and_poll_event(monkeypatch) -> None:
         await client.send_message("chat1", {"body": {"contentType": "text", "content": "reply"}})
 
         assert events[0]["event_id"] == "msg1"
+        assert events[0]["event_type"] == "meeting"
+        assert events[0]["message"]["body"]["content_type"] == "html"
+        assert events[0]["message"]["attachments"][0]["name"] == "img.png"
+        assert events[0]["message"]["mentions"][0]["text"] == "@Alice"
+        assert events[0]["message"]["reply_to"]["id"] == "parent1"
+        assert events[0]["message"]["thread"]["parent_id"] == "parent1"
+        assert events[0]["message"]["thread"]["reply_count"] == 1
+        assert events[0]["message"]["replies"][0]["id"] == "msg1-reply"
+        assert events[0]["message"]["meeting"]["info"]["join_url"] == "https://teams.example/join"
+        assert "join_url" not in events[0]["message"]["meeting"]["online_meeting"]
+        assert events[0]["conversation"]["thread"]["parent_id"] == "parent1"
         assert client.posts[-1][0] == "/chats/chat1/messages"
+
+    asyncio.run(_run())
+
+
+def test_change_notifications_dispatch_events() -> None:
+    async def _run() -> None:
+        transport = MemoryNotificationTransport()
+        source = TeamsWebhookNotificationSource(transport, renewal_window=3600.0)
+        client = NotificationEnabledClient(source)
+
+        tenant = TeamsTenant(id="tenant", display_name="Acme")
+        token = TeamsToken(access_token="token")
+
+        client.queue_response("/me", {"id": "user1", "displayName": "Alice"})
+        client.queue_response(
+            "/chats/chat-1/messages/msg-99",
+            {
+                "id": "msg-99",
+                "chatId": "chat-1",
+                "createdDateTime": "2024-01-01T00:00:00Z",
+                "body": {"content": "<p>Hello</p>", "contentType": "html"},
+                "from": {"user": {"id": "user2", "displayName": "Bob"}},
+            },
+        )
+
+        await client.connect(tenant, token)
+
+        events: list[Mapping[str, object]] = []
+
+        async def handler(payload: Mapping[str, object]) -> None:
+            events.append(payload)
+
+        client.add_event_handler(handler)
+
+        subscription_id = source.subscription_id
+        assert subscription_id is not None
+
+        notification = {
+            "subscriptionId": subscription_id,
+            "resource": "/chats('chat-1')/messages('msg-99')",
+            "resourceData": {"id": "msg-99", "chatId": "chat-1"},
+        }
+
+        await transport.dispatch(subscription_id, notification)
+
+        assert events and events[0]["event_id"] == "msg-99"
+        assert events[0]["message"]["body"]["content_type"] == "html"
+
+        await client.acknowledge_event("msg-99")
+        assert (subscription_id, "msg-99") in transport.acknowledged
+
+        health = await client.health()
+        assert health["delivery_mode"] == "change_notifications"
+        assert health["subscription_id"] == subscription_id
+
+        await client.disconnect()
+
+    asyncio.run(_run())
+
+
+def test_send_message_sanitises_cards_and_uploads() -> None:
+    async def _run() -> None:
+        client = DummyTeamsClient()
+        message = {
+            "body": {"contentType": "text", "content": "Hello\nWorld"},
+            "attachments": [
+                {
+                    "contentType": "application/vnd.microsoft.card.adaptive",
+                    "content": {
+                        "type": "AdaptiveCard",
+                        "body": [{"type": "TextBlock", "text": "<script>bad</script>"}],
+                        "actions": [
+                            {"type": "Action.OpenUrl", "url": "javascript:alert(1)"},
+                            {"type": "Action.OpenUrl", "url": "https://example.com"},
+                        ],
+                    },
+                    "contentUrl": "javascript:alert('x')",
+                }
+            ],
+        }
+
+        result = await client.send_message(
+            "chat1",
+            message,
+            file_uploads=[{"filename": "hello.txt", "content": b"hello", "content_type": "text/plain"}],
+        )
+
+        path, payload = client.posts[-1]
+        assert path == "/chats/chat1/messages"
+        assert payload["body"]["content"].startswith("<p>Hello")
+
+        attachments = payload["attachments"]
+        assert len(attachments) == 2
+
+        card_attachment = attachments[0]
+        assert card_attachment["contentType"] == "application/vnd.microsoft.card.adaptive"
+        assert "javascript" not in card_attachment.get("content", "")
+        assert "contentUrl" not in card_attachment
+
+        file_attachment = attachments[1]
+        assert file_attachment["name"] == "hello.txt"
+        assert file_attachment["contentType"] == "text/plain"
+        assert "contentBytes" in file_attachment
+
+        assert result["uploaded_files"][0]["name"] == "hello.txt"
+
+    asyncio.run(_run())
+
+
+def test_send_message_sanitises_html_content() -> None:
+    async def _run() -> None:
+        client = DummyTeamsClient()
+        client._tenant = TeamsTenant(id="tenant")  # type: ignore[protected-access]
+        client._token = TeamsToken(access_token="token")  # type: ignore[protected-access]
+
+        await client.send_message(
+            "chat1",
+            {
+                "body": {
+                    "contentType": "html",
+                    "content": (
+                        "<script>alert(1)</script><p>Hello <b>World</b></p>"
+                        '<a href="javascript:bad">bad</a><a href="https://ok">ok</a>'
+                    ),
+                }
+            },
+        )
+
+        _, payload = client.posts[-1]
+        assert payload["body"]["contentType"] == "html"
+        assert payload["body"]["content"] == '<p>Hello <b>World</b></p>bad<a href="https://ok">ok</a>'
+
+    asyncio.run(_run())
+
+
+def test_token_refresh_invoked_when_expiring() -> None:
+    async def _run() -> None:
+        client = TeamsGraphClient(logger=logging.getLogger("refresh"), token_refresh_margin=45.0)
+        client._token = TeamsToken(  # type: ignore[protected-access]
+            access_token="old",
+            refresh_token="refresh",
+            expires_at=time.time() + 10,
+        )
+
+        refreshed_tokens: list[TeamsToken] = []
+        updated_tokens: list[TeamsToken] = []
+
+        async def refresher(current: TeamsToken) -> TeamsToken:
+            refreshed_tokens.append(current)
+            return TeamsToken(
+                access_token="new",
+                refresh_token="refresh-2",
+                expires_at=time.time() + 3600,
+            )
+
+        async def on_update(updated: TeamsToken) -> None:
+            updated_tokens.append(updated)
+
+        client.configure_token_refresh(refresher, on_update, margin=30.0)
+        await client._ensure_valid_token()  # type: ignore[attr-defined]
+
+        assert client._token is not None  # type: ignore[truthy-bool]
+        assert client._token.access_token == "new"  # type: ignore[union-attr]
+        assert refreshed_tokens and refreshed_tokens[0].access_token == "old"
+        assert updated_tokens and updated_tokens[0].access_token == "new"
+
+    asyncio.run(_run())
+
+
+def test_notification_source_receives_token_refresh() -> None:
+    async def _run() -> None:
+        source = SpyNotificationSource()
+        client = TeamsGraphClient(
+            logger=logging.getLogger("notify-refresh"),
+            token_refresh_margin=45.0,
+            notification_source=source,  # type: ignore[arg-type]
+        )
+        client._token = TeamsToken(  # type: ignore[protected-access]
+            access_token="old",
+            refresh_token="refresh",
+            expires_at=time.time() + 10,
+        )
+
+        async def refresher(current: TeamsToken) -> TeamsToken:
+            return TeamsToken(
+                access_token="new",
+                refresh_token="refresh-2",
+                expires_at=time.time() + 3600,
+            )
+
+        async def on_update(updated: TeamsToken) -> None:
+            return None
+
+        client.configure_token_refresh(refresher, on_update, margin=30.0)
+        await client._ensure_valid_token()  # type: ignore[attr-defined]
+
+        assert source.refreshed and source.refreshed[0] == "new"
+
+    asyncio.run(_run())
+
+
+def test_token_refresh_skipped_when_not_needed() -> None:
+    async def _run() -> None:
+        client = TeamsGraphClient(logger=logging.getLogger("refresh-skip"), token_refresh_margin=45.0)
+        client._token = TeamsToken(  # type: ignore[protected-access]
+            access_token="token",
+            refresh_token="refresh",
+            expires_at=time.time() + 3600,
+        )
+
+        refreshed: list[TeamsToken] = []
+
+        async def refresher(current: TeamsToken) -> TeamsToken:
+            refreshed.append(current)
+            return current
+
+        async def on_update(updated: TeamsToken) -> None:
+            raise AssertionError("token should not be updated when not expiring")
+
+        client.configure_token_refresh(refresher, on_update, margin=30.0)
+        await client._ensure_valid_token()  # type: ignore[attr-defined]
+
+        assert client._token is not None  # type: ignore[truthy-bool]
+        assert client._token.access_token == "token"  # type: ignore[union-attr]
+        assert refreshed == []
+
+    asyncio.run(_run())
+
+
+def test_send_message_renders_plain_text_as_html() -> None:
+    async def _run() -> None:
+        client = DummyTeamsClient()
+        client._tenant = TeamsTenant(id="tenant")  # type: ignore[protected-access]
+        client._token = TeamsToken(access_token="token")  # type: ignore[protected-access]
+
+        await client.send_message(
+            "chat1",
+            {"body": {"contentType": "text", "content": "Line1\nLine2"}},
+        )
+
+        _, payload = client.posts[-1]
+        assert payload["body"]["content"] == "<p>Line1<br />Line2</p>"
+        assert payload["body"]["contentType"] == "html"
 
     asyncio.run(_run())
 
@@ -184,3 +576,31 @@ def test_teams_oauth_payload(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result["access_token"] == "token"
     assert captured["url"].startswith("https://login.microsoftonline.com")
     assert captured["data"]["client_secret"] == "secret"
+
+
+def test_health_reports_teams_runtime_state() -> None:
+    async def _run() -> None:
+        tenant = TeamsTenant(id="tenant")
+        token = TeamsToken(access_token="token")
+        client = DummyTeamsClient()
+        client.queue_response("/me", {"id": "user1"})
+
+        await client.connect(tenant, token)
+
+        await client._dispatch_event("chat1", {"id": "msg-1"})  # type: ignore[arg-type]
+
+        snapshot = await client.health()
+        assert snapshot["connected"] is True
+        assert snapshot["delivery_mode"] == "polling"
+        assert snapshot.get("subscription_id") is None
+        assert snapshot["pending_events"] == 1
+        assert snapshot["last_event_id"] == "msg-1"
+
+        await client.acknowledge_event("msg-1")
+
+        snapshot_after = await client.health()
+        assert snapshot_after["pending_events"] == 0
+        assert snapshot_after["last_ack_latency"] >= 0.0
+        assert snapshot_after["consecutive_errors"] == 0
+
+    asyncio.run(_run())

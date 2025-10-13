@@ -7,7 +7,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Mapping, Optional, Tuple
+from typing import Awaitable, Callable, Dict, List, Mapping, Optional, Tuple
 
 from .client import TeamsClientProtocol, TeamsTenant, TeamsToken
 
@@ -108,6 +108,20 @@ class SessionManager:
         self._clients: Dict[str, TeamsClientProtocol] = {}
         self._sessions: Dict[str, SessionData] = {}
         self._locks: Dict[str, asyncio.Lock] = {}
+        self._token_refresher: Optional[
+            Callable[[TeamsTenant, TeamsToken], Awaitable[TeamsToken]]
+        ] = None
+        self._refresh_margin: float = 120.0
+        self._configured_refresh: Dict[str, bool] = {}
+
+    def set_token_refresher(
+        self,
+        refresher: Callable[[TeamsTenant, TeamsToken], Awaitable[TeamsToken]],
+        *,
+        margin: float = 120.0,
+    ) -> None:
+        self._token_refresher = refresher
+        self._refresh_margin = max(30.0, float(margin))
 
     async def ensure_client(
         self,
@@ -140,16 +154,22 @@ class SessionManager:
             client = self._clients.get(key)
             if client is None or not await client.is_connected():
                 client = self._factory(session_to_use.tenant)
+                self._configured_refresh.pop(key, None)
+                self._configure_token_refresh(key, client, session_to_use)
                 await client.connect(session_to_use.tenant, session_to_use.token)
                 self._clients[key] = client
             elif token is not None and session_to_use.token.access_token == token.access_token:
                 # Session already reflects the updated token and connection remains valid.
-                pass
+                self._configure_token_refresh(key, client, session_to_use)
             elif token is not None:
                 await client.disconnect()
                 client = self._factory(session_to_use.tenant)
+                self._configured_refresh.pop(key, None)
+                self._configure_token_refresh(key, client, session_to_use)
                 await client.connect(session_to_use.tenant, session_to_use.token)
                 self._clients[key] = client
+            else:
+                self._configure_token_refresh(key, client, session_to_use)
 
             self._sessions[key] = session_to_use
             await self._store.persist(session_to_use.tenant.id, session_to_use.user_id, session_to_use)
@@ -162,9 +182,53 @@ class SessionManager:
         except KeyError as exc:
             raise RuntimeError(f"no active Teams client for {tenant_id}/{user_id}") from exc
 
+    def _configure_token_refresh(
+        self,
+        key: str,
+        client: TeamsClientProtocol,
+        session: SessionData,
+    ) -> None:
+        if self._token_refresher is None or self._configured_refresh.get(key):
+            return
+
+        configure = getattr(client, "configure_token_refresh", None)
+        if not callable(configure):
+            self._configured_refresh[key] = True
+            return
+
+        async def refresher(current: TeamsToken) -> TeamsToken:
+            refresher_fn = self._token_refresher
+            if refresher_fn is None:
+                raise RuntimeError("Teams token refresher is not configured")
+            return await refresher_fn(session.tenant, current)
+
+        async def on_update(updated: TeamsToken) -> None:
+            existing = self._sessions.get(key)
+            tenant = existing.tenant if existing is not None else session.tenant
+            user_id = existing.user_id if existing is not None else session.user_id
+            refreshed_session = SessionData(tenant=tenant, token=updated, user_id=user_id)
+            self._sessions[key] = refreshed_session
+            await self._store.persist(tenant.id, user_id, refreshed_session)
+
+        try:
+            configure(refresher, on_update, margin=self._refresh_margin)
+        except TypeError:
+            configure(refresher, on_update)
+        self._configured_refresh[key] = True
+
     def get_session(self, tenant_id: str, user_id: Optional[str]) -> Optional[SessionData]:
         key = self._key(tenant_id, user_id)
         return self._sessions.get(key)
+
+    def active_entries(self) -> List[Tuple[str, Optional[str], TeamsClientProtocol, Optional[SessionData]]]:
+        """Return a snapshot of active Teams clients and their sessions."""
+
+        entries: List[Tuple[str, Optional[str], TeamsClientProtocol, Optional[SessionData]]] = []
+        for key, client in self._clients.items():
+            tenant_id, user_token = key.split("::", 1)
+            user_id = None if user_token == "user" else user_token
+            entries.append((tenant_id, user_id, client, self._sessions.get(key)))
+        return entries
 
     async def export_session(self, tenant_id: str, user_id: Optional[str]) -> Optional[SessionData]:
         key = self._key(tenant_id, user_id)
@@ -177,6 +241,7 @@ class SessionManager:
         key = self._key(tenant_id, user_id)
         client = self._clients.pop(key, None)
         self._sessions.pop(key, None)
+        self._configured_refresh.pop(key, None)
         if client is not None and disconnect:
             await client.disconnect()
 
@@ -186,6 +251,7 @@ class SessionManager:
                 await client.disconnect()
             self._clients.pop(key, None)
             self._sessions.pop(key, None)
+            self._configured_refresh.pop(key, None)
 
     @staticmethod
     def _key(tenant_id: str, user_id: Optional[str]) -> str:

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import copy
+import logging
+import time
 from typing import Dict, Mapping, MutableMapping, Optional
 
 from msgr_bridge_sdk import Envelope, StoneMQClient, build_envelope
@@ -14,7 +16,7 @@ _DEFAULT_CAPABILITIES: Mapping[str, object] = {
     "messaging": {
         "text": True,
         "mentions": True,
-        "attachments": ["file", "image"],
+        "attachments": ["file", "image", "adaptive_card"],
     },
     "presence": {"typing": True, "read_receipts": True},
     "threads": {"supported": True},
@@ -40,10 +42,15 @@ class TeamsBridgeDaemon:
         self._instance = instance
         self._event_handlers: Dict[str, object] = {}
         self._ack_state: Dict[str, Mapping[str, object]] = {}
+        self._logger = logging.getLogger(__name__)
+
+        if oauth is not None:
+            sessions.set_token_refresher(self._refresh_session_token)
 
         self._client.register("outbound_message", self._handle_outbound_message)
         self._client.register("ack_event", self._handle_ack_event)
         self._client.register_request("link_account", self._handle_link_account)
+        self._client.register_request("health_snapshot", self._handle_health_snapshot)
 
     async def start(self) -> None:
         await self._client.start()
@@ -118,6 +125,27 @@ class TeamsBridgeDaemon:
 
         return self._build_linked_response(identity, session, capabilities, members, conversations)
 
+    async def _refresh_session_token(self, tenant: TeamsTenant, token: TeamsToken) -> TeamsToken:
+        if self._oauth is None:
+            raise RuntimeError("Teams OAuth client is not configured for token refresh")
+        if token.refresh_token is None:
+            raise RuntimeError("Teams token does not include a refresh_token")
+
+        payload = await self._oauth.refresh_token(token.refresh_token)
+        refreshed = _extract_token(payload) if isinstance(payload, Mapping) else None
+        if refreshed is None:
+            raise RuntimeError("Teams OAuth refresh did not return a valid token")
+
+        if refreshed.refresh_token is None and token.refresh_token is not None:
+            refreshed = TeamsToken(
+                access_token=refreshed.access_token,
+                refresh_token=token.refresh_token,
+                expires_at=refreshed.expires_at,
+                token_type=refreshed.token_type,
+            )
+
+        return refreshed
+
     async def _handle_outbound_message(self, envelope: Envelope) -> None:
         metadata = envelope.metadata
         payload = envelope.payload
@@ -142,18 +170,46 @@ class TeamsBridgeDaemon:
 
         message_body = payload.get("message")
         if isinstance(message_body, str):
-            message_body = {"body": {"contentType": "text", "content": message_body}}
-        elif not isinstance(message_body, Mapping):
+            message_map: Dict[str, object] = {"body": {"contentType": "text", "content": message_body}}
+        elif isinstance(message_body, Mapping):
+            message_map = dict(message_body)
+        else:
             raise ValueError("message payload must be a string or mapping")
+
+        attachments_payload = payload.get("attachments")
+        if isinstance(attachments_payload, list):
+            existing = (
+                list(message_map.get("attachments", []))
+                if isinstance(message_map.get("attachments"), list)
+                else []
+            )
+            additional = [dict(item) for item in attachments_payload if isinstance(item, Mapping)]
+            if additional:
+                message_map["attachments"] = existing + additional
+
+        mentions_payload = payload.get("mentions")
+        if isinstance(mentions_payload, list):
+            existing_mentions = (
+                list(message_map.get("mentions", []))
+                if isinstance(message_map.get("mentions"), list)
+                else []
+            )
+            additional_mentions = [dict(item) for item in mentions_payload if isinstance(item, Mapping)]
+            if additional_mentions:
+                message_map["mentions"] = existing_mentions + additional_mentions
 
         reply_to = payload.get("reply_to") or payload.get("reply_to_id")
         metadata_payload = payload.get("metadata") if isinstance(payload.get("metadata"), Mapping) else None
 
+        file_uploads_payload = payload.get("file_uploads")
+        file_uploads = list(file_uploads_payload) if isinstance(file_uploads_payload, list) else None
+
         await client.send_message(
             conversation_id,
-            message_body,  # type: ignore[arg-type]
+            message_map,
             reply_to_id=str(reply_to) if isinstance(reply_to, str) else None,
             metadata=metadata_payload,
+            file_uploads=file_uploads,
         )
 
     async def _handle_ack_event(self, envelope: Envelope) -> None:
@@ -172,6 +228,65 @@ class TeamsBridgeDaemon:
 
         await client.acknowledge_event(str(event_id))
         self._ack_state[str(event_id)] = dict(payload)
+
+    async def _handle_health_snapshot(self, envelope: Envelope) -> Mapping[str, object]:
+        payload = envelope.payload
+        filter_tenant = payload.get("tenant_id") or payload.get("instance")
+        filter_user = payload.get("user_id")
+
+        entries: list[Mapping[str, object]] = []
+        connected = 0
+        pending_events = 0
+
+        for tenant_id, user_id, client, session in self._sessions.active_entries():
+            if filter_tenant is not None and str(filter_tenant) != tenant_id:
+                continue
+            if filter_user and str(filter_user) != (user_id or ""):
+                continue
+
+            try:
+                runtime = await client.health()
+            except Exception:  # pragma: no cover - defensive logging for ops
+                self._logger.exception(
+                    "Teams health snapshot failed",
+                    extra={"tenant_id": tenant_id, "user_id": user_id},
+                )
+                runtime = {"status": "error"}
+
+            client_connected = bool(runtime.get("connected"))
+            if client_connected:
+                connected += 1
+
+            client_pending = _coerce_int(runtime.get("pending_events"))
+            pending_events += client_pending
+
+            entry: Dict[str, object] = {
+                "tenant_id": tenant_id,
+                "user_id": user_id,
+                "connected": client_connected,
+                "pending_events": client_pending,
+                "runtime": dict(runtime),
+            }
+            session_payload = session.to_dict() if session is not None else None
+            if session_payload is not None:
+                entry["session"] = session_payload
+
+            entries.append(_compact_snapshot(entry))
+
+        acked_events = [dict(value) for value in self._ack_state.values()]
+        summary = {
+            "total_clients": len(entries),
+            "connected_clients": connected,
+            "pending_events": pending_events,
+            "acked_events": len(acked_events),
+        }
+
+        return {
+            "status": "ok",
+            "summary": summary,
+            "clients": entries,
+            "acked_events": acked_events,
+        }
 
     async def _register_event_handler(
         self,
@@ -229,13 +344,32 @@ def _extract_token(payload: Mapping[str, object]) -> Optional[TeamsToken]:
         token_map = payload.get("token") if isinstance(payload.get("token"), Mapping) else payload
         access_token = token_map.get("access_token") if isinstance(token_map, Mapping) else None
         refresh_token = token_map.get("refresh_token") if isinstance(token_map, Mapping) else None
+        expires_at_value = None
         expires_at = token_map.get("expires_at") if isinstance(token_map, Mapping) else None
+        expires_in = token_map.get("expires_in") if isinstance(token_map, Mapping) else None
+        ext_expires_in = token_map.get("ext_expires_in") if isinstance(token_map, Mapping) else None
+        expires_on = token_map.get("expires_on") if isinstance(token_map, Mapping) else None
+        now = time.time()
+
+        if isinstance(expires_at, (int, float)):
+            expires_at_value = float(expires_at)
+        elif isinstance(expires_at, str) and expires_at.isdigit():
+            expires_at_value = float(expires_at)
+
+        for candidate in (expires_in, ext_expires_in):
+            if isinstance(candidate, (int, float)):
+                expires_at_value = now + float(candidate)
+                break
+
+        if expires_at_value is None and isinstance(expires_on, str) and expires_on.isdigit():
+            expires_at_value = float(expires_on)
+
         token_type = token_map.get("token_type") if isinstance(token_map, Mapping) else None
         if isinstance(access_token, str) and access_token:
             return TeamsToken(
                 access_token=access_token,
                 refresh_token=str(refresh_token) if isinstance(refresh_token, str) else None,
-                expires_at=float(expires_at) if isinstance(expires_at, (int, float)) else None,
+                expires_at=expires_at_value,
                 token_type=str(token_type) if isinstance(token_type, str) else "Bearer",
             )
         if isinstance(payload.get("access_token"), str):
@@ -257,10 +391,19 @@ def _extract_tenant(payload: Mapping[str, object]) -> Optional[Mapping[str, obje
 
 
 def _build_tenant(payload: Mapping[str, object]) -> TeamsTenant:
+    requires_rsc = payload.get("requires_resource_specific_consent")
+    if isinstance(requires_rsc, bool):
+        requires_resource_specific_consent = requires_rsc
+    elif isinstance(requires_rsc, str):
+        requires_resource_specific_consent = requires_rsc.lower() in {"true", "1", "yes"}
+    else:
+        requires_resource_specific_consent = False
+
     return TeamsTenant(
         id=str(payload.get("id") or payload.get("tenant_id")),
         display_name=str(payload.get("display_name")) if payload.get("display_name") else None,
         domain=str(payload.get("domain")) if payload.get("domain") else None,
+        requires_resource_specific_consent=requires_resource_specific_consent,
     )
 
 
@@ -280,27 +423,64 @@ def _ensure_list(value: Mapping[str, object] | list[Mapping[str, object]]) -> li
     return []
 
 
+def _coerce_int(value: object) -> int:
+    if isinstance(value, (int, float)):
+        return int(value)
+    return 0
+
+
+def _compact_snapshot(values: Mapping[str, object | None]) -> Dict[str, object]:
+    return {key: value for key, value in values.items() if value is not None}
+
+
 def _browser_consent_plan(tenant: TeamsTenant) -> Dict[str, object]:
-    return {
+    steps: list[Dict[str, object]] = [
+        {
+            "title": "Åpne Microsoft-innloggingen",
+            "action": "open_webview",
+            "url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+            "note": "Start autorisasjonskoden med de forhåndsdefinerte Teams-scope'ene.",
+        },
+        {
+            "title": "Fullfør påloggingen",
+            "action": "capture_redirect",
+            "note": "Når innloggingen er ferdig fanger Msgr opp omdirigeringen og koden inne i nettleseren.",
+        },
+        {
+            "title": "Veksle kode mot token",
+            "action": "exchange_code",
+            "note": "Msgrs Teams-bakdel utveksler koden for tilgangs- og oppfriskningstoken og lagrer dem sikkert.",
+        },
+    ]
+
+    plan: Dict[str, object] = {
         "status": "consent_required",
         "reason": "interactive_consent_required",
         "flow": {
             "kind": "embedded_browser_consent",
             "tenant": tenant.to_dict(),
-            "steps": [
-                {
-                    "action": "open_webview",
-                    "url": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-                    "note": "Initiate the Microsoft identity platform authorization code flow for Teams scopes.",
-                },
-                {
-                    "action": "capture_redirect",
-                    "note": "Intercept the redirect URI inside the webview and extract the authorization code.",
-                },
-                {
-                    "action": "exchange_code",
-                    "note": "Use the captured code with the Teams bridge backend to obtain access/refresh tokens via Microsoft Graph.",
-                },
-            ],
+            "steps": steps,
         },
     }
+
+    if tenant.requires_resource_specific_consent:
+        rsc_details = {
+            "required": True,
+            "title": "Gi ressurs-spesifikt samtykke",
+            "note": (
+                "Denne leietakeren krever Microsoft Teams Resource-Specific Consent (RSC). "
+                "Velg teamet/kanalen når du blir bedt om det i samtykkedialogen og bekreft "
+                "tilgang for Msgr-appen."
+            ),
+        }
+        steps.insert(
+            1,
+            {
+                "title": "Behandle RSC-forespørselen",
+                "action": "resource_specific_consent",
+                "note": "Når dialogen spør om team/kanal-tilgang må du velge ressursene Msgr skal synkronisere.",
+            },
+        )
+        plan["flow"]["resource_specific_consent"] = rsc_details  # type: ignore[index]
+
+    return plan

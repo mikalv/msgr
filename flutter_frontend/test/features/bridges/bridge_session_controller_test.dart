@@ -82,4 +82,68 @@ void main() {
       'https://example.com:443/auth/bridge/session-1/start',
     );
   });
+
+  test('unlink sends delete request and refreshes session', () async {
+    var deleteCount = 0;
+    var fetchCount = 0;
+    final client = MockClient((request) async {
+      if (request.method == 'DELETE' &&
+          request.url.path.endsWith('/bridges/teams')) {
+        deleteCount += 1;
+        return http.Response('', 204);
+      }
+
+      if (request.method == 'GET' &&
+          request.url.path.endsWith('/bridges/sessions/session-2')) {
+        fetchCount += 1;
+        final body = {
+          'data': {
+            'id': 'session-2',
+            'account_id': 'acct-1',
+            'service': 'teams',
+            'state': 'awaiting_user',
+            'login_method': 'oauth',
+            'auth_surface': 'embedded_browser',
+            'client_context': {},
+            'metadata': {},
+            'catalog_snapshot': {},
+            'authorization_path': '/auth/bridge/session-2/start',
+            'callback_path': '/auth/bridge/session-2/callback',
+          },
+        };
+        return http.Response(jsonEncode(body), 200,
+            headers: {'Content-Type': 'application/json'});
+      }
+
+      return http.Response('{}', 200);
+    });
+
+    final api = BridgeApi(client: client);
+    final session = BridgeAuthSession.fromJson({
+      'id': 'session-2',
+      'account_id': 'acct-1',
+      'service': 'teams',
+      'state': 'linked',
+      'login_method': 'oauth',
+      'auth_surface': 'embedded_browser',
+      'client_context': {},
+      'metadata': {},
+      'catalog_snapshot': {},
+      'authorization_path': '/auth/bridge/session-2/start',
+      'callback_path': '/auth/bridge/session-2/callback',
+    });
+
+    final controller = BridgeSessionController(
+      identity: identity,
+      api: api,
+      initialSession: session,
+      bridgeId: 'teams',
+    );
+
+    await controller.unlink();
+
+    expect(deleteCount, 1);
+    expect(fetchCount, 1);
+    expect(controller.error, isNull);
+  });
 }

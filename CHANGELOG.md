@@ -1,6 +1,47 @@
 # Changelog
 
 ## Unreleased
+- Enhanced the Microsoft Teams OAuth consent experience with resource-specific consent prompts,
+  credential status surfacing, and revocation controls across the daemon, bridge metadata, and
+  Flutter linking wizard, including updated unit tests for the Teams SDK and bridge session
+  controller.
+- Normalised Microsoft Teams chat and channel events into the canonical Msgr schema, capturing
+  reply hierarchies, mentions, reactions, and meeting metadata while extending runtime tests to
+  cover the richer payloads alongside webhook and poller dispatch flows. Introduced adaptive-card
+  sanitisation and file-upload helpers so outbound Teams messages safely render HTML/cards and
+  upload binary attachments with accompanying metadata for downstream consumers.
+- Replaced the Microsoft Teams Graph poller with a webhook-driven change-notification pipeline,
+  including reusable notification source abstractions, an in-memory transport for tests, and
+  runtime coverage that validates real-time event delivery, acknowledgements, and token refresh
+  integration.
+- Added Microsoft Teams OAuth refresh handling that renews access tokens before expiry via the
+  bridge daemon, persists refreshed credentials through the session manager, and exercises the
+  new refresh flow with runtime tests covering the client, daemon, and credential vault updates.
+- Wired the Slack and Microsoft Teams bridge health snapshots into queue request handlers,
+  exposed connector helpers for retrieving runtime metrics, and introduced an Elixir
+  `Messngr.Bridges.HealthReporter` that polls bridges and emits telemetry so operations
+  dashboards receive per-client pending-event and connectivity data.
+- Added Slack RTM runtime health snapshots and structured logging so operators can monitor
+  websocket status, pending acknowledgements, and event freshness; added unit tests that
+  exercise the diagnostics surface.
+- Added Microsoft Teams Graph poller health reporting with consecutive error tracking, poll
+  timestamps, and telemetry logging, plus runtime tests covering the health snapshot contract.
+- Added Slack outbound file upload support that stages remote files via
+  `files.getUploadURLExternal`, appends file blocks to `chat.postMessage`, and
+  returns upload metadata so bridge workers can share attachments alongside
+  text. Introduced unit coverage for file uploads and block composition.
+- Sanitised Microsoft Teams outbound messages by normalising plain-text bodies
+  into HTML, stripping disallowed tags/links from HTML payloads, and ensuring
+  attachments are cleaned before POSTing to Graph. Added regression tests to
+  verify the sanitiser output.
+- Normalised Slack RTM and Microsoft Teams Graph events into Msgr's canonical
+  message schema, covering message edits, deletions, reactions, attachments,
+  mentions, and thread metadata so downstream consumers receive structured
+  payloads with consistent fields across bridges. Added comprehensive unit
+  tests for the new event mappers.
+- Added `docs/slack_bridge_remaining_work.md` and `docs/teams_bridge_remaining_work.md` summarising
+  the remaining Slack and Microsoft Teams bridge workstreams so contributors know which operational
+  and product gaps to close before production pilots.
 - Locked down media thumbnails by validating storage buckets/object keys during
   upload consumption, stripping untrusted pointers, and covering the flow with
   regression tests ahead of the alpha cut.

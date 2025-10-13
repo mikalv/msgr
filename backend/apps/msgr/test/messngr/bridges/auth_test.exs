@@ -42,6 +42,16 @@ defmodule Messngr.Bridges.AuthTest do
       assert session.expires_at
     end
 
+    test "includes consent plan metadata for teams", %{account: account} do
+      {:ok, %AuthSession{} = session} = Auth.start_session(account, "teams", %{})
+
+      plan = session.metadata["consent_plan"]
+      assert is_map(plan)
+      assert plan["kind"] == "embedded_browser"
+      assert is_list(plan["steps"])
+      assert Enum.any?(plan["steps"], fn step -> step["action"] == "resource_specific_consent" end)
+    end
+
     test "returns error for unknown connector", %{account: account} do
       assert {:error, :unknown_connector} = Auth.start_session(account, "unknown", %{})
     end

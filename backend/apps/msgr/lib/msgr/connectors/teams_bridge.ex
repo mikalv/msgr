@@ -64,6 +64,15 @@ defmodule Msgr.Connectors.TeamsBridge do
     ServiceBridge.publish(bridge, :ack_event, payload, opts)
   end
 
+  @doc """
+  Requests a runtime health snapshot for Teams bridge daemons.
+  """
+  @spec health_snapshot(bridge(), map() | keyword(), keyword()) :: {:ok, map()} | {:error, term()}
+  def health_snapshot(bridge, params \\ %{}, opts \\ []) do
+    payload = normalise_health_params(params)
+    ServiceBridge.request(bridge, :health_snapshot, payload, opts)
+  end
+
   defp persist_link_response(%ServiceBridge{} = bridge, params, response, instance) do
     status = Map.get(response, "status") || Map.get(response, :status)
 
@@ -171,6 +180,10 @@ defmodule Msgr.Connectors.TeamsBridge do
   end
 
   defp fetch_user(_), do: %{}
+
+  defp normalise_health_params(params) when is_map(params), do: Map.new(params)
+  defp normalise_health_params(params) when is_list(params), do: Map.new(params)
+  defp normalise_health_params(_other), do: %{}
 
   defp build_metadata(tenant, user) do
     %{}

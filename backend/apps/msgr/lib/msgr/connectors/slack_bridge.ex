@@ -64,6 +64,15 @@ defmodule Msgr.Connectors.SlackBridge do
     ServiceBridge.publish(bridge, :ack_event, payload, opts)
   end
 
+  @doc """
+  Requests a runtime health snapshot for Slack bridge daemons.
+  """
+  @spec health_snapshot(bridge(), map() | keyword(), keyword()) :: {:ok, map()} | {:error, term()}
+  def health_snapshot(bridge, params \\ %{}, opts \\ []) do
+    payload = normalise_health_params(params)
+    ServiceBridge.request(bridge, :health_snapshot, payload, opts)
+  end
+
   defp normalise_workspace_payload(payload) do
     workspace =
       payload[:workspace] ||
@@ -182,6 +191,10 @@ defmodule Msgr.Connectors.SlackBridge do
   end
 
   defp fetch_user(_), do: %{}
+
+  defp normalise_health_params(params) when is_map(params), do: Map.new(params)
+  defp normalise_health_params(params) when is_list(params), do: Map.new(params)
+  defp normalise_health_params(_other), do: %{}
 
   defp build_metadata(workspace, user) do
     %{}

@@ -7,7 +7,7 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Mapping, Optional, Tuple
+from typing import Callable, Dict, List, Mapping, Optional, Tuple
 
 from .client import SlackClientProtocol, SlackToken
 
@@ -150,6 +150,16 @@ class SessionManager:
     def get_session(self, user_id: str, instance: Optional[str]) -> Optional[SessionData]:
         key = self._key(user_id, instance)
         return self._sessions.get(key)
+
+    def active_entries(self) -> List[Tuple[str, Optional[str], SlackClientProtocol, Optional[SessionData]]]:
+        """Return a snapshot of active Slack clients and their sessions."""
+
+        entries: List[Tuple[str, Optional[str], SlackClientProtocol, Optional[SessionData]]] = []
+        for key, client in self._clients.items():
+            user_id, instance_token = key.split("::", 1)
+            instance = None if instance_token == "workspace" else instance_token
+            entries.append((user_id, instance, client, self._sessions.get(key)))
+        return entries
 
     async def export_session(self, user_id: str, instance: Optional[str]) -> Optional[SessionData]:
         key = self._key(user_id, instance)
