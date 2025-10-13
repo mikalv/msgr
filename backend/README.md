@@ -108,6 +108,16 @@ ingen av variablene over er satt. Du kan overstyre den ved å eksportere din ege
 `NOISE_STATIC_KEY`. Husk samtidig å sette `NOISE_TRANSPORT_ENABLED=true` dersom
 du skal teste Noise-håndtrykket lokalt.
 
+### Klientnøkler for enheter
+
+Statiske klientnøkler som registreres gjennom OTP/OIDC må nå være 32 eller 64
+byte lange og leveres som URL-sikker base64 uten padding (hex støttes også og
+konverteres automatisk). Backenden normaliserer nøklene, lagrer et SHA-256
+fingeravtrykk og tar vare på attestasjonsmetadata slik at kompromitterte
+enheter kan identifiseres og deaktiveres under alpha-testingen. Dersom du
+videresender nøkler fra klienter må du oppgradere til det nye formatet før
+registrering.
+
 ### Hente fra AWS Secrets Manager
 
 Konfigurer følgende miljøvariabler i tillegg til `NOISE_STATIC_KEY_SECRET_ID`:

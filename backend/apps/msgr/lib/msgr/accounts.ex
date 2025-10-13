@@ -5,7 +5,7 @@ defmodule Messngr.Accounts do
 
   import Ecto.Query
 
-  alias Messngr.Accounts.{Account, Contact, Device, Identity, Profile}
+  alias Messngr.Accounts.{Account, Contact, Device, DeviceKey, Identity, Profile}
   alias Messngr.Repo
 
   @spec list_accounts() :: [Account.t()]
@@ -109,20 +109,27 @@ defmodule Messngr.Accounts do
 
   @spec get_device_by_public_key(Ecto.UUID.t(), String.t()) :: Device.t() | nil
   def get_device_by_public_key(account_id, device_public_key) do
-    Repo.get_by(Device, account_id: account_id, device_public_key: device_public_key)
+    with {:ok, %{encoded: normalized}} <- normalize_device_public_key(device_public_key) do
+      Repo.get_by(Device, account_id: account_id, device_public_key: normalized)
+    else
+      :none -> nil
+      {:error, _reason} -> nil
+    end
   end
 
   @spec create_device(map()) :: {:ok, Device.t()} | {:error, Ecto.Changeset.t()}
   def create_device(attrs) do
-    %Device{}
-    |> Device.changeset(attrs)
+    attrs
+    |> normalize_device_attrs()
+    |> then(&Device.changeset(%Device{}, &1))
     |> Repo.insert()
   end
 
   @spec update_device(Device.t(), map()) :: {:ok, Device.t()} | {:error, Ecto.Changeset.t()}
   def update_device(%Device{} = device, attrs) do
-    device
-    |> Device.changeset(attrs)
+    attrs
+    |> normalize_device_attrs()
+    |> Device.changeset(device)
     |> Repo.update()
   end
 
@@ -144,7 +151,7 @@ defmodule Messngr.Accounts do
   @spec attach_device_for_identity(Identity.t(), map()) ::
           {:ok, %{identity: Identity.t(), device: Device.t() | nil}} | {:error, term()}
   def attach_device_for_identity(%Identity{} = identity, attrs \\ %{}) do
-    device_public_key =
+    key_result =
       attrs
       |> Map.get(:device_public_key)
       |> Kernel.||(Map.get(attrs, "device_public_key"))
@@ -154,12 +161,15 @@ defmodule Messngr.Accounts do
 
     identity = maybe_preload_account(identity)
 
-    cond do
-      is_nil(device_public_key) ->
+    case key_result do
+      :none ->
         {:ok, %{identity: identity, device: nil}}
 
-      true ->
-        upsert_device(identity, device_public_key, attrs)
+      {:ok, key_info} ->
+        upsert_device(identity, key_info, attrs)
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -354,24 +364,48 @@ defmodule Messngr.Accounts do
   end
 
   defp normalize_device_public_key(value) when is_binary(value) do
-    value
-    |> String.trim()
-    |> case do
-      "" -> nil
-      trimmed -> trimmed
+    case DeviceKey.normalize(value) do
+      {:ok, encoded, raw} ->
+        {:ok, %{encoded: encoded, raw: raw, fingerprint: DeviceKey.fingerprint(raw)}}
+
+      {:error, :empty} -> :none
+      {:error, _reason} -> {:error, :invalid_device_public_key}
     end
   end
 
-  defp normalize_device_public_key(_), do: nil
+  defp normalize_device_public_key(_), do: :none
 
   defp preload_account_relations(%Account{} = account) do
     Repo.preload(account, [:profiles, :devices])
   end
 
-  defp upsert_device(identity, device_public_key, attrs) do
+  defp normalize_device_attrs(attrs) do
+    key = Map.get(attrs, :device_public_key) || Map.get(attrs, "device_public_key")
+
+    case normalize_device_public_key(key) do
+      {:ok, %{encoded: encoded, fingerprint: fingerprint}} ->
+        attrs
+        |> put_key(:device_public_key, encoded)
+        |> put_key(:public_key_fingerprint, fingerprint)
+
+      :none ->
+        attrs
+
+      {:error, :invalid_device_public_key} ->
+        attrs
+    end
+  end
+
+  defp put_key(map, key, value) when is_atom(key) do
+    map
+    |> Map.put(key, value)
+    |> Map.put(Atom.to_string(key), value)
+  end
+
+  defp upsert_device(identity, %{encoded: device_public_key} = key_info, attrs) do
     Repo.transaction(fn ->
       account = identity.account
-      params = build_device_attrs(account, device_public_key, attrs)
+      params = build_device_attrs(account, key_info, attrs)
 
       case get_device_by_public_key(account.id, device_public_key) do
         nil ->
@@ -414,11 +448,15 @@ defmodule Messngr.Accounts do
     end
   end
 
-  defp build_device_attrs(account, device_public_key, attrs) do
+  defp build_device_attrs(account, %{encoded: device_public_key, fingerprint: fingerprint}, attrs) do
     %{
       account_id: account.id,
       profile_id: resolve_profile_id(account, attrs),
       device_public_key: device_public_key,
+      public_key_fingerprint:
+        Map.get(attrs, :public_key_fingerprint) ||
+          Map.get(attrs, "public_key_fingerprint") ||
+          fingerprint,
       attesters: attrs |> fetch_attesters(),
       last_handshake_at:
         Map.get(attrs, :last_handshake_at) ||
