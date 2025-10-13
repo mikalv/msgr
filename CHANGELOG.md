@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added `docs/slack_bridge_remaining_work.md` and `docs/teams_bridge_remaining_work.md` summarising
+  the remaining Slack and Microsoft Teams bridge workstreams so contributors know which operational
+  and product gaps to close before production pilots.
 - Stored Slack and Microsoft Teams bridge session tokens in the credential vault via a shared
   `Msgr.Connectors.SessionVault` helper so database snapshots no longer persist plaintext tokens and
   connector tests verify credential vault usage.
