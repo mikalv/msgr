@@ -51,6 +51,8 @@ docker compose build stonemq --build-arg STONEMQ_REF=<commit-eller-branch>
 - **Prometheus** skraper metrikker fra Phoenix på `backend:9568` via
   `TelemetryMetricsPrometheus`. Bruk `http://localhost:9090` for å inspisere
   råmetrikker.
+- Sett `PROMETHEUS_ENABLED=false` dersom du vil skru av eksportøren i et
+  begrenset miljø. Porten kan overstyres med `PROMETHEUS_PORT`.
 - **Grafana** startes med en forhåndsprovisjonert Prometheus-datakilde og er
   tilgjengelig på `http://localhost:3000` (bruker/pass: `admin`/`admin`).
 - **OpenObserve** håndterer loggdata på `http://localhost:5080`. Standardbrukeren
@@ -75,6 +77,43 @@ utviklingsmiljøet som er startet via `docker compose up`.
 
 - Sett `PHX_LISTEN_IP` om du ønsker å binde serveren til en annen adresse.
 - Legg til ekstra miljøvariabler i `docker-compose.yml` ved behov.
+
+## Media-signering
+
+Alle opplastings- og nedlastings-URLer signeres med en hemmelig nøkkel slik at
+ingen kan manipulere forespørsler til object storage. Sett
+`MEDIA_SIGNING_SECRET` i miljøet før du starter backenden (Docker Compose gjør
+det enkelt via `.env` eller direkte variabler). Hver installasjon bør bruke en
+unik verdi – du kan generere en ved å kjøre
+
+```bash
+openssl rand -hex 32
+```
+
+I utviklings- og testmiljø faller backenden tilbake til en midlertidig
+standardnøkkel dersom variabelen ikke er satt, men i staging/prod må den være
+eksplisitt konfigurert. Når du oppretter mediaopplastinger kan du sende med en
+checksum; den signeres nå sammen med URLen slik at klienter kan verifisere at
+innholdet ikke er tuklet med før det vises.
+
+## Media-retensjon
+
+Backenden rydder nå jevnlig opp i opplastinger der `retention_expires_at` har
+passert. En bakgrunnsprosess (`Messngr.Media.RetentionPruner`) kjører som del av
+OTP-treet og sletter både database-rader og tilhørende objekter i storage.
+Standardintervallet er hvert tiende minutt og prosessen tar maks 100 rader om
+gangen for å unngå store batcher som kan påvirke IO.
+
+Konfigurasjon kan overstyres via miljøvariabler:
+
+- `MEDIA_RETENTION_SWEEP_ENABLED` (`true`/`false`) skrur jobben av/på.
+- `MEDIA_RETENTION_SWEEP_INTERVAL_MS` setter intervallet i millisekunder (default
+  600000).
+- `MEDIA_RETENTION_SWEEP_BATCH_SIZE` bestemmer hvor mange opplastinger som
+  behandles per kjøring (default 100).
+
+Alle verdier kan også settes direkte i `config/config.exs` eller via
+`runtime.exs` dersom du trenger forskjellige innstillinger per miljø.
 
 ## Noise-konfigurasjon
 
@@ -105,6 +144,16 @@ Utviklingsmiljøet (`config/dev.exs`) definerer en default-nøkkel som brukes n�
 ingen av variablene over er satt. Du kan overstyre den ved å eksportere din egen
 `NOISE_STATIC_KEY`. Husk samtidig å sette `NOISE_TRANSPORT_ENABLED=true` dersom
 du skal teste Noise-håndtrykket lokalt.
+
+### Klientnøkler for enheter
+
+Statiske klientnøkler som registreres gjennom OTP/OIDC må nå være 32 eller 64
+byte lange og leveres som URL-sikker base64 uten padding (hex støttes også og
+konverteres automatisk). Backenden normaliserer nøklene, lagrer et SHA-256
+fingeravtrykk og tar vare på attestasjonsmetadata slik at kompromitterte
+enheter kan identifiseres og deaktiveres under alpha-testingen. Dersom du
+videresender nøkler fra klienter må du oppgradere til det nye formatet før
+registrering.
 
 ### Hente fra AWS Secrets Manager
 

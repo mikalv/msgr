@@ -541,4 +541,44 @@ defmodule Messngr.ChatTest do
     assert payload.count == 0
     assert payload.watchers == []
   end
+
+  test "purge_stale_watchers removes expired watchers and broadcasts", %{profile_a: profile_a, profile_b: profile_b} do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+
+    previous_ttl = Application.get_env(:msgr, :conversation_watcher_ttl_ms)
+    Application.put_env(:msgr, :conversation_watcher_ttl_ms, 5)
+
+    on_exit(fn ->
+      if is_nil(previous_ttl) do
+        Application.delete_env(:msgr, :conversation_watcher_ttl_ms)
+      else
+        Application.put_env(:msgr, :conversation_watcher_ttl_ms, previous_ttl)
+      end
+    end)
+
+    :ok = Chat.subscribe_to_conversation(conversation.id)
+
+    {:ok, _payload} = Chat.watch_conversation(conversation.id, profile_a.id)
+
+    Process.sleep(20)
+
+    assert {:ok, %{conversations: 1, watchers: 1}} = Chat.purge_stale_watchers()
+
+    assert_receive {:conversation_watchers, %{count: 0, watchers: []}}
+  end
+
+  test "around_id/3 falls back when the pivot message is missing", %{profile_a: profile_a, profile_b: profile_b} do
+    {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
+
+    {:ok, message} = Chat.send_message(conversation.id, profile_a.id, %{"body" => "first"})
+    {:ok, _} = Chat.send_message(conversation.id, profile_a.id, %{"body" => "second"})
+
+    {:ok, _deleted} = Chat.delete_message(conversation.id, profile_a.id, message.id, %{})
+
+    page = Chat.around_id(conversation.id, message.id, limit: 5)
+
+    refute Enum.any?(page.entries, fn entry -> entry.id == message.id end)
+    assert page.meta.has_more.before == false
+    assert page.meta.has_more.after in [false, true]
+  end
 end

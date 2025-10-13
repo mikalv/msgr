@@ -9,7 +9,10 @@ defmodule Messngr.Noise.SessionFixtures do
   alias Messngr.Transport.Noise.Session
 
   def noise_device_fixture(account, profile, attrs \\ %{}) do
-    key = Map.get(attrs, :device_public_key) || Map.get(attrs, "device_public_key") || "noise-#{System.unique_integer([:positive])}"
+    key =
+      Map.get(attrs, :device_public_key) ||
+        Map.get(attrs, "device_public_key") ||
+        Base.url_encode64(:crypto.strong_rand_bytes(32), padding: false)
 
     {:ok, device} =
       Accounts.create_device(%{

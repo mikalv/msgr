@@ -1,6 +1,33 @@
 # Changelog
 
 ## Unreleased
+- Locked down media thumbnails by validating storage buckets/object keys during
+  upload consumption, stripping untrusted pointers, and covering the flow with
+  regression tests ahead of the alpha cut.
+- Expanded the alpha readiness review with an actionable implementation queue covering backend, frontend, and DevEx blockers remaining before alpha.
+- Updated the alpha readiness review with a status tracker that highlights the remaining backend, frontend, and DevEx work before inviting testers.
+- Added a media retention pruner that periodically deletes expired uploads and
+  their storage objects, with configurable sweep intervals and batch sizes plus
+  tests and docs so alpha deployments do not accumulate orphaned blobs.
+- Hardened media signing by requiring environment-provided secrets, binding
+  checksums into presigned URLs, and covering the behaviour with tests and
+  updated operator docs so alpha deployments can trust object storage links.
+- Enforced Noise handshake verification by default, removed legacy header fallbacks,
+  and wired OTP challenges to rate limiting plus email/SMS delivery so passwordless
+  auth is safe to expose to alpha testers.
+- Added conversation channel payload caps and per-profile rate limiting so early testers
+  cannot spam large messages or overwhelm realtime resources.
+- Enabled the Prometheus exporter by default with runtime toggles and coverage so
+  alpha operators can inspect latency and error metrics without manual config.
+- Validated Noise device keys by normalising to URL-safe base64, storing SHA-256
+  fingerprints, and expanding attester metadata so compromised devices can be
+  audited and revoked before inviting alpha testers.
+- Hardened chat persistence with retryable receipt fan-out, guarded pagination pivots,
+  and a supervised watcher sweep so realtime occupancy stays accurate for alpha testers.
+- Updated the alpha readiness review with the new chat persistence hardening milestones
+  documented alongside the remaining backend, frontend, and DevEx gaps.
+- Added an alpha readiness review in `docs/alpha_review.md` capturing backend, frontend, and DevEx
+  gaps to close before inviting external testers.
 - Stored Slack and Microsoft Teams bridge session tokens in the credential vault via a shared
   `Msgr.Connectors.SessionVault` helper so database snapshots no longer persist plaintext tokens and
   connector tests verify credential vault usage.

@@ -7,27 +7,10 @@ defmodule MessngrWeb.Application do
 
   @impl true
   def start(_type, _args) do
-    prometheus_options =
-      Application.get_env(:msgr_web, :prometheus, [])
-      |> Enum.into(%{})
-
     prometheus_child =
-      case prometheus_options do
-        %{enabled: true} ->
-          metrics = MessngrWeb.Telemetry.metrics()
-          name = Map.get(prometheus_options, :name, :prometheus_metrics)
-          port = Map.get(prometheus_options, :port, 9_568)
-
-          {TelemetryMetricsPrometheus,
-           [
-             metrics: metrics,
-             name: name,
-             port: port
-           ]}
-
-        _ ->
-          nil
-      end
+      :msgr_web
+      |> Application.get_env(:prometheus, [])
+      |> prometheus_child_spec()
 
     children =
       [
@@ -46,6 +29,31 @@ defmodule MessngrWeb.Application do
     opts = [strategy: :one_for_one, name: MessngrWeb.Supervisor]
     Supervisor.start_link(children, opts)
   end
+
+  @doc false
+  @spec prometheus_child_spec(keyword() | map()) :: Supervisor.child_spec() | nil
+  def prometheus_child_spec(nil), do: nil
+
+  def prometheus_child_spec(options) when is_list(options) or is_map(options) do
+    options
+    |> Enum.into(%{})
+    |> build_prometheus_child()
+  end
+
+  defp build_prometheus_child(%{enabled: true} = options) do
+    metrics = MessngrWeb.Telemetry.metrics()
+    name = Map.get(options, :name, :prometheus_metrics)
+    port = Map.get(options, :port, 9_568)
+
+    {TelemetryMetricsPrometheus,
+     [
+       metrics: metrics,
+       name: name,
+       port: port
+     ]}
+  end
+
+  defp build_prometheus_child(_options), do: nil
 
   # Tell Phoenix to update the endpoint configuration
   # whenever the application is updated.

@@ -38,7 +38,6 @@ defmodule MessngrWeb.Plugs.NoiseSession do
   def init(opts) do
     opts
     |> Enum.into(%{})
-    |> Map.put_new(:allow_legacy_headers, Application.get_env(:msgr_web, :legacy_actor_headers, false))
     |> Map.put_new(:assign_session, true)
   end
 
@@ -104,9 +103,7 @@ defmodule MessngrWeb.Plugs.NoiseSession do
           |> then(&{:ok, &1})
         end
 
-      :legacy when opts.allow_legacy_headers -> legacy_headers(conn)
       {:error, reason} -> {:error, reason}
-      :legacy -> {:error, :invalid_token}
     end
   end
 
@@ -114,11 +111,7 @@ defmodule MessngrWeb.Plugs.NoiseSession do
     with :error <- fetch_authorization_token(conn),
          :error <- fetch_noise_header(conn),
          :error <- fetch_session_token(conn) do
-      if legacy_headers_present?(conn) do
-        :legacy
-      else
-        {:error, :missing_token}
-      end
+      {:error, :missing_token}
     end
   end
 
@@ -156,24 +149,6 @@ defmodule MessngrWeb.Plugs.NoiseSession do
     |> case do
       "" -> :error
       trimmed -> {:ok, trimmed, source}
-    end
-  end
-
-  defp legacy_headers_present?(conn) do
-    get_req_header(conn, "x-account-id") != [] and get_req_header(conn, "x-profile-id") != []
-  end
-
-  defp legacy_headers(conn) do
-    with [account_id] <- get_req_header(conn, "x-account-id"),
-         [profile_id] <- get_req_header(conn, "x-profile-id"),
-         {:ok, account} <- load_account(account_id),
-         {:ok, profile} <- load_profile(account, profile_id) do
-      conn
-      |> assign(:current_account, account)
-      |> assign(:current_profile, profile)
-      |> then(&{:ok, &1})
-    else
-      _ -> {:error, :invalid_token}
     end
   end
 
