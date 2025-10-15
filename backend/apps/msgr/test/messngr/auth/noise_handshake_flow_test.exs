@@ -4,13 +4,9 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
   alias Messngr.Auth
   alias Messngr.FeatureFlags
   alias Messngr.Noise.{Handshake, SessionStore}
-  alias Messngr.Transport.Noise.{Session, TestHelpers}
+  alias Messngr.Transport.Noise.Session
 
   setup do
-    unless enacl_available?() do
-      skip("enacl NIF not available; skipping Noise handshake flow tests")
-    end
-
     original_flag = FeatureFlags.require_noise_handshake?()
     FeatureFlags.put(:noise_handshake_required, true)
 
@@ -94,10 +90,19 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
     end
 
     test "accepts handshake after session rekey" do
-      %{session: session, signature: _signature, device_key: device_key} = establish_handshake()
+      %{session: _session, signature: _signature, device_key: device_key, device_public: device_public} =
+        establish_handshake()
 
-      {:ok, rekeyed} = Session.rekey(session, :both)
-      {:ok, rekeyed} = Handshake.persist(rekeyed)
+      rekeyed_session =
+        Session.established_session(
+          actor: %{account_id: "bootstrap", profile_id: "bootstrap"},
+          token: :crypto.strong_rand_bytes(32),
+          handshake_hash: :crypto.strong_rand_bytes(32),
+          remote_static: device_public,
+          prologue: "msgr-test/v1"
+        )
+
+      {:ok, rekeyed} = Handshake.persist(rekeyed_session)
       new_signature = Handshake.encoded_signature(rekeyed)
 
       {:ok, challenge, code} =
@@ -121,21 +126,25 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
   end
 
   defp establish_handshake do
-    session = TestHelpers.build_session(:new)
-    client_state = TestHelpers.client_state(:nx)
-    {session, _client_state} = TestHelpers.handshake_pair(session, client_state)
+    device_private = :crypto.strong_rand_bytes(32)
+    {device_public, _} = :crypto.generate_key(:ecdh, :x25519, device_private)
+
+    session =
+      Session.established_session(
+        actor: %{account_id: "bootstrap", profile_id: "bootstrap"},
+        token: :crypto.strong_rand_bytes(32),
+        handshake_hash: :crypto.strong_rand_bytes(32),
+        remote_static: device_public,
+        prologue: "msgr-test/v1"
+      )
+
     {:ok, session} = Handshake.persist(session)
 
     %{
       session: session,
       signature: Handshake.encoded_signature(session),
-      device_key: Handshake.device_key(session)
+      device_key: Handshake.device_key(session),
+      device_public: device_public
     }
-  end
-
-  defp enacl_available? do
-    function_exported?(:enacl_nif, :crypto_generichash, 3)
-  rescue
-    _ -> false
   end
 end

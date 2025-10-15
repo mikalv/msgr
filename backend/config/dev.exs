@@ -52,6 +52,7 @@ config :msgr_web, MessngrWeb.Endpoint,
 
 config :msgr_web, dev_routes: true
 config :msgr_web, :expose_otp_codes, true
+config :msgr_web, :noise_handshake_stub, enabled: true
 
 shared_repo_dev_config = [
   username: System.get_env("POSTGRES_USERNAME", "postgres"),
@@ -103,9 +104,11 @@ openobserve_opts = [
   queue_module: openobserve_queue_module
 ]
 
-config :messngr_logging, Messngr.Logging.OpenObserveBackend,
-  default: [],
-  openobserve_dev: openobserve_opts
+if Code.ensure_loaded?(Messngr.Logging.OpenObserveBackend) do
+  config :messngr_logging, Messngr.Logging.OpenObserveBackend,
+    default: [],
+    openobserve_dev: openobserve_opts
+end
 
 config :msgr_web, :prometheus,
   enabled: true,

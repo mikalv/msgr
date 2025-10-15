@@ -56,7 +56,7 @@ defmodule Messngr.ShareLinks do
   """
   @spec create_bridge_link(BridgeAccount.t(), atom() | String.t(), map()) ::
           {:ok, ShareLink.t()} | {:error, term()}
-  def create_bridge_link(%BridgeAccount{} = bridge_account, kind, attrs \ %{}) do
+  def create_bridge_link(%BridgeAccount{} = bridge_account, kind, attrs \\ %{}) do
     params =
       attrs
       |> normalise_attrs()
@@ -238,4 +238,3 @@ defmodule Messngr.ShareLinks do
 
   defp normalise_attrs(_), do: %{}
 end
-

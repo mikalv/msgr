@@ -11,7 +11,7 @@ defmodule MessngrWeb.MessageJSON do
   end
 
   def receipt(%{receipt: receipt}) do
-    %{data: receipt(receipt)}
+    %{data: receipt_payload(receipt)}
   end
 
   defp encode_meta(nil), do: %{start_cursor: nil, end_cursor: nil, has_more: %{before: false, after: false}}
@@ -46,11 +46,11 @@ defmodule MessngrWeb.MessageJSON do
       metadata: message.metadata || %{},
       thread_id: message.thread_id,
       profile: profile_payload(message.profile),
-      receipts: Enum.map(message.receipts || [], &receipt/1)
+      receipts: Enum.map(message.receipts || [], &receipt_payload/1)
     }
   end
 
-  defp receipt(%MessageReceipt{} = receipt) do
+  defp receipt_payload(%MessageReceipt{} = receipt) do
     %{
       id: receipt.id,
       status: receipt.status,

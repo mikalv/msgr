@@ -116,19 +116,21 @@ config :msgr_web, :prometheus,
   port: 9568,
   name: :prometheus_metrics
 
-config :messngr_logging, Messngr.Logging.OpenObserveBackend,
-  default: [
-    enabled: false,
-    endpoint: "http://localhost:5080",
-    org: "default",
-    stream: "backend",
-    dataset: "_json",
-    username: "root@example.com",
-    password: "Complexpass#123",
-    metadata: [:application, :module, :function, :line, :request_id, :pid],
-    level: :info,
-    service: "msgr_backend"
-  ]
+if Code.ensure_loaded?(Messngr.Logging.OpenObserveBackend) do
+  config :messngr_logging, Messngr.Logging.OpenObserveBackend,
+    default: [
+      enabled: false,
+      endpoint: "http://localhost:5080",
+      org: "default",
+      stream: "backend",
+      dataset: "_json",
+      username: "root@example.com",
+      password: "Complexpass#123",
+      metadata: [:application, :module, :function, :line, :request_id, :pid],
+      level: :info,
+      service: "msgr_backend"
+    ]
+end
 
 config :phoenix, :stacktrace_depth, 20
 

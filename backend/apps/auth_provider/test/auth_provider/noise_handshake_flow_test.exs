@@ -4,7 +4,7 @@ defmodule AuthProvider.NoiseHandshakeFlowTest do
   alias Messngr.Auth
   alias Messngr.FeatureFlags
   alias Messngr.Noise.Handshake
-  alias Messngr.Transport.Noise.{Session, TestHelpers}
+  alias Messngr.Transport.Noise.Session
 
   setup do
     original_flag = FeatureFlags.require_noise_handshake?()
@@ -55,9 +55,18 @@ defmodule AuthProvider.NoiseHandshakeFlowTest do
   end
 
   defp establish_handshake do
-    session = TestHelpers.build_session(:new)
-    client_state = TestHelpers.client_state(:nx)
-    {session, _client_state} = TestHelpers.handshake_pair(session, client_state)
+    device_private = :crypto.strong_rand_bytes(32)
+    {device_public, _} = :crypto.generate_key(:ecdh, :x25519, device_private)
+
+    session =
+      Session.established_session(
+        actor: %{account_id: "bootstrap", profile_id: "bootstrap"},
+        token: :crypto.strong_rand_bytes(32),
+        handshake_hash: :crypto.strong_rand_bytes(32),
+        remote_static: device_public,
+        prologue: "msgr-test/v1"
+      )
+
     {:ok, session} = Handshake.persist(session)
 
     %{

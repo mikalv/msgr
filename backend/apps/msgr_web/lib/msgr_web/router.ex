@@ -24,6 +24,7 @@ defmodule MessngrWeb.Router do
     post "/auth/challenge", AuthController, :challenge
     post "/auth/verify", AuthController, :verify
     post "/auth/oidc", AuthController, :oidc
+    post "/noise/handshake", NoiseHandshakeController, :create
     resources "/users", AccountController, only: [:index, :create, :update]
   end
 

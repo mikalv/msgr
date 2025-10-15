@@ -68,6 +68,7 @@ defmodule Mix.Tasks.Noise.RotateStaticKey do
   defp generate_key_pair do
     case :enoise_keypair.new(:dh25519) do
       {:ok, _type, private_key, public_key} -> {private_key, public_key}
+      {:kp, _type, private_key, public_key} -> {private_key, public_key}
       {:enoise_keypair, _type, private_key, public_key} -> {private_key, public_key}
       other -> raise "Unsupported keypair format: #{inspect(other)}"
     end

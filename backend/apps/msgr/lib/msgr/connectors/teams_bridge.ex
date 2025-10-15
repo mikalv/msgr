@@ -150,25 +150,6 @@ defmodule Msgr.Connectors.TeamsBridge do
 
   defp build_sync_attrs(_response, _service, _account_id, _instance), do: {:ok, %{}}
 
-    contacts =
-      response
-      |> fetch_list([:members, :contacts])
-
-    channels =
-      response
-      |> fetch_list([:chats, :conversations, :teams])
-
-    %{
-      external_id: extract_user_id(user),
-      display_name: extract_display_name(user),
-      metadata: build_metadata(tenant, user),
-      session: ensure_map(session),
-      capabilities: ensure_map(capabilities),
-      contacts: ensure_list(contacts),
-      channels: ensure_list(channels)
-    }
-  end
-
   defp fetch_tenant(data) when is_map(data) do
     fetch_map(data, :tenant) || fetch_map(data, :organization) || %{}
   end

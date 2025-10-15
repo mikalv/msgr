@@ -1,16 +1,8 @@
 {:ok, _} = Application.ensure_all_started(:mox)
 {:ok, _} = Application.ensure_all_started(:hammer)
-case Application.ensure_all_started(:enacl) do
-  {:ok, _} -> :ok
-  {:error, _} -> :ok
-end
+{:ok, _} = Application.ensure_all_started(:decibel)
 
-case Application.ensure_all_started(:enoise) do
-  {:ok, _} -> :ok
-  {:error, _} -> :ok
-end
-
-{:ok, _} = Application.ensure_all_started(:msgr)
+{:ok, _} = Application.ensure_all_started(:msgr, permanent: false)
 
 ExUnit.start()
 

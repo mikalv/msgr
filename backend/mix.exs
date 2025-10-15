@@ -37,11 +37,6 @@ defmodule Messngr.Umbrella.MixProject do
       # Required to run "mix format" on ~H/.heex files from the umbrella root
       # TODO bump on release to {:phoenix_live_view, ">= 0.0.0"},
       {:phoenix_live_view, "~> 1.0.0-rc.1", override: true},
-      # Overrides pga build errors
-      {:enacl,
-       git: "https://github.com/mikalv/enacl.git",
-       ref: "e287977b91eb7eeddb282567c3a779865a0cd803",
-       override: true},
       {:gen_smtp, "~> 1.3", override: true},
       {:decibel, "~> 0.2.4", override: true},
       {:ex_json_schema, "~> 0.11.1", override: true},

@@ -1,17 +1,9 @@
 defmodule Messngr.Transport.Noise.RegistryTest do
   use ExUnit.Case, async: false
 
+  alias Ecto.UUID
   alias Messngr.Transport.Noise.Registry
   alias Messngr.Transport.Noise.Session
-  alias Messngr.Transport.Noise.TestHelpers
-
-  setup do
-    unless enacl_available?() do
-      skip("enacl NIF not available; skipping Noise registry tests")
-    end
-
-    :ok
-  end
 
   setup do
     %{registry: start_supervised!({Registry, ttl: 80, cleanup_interval: 20})}
@@ -74,15 +66,13 @@ defmodule Messngr.Transport.Noise.RegistryTest do
   end
 
   defp established_session(opts \\ []) do
-    session = TestHelpers.build_session(:new, opts)
-    client_state = TestHelpers.client_state(:nx)
-    {session, _} = TestHelpers.handshake_pair(session, client_state)
-    session
-  end
+    defaults = [
+      actor: %{account_id: UUID.generate(), profile_id: UUID.generate()},
+      remote_static: :crypto.strong_rand_bytes(32),
+      handshake_hash: :crypto.strong_rand_bytes(32)
+    ]
 
-  defp enacl_available? do
-    function_exported?(:enacl_nif, :crypto_generichash, 3)
-  rescue
-    _ -> false
+    opts = Keyword.merge(defaults, opts)
+    Session.established_session(opts)
   end
 end

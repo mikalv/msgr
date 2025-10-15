@@ -36,13 +36,8 @@ defmodule Messngr.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
-      {:decibel, "~> 0.2.3"},
+      {:decibel, "~> 0.2.4"},
       {:uuid, "~> 1.1"},
-      {:enoise, "~> 1.1"},
-      {:enacl,
-       git: "https://github.com/mikalv/enacl.git",
-       ref: "e287977b91eb7eeddb282567c3a779865a0cd803",
-       override: true},
       {:telemetry, "~> 1.3"},
       {:dns_cluster, "~> 0.1.1"},
       {:phoenix_pubsub, "~> 2.1"},

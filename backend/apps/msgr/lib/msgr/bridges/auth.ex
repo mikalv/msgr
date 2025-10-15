@@ -639,8 +639,11 @@ defmodule Messngr.Bridges.Auth do
       true ->
         case maybe_atom_key(key) do
           nil -> {:error, {:missing_value, key}}
-          atom when Map.has_key?(map, atom) -> {:ok, map[atom]}
-          _ -> {:error, {:missing_value, key}}
+          atom ->
+            case Map.fetch(map, atom) do
+              {:ok, value} -> {:ok, value}
+              :error -> {:error, {:missing_value, key}}
+            end
         end
     end
   end

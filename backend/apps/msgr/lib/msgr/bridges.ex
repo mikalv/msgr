@@ -442,13 +442,21 @@ defmodule Messngr.Bridges do
   end
 
   defp do_fetch_attr(attrs, key) when is_binary(key) do
-    case attrs do
-      %{^key => value} -> value
-      _ ->
-        atom_key = String.to_existing_atom(key)
-        attrs[atom_key]
-    rescue
-      ArgumentError -> nil
+    cond do
+      Map.has_key?(attrs, key) -> Map.get(attrs, key)
+      true ->
+        atom_key =
+          try do
+            String.to_existing_atom(key)
+          rescue
+            ArgumentError -> nil
+          end
+
+        if atom_key && Map.has_key?(attrs, atom_key) do
+          Map.get(attrs, atom_key)
+        else
+          nil
+        end
     end
   end
 

@@ -68,18 +68,18 @@ defmodule Messngr.Accounts.DeviceKey do
   end
 
   defp decode_hex(value) do
-    value
-    |> String.downcase()
-    |> case do
-      <<_::binary-size(size)>> = hex when rem(size, 2) == 0 and size >= 64 and size <= 128 ->
+    hex = String.downcase(value)
+    size = byte_size(hex)
+
+    cond do
+      rem(size, 2) != 0 -> {:error, :invalid_hex}
+      size < 64 or size > 128 -> {:error, :invalid_hex}
+      true ->
         try do
           {:ok, Base.decode16!(hex, case: :lower)}
         rescue
           ArgumentError -> {:error, :invalid_hex}
         end
-
-      _ ->
-        {:error, :invalid_hex}
     end
   end
 

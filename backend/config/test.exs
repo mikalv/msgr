@@ -9,6 +9,7 @@ config :msgr, Messngr.Repo,
   pool_size: 10
 
 config :msgr, :feature_flags, noise_handshake_required: false
+config :msgr, :dns_cluster_query, :ignore
 
 config :msgr, :llm_client, Messngr.AI.LlmClientMock
 
@@ -20,8 +21,27 @@ config :msgr_web, MessngrWeb.Endpoint,
 config :logger, level: :warning
 
 config :msgr_web, :expose_otp_codes, true
+config :msgr_web, :noise_handshake_stub, enabled: true
 
 config :phoenix, :plug_init_mode, :runtime
+
+noise_private_key = :crypto.hash(:sha256, "msgr-noise-test-key")
+{noise_public_key, _} = :crypto.generate_key(:ecdh, :x25519, noise_private_key)
+
+fingerprint =
+  noise_public_key
+  |> then(&:crypto.hash(:blake2b, &1))
+  |> binary_part(0, 32)
+  |> Base.encode16(case: :lower)
+
+config :msgr, :noise,
+  enabled: true,
+  private_key: noise_private_key,
+  public_key: noise_public_key,
+  protocol: "Noise_NX_25519_ChaChaPoly_Blake2b",
+  prologue: "msgr-noise/v1",
+  fingerprint: fingerprint,
+  transport_port: 5_443
 
 config :msgr, :noise_session_registry, enabled: false
 
