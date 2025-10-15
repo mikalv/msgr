@@ -38,6 +38,14 @@
   cover the richer payloads alongside webhook and poller dispatch flows. Introduced adaptive-card
   sanitisation and file-upload helpers so outbound Teams messages safely render HTML/cards and
   upload binary attachments with accompanying metadata for downstream consumers.
+- Oppdaterte dev-innloggingen i Flutter med backend-host-override via
+  `BackendEnvironment.override`, lagring av Noise-token/session i
+  `AuthIdentityStore` og nye enhetstester for persistensen.
+- Forenklet `AppNavigation.redirectWhenLoggedIn` slik at direktechat kan brukes
+  uten å velge workspace først, og dokumenterte flyten i
+  `docs/frontend_chat_flow.md`.
+- Herdet `ChatSocket` med tilkoblingshendelser og robust gjenoppkobling som
+  oppdaterer `ChatViewModel`, inkludert nye widgettester for sanntidsstatus.
 - Replaced the Microsoft Teams Graph poller with a webhook-driven change-notification pipeline,
   including reusable notification source abstractions, an in-memory transport for tests, and
   runtime coverage that validates real-time event delivery, acknowledgements, and token refresh

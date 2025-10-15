@@ -33,6 +33,18 @@ class BackendEnvironment {
   /// hot paths.
   String get apiBaseUrl => (_override ?? _default).baseUrl;
 
+  /// Returns the currently active backend host. Useful for diagnostics and UI
+  /// where the user should be able to inspect or override the connection
+  /// target without having to parse a URI manually.
+  String get host => (_override ?? _default).host;
+
+  /// Returns the configured backend port if it is explicitly set. When `null`
+  /// the scheme default (80/443) is implied.
+  int? get port => (_override ?? _default).port;
+
+  /// Returns the API path prefix used when composing backend URLs.
+  String get apiPath => (_override ?? _default).apiPath;
+
   /// Builds a [Uri] by combining the base API path with an additional
   /// [relativePath]. Leading or trailing slashes are handled automatically.
   Uri apiUri(String relativePath, {Map<String, dynamic>? queryParameters}) {

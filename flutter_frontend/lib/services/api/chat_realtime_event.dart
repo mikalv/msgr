@@ -6,6 +6,21 @@ abstract class ChatRealtimeEvent {
   const ChatRealtimeEvent();
 }
 
+/// States reported fra realtime-klienten når forbindelsen endrer tilstand.
+enum ChatConnectionState { connecting, connected, reconnecting, disconnected }
+
+/// Event som beskriver endringer i realtime-forbindelsen.
+class ChatConnectionEvent extends ChatRealtimeEvent {
+  const ChatConnectionEvent(this.state, {this.error});
+
+  final ChatConnectionState state;
+  final Object? error;
+
+  bool get isConnected => state == ChatConnectionState.connected;
+  bool get isDisconnected =>
+      state == ChatConnectionState.disconnected && error == null;
+}
+
 /// Event når en melding blir opprettet eller oppdatert.
 class ChatMessageEvent extends ChatRealtimeEvent {
   const ChatMessageEvent(this.message,

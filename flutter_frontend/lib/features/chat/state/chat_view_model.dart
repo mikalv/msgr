@@ -93,6 +93,7 @@ class ChatViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isSending => _isSending;
   bool get isOffline => _isOffline;
+  bool get isRealtimeConnected => _realtimeConnected;
   String? get error => _error;
   List<ChatMessage> get messages => _messages;
   ChatThread? get thread => _thread;
@@ -621,29 +622,40 @@ class ChatViewModel extends ChangeNotifier {
 
     try {
       await _realtimeSubscription?.cancel();
-      await _realtime.connect(
-        identity: _identity,
-        conversationId: _thread!.id,
-      );
-
-      _realtimeConnected = true;
-      _realtimeSubscription = _realtime.events.listen(
+      final subscription = _realtime.events.listen(
         _handleRealtimeEvent,
         onError: (error) {
           debugPrint('Realtime stream error: $error');
           _realtimeConnected = false;
           _stopTypingActivity();
+          notifyListeners();
         },
       );
-      _markExistingMessagesRead();
+      _realtimeSubscription = subscription;
+
+      await _realtime.connect(
+        identity: _identity,
+        conversationId: _thread!.id,
+      );
+
+      if (_realtime.isConnected) {
+        _realtimeConnected = true;
+        _markExistingMessagesRead();
+      }
     } on ChatSocketException catch (error, stack) {
       debugPrint('Failed to connect realtime: $error\n$stack');
       _realtimeConnected = false;
       _stopTypingActivity();
+      await _realtimeSubscription?.cancel();
+      _realtimeSubscription = null;
+      notifyListeners();
     } catch (error, stack) {
       debugPrint('Unexpected realtime error: $error\n$stack');
       _realtimeConnected = false;
       _stopTypingActivity();
+      await _realtimeSubscription?.cancel();
+      _realtimeSubscription = null;
+      notifyListeners();
     }
   }
 
@@ -779,6 +791,38 @@ class ChatViewModel extends ChangeNotifier {
 
   void _handleRealtimeEvent(ChatRealtimeEvent event) {
     if (_thread == null) return;
+
+    if (event is ChatConnectionEvent) {
+      switch (event.state) {
+        case ChatConnectionState.connected:
+          final changed = !_realtimeConnected;
+          _realtimeConnected = true;
+          _updateOffline(false);
+          _markExistingMessagesRead();
+          if (changed) {
+            notifyListeners();
+          }
+          break;
+        case ChatConnectionState.reconnecting:
+        case ChatConnectionState.connecting:
+          final wasConnected = _realtimeConnected;
+          _realtimeConnected = false;
+          _stopTypingActivity();
+          if (wasConnected) {
+            notifyListeners();
+          }
+          break;
+        case ChatConnectionState.disconnected:
+          final wasConnected = _realtimeConnected;
+          _realtimeConnected = false;
+          _stopTypingActivity();
+          if (wasConnected) {
+            notifyListeners();
+          }
+          break;
+      }
+      return;
+    }
 
     if (event is ChatMessageEvent) {
       _mergeMessage(event.message);

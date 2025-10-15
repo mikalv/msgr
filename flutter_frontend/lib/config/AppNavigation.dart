@@ -146,13 +146,6 @@ class AppNavigation {
   String? redirectWhenLoggedIn(BuildContext context, GoRouterState state) {
     if (StoreProvider.of<AppState>(context).state.authState.currentUser !=
         null) {
-      if (StoreProvider.of<AppState>(context).state.authState.teamAccessToken ==
-          null) {
-        _log.warning(
-            'User managed to get a unwanted state where currentUser is set, '
-            'but no team selected - Sending to select team screen');
-        return selectTeamPath;
-      }
       _log.info(
           'Redirecting user cause redirectWhenLoggedIn (from route ${state.path} to route $dashboardPath)');
       return dashboardPath;
