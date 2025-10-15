@@ -6,7 +6,7 @@ defmodule MessngrWeb.Router do
   end
 
   pipeline :actor do
-    plug MessngrWeb.Plugs.CurrentActor
+    plug MessngrWeb.Plugs.CurrentActor, authorization_schemes: [:noise]
   end
 
   pipeline :browser do
@@ -67,6 +67,7 @@ defmodule MessngrWeb.Router do
     get "/bridges/sessions/:id", BridgeAuthSessionController, :show
     post "/bridges/:bridge_id/sessions/:id/credentials", BridgeAuthSessionController, :submit_credentials
     delete "/bridges/:bridge_id", BridgeAccountController, :delete
+    get "/account/me", AccountController, :me
   end
 
   scope "/auth/bridge", MessngrWeb do

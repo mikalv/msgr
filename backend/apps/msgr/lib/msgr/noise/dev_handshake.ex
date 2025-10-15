@@ -14,6 +14,7 @@ defmodule Messngr.Noise.DevHandshake do
   alias UUID
 
   @default_ttl_ms :timer.minutes(5)
+  @config_key __MODULE__
 
   @doc """
   Generates and persists a Noise session that mimics the result of a completed
@@ -36,7 +37,8 @@ defmodule Messngr.Noise.DevHandshake do
            }}
           | {:error, term()}
   def generate(opts \\ []) do
-    with {:ok, noise_config} <- fetch_noise_config(),
+    with :ok <- ensure_enabled(),
+         {:ok, noise_config} <- fetch_noise_config(),
          {:ok, registry} <- ensure_registry_started(),
          {:ok, session_data} <- build_session(noise_config, opts),
          {:ok, session} <- Handshake.persist(session_data.session, registry: registry) do
@@ -56,21 +58,31 @@ defmodule Messngr.Noise.DevHandshake do
     end
   end
 
+  def enabled? do
+    config() |> Keyword.get(:enabled, false)
+  end
+
+  defp ensure_enabled do
+    if enabled?() do
+      :ok
+    else
+      {:error, :dev_handshake_disabled}
+    end
+  end
+
   defp fetch_noise_config do
     noise_config = Application.get_env(:msgr, :noise, [])
+    handshake_config = config()
 
     cond do
-      Keyword.get(noise_config, :enabled, false) == false ->
-        {:error, :noise_transport_disabled}
+      Keyword.get(noise_config, :enabled, false) ->
+        ensure_key_material(noise_config)
 
-      Keyword.get(noise_config, :private_key) in [nil, ""] ->
-        {:error, :noise_private_key_missing}
-
-      Keyword.get(noise_config, :public_key) in [nil, ""] ->
-        {:error, :noise_public_key_missing}
+      allow_without_transport?(handshake_config) ->
+        ensure_key_material(noise_config)
 
       true ->
-        {:ok, noise_config}
+        {:error, :noise_transport_disabled}
     end
   end
 
@@ -124,15 +136,15 @@ defmodule Messngr.Noise.DevHandshake do
        session: session,
        device_private_key: Base.url_encode64(device_private, padding: false),
        expires_at: expires_at,
-        server: %{
-          protocol: protocol,
-          prologue: prologue,
-          fingerprint: fingerprint,
-          public_key:
-            noise_config
-            |> Keyword.fetch!(:public_key)
-            |> Base.encode64()
-        }
+       server: %{
+         protocol: protocol,
+         prologue: prologue,
+         fingerprint: fingerprint,
+         public_key:
+           noise_config
+           |> Keyword.fetch!(:public_key)
+           |> Base.encode64()
+       }
      }}
   end
 
@@ -140,4 +152,106 @@ defmodule Messngr.Noise.DevHandshake do
     Application.get_env(:msgr, :noise_session_registry, [])
     |> Keyword.get(:ttl, @default_ttl_ms)
   end
+
+  defp config do
+    Application.get_env(:msgr, @config_key, [])
+  end
+
+  defp allow_without_transport?(config) do
+    Keyword.get(config, :allow_without_transport, false)
+  end
+
+  defp ensure_key_material(noise_config) do
+    with {:ok, private_key} <- resolve_private_key(noise_config),
+         {:ok, public_key} <- resolve_public_key(noise_config, private_key) do
+      fingerprint =
+        Keyword.get(noise_config, :fingerprint) ||
+          KeyLoader.fingerprint(private_key)
+
+      protocol = Keyword.get(noise_config, :protocol, KeyLoader.protocol())
+      prologue = Keyword.get(noise_config, :prologue, KeyLoader.prologue())
+
+      {:ok,
+       noise_config
+       |> Keyword.put(:private_key, private_key)
+       |> Keyword.put(:public_key, public_key)
+       |> Keyword.put(:fingerprint, fingerprint)
+       |> Keyword.put(:protocol, protocol)
+       |> Keyword.put(:prologue, prologue)}
+    end
+  end
+
+  defp resolve_private_key(config) do
+    case Keyword.get(config, :private_key) do
+      key when is_binary(key) and byte_size(key) == 32 ->
+        {:ok, key}
+
+      key when is_binary(key) ->
+        decode_base64_key(key, :noise_private_key_invalid)
+
+      _ ->
+        config
+        |> Keyword.get(:private_key_base64)
+        |> decode_base64_key(:noise_private_key_invalid)
+        |> case do
+          {:ok, key} -> {:ok, key}
+          {:error, :not_found} -> load_private_key(config)
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  end
+
+  defp resolve_public_key(config, private_key) do
+    case Keyword.get(config, :public_key) do
+      key when is_binary(key) and byte_size(key) == 32 ->
+        {:ok, key}
+
+      key when is_binary(key) ->
+        decode_base64_key(key, :noise_public_key_invalid)
+
+      _ ->
+        config
+        |> Keyword.get(:public_key_base64)
+        |> decode_base64_key(:noise_public_key_invalid)
+        |> case do
+          {:ok, key} -> {:ok, key}
+          {:error, :not_found} -> {:ok, KeyLoader.public_key(private_key)}
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  end
+
+  defp load_private_key(config) do
+    config
+    |> key_loader_opts()
+    |> KeyLoader.load()
+    |> case do
+      {:ok, key} -> {:ok, key}
+      {:error, :noise_static_key_not_found} -> {:error, :noise_private_key_missing}
+      {:error, reason} -> {:error, {:noise_private_key_load_failed, reason}}
+    end
+  end
+
+  defp key_loader_opts(config) do
+    []
+    |> maybe_put(:env_var, Keyword.get(config, :env_var))
+    |> maybe_put(:secret_id, Keyword.get(config, :secret_id))
+    |> maybe_put(:secret_field, Keyword.get(config, :secret_field))
+    |> maybe_put(:secret_region, Keyword.get(config, :secret_region))
+    |> maybe_put(:default, Keyword.get(config, :default_static_key))
+  end
+
+  defp maybe_put(opts, _key, nil), do: opts
+  defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
+
+  defp decode_base64_key(nil, _error), do: {:error, :not_found}
+
+  defp decode_base64_key(value, error) when is_binary(value) do
+    case Base.decode64(value) do
+      {:ok, decoded} when byte_size(decoded) == 32 -> {:ok, decoded}
+      _ -> {:error, error}
+    end
+  end
+
+  defp decode_base64_key(_value, error), do: {:error, error}
 end

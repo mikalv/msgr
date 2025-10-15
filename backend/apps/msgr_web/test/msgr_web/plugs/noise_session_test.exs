@@ -84,6 +84,18 @@ defmodule MessngrWeb.Plugs.NoiseSessionTest do
     assert conn.status == 401
   end
 
+  test "rejects bearer scheme when not allowed", %{conn: conn, account: account, profile: profile} do
+    %{token: token} = noise_session_fixture(account, profile)
+
+    conn =
+      conn
+      |> put_req_header("authorization", "Bearer #{token}")
+      |> NoiseSession.call(%{authorization_schemes: [:noise]})
+
+    assert conn.halted
+    assert conn.status == 401
+  end
+
   describe "verify_token/2" do
     test "returns actor metadata", %{account: account, profile: profile} do
       %{token: token} = noise_session_fixture(account, profile)

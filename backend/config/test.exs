@@ -45,6 +45,10 @@ config :msgr, :noise,
 
 config :msgr, :noise_session_registry, enabled: false
 
+config :msgr, Messngr.Noise.DevHandshake,
+  enabled: true,
+  allow_without_transport: false
+
 config :msgr, Messngr.Chat.WatcherPruner, enabled: false
 
 shared_repo_config =

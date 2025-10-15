@@ -1,6 +1,17 @@
 # Changelog
 
 ## Unreleased
+- Returnerer nå `profile_id` og profilpayload i OTP-responsen, og standard
+  profilnavn henter fornavn/e-post i stedet for «Privat», med oppdatert
+  testdekning.
+- La til dev-togglingsstøtte for `Messngr.Noise.DevHandshake`, inkludert
+  runtime-overstyring, controller-guarding og enhetstester som verifiserer
+  fallback til konfigurerte standardnøkler.
+- Strammet inn `CurrentActor` til å kreve `Authorization: Noise` i
+  samtaleendepunktene, la til kontakt→samtale→broadcast-test og verifiserte at
+  `POST /api/conversations` avviser Bearer-tokens.
+- Eksponerte `GET /api/account/me`, dokumenterte backend-oppsett og Noise-toggles
+  i `docs/backend_setup.md`, og oppdaterte API-kontrakten.
 - Dokumenterte arkitekturvalgene i `docs/architecture_alignment.md` med sjekklister
   for Phoenix-kontekster, Flutter-featurestrukturen og operasjonelle prinsipper
   (TLS/Noise-toggles, enkel Postgres-instans).

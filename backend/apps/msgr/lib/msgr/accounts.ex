@@ -64,20 +64,104 @@ defmodule Messngr.Accounts do
 
   defp fetch_profile_name(attrs) do
     attrs
-    |> Map.get("profile_name")
-    |> Kernel.||(Map.get(attrs, :profile_name))
-    |> Kernel.||(Map.get(attrs, "display_name"))
-    |> Kernel.||(Map.get(attrs, :display_name))
+    |> provided_profile_name()
+    |> case do
+      nil -> derive_default_profile_name(attrs)
+      name -> sanitize_profile_name(name) || derive_default_profile_name(attrs)
+    end
+  end
+
+  defp provided_profile_name(attrs) do
+    cond do
+      value = Map.get(attrs, "profile_name") -> value
+      value = Map.get(attrs, :profile_name) -> value
+      value = nested_profile_name(Map.get(attrs, "profile")) -> value
+      value = nested_profile_name(Map.get(attrs, :profile)) -> value
+      true -> nil
+    end
+  end
+
+  defp nested_profile_name(%{} = profile_attrs) do
+    profile_attrs["name"] || profile_attrs[:name]
+  end
+
+  defp nested_profile_name(_), do: nil
+
+  defp derive_default_profile_name(attrs) do
+    attrs
+    |> default_name_candidates()
+    |> Enum.find_value(& &1)
     |> case do
       nil -> "Privat"
-      name ->
-        trimmed = String.trim(to_string(name))
-        if trimmed == "" do
-          "Privat"
-        else
-          trimmed
-        end
+      candidate -> candidate
     end
+  end
+
+  defp default_name_candidates(attrs) do
+    [
+      first_name(Map.get(attrs, "display_name")),
+      first_name(Map.get(attrs, :display_name)),
+      first_name_from_email(Map.get(attrs, "email")),
+      first_name_from_email(Map.get(attrs, :email))
+    ]
+  end
+
+  defp sanitize_profile_name(nil), do: nil
+
+  defp sanitize_profile_name(name) do
+    name
+    |> to_string()
+    |> String.trim()
+    |> case do
+      "" -> nil
+      trimmed -> trimmed
+    end
+  end
+
+  defp first_name(nil), do: nil
+
+  defp first_name(name) do
+    name
+    |> to_string()
+    |> String.trim()
+    |> case do
+      "" -> nil
+      trimmed ->
+        trimmed
+        |> String.split(~r/\s+/, trim: true)
+        |> Enum.at(0)
+    end
+  end
+
+  defp first_name_from_email(nil), do: nil
+
+  defp first_name_from_email(email) do
+    email
+    |> to_string()
+    |> String.trim()
+    |> case do
+      "" -> nil
+      trimmed ->
+        local_part =
+          trimmed
+          |> String.split("@", parts: 2)
+          |> Enum.at(0)
+
+        local_part
+        |> to_string()
+        |> String.replace(~r/[^[:alnum:]]+/u, " ")
+        |> String.split(~r/\s+/, trim: true)
+        |> Enum.at(0)
+        |> prettify_email_guess()
+    end
+  end
+
+  defp prettify_email_guess(nil), do: nil
+
+  defp prettify_email_guess(value) do
+    value
+    |> String.downcase()
+    |> String.capitalize()
   end
 
   @spec create_profile(map()) :: {:ok, Profile.t()} | {:error, Ecto.Changeset.t()}
