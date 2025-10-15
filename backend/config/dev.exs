@@ -30,6 +30,10 @@ config :msgr, :noise,
   env_var: "NOISE_STATIC_KEY",
   secret_field: "private"
 
+config :msgr, Messngr.Noise.DevHandshake,
+  enabled: true,
+  allow_without_transport: true
+
 config :msgr_web, MessngrWeb.Endpoint,
   http: [ip: listen_ip, port: String.to_integer(System.get_env("PORT", "4000"))],
   check_origin: false,

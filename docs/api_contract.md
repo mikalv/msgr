@@ -108,6 +108,13 @@ Feil:
        "email": "kari@example.com",
        "phone_number": null
      },
+     "profile_id": "profile-uuid",
+     "profile": {
+       "id": "profile-uuid",
+       "name": "Kari",
+       "slug": "kari",
+       "mode": "personal"
+     },
      "identity": {
        "id": "identity-uuid",
        "kind": "email",
@@ -263,8 +270,33 @@ Når ingen treff finnes returneres `match: null` for den aktuelle oppføringen.
     "profiles": [
       {
         "id": "profile-uuid",
-        "name": "Privat",
-        "mode": "private"
+        "name": "Kari",
+        "mode": "personal"
+      }
+    ]
+  }
+}
+```
+
+### Hente min konto
+
+`GET /api/account/me`
+
+Returnerer kontoen/profilene som er knyttet til gjeldende Noise-sesjon.
+
+**Respons 200**
+
+```json
+{
+  "data": {
+    "id": "acct-uuid",
+    "display_name": "Kari Nordmann",
+    "profiles": [
+      {
+        "id": "profile-uuid",
+        "name": "Kari",
+        "slug": "kari",
+        "mode": "personal"
       }
     ]
   }

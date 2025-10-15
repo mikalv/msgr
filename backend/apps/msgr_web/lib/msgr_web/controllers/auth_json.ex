@@ -24,6 +24,12 @@ defmodule MessngrWeb.AuthJSON do
 
     default_profile = List.first(profiles)
 
+    default_profile_id =
+      case default_profile do
+        %{id: id} -> id
+        _ -> nil
+      end
+
     base = %{
       account: %{
         id: account.id,
@@ -33,6 +39,7 @@ defmodule MessngrWeb.AuthJSON do
         profiles: profiles
       },
       profile: default_profile,
+      profile_id: default_profile_id,
       identity: %{
         id: identity.id,
         kind: identity.kind,

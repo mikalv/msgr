@@ -8,10 +8,12 @@ defmodule Messngr.Noise.DevHandshakeTest do
   setup do
     original_noise = Application.get_env(:msgr, :noise, [])
     original_registry = Application.get_env(:msgr, :noise_session_registry, [])
+    original_handshake = Application.get_env(:msgr, Messngr.Noise.DevHandshake, [])
 
     on_exit(fn ->
       Application.put_env(:msgr, :noise, original_noise)
       Application.put_env(:msgr, :noise_session_registry, original_registry)
+      Application.put_env(:msgr, Messngr.Noise.DevHandshake, original_handshake)
 
       if pid = Process.whereis(Registry) do
         Process.exit(pid, :normal)
@@ -33,6 +35,7 @@ defmodule Messngr.Noise.DevHandshakeTest do
 
     Application.put_env(:msgr, :noise, noise_config)
     Application.put_env(:msgr, :noise_session_registry, [ttl: 200])
+    Application.put_env(:msgr, Messngr.Noise.DevHandshake, enabled: true, allow_without_transport: false)
 
     {:ok,
      %{
@@ -74,5 +77,34 @@ defmodule Messngr.Noise.DevHandshakeTest do
     Application.put_env(:msgr, :noise, [enabled: true, private_key: nil, public_key: nil])
 
     assert {:error, :noise_private_key_missing} = DevHandshake.generate()
+  end
+
+  test "generate/1 returns error when dev toggle disabled" do
+    Application.put_env(:msgr, Messngr.Noise.DevHandshake, enabled: false)
+
+    assert {:error, :dev_handshake_disabled} = DevHandshake.generate()
+  end
+
+  test "generate/1 loads default key when allowed without transport", %{private_key: private_key} do
+    default_base64 = Base.encode64(private_key)
+
+    Application.put_env(:msgr, :noise,
+      enabled: false,
+      default_static_key: {:base64, default_base64},
+      protocol: KeyLoader.protocol(),
+      prologue: KeyLoader.prologue()
+    )
+
+    Application.put_env(:msgr, Messngr.Noise.DevHandshake, enabled: true, allow_without_transport: true)
+
+    assert {:ok, payload} = DevHandshake.generate(ttl_ms: 50)
+
+    expected_public_key =
+      private_key
+      |> KeyLoader.public_key()
+      |> Base.encode64()
+
+    assert payload.server.public_key == expected_public_key
+    assert %Session{} = payload.session
   end
 end

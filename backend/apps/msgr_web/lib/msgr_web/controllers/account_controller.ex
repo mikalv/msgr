@@ -37,6 +37,14 @@ defmodule MessngrWeb.AccountController do
     end
   end
 
+  def me(conn, _params) do
+    current_account = conn.assigns.current_account
+
+    account = Messngr.get_account!(current_account.id)
+
+    render(conn, :show, account: account)
+  end
+
   defp normalize_account_attrs(params) when is_map(params) do
     params
     |> Map.take([
