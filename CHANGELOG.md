@@ -1,6 +1,14 @@
 # Changelog
 
 ## Unreleased
+
+### Architecture checklist
+
+- [x] TLS kan toggles via miljøvariablene `MSGR_TLS_*` uten kodeendringer.
+- [x] Noise-transport og handshake styres av `NOISE_*`-variabler og `libmsgr_core`.
+- [x] Kun én Postgres-instans brukes i docker-stacken (`services.db`).
+- [x] Flutter-klienten følger feature-først-strukturen (`auth`, `bridges`, `chat`, `contacts`).
+- [x] Krypteringslaget er modulært slik at transport/Noise kan byttes uten å endre UI-kode.
 - Returnerer nå `profile_id` og profilpayload i OTP-responsen, og standard
   profilnavn henter fornavn/e-post i stedet for «Privat», med oppdatert
   testdekning.
