@@ -28,7 +28,7 @@ Bygge en norsk meldingsplattform der én konto kan ha flere profiler og moduser 
      - `POST /api/conversations` for 1:1 chat, automatisk opprett profil-deltakere.
      - `GET /api/conversations/:id/messages` og `POST /api/conversations/:id/messages`.
    - Phoenix Channel `ChatChannel` på `conversation:<id>` for sanntid.
-   - Auth: midlertidig `x-user-id` header; bytt til OIDC/Noise senere.
+   - Auth: midlertidig dev-endpoint for Noise-handshake som gir `Authorization: Noise <token>` frem til transporten er på plass.
    - Testing: ExUnit for kontomodell, meldingsstrøm, kanalbroadcast.
 
 2. **Flutter**
@@ -38,7 +38,7 @@ Bygge en norsk meldingsplattform der én konto kan ha flere profiler og moduser 
    - E2E: integrasjonstest mot lokal backend (mock server) + widgettester for composer.
 
 3. **DevEx**
-   - Skripter for å starte stack (`docker compose up backend postgres` + `flutter run`).
+   - Skripter for å starte stack (`NOISE_TRANSPORT_ENABLED=true docker compose up backend postgres` + `flutter run`).
    - CI: Github Actions (lint, format, `mix test`, `flutter test`).
    - Observability stub: struktur for telemetry events (send→ack, typing, errors).
 
