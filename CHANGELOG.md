@@ -57,6 +57,8 @@
   backend and Flutter can hook into send→ack timelines.
 - Fixed the socket telemetry docs to follow Elixir heredoc formatting so
   `mix format` succeeds.
+- Corrected the Microsoft Teams bridge consent copy to remove invalid string
+  continuations so `mix format` can process `Messngr.Bridges.Auth`.
 
 ### Continuous integration
 
