@@ -6,6 +6,7 @@ import '../contracts/device.dart';
 import '../contracts/storage.dart';
 import '../crypto/key_manager.dart';
 import '../models/auth_challenge.dart';
+import '../models/noise_handshake.dart';
 import 'registration_api.dart';
 
 class RegistrationServiceCore {
@@ -32,6 +33,7 @@ class RegistrationServiceCore {
   String? email;
   String? msisdn;
   AuthChallenge? lastChallenge;
+  NoiseHandshakeSession? _noiseHandshake;
 
   void updateCachedContext({
     required Map<String, dynamic> deviceInfo,
@@ -123,10 +125,13 @@ class RegistrationServiceCore {
     required String identifier,
   }) async {
     await ensureKeysLoaded();
+    final handshake = await _ensureNoiseHandshake();
+    final deviceId = handshake?.deviceKey ?? keyManager.deviceId;
+
     final challenge = await _api.requestChallenge(
       channel: channel,
       identifier: identifier,
-      deviceId: keyManager.deviceId,
+      deviceId: deviceId,
     );
     if (challenge != null) {
       lastChallenge = challenge;
@@ -140,14 +145,20 @@ class RegistrationServiceCore {
     String? displayName,
   }) async {
     await ensureKeysLoaded();
+    final handshake = _noiseHandshake ?? await _ensureNoiseHandshake(refreshIfNeeded: false);
     final response = await _api.verifyCode(
       challengeId: challengeId,
       code: code,
       displayName: displayName,
+      noiseSessionId: handshake?.sessionId,
+      noiseSignature: handshake?.signature,
+      lastHandshakeAt: handshake != null ? DateTime.now().toUtc() : null,
     );
     if (response == null) {
       return null;
     }
+
+    _clearNoiseHandshake();
 
     final account = response['account'] as Map<String, dynamic>;
     final identity = response['identity'] as Map<String, dynamic>;
@@ -264,6 +275,36 @@ class RegistrationServiceCore {
       return null;
     }
     return RefreshSessionResponse(accessToken: token, refreshToken: refresh);
+  }
+
+  Future<NoiseHandshakeSession?> _ensureNoiseHandshake({bool refreshIfNeeded = true}) async {
+    final current = _noiseHandshake;
+
+    if (!refreshIfNeeded) {
+      return current;
+    }
+
+    if (current != null && !current.shouldRefresh && !current.isExpired) {
+      return current;
+    }
+
+    final session = await _api.createNoiseHandshake();
+
+    if (session == null ||
+        session.sessionId.isEmpty ||
+        session.signature.isEmpty ||
+        session.deviceKey.isEmpty) {
+      _log.fine('Noise handshake endpoint unavailable or returned incomplete data');
+      _noiseHandshake = null;
+      return null;
+    }
+
+    _noiseHandshake = session;
+    return _noiseHandshake;
+  }
+
+  void _clearNoiseHandshake() {
+    _noiseHandshake = null;
   }
 }
 

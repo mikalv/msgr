@@ -8,5 +8,6 @@ export 'src/memory/memory_device_info.dart';
 export 'src/memory/memory_storage.dart';
 export 'src/network/server_resolver.dart';
 export 'src/models/auth_challenge.dart';
+export 'src/models/noise_handshake.dart';
 export 'src/registration/registration_api.dart';
 export 'src/registration/registration_service.dart';
