@@ -38,6 +38,28 @@
   cover the richer payloads alongside webhook and poller dispatch flows. Introduced adaptive-card
   sanitisation and file-upload helpers so outbound Teams messages safely render HTML/cards and
   upload binary attachments with accompanying metadata for downstream consumers.
+
+### Developer experience
+
+- Replaced the `libmsgr_core` key manager test double with an in-memory secure storage helper so `dart test` no longer fails while loading mocks.
+- Added `scripts/start_stack.sh` and `scripts/run_flutter.sh` to capture the
+  recommended `docker compose`/`flutter run` incantations and documented the
+  demoflyt (<1s send→ack, re-login) in `docs/backend_setup.md`.
+- Completed the CLI migration by deleting the legacy `libmsgr/tool` forwarder,
+  fixing the standalone `libmsgr_cli` binary and pointing integration tests to
+  `packages/libmsgr_cli/bin/msgr.dart`.
+
+### Observability
+
+- Instrumented `ConversationChannel` typing and message ack flows with telemetry
+  stubs and added a matching socket telemetry broadcaster in `libmsgr` so both
+  backend and Flutter can hook into send→ack timelines.
+
+### Continuous integration
+
+- Restored the migrations formatter configuration so `mix format --check-formatted` can execute without error.
+- Introduced a GitHub Actions workflow that runs `mix format --check-formatted`,
+  `mix test`, `flutter format` and `flutter test` on pushes and pull requests.
 - Oppdaterte dev-innloggingen i Flutter med backend-host-override via
   `BackendEnvironment.override`, lagring av Noise-token/session i
   `AuthIdentityStore` og nye enhetstester for persistensen.
@@ -233,8 +255,9 @@
   controller-tester, oppdatert API-kontrakt og Flutter `libmsgr`
   klientimplementasjon for å lagre kontakter og slå opp kjente venner.
 - Documented the `libmsgr` API surface, added a dedicated CLI entry point for
-  the registration flow (`tool/msgr_cli.dart`), and updated the integration test
-  suite to use the new command for provisioning accounts.
+  the registration flow (now shipped as `packages/libmsgr_cli/bin/msgr.dart`),
+  and updated the integration test suite to use the new command for provisioning
+  accounts.
 - Added multi-identity account linking so `Accounts.ensure_identity/1` can attach
   new email/phone/OIDC credentials to an existing account via `account_id`, with
   safeguards against cross-account hijacking, refreshed docs and regression

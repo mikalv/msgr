@@ -48,3 +48,37 @@ skriver controller-tester.
 
 I dev kan du deretter generere en midlertidig Noise-handshake med
 `curl -X POST http://localhost:4000/api/noise/handshake` før du starter OTP-flowen.
+
+## Scripts og hurtigkommandoer
+
+For å kutte ned på copy/paste av lange kommandoer finnes det nå to hjelpeskript i
+repoet:
+
+- `./scripts/start_stack.sh [-d]` setter `NOISE_TRANSPORT_ENABLED=true` og kjører
+  `docker compose up` med samme `docker-compose.yml` som integrasjonstestene.
+  Legg til `-d` for å kjøre i bakgrunnen.
+- `./scripts/run_flutter.sh [host] [flutter-argumenter]` kjører `flutter pub get`
+  i `flutter_frontend/` og starter klienten med
+  `--dart-define=MSGR_BACKEND_HOST=<host>`. Host kan settes via første argument
+  eller miljøvariabelen `MSGR_BACKEND_HOST` (standard er
+  `auth.7f000001.nip.io`). Alle ekstra argumenter sendes videre til
+  `flutter run`.
+
+## Manuell validering
+
+Når stacken kjører er demoflyten vi bruker internt:
+
+1. `./scripts/start_stack.sh -d` for å starte backend (StoneMQ, auth, API). Vent
+   til `auth.7f000001.nip.io` svarer.
+2. `cd flutter_frontend/packages/libmsgr_cli && dart run bin/msgr.dart integration-flow --json`
+   for å provisionere bruker, team og få ut `teamHost`/tokens.
+3. `MSGR_BACKEND_HOST=<teamHost> ./scripts/run_flutter.sh` for å starte appen mot
+   riktig subdomene.
+4. Send en melding i en ny eller eksisterende kanal og bekreft at den dukker opp
+   under ett sekund – backend svarer med `message_created` over sokkel og UI
+   viser bekreftelsen.
+5. Logg ut fra klienten, logg inn igjen med samme OTP og bekreft at tidligere
+   samtaler/rom lastes inn uten feil.
+
+Denne runden dokumenterer både at sokkeleventy bekreftes raskt («send→ack») og at
+re-login beholder lagrede nøkler/device context.

@@ -74,5 +74,5 @@
 
 ## Next Steps
 1. Complete auth/services migration by moving the remaining repositories (message/profile/etc.) into `libmsgr_core`.
-2. Switch CLI integration tests to invoke `packages/libmsgr_cli` directly and remove the legacy `tool/` proxy once stable.
+2. ✅ Switch CLI integration tests to invoke `packages/libmsgr_cli` directly and remove the legacy `tool/` proxy once stable.
 3. Gradually migrate persistence/cache adapters (Drift, Redux wiring) to use the new abstractions and delete Flutter-only shims.

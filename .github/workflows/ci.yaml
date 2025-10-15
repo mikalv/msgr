@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: '1.16.2'
+          otp-version: '26.2'
+      - name: Install dependencies
+        run: mix deps.get
+      - name: Check formatting
+        run: mix format --check-formatted
+      - name: Run tests
+        env:
+          MIX_ENV: test
+        run: mix test
+
+  dart-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: '3.5.1'
+      - name: Test libmsgr_core
+        working-directory: flutter_frontend/packages/libmsgr_core
+        run: |
+          dart pub get
+          dart test
+      - name: Test libmsgr_cli
+        working-directory: flutter_frontend/packages/libmsgr_cli
+        run: |
+          dart pub get
+          dart test
+
+  flutter:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flutter_frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Flutter pub get
+        run: flutter pub get
+      - name: Check formatting
+        run: flutter format --set-exit-if-changed lib packages test
+      - name: Run Flutter tests
+        run: flutter test
+    needs:
+      - dart-packages

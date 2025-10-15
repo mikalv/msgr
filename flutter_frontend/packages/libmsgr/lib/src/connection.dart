@@ -1,4 +1,5 @@
 import 'package:libmsgr/libmsgr.dart';
+import 'package:libmsgr/src/telemetry/socket_telemetry.dart';
 import 'package:libmsgr/src/typedefs.dart';
 import 'package:libmsgr/src/utils/events.dart';
 import 'package:logging/logging.dart';
@@ -175,7 +176,35 @@ class MsgrConnection {
     final key = (msg.roomID != null) ? 'room:$destID' : 'conversation:$destID';
     if (_socket.channels.containsKey(key)) {
       final chl = _socket.channels[key]!;
-      return chl.push('create:msg', msg.toMap());
+      SocketTelemetry.instance.messageSent(
+        conversationId: msg.conversationID ?? msg.roomID ?? destID,
+        messageId: msg.id,
+        metadata: {'topic': key},
+      );
+
+      final push = chl.push('create:msg', msg.toMap());
+      push?.future.then((response) {
+        SocketTelemetry.instance.messageAcknowledged(
+          conversationId: msg.conversationID ?? msg.roomID ?? destID,
+          messageId: msg.id,
+          metadata: {
+            'topic': key,
+            'status': response?.status ?? 'ok',
+          },
+        );
+      }).catchError((error) {
+        SocketTelemetry.instance.messageAcknowledged(
+          conversationId: msg.conversationID ?? msg.roomID ?? destID,
+          messageId: msg.id,
+          metadata: {
+            'topic': key,
+            'status': 'error',
+            'error': error.toString(),
+          },
+        );
+      });
+
+      return push;
     } else {
       _log.severe('Channel $destID not found!');
       throw Exception('Channel $destID not found!');

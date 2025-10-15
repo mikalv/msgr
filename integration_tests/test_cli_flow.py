@@ -16,7 +16,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCKER_COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
-LIBMSGR_PACKAGE_DIR = REPO_ROOT / "flutter_frontend" / "packages" / "libmsgr"
+LIBMSGR_CLI_PACKAGE_DIR = REPO_ROOT / "flutter_frontend" / "packages" / "libmsgr_cli"
 DEFAULT_TIMEOUT = 180
 
 
@@ -107,18 +107,18 @@ def _run_cli_flow(env: Dict[str, str]) -> Dict[str, Any]:
     if shutil.which("dart") is None:
         pytest.skip("Dart SDK is required to run the CLI integration flow")
 
-    subprocess.run(["dart", "pub", "get"], check=True, cwd=LIBMSGR_PACKAGE_DIR, env=env)
+    subprocess.run(["dart", "pub", "get"], check=True, cwd=LIBMSGR_CLI_PACKAGE_DIR, env=env)
 
     process = subprocess.run(
         [
             "dart",
             "run",
-            "tool/msgr_cli.dart",
+            "bin/msgr.dart",
             "integration-flow",
             "--json",
         ],
         check=True,
-        cwd=LIBMSGR_PACKAGE_DIR,
+        cwd=LIBMSGR_CLI_PACKAGE_DIR,
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
