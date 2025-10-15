@@ -38,9 +38,11 @@ Bygge en norsk meldingsplattform der én konto kan ha flere profiler og moduser 
    - E2E: integrasjonstest mot lokal backend (mock server) + widgettester for composer.
 
 3. **DevEx**
-   - Skripter for å starte stack (`NOISE_TRANSPORT_ENABLED=true docker compose up backend postgres` + `flutter run`).
+   - ✅ Skripter for å starte stack (`./scripts/start_stack.sh`) og anbefalt
+     Flutter-kommando (`./scripts/run_flutter.sh`).
    - CI: Github Actions (lint, format, `mix test`, `flutter test`).
-   - Observability stub: struktur for telemetry events (send→ack, typing, errors).
+   - Observability stub: struktur for telemetry events (send→ack, typing, errors)
+     og dokumentert manuell demoflyt (<1s send→ack, re-login).
 
 ## Fase 2 – Profiler & moduser
 - Modellér profiler med tema, varsler, sikkerhetspolicy (PIN/biometri flagg).

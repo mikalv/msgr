@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:args/command_runner.dart';
 import 'package:libmsgr_cli/libmsgr_cli.dart';
 
 Future<void> main(List<String> args) async {

@@ -81,9 +81,8 @@ suitable for use both in Flutter and in command line tools.
 
 ## Command line utilities
 
-CLI tooling now lives in the `packages/libmsgr_cli` package. The legacy
-`tool/msgr_cli.dart` entrypoint forwards to the new implementation so existing
-integration tests keep working.
+CLI tooling now lives in the `packages/libmsgr_cli` package and integration
+tests invoke it directly via `bin/msgr.dart`.
 
 `libmsgr_cli` boots the pure Dart core (`libmsgr_core`), persists state in a
 local directory and exposes an `integration-flow` command that registers a

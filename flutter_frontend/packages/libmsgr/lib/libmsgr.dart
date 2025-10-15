@@ -28,6 +28,7 @@ export 'src/registration_service.dart';
 export 'src/services/contact_api.dart';
 
 export 'src/lib_constants.dart';
+export 'src/telemetry/socket_telemetry.dart';
 
 export 'package:libmsgr_core/libmsgr_core.dart'
     show UserSession, RefreshSessionResponse, TeamCreationResult, ProfileResult;
