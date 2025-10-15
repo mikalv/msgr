@@ -138,6 +138,87 @@ defmodule MessngrWeb.ConversationChannelTest do
       assert stop_payload[:profile_id] == socket.assigns.current_profile.id
     end
 
+    test "emits telemetry for send and ack", %{socket: socket} do
+      parent = self()
+      handler_id = "conversation-telemetry-" <> inspect(parent)
+      events = [
+        [:messngr, :socket, :message, :sent],
+        [:messngr, :socket, :message, :acknowledged]
+      ]
+
+      :telemetry.attach_many(handler_id, events, fn event, measurements, metadata, _ ->
+        send(parent, {:telemetry_event, event, measurements, metadata})
+      end, %{})
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      ref = push(socket, "message:create", %{"body" => "Telemetry"})
+      assert_reply ref, :ok, %{"data" => %{"id" => message_id}}
+
+      assert_receive {
+                       :telemetry_event,
+                       [:messngr, :socket, :message, :sent],
+                       %{count: 1},
+                       sent_meta
+                     },
+                     100
+
+      assert sent_meta[:message_id] == message_id
+      assert sent_meta[:conversation_id] == socket.assigns.conversation_id
+
+      ref_deliver = push(socket, "message:deliver", %{"message_id" => message_id})
+      assert_reply ref_deliver, :ok, %{"status" => "delivered"}
+
+      assert_receive {
+                       :telemetry_event,
+                       [:messngr, :socket, :message, :acknowledged],
+                       %{count: 1},
+                       ack_meta
+                     },
+                     100
+
+      assert ack_meta[:message_id] == message_id
+    end
+
+    test "emits telemetry for typing events", %{socket: socket} do
+      parent = self()
+      handler_id = "conversation-typing-" <> inspect(parent)
+      events = [
+        [:messngr, :socket, :typing, :started],
+        [:messngr, :socket, :typing, :stopped]
+      ]
+
+      :telemetry.attach_many(handler_id, events, fn event, measurements, metadata, _ ->
+        send(parent, {:telemetry_event, event, measurements, metadata})
+      end, %{})
+
+      on_exit(fn -> :telemetry.detach(handler_id) end)
+
+      push(socket, "typing:start", %{})
+
+      assert_receive {
+                       :telemetry_event,
+                       [:messngr, :socket, :typing, :started],
+                       %{count: 1},
+                       start_meta
+                     },
+                     100
+
+      assert start_meta[:conversation_id] == socket.assigns.conversation_id
+
+      push(socket, "typing:stop", %{})
+
+      assert_receive {
+                       :telemetry_event,
+                       [:messngr, :socket, :typing, :stopped],
+                       %{count: 1},
+                       stop_meta
+                     },
+                     100
+
+      assert stop_meta[:conversation_id] == socket.assigns.conversation_id
+    end
+
     test "reaction add/remove reply and broadcast", %{socket: socket, peer_socket: peer_socket, message: message, conversation: conversation, profile: profile} do
       ref = push(socket, "reaction:add", %{"message_id" => message.id, "emoji" => "🔥"})
       assert_reply ref, :ok, %{"reaction" => %{"emoji" => "🔥"}}

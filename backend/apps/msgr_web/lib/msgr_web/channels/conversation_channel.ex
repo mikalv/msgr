@@ -11,6 +11,7 @@ defmodule MessngrWeb.ConversationChannel do
   alias Messngr.Chat
   alias Messngr.RateLimiter
   alias MessngrWeb.Presence
+  alias MessngrWeb.Telemetry.Socket, as: SocketTelemetry
 
   @typing_timeout_ms 5_000
   @watcher_timeout_ms 30_000
@@ -48,9 +49,15 @@ defmodule MessngrWeb.ConversationChannel do
     with :ok <- enforce_rate_limit(socket, :conversation_message_event),
          {:ok, body} <- extract_body(payload),
          {:ok, message} <-
-           Messngr.send_message(socket.assigns.conversation_id, socket.assigns.current_profile.id, %{
-             "body" => body
-           }) do
+         Messngr.send_message(socket.assigns.conversation_id, socket.assigns.current_profile.id, %{
+           "body" => body
+          }) do
+      SocketTelemetry.message_sent(
+        socket.assigns.conversation_id,
+        socket.assigns.current_profile.id,
+        %{message_id: message.id}
+      )
+
       {:reply, {:ok, MessageJSON.show(%{message: message})}, socket}
     else
       {:error, %Changeset{} = changeset} -> reply_changeset_error(socket, changeset)
@@ -122,12 +129,19 @@ defmodule MessngrWeb.ConversationChannel do
 
     with {:ok, message_id} <- require_message_id(payload),
          {:ok, _receipt} <-
-           Messngr.acknowledge_message_delivery(
-             socket.assigns.conversation_id,
-             socket.assigns.current_profile.id,
-             message_id,
-             %{device: socket.assigns[:current_device]}
-           ) do
+          Messngr.acknowledge_message_delivery(
+            socket.assigns.conversation_id,
+            socket.assigns.current_profile.id,
+            message_id,
+            %{device: socket.assigns[:current_device]}
+          ) do
+      SocketTelemetry.message_acknowledged(
+        socket.assigns.conversation_id,
+        socket.assigns.current_profile.id,
+        message_id,
+        %{device_id: socket.assigns[:current_device] && socket.assigns[:current_device].id}
+      )
+
       {:reply, {:ok, %{status: "delivered"}}, socket}
     else
       {:error, reason} -> reply_reason_error(socket, reason)
@@ -261,6 +275,12 @@ defmodule MessngrWeb.ConversationChannel do
     socket = put_typing_timer(socket, key)
     update_presence_typing(socket, key, true)
 
+    SocketTelemetry.typing_started(
+      socket.assigns.conversation_id,
+      socket.assigns.current_profile.id,
+      %{thread_id: thread_id}
+    )
+
     broadcast_typing(socket, "typing_started", typing_payload(socket, thread_id, include_expiry: true))
 
     {:noreply, socket}
@@ -275,6 +295,12 @@ defmodule MessngrWeb.ConversationChannel do
     update_presence_typing(socket, key, false)
 
     if removed? do
+      SocketTelemetry.typing_stopped(
+        socket.assigns.conversation_id,
+        socket.assigns.current_profile.id,
+        %{thread_id: thread_id}
+      )
+
       broadcast_typing(socket, "typing_stopped", typing_payload(socket, thread_id))
     end
 
@@ -306,7 +332,14 @@ defmodule MessngrWeb.ConversationChannel do
 
     if removed? do
       update_presence_typing(socket, key, false)
-      broadcast_typing(socket, "typing_stopped", typing_payload(socket, thread_id_from_key(key)))
+      thread_id = thread_id_from_key(key)
+      SocketTelemetry.typing_stopped(
+        socket.assigns.conversation_id,
+        socket.assigns.current_profile.id,
+        %{thread_id: thread_id, reason: :timeout}
+      )
+
+      broadcast_typing(socket, "typing_stopped", typing_payload(socket, thread_id))
     end
 
     {:noreply, socket}

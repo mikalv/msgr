@@ -1,8 +1,8 @@
 # libmsgr
 
-`libmsgr` is the shared Dart library that powers the Flutter client and our
-command line tooling. It provides repositories, models and helper services for
-interacting with the msgr backend from multiple front-ends.
+`libmsgr` is the shared Dart library that powers the Flutter client. It
+provides repositories, models and helper services for interacting with the
+msgr backend from multiple front-ends.
 
 ## Features
 
@@ -13,8 +13,8 @@ interacting with the msgr backend from multiple front-ends.
 - Repositories for rooms, conversations, profiles and messages backed by Drift
   and HTTP APIs.
 - Data models for all messaging domain entities with `fromJson` factories.
-- Lightweight CLI that can exercise the registration flow for manual smoke tests
-  and integration testing.
+- Works together with the pure Dart [`libmsgr_cli`](../libmsgr_cli) package for
+  command line smoke tests and automation.
 
 ## Getting started
 
@@ -33,14 +33,14 @@ For more background on the public API see [`docs/libmsgr_api.md`](../../docs/lib
 
 ## CLI usage
 
-The package ships with an executable that makes it easier to perform a full
-registration flow from a terminal. This is helpful when smoke testing the
-backend or when running integration tests locally.
+Command line automation now lives in the sibling
+[`libmsgr_cli`](../libmsgr_cli) package so the tooling can depend solely on the
+pure Dart `libmsgr_core` abstractions. To run the integration flow locally:
 
 ```bash
-cd flutter_frontend/packages/libmsgr
+cd flutter_frontend/packages/libmsgr_cli
 dart pub get
-dart run tool/msgr_cli.dart integration-flow
+dart run bin/msgr.dart integration-flow
 ```
 
 Pass `--json` (or `-j`) to emit machine readable output that includes the team
