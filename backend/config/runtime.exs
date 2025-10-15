@@ -7,6 +7,37 @@ end
 
 env = config_env()
 
+bool_env = fn
+  nil, default -> default
+  value, _default -> String.downcase(value) in ["1", "true", "yes", "on"]
+end
+
+blank_to_nil = fn
+  nil -> nil
+  "" -> nil
+  value -> value
+end
+
+port_env = fn
+  nil, default, _env_name -> default
+  "", default, _env_name -> default
+  value, _default, env_name ->
+    case Integer.parse(value) do
+      {port, ""} -> port
+      _ -> raise "#{env_name} must be an integer"
+    end
+end
+
+int_env = fn
+  nil, default, _env_name -> default
+  "", default, _env_name -> default
+  value, _default, env_name ->
+    case Integer.parse(value) do
+      {int, ""} -> int
+      _ -> raise "#{env_name} must be an integer"
+    end
+end
+
 default_db =
   case env do
     :prod -> "msgr_prod"
@@ -116,37 +147,6 @@ else
 end
 
 noise_config = Application.get_env(:msgr, :noise, [])
-
-bool_env = fn
-  nil, default -> default
-  value, _default -> String.downcase(value) in ["1", "true", "yes", "on"]
-end
-
-blank_to_nil = fn
-  nil -> nil
-  "" -> nil
-  value -> value
-end
-
-port_env = fn
-  nil, default, _env_name -> default
-  "", default, _env_name -> default
-  value, _default, env_name ->
-    case Integer.parse(value) do
-      {port, ""} -> port
-      _ -> raise "#{env_name} must be an integer"
-    end
-end
-
-int_env = fn
-  nil, default, _env_name -> default
-  "", default, _env_name -> default
-  value, _default, env_name ->
-    case Integer.parse(value) do
-      {int, ""} -> int
-      _ -> raise "#{env_name} must be an integer"
-    end
-end
 
 prometheus_config = Application.get_env(:msgr_web, :prometheus, [])
 
