@@ -12,7 +12,7 @@ defmodule Messngr.AccountsTest do
         })
 
       assert account.display_name == "Kari Nordmann"
-      assert [%{name: "Privat"}] = account.profiles
+      assert [%{name: "Kari"}] = account.profiles
       assert account.handle =~ "kari"
     end
 

@@ -88,4 +88,12 @@ defmodule MessngrWeb.ConversationControllerTest do
 
     assert json_response(conn, 401) == %{"error" => "missing or invalid noise session"}
   end
+
+  test "bearer scheme is rejected", %{target_profile: target_profile} do
+    conn = build_conn()
+    conn = put_req_header(conn, "authorization", "Bearer fake")
+    conn = post(conn, ~p"/api/conversations", %{target_profile_id: target_profile.id})
+
+    assert json_response(conn, 401) == %{"error" => "missing or invalid noise session"}
+  end
 end

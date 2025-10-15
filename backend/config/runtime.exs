@@ -322,3 +322,22 @@ if noise_enabled do
 else
   Logger.info("Noise transport disabled; skipping static key load", port: noise_port)
 end
+
+dev_handshake_config = Application.get_env(:msgr, Messngr.Noise.DevHandshake, [])
+
+dev_handshake_enabled =
+  bool_env.(
+    System.get_env("NOISE_DEV_HANDSHAKE_ENABLED"),
+    Keyword.get(dev_handshake_config, :enabled, false)
+  )
+
+dev_handshake_allow =
+  bool_env.(
+    System.get_env("NOISE_DEV_HANDSHAKE_ALLOW_DISABLED"),
+    Keyword.get(dev_handshake_config, :allow_without_transport, false)
+  )
+
+config :msgr, Messngr.Noise.DevHandshake,
+  dev_handshake_config
+  |> Keyword.put(:enabled, dev_handshake_enabled)
+  |> Keyword.put(:allow_without_transport, dev_handshake_allow)

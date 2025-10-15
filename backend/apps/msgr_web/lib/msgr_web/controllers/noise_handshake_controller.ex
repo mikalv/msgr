@@ -7,26 +7,34 @@ defmodule MessngrWeb.NoiseHandshakeController do
   action_fallback MessngrWeb.FallbackController
 
   def create(conn, _params) do
-    if stub_enabled?() do
-      case DevHandshake.generate() do
-        {:ok, payload} ->
-          render(conn, :create, payload: payload)
+    cond do
+      not stub_enabled?() ->
+        {:error, :not_found}
 
-        {:error, :noise_transport_disabled} ->
-          {:error, :service_unavailable}
+      not DevHandshake.enabled?() ->
+        {:error, :not_found}
 
-        {:error, {:registry_start_failed, reason}} ->
-          conn
-          |> put_status(:internal_server_error)
-          |> json(%{error: "noise_registry_failed", reason: inspect(reason)})
+      true ->
+        case DevHandshake.generate() do
+          {:ok, payload} ->
+            render(conn, :create, payload: payload)
 
-        {:error, reason} ->
-          conn
-          |> put_status(:internal_server_error)
-          |> json(%{error: "noise_handshake_failed", reason: inspect(reason)})
-      end
-    else
-      {:error, :not_found}
+          {:error, :noise_transport_disabled} ->
+            {:error, :service_unavailable}
+
+          {:error, :dev_handshake_disabled} ->
+            {:error, :not_found}
+
+          {:error, {:registry_start_failed, reason}} ->
+            conn
+            |> put_status(:internal_server_error)
+            |> json(%{error: "noise_registry_failed", reason: inspect(reason)})
+
+          {:error, reason} ->
+            conn
+            |> put_status(:internal_server_error)
+            |> json(%{error: "noise_handshake_failed", reason: inspect(reason)})
+        end
     end
   end
 

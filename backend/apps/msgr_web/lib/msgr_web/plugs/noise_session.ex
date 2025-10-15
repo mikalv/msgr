@@ -39,6 +39,7 @@ defmodule MessngrWeb.Plugs.NoiseSession do
     opts
     |> Enum.into(%{})
     |> Map.put_new(:assign_session, true)
+    |> Map.put_new(:authorization_schemes, [:noise, :bearer])
   end
 
   @impl Plug
@@ -94,7 +95,7 @@ defmodule MessngrWeb.Plugs.NoiseSession do
   def decode_token(token), do: SessionStore.decode_token(token)
 
   defp ensure_actor(conn, opts) do
-    case fetch_token(conn) do
+    case fetch_token(conn, opts) do
       {:ok, token, source} ->
         with {:ok, actor} <- verify_token(token, opts) do
           conn
@@ -107,21 +108,31 @@ defmodule MessngrWeb.Plugs.NoiseSession do
     end
   end
 
-  defp fetch_token(conn) do
-    with :error <- fetch_authorization_token(conn),
+  defp fetch_token(conn, opts) do
+    with :error <- fetch_authorization_token(conn, opts),
          :error <- fetch_noise_header(conn),
          :error <- fetch_session_token(conn) do
       {:error, :missing_token}
     end
   end
 
-  defp fetch_authorization_token(conn) do
+  defp fetch_authorization_token(conn, opts) do
+    allowed_schemes =
+      opts
+      |> Map.get(:authorization_schemes, [:noise, :bearer])
+      |> List.wrap()
+      |> MapSet.new()
+
     conn
     |> get_req_header("authorization")
     |> List.first()
     |> case do
-      "Noise " <> token -> normalize_token(token, :authorization)
-      "Bearer " <> token -> normalize_token(token, :authorization)
+      "Noise " <> token when MapSet.member?(allowed_schemes, :noise) ->
+        normalize_token(token, :authorization)
+
+      "Bearer " <> token when MapSet.member?(allowed_schemes, :bearer) ->
+        normalize_token(token, :authorization)
+
       _ -> :error
     end
   end
