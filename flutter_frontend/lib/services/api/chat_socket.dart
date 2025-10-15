@@ -79,6 +79,8 @@ class ChatSocket implements ChatRealtime {
   ChatSocket({PhoenixSocket Function(String endpoint)? socketFactory})
       : _socketFactory = socketFactory;
 
+  static const _connectTimeout = Duration(seconds: 15);
+
   final PhoenixSocket Function(String endpoint)? _socketFactory;
   final StreamController<ChatMessage> _messagesController =
       StreamController<ChatMessage>.broadcast();
@@ -91,6 +93,11 @@ class ChatSocket implements ChatRealtime {
   bool _isConnected = false;
   bool _disposed = false;
   String? _conversationId;
+  bool _intentionalDisconnect = false;
+  bool _allowReconnect = false;
+  StreamSubscription<PhoenixSocketOpenEvent>? _openSubscription;
+  StreamSubscription<PhoenixSocketCloseEvent>? _closeSubscription;
+  StreamSubscription<PhoenixSocketErrorEvent>? _errorSubscription;
 
   @override
   Stream<ChatRealtimeEvent> get events => _eventController.stream;
@@ -100,6 +107,13 @@ class ChatSocket implements ChatRealtime {
 
   @override
   bool get isConnected => _isConnected && !_disposed;
+
+  void _emitConnectionState(ChatConnectionState state, {Object? error}) {
+    if (_eventController.isClosed) {
+      return;
+    }
+    _eventController.add(ChatConnectionEvent(state, error: error));
+  }
 
   @override
   Future<void> connect({
@@ -116,10 +130,23 @@ class ChatSocket implements ChatRealtime {
 
     await disconnect();
 
+    _intentionalDisconnect = false;
+    _emitConnectionState(ChatConnectionState.connecting);
+
     final endpoint = _buildEndpoint();
     final socket = _socketFactory?.call(endpoint) ?? PhoenixSocket(endpoint);
+    _socket = socket;
+    _bindSocketLifecycle(socket);
 
-    await socket.connect();
+    try {
+      await socket.connect().timeout(_connectTimeout);
+    } catch (error) {
+      await _cleanupSocketLifecycle();
+      _socket = null;
+      socket.dispose();
+      _emitConnectionState(ChatConnectionState.disconnected, error: error);
+      throw ChatSocketException('Klarte ikke å koble til sanntidsserver.', error);
+    }
 
     final channel = socket.addChannel(
       topic: 'conversation:$conversationId',
@@ -130,8 +157,38 @@ class ChatSocket implements ChatRealtime {
       },
     );
 
-    final joinResponse = await channel.join().future;
+    final joinPush = channel.join();
+    joinPush
+      ..onReply('ok', (response) {
+        if (_disposed) return;
+        _allowReconnect = true;
+        _isConnected = true;
+        _emitConnectionState(ChatConnectionState.connected);
+      })
+      ..onReply('error', (response) {
+        if (_disposed) return;
+        _isConnected = false;
+        if (!_intentionalDisconnect) {
+          _emitConnectionState(
+            ChatConnectionState.reconnecting,
+            error: response.response ?? response.status,
+          );
+        }
+      })
+      ..onReply('timeout', (response) {
+        if (_disposed) return;
+        _isConnected = false;
+        if (!_intentionalDisconnect) {
+          _emitConnectionState(
+            ChatConnectionState.reconnecting,
+            error: response.response ?? response.status,
+          );
+        }
+      });
+
+    final joinResponse = await joinPush.future;
     if (!joinResponse.isOk) {
+      await _cleanupSocketLifecycle();
       socket.dispose();
       throw ChatSocketException(
         'Klarte ikke å knytte til samtalen.',
@@ -139,16 +196,18 @@ class ChatSocket implements ChatRealtime {
       );
     }
 
-    _socket = socket;
     _channel = channel;
     _conversationId = conversationId;
     _isConnected = true;
+    _allowReconnect = true;
 
+    _emitConnectionState(ChatConnectionState.connected);
+
+    await _subscription?.cancel();
     _subscription = channel.messages.listen(
       _handleMessage,
-      onError: (error, stackTrace) {
-        // Propagerer ikke videre, men logger kan legges på sikt.
-      },
+      onError: _handleChannelError,
+      onDone: _handleChannelDone,
     );
   }
 
@@ -186,11 +245,15 @@ class ChatSocket implements ChatRealtime {
 
   @override
   Future<void> disconnect() async {
+    _intentionalDisconnect = true;
+    _allowReconnect = false;
     _isConnected = false;
     _conversationId = null;
 
     await _subscription?.cancel();
     _subscription = null;
+
+    await _cleanupSocketLifecycle();
 
     if (_channel != null) {
       try {
@@ -198,12 +261,16 @@ class ChatSocket implements ChatRealtime {
       } catch (_) {
         // Ignorer - typisk hvis sokkelen allerede er stengt.
       }
+      _channel!.close();
       _channel = null;
     }
 
-    _socket?.close();
-    _socket?.dispose();
+    final socket = _socket;
     _socket = null;
+    socket?.close();
+    socket?.dispose();
+
+    _emitConnectionState(ChatConnectionState.disconnected);
   }
 
   @override
@@ -212,6 +279,8 @@ class ChatSocket implements ChatRealtime {
       return;
     }
 
+    _intentionalDisconnect = true;
+    _allowReconnect = false;
     await disconnect();
     await _messagesController.close();
     await _eventController.close();
@@ -413,6 +482,26 @@ class ChatSocket implements ChatRealtime {
     }
   }
 
+  void _handleChannelError(Object error, StackTrace _) {
+    if (_disposed) return;
+    _isConnected = false;
+    if (_allowReconnect && !_intentionalDisconnect) {
+      _emitConnectionState(ChatConnectionState.reconnecting, error: error);
+    } else {
+      _emitConnectionState(ChatConnectionState.disconnected, error: error);
+    }
+  }
+
+  void _handleChannelDone() {
+    if (_disposed) return;
+    _isConnected = false;
+    if (_allowReconnect && !_intentionalDisconnect) {
+      _emitConnectionState(ChatConnectionState.reconnecting);
+    } else {
+      _emitConnectionState(ChatConnectionState.disconnected);
+    }
+  }
+
   Map<String, dynamic>? _extractMessagePayload(dynamic payload) {
     if (payload is Map) {
       final map = Map<String, dynamic>.from(payload as Map);
@@ -438,6 +527,46 @@ class ChatSocket implements ChatRealtime {
     );
 
     return socketUri.toString();
+  }
+
+  void _bindSocketLifecycle(PhoenixSocket socket) {
+    _openSubscription?.cancel();
+    _closeSubscription?.cancel();
+    _errorSubscription?.cancel();
+
+    _openSubscription = socket.openStream.listen((_) {
+      if (_disposed || _intentionalDisconnect) {
+        return;
+      }
+      if (_allowReconnect && !_isConnected) {
+        _emitConnectionState(ChatConnectionState.reconnecting);
+      }
+    });
+
+    _closeSubscription = socket.closeStream.listen((event) {
+      if (_disposed) return;
+      _isConnected = false;
+      _emitConnectionState(ChatConnectionState.disconnected, error: event);
+      if (_allowReconnect && !_intentionalDisconnect) {
+        _emitConnectionState(ChatConnectionState.reconnecting, error: event);
+      }
+    });
+
+    _errorSubscription = socket.errorStream.listen((event) {
+      if (_disposed || !_allowReconnect || _intentionalDisconnect) {
+        return;
+      }
+      _emitConnectionState(ChatConnectionState.reconnecting, error: event);
+    });
+  }
+
+  Future<void> _cleanupSocketLifecycle() async {
+    await _openSubscription?.cancel();
+    await _closeSubscription?.cancel();
+    await _errorSubscription?.cancel();
+    _openSubscription = null;
+    _closeSubscription = null;
+    _errorSubscription = null;
   }
 
   PhoenixChannel _requireChannel() {

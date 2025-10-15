@@ -199,6 +199,28 @@ void main() {
       await _pump();
       expect(realtime.stopTypingCalls, equals(1));
     });
+
+    test('updates realtime connection state from connection events', () async {
+      expect(viewModel.isRealtimeConnected, isTrue);
+
+      realtime.emit(
+        const ChatConnectionEvent(ChatConnectionState.reconnecting),
+      );
+      await _pump();
+      expect(viewModel.isRealtimeConnected, isFalse);
+
+      realtime.emit(
+        const ChatConnectionEvent(ChatConnectionState.connected),
+      );
+      await _pump();
+      expect(viewModel.isRealtimeConnected, isTrue);
+
+      realtime.emit(
+        const ChatConnectionEvent(ChatConnectionState.disconnected),
+      );
+      await _pump();
+      expect(viewModel.isRealtimeConnected, isFalse);
+    });
   });
 }
 
@@ -290,11 +312,13 @@ class _MockRealtime implements ChatRealtime {
     required String conversationId,
   }) async {
     _connected = true;
+    emit(const ChatConnectionEvent(ChatConnectionState.connected));
   }
 
   @override
   Future<void> disconnect() async {
     _connected = false;
+    emit(const ChatConnectionEvent(ChatConnectionState.disconnected));
   }
 
   @override

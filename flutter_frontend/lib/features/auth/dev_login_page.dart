@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:messngr/config/backend_environment.dart';
 import 'package:messngr/services/api/auth_api.dart';
 import 'package:messngr/services/api/chat_api.dart' show AccountIdentity, ApiException;
 
@@ -31,13 +32,23 @@ class _DevLoginPageState extends State<DevLoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _displayNameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _backendController = TextEditingController();
   bool _isSubmitting = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final backend = BackendEnvironment.instance.apiBaseUri;
+    final host = backend.hasPort ? '${backend.host}:${backend.port}' : backend.host;
+    _backendController.text = host;
+  }
 
   @override
   void dispose() {
     _displayNameController.dispose();
     _emailController.dispose();
+    _backendController.dispose();
     super.dispose();
   }
 
@@ -53,6 +64,14 @@ class _DevLoginPageState extends State<DevLoginPage> {
 
     final displayName = _displayNameController.text.trim();
     final email = _emailController.text.trim();
+    final backendOverride = _backendController.text.trim();
+
+    if (!_applyBackendOverride(backendOverride)) {
+      setState(() {
+        _isSubmitting = false;
+      });
+      return;
+    }
 
     try {
       final authApi = AuthApi();
@@ -171,6 +190,63 @@ class _DevLoginPageState extends State<DevLoginPage> {
     return result?.isEmpty ?? true ? null : result;
   }
 
+  bool _applyBackendOverride(String raw) {
+    if (raw.isEmpty) {
+      return true;
+    }
+
+    final parsed = _parseBackendInput(raw);
+    if (parsed == null) {
+      setState(() {
+        _error = 'Ugyldig backend-adresse: "$raw"';
+      });
+      return false;
+    }
+
+    BackendEnvironment.instance.override(
+      scheme: parsed.scheme,
+      host: parsed.host,
+      port: parsed.port,
+    );
+    return true;
+  }
+
+  _BackendOverride? _parseBackendInput(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+
+    if (trimmed.contains('://')) {
+      final uri = Uri.tryParse(trimmed);
+      if (uri == null || uri.host.isEmpty) {
+        return null;
+      }
+      return _BackendOverride(
+        scheme: uri.scheme.isNotEmpty ? uri.scheme : null,
+        host: uri.host,
+        port: uri.hasPort ? uri.port : null,
+      );
+    }
+
+    final parts = trimmed.split(':');
+    final host = parts.first.trim();
+    if (host.isEmpty) {
+      return null;
+    }
+
+    int? port;
+    if (parts.length > 1) {
+      final portCandidate = parts.sublist(1).join(':');
+      port = int.tryParse(portCandidate);
+      if (port == null) {
+        return null;
+      }
+    }
+
+    return _BackendOverride(host: host, port: port);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -227,6 +303,14 @@ class _DevLoginPageState extends State<DevLoginPage> {
                         hintText: 'kari@example.com',
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _backendController,
+                      decoration: const InputDecoration(
+                        labelText: 'Backend-host (valgfri)',
+                        hintText: '10.0.2.2:4000 eller https://dev.msgr.no',
+                      ),
+                    ),
                     if (_error != null) ...[
                       const SizedBox(height: 16),
                       Text(
@@ -255,4 +339,12 @@ class _DevLoginPageState extends State<DevLoginPage> {
       ),
     );
   }
+}
+
+class _BackendOverride {
+  const _BackendOverride({this.scheme, required this.host, this.port});
+
+  final String? scheme;
+  final String host;
+  final int? port;
 }

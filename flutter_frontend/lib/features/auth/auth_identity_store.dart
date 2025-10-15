@@ -45,8 +45,10 @@ class AuthIdentityStore {
     await prefs.setString(_accountIdKey, identity.accountId);
     await prefs.setString(_profileIdKey, identity.profileId);
     await prefs.setString(_noiseTokenKey, identity.noiseToken);
-    if (noiseSessionId != null && noiseSessionId.isNotEmpty) {
-      await prefs.setString(_noiseSessionIdKey, noiseSessionId);
+    final resolvedNoiseSessionId =
+        (noiseSessionId ?? identity.noiseSessionId)?.trim();
+    if (resolvedNoiseSessionId != null && resolvedNoiseSessionId.isNotEmpty) {
+      await prefs.setString(_noiseSessionIdKey, resolvedNoiseSessionId);
     }
     if (devicePrivateKey != null && devicePrivateKey.isNotEmpty) {
       await prefs.setString(_devicePrivateKeyKey, devicePrivateKey);
