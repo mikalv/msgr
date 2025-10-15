@@ -41,7 +41,7 @@
 
 ### Developer experience
 
-- Replaced the `libmsgr_core` key manager test double with an in-memory secure storage helper so `dart test` no longer fails while loading mocks.
+- Updated the `libmsgr_core` key manager tests to rely on the built-in `MemorySecureStorage`, keeping the Mockito removal while restoring compatibility with `dart test`.
 - Added `scripts/start_stack.sh` and `scripts/run_flutter.sh` to capture the
   recommended `docker compose`/`flutter run` incantations and documented the
   demoflyt (<1s send→ack, re-login) in `docs/backend_setup.md`.
@@ -54,6 +54,8 @@
 - Instrumented `ConversationChannel` typing and message ack flows with telemetry
   stubs and added a matching socket telemetry broadcaster in `libmsgr` so both
   backend and Flutter can hook into send→ack timelines.
+- Fixed the socket telemetry docs to follow Elixir heredoc formatting so
+  `mix format` succeeds.
 
 ### Continuous integration
 

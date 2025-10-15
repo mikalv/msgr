@@ -4,7 +4,9 @@ defmodule MessngrWeb.Telemetry.Socket do
   latency and typing behaviour before wiring up a full observability pipeline.
   """
 
-  @doc """Emit an event when a user sends a message through the socket."""
+  @doc """
+  Emit an event when a user sends a message through the socket.
+  """
   @spec message_sent(binary(), binary(), map()) :: :ok
   def message_sent(conversation_id, profile_id, metadata \\ %{}) do
     emit([:messngr, :socket, :message, :sent], %{count: 1},
@@ -12,7 +14,9 @@ defmodule MessngrWeb.Telemetry.Socket do
     )
   end
 
-  @doc """Emit an event when the client acknowledges delivery."""
+  @doc """
+  Emit an event when the client acknowledges delivery.
+  """
   @spec message_acknowledged(binary(), binary(), binary(), map()) :: :ok
   def message_acknowledged(conversation_id, profile_id, message_id, metadata \\ %{}) do
     emit([:messngr, :socket, :message, :acknowledged], %{count: 1},
@@ -24,7 +28,9 @@ defmodule MessngrWeb.Telemetry.Socket do
     )
   end
 
-  @doc """Emit an event when a user starts typing."""
+  @doc """
+  Emit an event when a user starts typing.
+  """
   @spec typing_started(binary(), binary(), map()) :: :ok
   def typing_started(conversation_id, profile_id, metadata \\ %{}) do
     emit([:messngr, :socket, :typing, :started], %{count: 1},
@@ -32,7 +38,9 @@ defmodule MessngrWeb.Telemetry.Socket do
     )
   end
 
-  @doc """Emit an event when a user stops typing."""
+  @doc """
+  Emit an event when a user stops typing.
+  """
   @spec typing_stopped(binary(), binary(), map()) :: :ok
   def typing_stopped(conversation_id, profile_id, metadata \\ %{}) do
     emit([:messngr, :socket, :typing, :stopped], %{count: 1},

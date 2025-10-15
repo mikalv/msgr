@@ -3,49 +3,19 @@ import 'dart:convert';
 import 'package:libmsgr_core/libmsgr_core.dart';
 import 'package:test/test.dart';
 
-class InMemorySecureStorage implements SecureStorage {
-  InMemorySecureStorage({Map<String, String>? seed})
-      : _store = Map<String, String>.from(seed ?? const {});
-
-  final Map<String, String> _store;
-
-  Map<String, String> get snapshot => Map.unmodifiable(_store);
-
-  @override
-  Future<void> deleteAll() async {
-    _store.clear();
-  }
-
-  @override
-  Future<void> deleteKey(String key) async {
-    _store.remove(key);
-  }
-
-  @override
-  Future<bool> containsKey(String key) async => _store.containsKey(key);
-
-  @override
-  Future<Map<String, String>> readAll() async => Map<String, String>.from(_store);
-
-  @override
-  Future<String?> readValue(String key) async => _store[key];
-
-  @override
-  Future<void> writeValue(String key, String value) async {
-    _store[key] = value;
-  }
-}
-
 void main() {
   group('KeyManager', () {
     test('creates new device when storage is empty', () async {
-      final storage = InMemorySecureStorage();
+      final storage = MemorySecureStorage();
       final keyManager = KeyManager(storage: storage);
 
       await keyManager.getOrGenerateDeviceId();
 
-      expect(storage.snapshot['deviceId'], isNotEmpty);
-      final encodedKeys = storage.snapshot['deviceKeys'];
+      final deviceId = await storage.readValue('deviceId');
+      expect(deviceId, isNotNull);
+      expect(deviceId, isNotEmpty);
+
+      final encodedKeys = await storage.readValue('deviceKeys');
       expect(encodedKeys, isNotNull);
 
       final payload = json.decode(encodedKeys!) as Map<String, dynamic>;
@@ -63,10 +33,9 @@ void main() {
         'deviceId': 'abc'
       });
 
-      final storage = InMemorySecureStorage(seed: {
-        'deviceId': 'abc',
-        'deviceKeys': storedPayload,
-      });
+      final storage = MemorySecureStorage();
+      await storage.writeValue('deviceId', 'abc');
+      await storage.writeValue('deviceKeys', storedPayload);
       final keyManager = KeyManager(storage: storage);
 
       await keyManager.getOrGenerateDeviceId();
@@ -76,7 +45,7 @@ void main() {
     });
 
     test('getDataForServer throws while loading', () {
-      final storage = InMemorySecureStorage();
+      final storage = MemorySecureStorage();
       final keyManager = KeyManager(storage: storage);
 
       keyManager.isLoading = true;
@@ -84,16 +53,13 @@ void main() {
     });
 
     test('getDataForServer returns signatures when loaded', () async {
-      final storage = InMemorySecureStorage();
+      final storage = MemorySecureStorage();
       final keyManager = KeyManager(storage: storage);
 
-      keyManager.isLoading = false;
-      keyManager.deviceId = 'abc';
-      keyManager.signingKeyPair = await keyManager.signAlgorithm.newKeyPair();
-      keyManager.dhKeyPair = await keyManager.dhAlgorithm.newKeyPair();
+      await keyManager.getOrGenerateDeviceId();
 
       final payload = await keyManager.getDataForServer();
-      expect(payload['deviceId'], 'abc');
+      expect(payload['deviceId'], keyManager.deviceId);
       expect(payload['pubkey'], isNotEmpty);
       expect(payload['dhpubkey'], isNotEmpty);
     });
