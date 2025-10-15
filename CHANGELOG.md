@@ -42,6 +42,7 @@
 ### Developer experience
 
 - Updated the `libmsgr_core` key manager tests to rely on the built-in `MemorySecureStorage`, keeping the Mockito removal while restoring compatibility with `dart test`.
+- Fixed the `libmsgr_cli` command runner tests by importing `dart:io` so the `Directory`-based option parsing compiles during `dart test`.
 - Added `scripts/start_stack.sh` and `scripts/run_flutter.sh` to capture the
   recommended `docker compose`/`flutter run` incantations and documented the
   demoflyt (<1s send→ack, re-login) in `docs/backend_setup.md`.
