@@ -126,10 +126,19 @@ class BridgeApi {
   }
 
   Map<String, String> _authHeaders(AccountIdentity identity) {
+    final token = identity.noiseToken.trim();
+    if (token.isEmpty) {
+      throw ApiException(
+        401,
+        'Missing Noise session token for account ${identity.accountId}',
+      );
+    }
+
     return {
       'Content-Type': 'application/json',
       'x-msgr-account-id': identity.accountId,
       'x-msgr-profile-id': identity.profileId,
+      'Authorization': 'Noise $token',
     };
   }
 }

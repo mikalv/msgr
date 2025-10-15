@@ -10,7 +10,11 @@ import 'package:messngr/services/api/bridge_api.dart';
 import 'package:messngr/services/api/chat_api.dart';
 
 void main() {
-  const identity = AccountIdentity(accountId: 'acct-1', profileId: 'profile-1');
+  const identity = AccountIdentity(
+    accountId: 'acct-1',
+    profileId: 'profile-1',
+    noiseToken: 'noise-token',
+  );
 
   setUp(() {
     BackendEnvironment.instance.override(

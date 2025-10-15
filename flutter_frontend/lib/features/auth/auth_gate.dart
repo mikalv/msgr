@@ -43,13 +43,18 @@ class _AuthGateState extends State<AuthGate> {
     });
   }
 
-  Future<void> _handleSignedIn(
-      AccountIdentity identity, String displayName) async {
-    await _store.save(identity, displayName: displayName);
+  Future<void> _handleSignedIn(DevLoginResult result) async {
+    await _store.save(
+      result.identity,
+      displayName: result.displayName,
+      noiseSessionId: result.noiseSessionId,
+      devicePrivateKey: result.devicePrivateKey,
+      devicePublicKey: result.devicePublicKey,
+    );
     if (!mounted) return;
     setState(() {
-      _identity = identity;
-      _displayName = displayName;
+      _identity = result.identity;
+      _displayName = result.displayName;
     });
   }
 

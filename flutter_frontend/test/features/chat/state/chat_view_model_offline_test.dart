@@ -38,7 +38,11 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final connectivity = _FakeConnectivity(initial: ConnectivityResult.none);
       final api = _FakeChatApi(thread: thread, message: message);
-      final identity = AccountIdentity(accountId: 'acc-1', profileId: 'profile-1');
+      final identity = AccountIdentity(
+        accountId: 'acc-1',
+        profileId: 'profile-1',
+        noiseToken: 'noise-token',
+      );
       final viewModel = ChatViewModel(
         identity: identity,
         api: api,

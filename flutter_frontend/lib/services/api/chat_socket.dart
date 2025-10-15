@@ -126,6 +126,7 @@ class ChatSocket implements ChatRealtime {
       parameters: {
         'account_id': identity.accountId,
         'profile_id': identity.profileId,
+        'noise_session': identity.noiseToken,
       },
     );
 

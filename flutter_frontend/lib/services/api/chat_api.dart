@@ -16,10 +16,17 @@ class ApiException implements Exception {
 }
 
 class AccountIdentity {
-  const AccountIdentity({required this.accountId, required this.profileId});
+  const AccountIdentity({
+    required this.accountId,
+    required this.profileId,
+    required this.noiseToken,
+    this.noiseSessionId,
+  });
 
   final String accountId;
   final String profileId;
+  final String noiseToken;
+  final String? noiseSessionId;
 }
 
 class ThumbnailUploadInfo {
@@ -141,33 +148,6 @@ class ChatApi {
   ChatApi({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
-
-  Future<AccountIdentity> createAccount(String displayName,
-      {String? email}) async {
-    final response = await _client.post(
-      backendApiUri('users'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'display_name': displayName,
-        if (email != null) 'email': email,
-      }),
-    );
-
-    final decoded = _decodeBody(response);
-    final data = decoded['data'] as Map<String, dynamic>;
-    final profiles = data['profiles'] as List<dynamic>? ?? const [];
-    final profile =
-        profiles.isEmpty ? null : profiles.first as Map<String, dynamic>;
-
-    if (profile == null) {
-      throw ApiException(response.statusCode, response.body);
-    }
-
-    return AccountIdentity(
-      accountId: data['id'] as String,
-      profileId: profile['id'] as String,
-    );
-  }
 
   Future<ChatThread> ensureDirectConversation({
     required AccountIdentity current,
@@ -343,10 +323,19 @@ class ChatApi {
   }
 
   Map<String, String> _authHeaders(AccountIdentity identity) {
+    final token = identity.noiseToken.trim();
+    if (token.isEmpty) {
+      throw ApiException(
+        401,
+        'Missing Noise session token for account ${identity.accountId}',
+      );
+    }
+
     return {
       'Content-Type': 'application/json',
       'x-account-id': identity.accountId,
       'x-profile-id': identity.profileId,
+      'Authorization': 'Noise $token',
     };
   }
 

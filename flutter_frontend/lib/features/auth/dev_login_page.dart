@@ -1,11 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/services/api/chat_api.dart';
+import 'package:messngr/services/api/auth_api.dart';
+import 'package:messngr/services/api/chat_api.dart' show AccountIdentity, ApiException;
+
+class DevLoginResult {
+  const DevLoginResult({
+    required this.identity,
+    required this.displayName,
+    required this.noiseSessionId,
+    required this.devicePrivateKey,
+    required this.devicePublicKey,
+  });
+
+  final AccountIdentity identity;
+  final String displayName;
+  final String noiseSessionId;
+  final String devicePrivateKey;
+  final String devicePublicKey;
+}
 
 class DevLoginPage extends StatefulWidget {
   const DevLoginPage({super.key, required this.onSignedIn});
 
-  final Future<void> Function(AccountIdentity identity, String displayName)
-      onSignedIn;
+  final Future<void> Function(DevLoginResult result) onSignedIn;
 
   @override
   State<DevLoginPage> createState() => _DevLoginPageState();
@@ -39,15 +55,51 @@ class _DevLoginPageState extends State<DevLoginPage> {
     final email = _emailController.text.trim();
 
     try {
-      final api = ChatApi();
-      final identity = await api.createAccount(
-        displayName,
-        email: email.isEmpty ? null : email,
+      final authApi = AuthApi();
+      final handshake = await authApi.createDevHandshake();
+
+      final usableEmail = email.isNotEmpty ? email : _generateEmail(displayName);
+
+      final challenge = await authApi.requestEmailChallenge(
+        email: usableEmail,
+        deviceKey: handshake.deviceKey,
       );
-      await widget.onSignedIn(identity, displayName);
+
+      final code = await _resolveOtpCode(challenge);
+      if (code == null) {
+        setState(() {
+          _error = 'Ingen OTP-kode ble oppgitt.';
+        });
+        return;
+      }
+
+      final session = await authApi.verifyCode(
+        challengeId: challenge.id,
+        code: code,
+        noiseSessionId: handshake.sessionId,
+        noiseSignature: handshake.signature,
+        displayName: displayName,
+      );
+
+      final identity = AccountIdentity(
+        accountId: session.accountId,
+        profileId: session.profileId,
+        noiseToken: session.noiseToken,
+        noiseSessionId: session.noiseSessionId,
+      );
+
+      await widget.onSignedIn(
+        DevLoginResult(
+          identity: identity,
+          displayName: displayName,
+          noiseSessionId: session.noiseSessionId,
+          devicePrivateKey: handshake.devicePrivateKey,
+          devicePublicKey: handshake.deviceKey,
+        ),
+      );
     } on ApiException catch (error) {
       setState(() {
-        _error = 'Kunne ikke opprette konto (${error.statusCode}).';
+        _error = 'Kunne ikke fullføre innlogging (${error.statusCode}).';
       });
     } catch (error) {
       setState(() {
@@ -60,6 +112,63 @@ class _DevLoginPageState extends State<DevLoginPage> {
         });
       }
     }
+  }
+
+  String _generateEmail(String displayName) {
+    final slug = displayName
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '.')
+        .replaceAll(RegExp(r'\.+'), '.')
+        .trim()
+        .replaceAll(RegExp(r'^\.|\.$'), '');
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final safeSlug = slug.isEmpty ? 'bruker' : slug;
+    return '$safeSlug+$timestamp@dev.msgr.local';
+  }
+
+  Future<String?> _resolveOtpCode(OtpChallenge challenge) async {
+    if (challenge.debugCode != null && challenge.debugCode!.isNotEmpty) {
+      return challenge.debugCode;
+    }
+    return _promptForOtpCode();
+  }
+
+  Future<String?> _promptForOtpCode() async {
+    final controller = TextEditingController();
+    String? result;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('OTP-kode'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Skriv inn koden fra e-post eller SMS',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Avbryt'),
+            ),
+            FilledButton(
+              onPressed: () {
+                result = controller.text.trim();
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Bekreft'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    return result?.isEmpty ?? true ? null : result;
   }
 
   @override
@@ -83,13 +192,14 @@ class _DevLoginPageState extends State<DevLoginPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Sett opp konto',
+                      'Logg inn med OTP',
                       style: theme.textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Vi bruker backendens ekte APIer. Oppgi navn (og gjerne e-post) for å opprette en profil.',
+                      'Vi lager en ny profil eller gjenbruker eksisterende konto via OTP. '
+                      'I dev returnerer backenden koden i klartekst.',
                       style: theme.textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 24),
@@ -113,7 +223,7 @@ class _DevLoginPageState extends State<DevLoginPage> {
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
-                        labelText: 'E-post (valgfri)',
+                        labelText: 'E-post (valgfri – brukes for OTP)',
                         hintText: 'kari@example.com',
                       ),
                     ),
@@ -134,7 +244,7 @@ class _DevLoginPageState extends State<DevLoginPage> {
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('Opprett konto'),
+                          : const Text('Logg inn'),
                     ),
                   ],
                 ),

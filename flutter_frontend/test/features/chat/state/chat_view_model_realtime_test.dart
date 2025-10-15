@@ -42,7 +42,11 @@ void main() {
       api = _StubChatApi(initialMessages: [remoteMessage]);
       cache = InMemoryChatCacheStore();
       connectivity = _FakeConnectivity();
-      identity = const AccountIdentity(accountId: 'acc-1', profileId: 'profile-self');
+      identity = const AccountIdentity(
+        accountId: 'acc-1',
+        profileId: 'profile-self',
+        noiseToken: 'noise-token',
+      );
       viewModel = ChatViewModel(
         identity: identity,
         api: api,
