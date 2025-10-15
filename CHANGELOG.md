@@ -1,6 +1,15 @@
 # Changelog
 
 ## Unreleased
+- Dokumenterte arkitekturvalgene i `docs/architecture_alignment.md` med sjekklister
+  for Phoenix-kontekster, Flutter-featurestrukturen og operasjonelle prinsipper
+  (TLS/Noise-toggles, enkel Postgres-instans).
+- La til `.env.example`, miljøtoggling i `docker-compose.yml` og HTTPS-oppsett i
+  `config/runtime.exs` slik at TLS og Noise kan aktiveres/deaktiveres uten
+  kodeendringer, samt oppdaterte backend-dokumentasjon for de nye bryterne.
+- Oppdaterte `libmsgr_core` til å håndtere Noise-handshake automatisk i
+  registreringsflyten, inkludert nye enhetstester og en dedikert
+  `DevHandshake`-test som verifiserer backend-registriet.
 - Enhanced the Microsoft Teams OAuth consent experience with resource-specific consent prompts,
   credential status surfacing, and revocation controls across the daemon, bridge metadata, and
   Flutter linking wizard, including updated unit tests for the Teams SDK and bridge session

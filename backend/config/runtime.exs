@@ -44,6 +44,77 @@ config :msgr_web, MessngrWeb.Endpoint,
     scheme: System.get_env("PHX_SCHEME", "https")
   ]
 
+tls_enabled =
+  bool_env.(
+    System.get_env("MSGR_TLS_ENABLED"),
+    false
+  )
+
+tls_force_ssl =
+  bool_env.(
+    System.get_env("MSGR_FORCE_SSL"),
+    false
+  )
+
+tls_force_ssl_hsts =
+  bool_env.(
+    System.get_env("MSGR_FORCE_SSL_HSTS"),
+    false
+  )
+
+if tls_enabled do
+  certfile =
+    case blank_to_nil.(System.get_env("MSGR_TLS_CERT_PATH")) do
+      nil -> raise "MSGR_TLS_CERT_PATH must be set when MSGR_TLS_ENABLED=true"
+      value -> value
+    end
+
+  keyfile =
+    case blank_to_nil.(System.get_env("MSGR_TLS_KEY_PATH")) do
+      nil -> raise "MSGR_TLS_KEY_PATH must be set when MSGR_TLS_ENABLED=true"
+      value -> value
+    end
+
+  cacertfile = blank_to_nil.(System.get_env("MSGR_TLS_CACERT_PATH"))
+
+  tls_port =
+    port_env.(
+      System.get_env("MSGR_TLS_PORT"),
+      4_443,
+      "MSGR_TLS_PORT"
+    )
+
+  https_opts =
+    [
+      port: tls_port,
+      cipher_suite: :strong,
+      certfile: certfile,
+      keyfile: keyfile
+    ]
+
+  https_opts =
+    if cacertfile do
+      Keyword.put(https_opts, :cacertfile, cacertfile)
+    else
+      https_opts
+    end
+
+  force_ssl_opts =
+    if tls_force_ssl do
+      [rewrite_on: [:x_forwarded_proto], hsts: tls_force_ssl_hsts]
+    else
+      false
+    end
+
+  config :msgr_web, MessngrWeb.Endpoint,
+    https: https_opts,
+    force_ssl: force_ssl_opts
+else
+  if tls_force_ssl do
+    Logger.warning("MSGR_FORCE_SSL=true but MSGR_TLS_ENABLED=false; skipping force_ssl configuration")
+  end
+end
+
 noise_config = Application.get_env(:msgr, :noise, [])
 
 bool_env = fn

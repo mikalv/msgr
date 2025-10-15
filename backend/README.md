@@ -77,6 +77,25 @@ utviklingsmiljøet som er startet via `docker compose up`.
 
 - Sett `PHX_LISTEN_IP` om du ønsker å binde serveren til en annen adresse.
 - Legg til ekstra miljøvariabler i `docker-compose.yml` ved behov.
+- Kopier `.env.example` til `.env` for å toggle TLS/Noise og andre miljøverdier uten å endre koden.
+
+### TLS/HTTPS-lytteren
+
+Phoenix-endpointet kan starte en egen HTTPS-lytter når du vil teste TLS lokalt
+eller i staging. Dette styres via miljøvariabler slik at du slipper å endre
+`runtime.exs`:
+
+- `MSGR_TLS_ENABLED`: Sett til `true` for å starte HTTPS-lytteren.
+- `MSGR_TLS_CERT_PATH` / `MSGR_TLS_KEY_PATH`: Absolutte stier til sertifikat og
+  privatnøkkel inni containeren.
+- `MSGR_TLS_PORT`: Porten HTTPS-lytteren bruker (default `4443`).
+- `MSGR_TLS_CACERT_PATH`: (valgfri) CA-bundle dersom du bruker egen CA.
+- `MSGR_FORCE_SSL`: Sett til `true` dersom trafikk på HTTP-porten skal
+  redirectes til HTTPS.
+- `MSGR_FORCE_SSL_HSTS`: Aktiver HSTS når `MSGR_FORCE_SSL=true`.
+
+Når TLS er deaktivert logges en advarsel dersom du forsøker å sette `MSGR_FORCE_SSL`
+slik at feilkonfigurasjoner fanges tidlig.
 
 ## Media-signering
 

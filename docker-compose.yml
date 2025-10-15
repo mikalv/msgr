@@ -23,6 +23,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile.dev
     container_name: msgr_backend
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy
@@ -38,6 +40,20 @@ services:
       PORT: 4000
       MSGR_WEB_LEGACY_ACTOR_HEADERS: ${MSGR_WEB_LEGACY_ACTOR_HEADERS:-false}
       SECRET_KEY_BASE: 3X6X5EiV0HEhNAZCFKuGcZNl14Q8U5hZ4qQlR9VuQ07oVcTyVwW7BrPPW5zSOdaT
+      NOISE_TRANSPORT_ENABLED: ${NOISE_TRANSPORT_ENABLED:-false}
+      NOISE_TRANSPORT_PORT: ${NOISE_TRANSPORT_PORT:-5443}
+      NOISE_STATIC_KEY: ${NOISE_STATIC_KEY:-}
+      NOISE_STATIC_KEY_SECRET_ID: ${NOISE_STATIC_KEY_SECRET_ID:-}
+      NOISE_STATIC_KEY_SECRET_FIELD: ${NOISE_STATIC_KEY_SECRET_FIELD:-private}
+      NOISE_STATIC_KEY_SECRET_REGION: ${NOISE_STATIC_KEY_SECRET_REGION:-}
+      NOISE_STATIC_KEY_ROTATED_AT: ${NOISE_STATIC_KEY_ROTATED_AT:-}
+      MSGR_TLS_ENABLED: ${MSGR_TLS_ENABLED:-false}
+      MSGR_TLS_PORT: ${MSGR_TLS_PORT:-4443}
+      MSGR_TLS_CERT_PATH: ${MSGR_TLS_CERT_PATH:-}
+      MSGR_TLS_KEY_PATH: ${MSGR_TLS_KEY_PATH:-}
+      MSGR_TLS_CACERT_PATH: ${MSGR_TLS_CACERT_PATH:-}
+      MSGR_FORCE_SSL: ${MSGR_FORCE_SSL:-false}
+      MSGR_FORCE_SSL_HSTS: ${MSGR_FORCE_SSL_HSTS:-false}
     working_dir: /app
     command: ["sh", "-c", "mix setup && mix phx.server"]
     volumes:

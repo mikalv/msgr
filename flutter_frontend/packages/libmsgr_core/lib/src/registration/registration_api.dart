@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../constants.dart';
 import '../models/auth_challenge.dart';
+import '../models/noise_handshake.dart';
 import '../network/server_resolver.dart';
 
 class RegistrationApi {
@@ -100,6 +101,9 @@ class RegistrationApi {
     required String challengeId,
     required String code,
     String? displayName,
+    String? noiseSessionId,
+    String? noiseSignature,
+    DateTime? lastHandshakeAt,
   }) async {
     final url = _resolver.resolveAuth('/api/auth/verify');
     final payload = {
@@ -107,6 +111,12 @@ class RegistrationApi {
       'code': code,
       if (displayName != null && displayName.isNotEmpty)
         'display_name': displayName,
+      if (noiseSessionId != null && noiseSessionId.isNotEmpty)
+        'noise_session_id': noiseSessionId,
+      if (noiseSignature != null && noiseSignature.isNotEmpty)
+        'noise_signature': noiseSignature,
+      if (lastHandshakeAt != null)
+        'last_handshake_at': lastHandshakeAt.toUtc().toIso8601String(),
     };
     final response = await _client.post(
       url,
@@ -117,6 +127,34 @@ class RegistrationApi {
       return null;
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<NoiseHandshakeSession?> createNoiseHandshake() async {
+    final url = _resolver.resolveAuth('/api/noise/handshake');
+    final response = await _client.post(
+      url,
+      headers: _jsonHeaders(),
+      body: jsonEncode(const {}),
+    );
+
+    if (response.statusCode != 200) {
+      return null;
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final data = decoded['data'];
+    if (data is! Map<String, dynamic>) {
+      return null;
+    }
+
+    final session = NoiseHandshakeSession.fromJson(data);
+    if (session.sessionId.isEmpty ||
+        session.signature.isEmpty ||
+        session.deviceKey.isEmpty) {
+      return null;
+    }
+
+    return session;
   }
 
   Future<Map<String, dynamic>?> completeOidc({
