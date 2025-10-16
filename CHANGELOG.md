@@ -67,6 +67,9 @@
 - Instrumented `ConversationChannel` typing and message ack flows with telemetry
   stubs and added a matching socket telemetry broadcaster in `libmsgr` so both
   backend and Flutter can hook into send→ack timelines.
+
+### Continuous integration
+
 - La til `Messngr.Metrics.Pipeline` med Telemetry-handlere, reporter-grensesnitt
   og Flutter/Elixir hooks for leveringslatens, leveringsrate, appstart og
   composer-ytelse, dokumentert i `architecture.md`.
@@ -74,9 +77,6 @@
   `mix format` succeeds.
 - Corrected the Microsoft Teams bridge consent copy to remove invalid string
   continuations so `mix format` can process `Messngr.Bridges.Auth`.
-
-### Continuous integration
-
 - Restored the migrations formatter configuration so `mix format --check-formatted` can execute without error.
 - Introduced a GitHub Actions workflow that runs `mix format --check-formatted`,
   `mix test`, `flutter format` and `flutter test` on pushes and pull requests.
