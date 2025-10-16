@@ -1,5 +1,16 @@
 # IDEAs
 
+## Eksperimentstatus
+
+| Idé | Scope | Status | Frontend? | Backend? | Notater |
+| --- | --- | --- | --- | --- | --- |
+| Pay-per-feature aktivering | Økosystem/prising | Discovery (2025-05-09) | Nei | Ja | Krever abonnementshåndtering, feature-flags og fakturering via backend. |
+| Passkeys for pålogging | Autentisering | Discovery (2025-05-09) | Ja | Ja | Avhenger av WebAuthn-planen, Flutter-passkey-SDK og nye autentiseringsendepunkt. |
+| QR-koder for familie/workspace-invitasjoner | Onboarding/deling | Backlog | Ja | Ja | Trenger QR-rendering i klienten og signerte invite-tokens i backend. |
+| Quiz/Vote meldingsformat | Meldinger/engasjement | Discovery (2025-05-09) | Ja | Ja | Frontend trenger komponenter for stemmegivning, backend må samle stemmer og emitte resultater. |
+
+Statusfeltet skal oppdateres når eksperimenter starter eller ferdigstilles. Se `CHANGELOG.md` for historikk.
+
 ## General
 
 * Hva med pay per feature?
