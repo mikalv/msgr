@@ -68,6 +68,17 @@
   stubs and added a matching socket telemetry broadcaster in `libmsgr` so both
   backend and Flutter can hook into send→ack timelines.
 
+### Produktplanlegging
+
+- Etablerte `docs/product_backlog.md` for å samle integrasjoner, kanalinitiativer,
+  admin/workspace-forbedringer og P2P/SRTP-satsinger med statusfelt som oppdateres
+  når eksperimenter starter eller avsluttes.
+- Opprettet `docs/webauthn_login_plan.md` med arkitektur for WebAuthn/passkey-
+  innlogginger, IDP-redirects og websocket-push av «login fullført»-signaler fra
+  backend til klient.
+- Triagerte nøkkelidéer i `IDEAS.md` og markerte hvilke eksperimenter som er i
+  discovery samt om de krever frontend- og/eller backend-arbeid.
+
 ### Continuous integration
 
 - La til `Messngr.Metrics.Pipeline` med Telemetry-handlere, reporter-grensesnitt
