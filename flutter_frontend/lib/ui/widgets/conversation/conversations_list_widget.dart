@@ -15,20 +15,28 @@ class ConversationsListWidget extends StatelessWidget {
     required this.context,
     required this.conversations,
     required this.store,
+    this.modeFilter,
   });
 
   final dynamic context;
   final dynamic conversations;
   final dynamic store;
+  final ProfileMode? modeFilter;
 
   @override
   Widget build(BuildContext context) {
+    final List<Conversation> items =
+        List<Conversation>.from(conversations as Iterable);
+    final filtered = modeFilter == null
+        ? items
+        : _filterByMode(store, items, modeFilter!);
+
     final theList = ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: conversations.length,
+      itemCount: filtered.length,
       itemBuilder: (BuildContext context, int index) {
-        final Conversation conversation = conversations[index];
+        final Conversation conversation = filtered[index];
         return ConversationsListItem(
             key: Key(conversation.id),
             store: store,
@@ -61,5 +69,36 @@ class ConversationsListWidget extends StatelessWidget {
         theList
       ],
     );
+  }
+}
+
+List<Conversation> _filterByMode(dynamic store,
+    List<Conversation> conversations, ProfileMode mode) {
+  final teamName = store.state.authState.currentTeamName;
+  if (teamName == null) {
+    return conversations;
+  }
+
+  try {
+    final repository = LibMsgr()
+        .repositoryFactory
+        .getRepositories(teamName)
+        .profileRepository;
+
+    return conversations.where((conversation) {
+      for (final member in conversation.members) {
+        try {
+          final profile = repository.fetchByID(member);
+          if (profile.mode == mode) {
+            return true;
+          }
+        } catch (_) {
+          continue;
+        }
+      }
+      return false;
+    }).toList(growable: false);
+  } catch (_) {
+    return conversations;
   }
 }

@@ -12,8 +12,11 @@ defmodule Messngr do
   defdelegate create_account(attrs), to: Accounts
   defdelegate update_account(account, attrs), to: Accounts
   defdelegate create_profile(attrs), to: Accounts
+  defdelegate update_profile(profile, attrs), to: Accounts
+  defdelegate delete_profile(profile), to: Accounts
   defdelegate list_profiles(account_id), to: Accounts
   defdelegate get_profile!(id), to: Accounts
+  defdelegate ensure_profile_for_account(account_id, profile_id), to: Accounts
   defdelegate list_devices(account_id), to: Accounts
   defdelegate get_device!(id), to: Accounts
   defdelegate create_device(attrs), to: Accounts
@@ -94,5 +97,6 @@ defmodule Messngr do
   defdelegate start_auth_challenge(attrs), to: Auth, as: :start_challenge
   defdelegate verify_auth_challenge(id, code, attrs \\ %{}), to: Auth, as: :verify_challenge
   defdelegate complete_oidc(attrs), to: Auth
+  defdelegate switch_profile(token, account_id, profile_id, opts \\ []), to: Auth
 
 end

@@ -103,6 +103,51 @@ defmodule Messngr.Noise.SessionStore do
   end
 
   @doc """
+  Updates the profile assigned to an existing session. The device and account
+  metadata remain untouched, but the new profile identifier must belong to the
+  same account as the original actor.
+  """
+  @spec switch_profile(binary(), String.t(), keyword()) :: {:ok, Session.t(), Actor.t()} | {:error, term()}
+  def switch_profile(token, profile_id, opts \\ []) when is_binary(token) do
+    registry = Keyword.get(opts, :registry, Registry)
+
+    case Registry.fetch_by_token(registry, token) do
+      {:ok, session} ->
+        case Session.actor(session) do
+          {:ok, actor_map} ->
+            profile_id = fetch_required(%{profile_id: profile_id}, :profile_id)
+
+            actor =
+              actor_map
+              |> actor_from_map()
+              |> Map.from_struct()
+              |> Map.put(:profile_id, profile_id)
+              |> normalize_actor()
+
+            session = Session.with_actor(session, Map.from_struct(actor))
+
+            case Registry.put(registry, session) do
+              {:ok, session} ->
+                emit_token_event(:switch_profile, session, actor)
+                {:ok, session, actor}
+
+              {:error, reason} ->
+                emit_token_failure(:switch_profile, reason, %{session_id: Session.id(session)})
+                {:error, reason}
+            end
+
+          :error ->
+            emit_token_failure(:switch_profile, :actor_missing, %{session_id: Session.id(session)})
+            {:error, :actor_missing}
+        end
+
+      :error ->
+        emit_token_failure(:switch_profile, :not_found, %{})
+        {:error, :not_found}
+    end
+  end
+
+  @doc """
   Encodes a raw Noise session token into a transport-safe string representation.
   """
   @spec encode_token(binary()) :: String.t()

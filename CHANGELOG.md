@@ -4,6 +4,18 @@
 
 ### Architecture checklist
 
+- Modellert utvidede profilpreferanser (tema, varsel- og sikkerhetspolicyer) på
+  Flutter, eksponerte `ProfileApi` for CRUD/bytte, la til modus-veksler med
+  banner/inbox-filtre samt dokumentasjon av scenarier i `docs/profile_modes.md`.
+- Etablerte per-profil nøkkellager (`profile_keys`) og backup-koder med
+  `Messngr.Accounts.KeyStore`, inkludert generering/innløsningstester og klient-
+  snapshot fingerprinting.
+- Registrerte push-tokens i `device_push_tokens` og introduserte
+  `Messngr.Notifications.PushDispatcher` med modus/quiet-hours-policy samt
+  Flutter-støtte for å sende `clientState` og `encryption` sammen med media.
+- Utvidet media-opplasting til å returnere `encryption`-placeholders og
+  `clientState`, synket Flutter-uploader og dokumenterte flyten i
+  `architecture.md`.
 - [x] TLS kan toggles via miljøvariablene `MSGR_TLS_*` uten kodeendringer.
 - [x] Noise-transport og handshake styres av `NOISE_*`-variabler og `libmsgr_core`.
 - [x] Kun én Postgres-instans brukes i docker-stacken (`services.db`).
@@ -41,6 +53,8 @@
 
 ### Developer experience
 
+- Updated the `libmsgr_core` key manager tests to rely on the built-in `MemorySecureStorage`, keeping the Mockito removal while restoring compatibility with `dart test`.
+- Fixed the `libmsgr_cli` command runner tests by importing `dart:io` so the `Directory`-based option parsing compiles during `dart test`.
 - Added `scripts/start_stack.sh` and `scripts/run_flutter.sh` to capture the
   recommended `docker compose`/`flutter run` incantations and documented the
   demoflyt (<1s send→ack, re-login) in `docs/backend_setup.md`.
@@ -56,6 +70,14 @@
 
 ### Continuous integration
 
+- La til `Messngr.Metrics.Pipeline` med Telemetry-handlere, reporter-grensesnitt
+  og Flutter/Elixir hooks for leveringslatens, leveringsrate, appstart og
+  composer-ytelse, dokumentert i `architecture.md`.
+- Fixed the socket telemetry docs to follow Elixir heredoc formatting so
+  `mix format` succeeds.
+- Corrected the Microsoft Teams bridge consent copy to remove invalid string
+  continuations so `mix format` can process `Messngr.Bridges.Auth`.
+- Restored the migrations formatter configuration so `mix format --check-formatted` can execute without error.
 - Introduced a GitHub Actions workflow that runs `mix format --check-formatted`,
   `mix test`, `flutter format` and `flutter test` on pushes and pull requests.
 - Oppdaterte dev-innloggingen i Flutter med backend-host-override via

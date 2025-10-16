@@ -42,6 +42,87 @@ defmodule Messngr.AccountsTest do
     end
   end
 
+  describe "update_profile/2" do
+    setup do
+      {:ok, account} = Accounts.create_account(%{"display_name" => "Sara"})
+      profile = List.first(account.profiles)
+      {:ok, account: account, profile: profile}
+    end
+
+    test "normalises theme and policies", %{profile: profile} do
+      {:ok, updated} =
+        Accounts.update_profile(profile, %{
+          "theme" => %{"primary" => "#112233", "mode" => "DARK", "variant" => "Focus"},
+          "notification_policy" => %{
+            "allow_push" => false,
+            "quiet_hours" => %{"enabled" => true, "start" => "21:30", :end => "06:00"}
+          },
+          "security_policy" => %{
+            "requires_pin" => true,
+            "lock_after_minutes" => "15",
+            "sensitive_notifications" => "HIDE_ALL"
+          }
+        })
+
+      assert updated.theme["primary"] == "#112233"
+      assert updated.theme["mode"] == "dark"
+      assert updated.notification_policy["allow_push"] == false
+      assert updated.notification_policy["quiet_hours"]["enabled"] == true
+      assert updated.notification_policy["quiet_hours"]["start"] == "21:30"
+      assert updated.notification_policy["quiet_hours"]["end"] == "06:00"
+      assert updated.security_policy["requires_pin"]
+      assert updated.security_policy["lock_after_minutes"] == 15
+      assert updated.security_policy["sensitive_notifications"] == "hide_all"
+    end
+
+    test "rejects invalid colours", %{profile: profile} do
+      assert {:error, changeset} =
+               Accounts.update_profile(profile, %{"theme" => %{"primary" => "blue"}})
+
+      assert %{theme: [message]} = errors_on(changeset)
+      assert String.contains?(message, "primary")
+    end
+  end
+
+  describe "delete_profile/1" do
+    setup do
+      {:ok, account} = Accounts.create_account(%{"display_name" => "Liv"})
+      profile = List.first(account.profiles)
+      {:ok, other} = Accounts.create_profile(%{"name" => "Jobb", "mode" => :work, "account_id" => account.id})
+      {:ok, account: account, profile: profile, other: other}
+    end
+
+    test "removes non-primary profile", %{other: other} do
+      assert {:ok, deleted} = Accounts.delete_profile(other)
+      assert deleted.id == other.id
+    end
+
+    test "prevents deleting last profile", %{profile: profile, other: other} do
+      assert {:ok, _} = Accounts.delete_profile(other)
+      assert {:error, :cannot_delete_last_profile} = Accounts.delete_profile(profile)
+    end
+  end
+
+  describe "ensure_profile_for_account/2" do
+    setup do
+      {:ok, account} = Accounts.create_account(%{"display_name" => "Ida"})
+      profile = List.first(account.profiles)
+      {:ok, account: account, profile: profile}
+    end
+
+    test "returns error for other account" do
+      {:ok, other_account} = Accounts.create_account(%{"display_name" => "Other"})
+      other_profile = List.first(other_account.profiles)
+
+      assert {:error, :profile_not_found} =
+               Accounts.ensure_profile_for_account(other_account.id, other_profile.id)
+    end
+
+    test "returns profile for matching account", %{account: account, profile: profile} do
+      assert {:ok, ^profile} = Accounts.ensure_profile_for_account(account.id, profile.id)
+    end
+  end
+
   describe "ensure_identity/1" do
     test "creates account and identity for new email" do
       assert {:ok, identity} =
