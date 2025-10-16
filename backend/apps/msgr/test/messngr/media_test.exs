@@ -44,6 +44,8 @@ defmodule Messngr.MediaTest do
     assert %{"url" => download_url} = instructions["download"]
     assert download_url =~ upload.object_key
     assert %DateTime{} = instructions["retentionUntil"]
+    assert %{"strategy" => "profile-enveloped"} = instructions["encryption"]
+    assert instructions["clientState"]["profileId"] == profile.id
 
     thumbnail_pointer = instructions["thumbnailUpload"]
 
@@ -72,7 +74,10 @@ defmodule Messngr.MediaTest do
     assert url =~ thumb_key
     assert bucket == thumbnail_pointer["bucket"]
     assert payload["body"] == "Sommerferie"
-
+    assert payload["encryption"]["strategy"] == "profile-enveloped"
+    assert payload["clientState"]["profileId"] == profile.id
+    assert media_payload["encryption"]["cipher"] == "aes-256-gcm"
+  
     assert %Upload{status: :consumed, width: 1920, height: 1080, sha256: ^sha} = Repo.get!(Upload, upload.id)
   end
 

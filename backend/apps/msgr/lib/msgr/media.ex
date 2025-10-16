@@ -4,6 +4,7 @@ defmodule Messngr.Media do
   Generates signed upload instructions and attaches metadata to chat messages.
   """
 
+  alias Messngr.Accounts.KeyStore
   alias Messngr.Media.{Storage, Upload}
   alias Messngr.Repo
   import Ecto.Query
@@ -63,6 +64,7 @@ defmodule Messngr.Media do
                  |> Repo.update() do
             Upload.payload(updated)
             |> put_retention()
+            |> put_encryption(updated)
           else
             {:error, reason} -> Repo.rollback(reason)
           end
@@ -170,7 +172,9 @@ defmodule Messngr.Media do
       "objectKey" => upload.object_key,
       "publicUrl" => Storage.public_url(upload.bucket, upload.object_key),
       "retentionUntil" => retention_until(),
-      "thumbnailUpload" => build_thumbnail_instructions(upload)
+      "thumbnailUpload" => build_thumbnail_instructions(upload),
+      "encryption" => build_encryption_descriptor(upload),
+      "clientState" => build_client_state(upload)
     }
   end
 
@@ -191,6 +195,60 @@ defmodule Messngr.Media do
   end
 
   defp build_thumbnail_instructions(_upload), do: nil
+
+  defp build_encryption_descriptor(%Upload{profile_id: profile_id}) do
+    %{
+      "strategy" => "profile-enveloped",
+      "cipher" => "aes-256-gcm",
+      "kmsKeyAlias" => "profiles/#{profile_id}",
+      "placeholders" => %{
+        "wrappingKey" => "client-managed",
+        "ciphertextField" => "media.ciphertext",
+        "nonceField" => "media.nonce"
+      }
+    }
+  end
+
+  defp build_client_state(%Upload{profile_id: profile_id}) do
+    case KeyStore.fetch_key(profile_id, :messaging) do
+      %Messngr.Accounts.ProfileKey{fingerprint: fingerprint, client_snapshot_version: version} ->
+        %{
+          "profileKeyFingerprint" => fingerprint,
+          "clientSnapshotVersion" => version
+        }
+
+      _ ->
+        %{
+          "profileKeyFingerprint" => nil,
+          "clientSnapshotVersion" => 0
+        }
+    end
+    |> Map.put("profileId", profile_id)
+  end
+
+  defp put_encryption(%{"media" => media} = payload, %Upload{} = upload) do
+    encryption = build_encryption_descriptor(upload)
+    client_state = build_client_state(upload)
+
+    media_with_encryption =
+      media
+      |> Map.put("encryption", encryption)
+      |> Map.put("clientState", client_state)
+
+    payload
+    |> Map.put("media", media_with_encryption)
+    |> Map.put("encryption", encryption)
+    |> Map.put("clientState", client_state)
+  end
+
+  defp put_encryption(payload, %Upload{} = upload) do
+    encryption = build_encryption_descriptor(upload)
+    client_state = build_client_state(upload)
+
+    payload
+    |> Map.put("encryption", encryption)
+    |> Map.put("clientState", client_state)
+  end
 
   defp purge_upload(%Upload{} = upload) do
     with :ok <- Storage.delete_object(upload.bucket, upload.object_key),

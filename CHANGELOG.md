@@ -7,6 +7,15 @@
 - Modellert utvidede profilpreferanser (tema, varsel- og sikkerhetspolicyer) på
   Flutter, eksponerte `ProfileApi` for CRUD/bytte, la til modus-veksler med
   banner/inbox-filtre samt dokumentasjon av scenarier i `docs/profile_modes.md`.
+- Etablerte per-profil nøkkellager (`profile_keys`) og backup-koder med
+  `Messngr.Accounts.KeyStore`, inkludert generering/innløsningstester og klient-
+  snapshot fingerprinting.
+- Registrerte push-tokens i `device_push_tokens` og introduserte
+  `Messngr.Notifications.PushDispatcher` med modus/quiet-hours-policy samt
+  Flutter-støtte for å sende `clientState` og `encryption` sammen med media.
+- Utvidet media-opplasting til å returnere `encryption`-placeholders og
+  `clientState`, synket Flutter-uploader og dokumenterte flyten i
+  `architecture.md`.
 - [x] TLS kan toggles via miljøvariablene `MSGR_TLS_*` uten kodeendringer.
 - [x] Noise-transport og handshake styres av `NOISE_*`-variabler og `libmsgr_core`.
 - [x] Kun én Postgres-instans brukes i docker-stacken (`services.db`).
@@ -58,6 +67,9 @@
 - Instrumented `ConversationChannel` typing and message ack flows with telemetry
   stubs and added a matching socket telemetry broadcaster in `libmsgr` so both
   backend and Flutter can hook into send→ack timelines.
+- La til `Messngr.Metrics.Pipeline` med Telemetry-handlere, reporter-grensesnitt
+  og Flutter/Elixir hooks for leveringslatens, leveringsrate, appstart og
+  composer-ytelse, dokumentert i `architecture.md`.
 - Fixed the socket telemetry docs to follow Elixir heredoc formatting so
   `mix format` succeeds.
 - Corrected the Microsoft Teams bridge consent copy to remove invalid string

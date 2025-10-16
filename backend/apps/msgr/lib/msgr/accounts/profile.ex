@@ -52,6 +52,8 @@ defmodule Messngr.Accounts.Profile do
 
     belongs_to :account, Messngr.Accounts.Account
     has_many :devices, Messngr.Accounts.Device
+    has_many :keys, Messngr.Accounts.ProfileKey
+    has_many :backup_codes, Messngr.Accounts.ProfileBackupCode
 
     timestamps(type: :utc_datetime)
   end
