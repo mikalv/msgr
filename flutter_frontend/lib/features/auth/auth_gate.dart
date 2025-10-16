@@ -5,10 +5,16 @@ import 'package:messngr/services/api/chat_api.dart';
 import 'package:provider/provider.dart';
 
 class AuthSession {
-  const AuthSession({required this.identity, required this.signOut});
+  const AuthSession({
+    required this.identity,
+    required this.signOut,
+    required this.updateIdentity,
+  });
 
   final AccountIdentity identity;
   final Future<void> Function() signOut;
+  final Future<void> Function(AccountIdentity identity, {String? displayName})
+      updateIdentity;
 }
 
 class AuthGate extends StatefulWidget {
@@ -67,6 +73,22 @@ class _AuthGateState extends State<AuthGate> {
     });
   }
 
+  Future<void> _handleIdentityUpdated(AccountIdentity identity,
+      {String? displayName}) async {
+    await _store.save(
+      identity,
+      displayName: displayName ?? _displayName,
+      noiseSessionId: identity.noiseSessionId,
+    );
+    if (!mounted) return;
+    setState(() {
+      _identity = identity;
+      if (displayName != null && displayName.isNotEmpty) {
+        _displayName = displayName;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -81,7 +103,11 @@ class _AuthGateState extends State<AuthGate> {
       return DevLoginPage(onSignedIn: _handleSignedIn);
     }
 
-    final session = AuthSession(identity: _identity!, signOut: _handleSignOut);
+    final session = AuthSession(
+      identity: _identity!,
+      signOut: _handleSignOut,
+      updateIdentity: _handleIdentityUpdated,
+    );
     return MultiProvider(
       providers: [
         Provider<AuthSession>.value(value: session),

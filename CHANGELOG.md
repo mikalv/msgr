@@ -4,6 +4,9 @@
 
 ### Architecture checklist
 
+- Modellert utvidede profilpreferanser (tema, varsel- og sikkerhetspolicyer) på
+  Flutter, eksponerte `ProfileApi` for CRUD/bytte, la til modus-veksler med
+  banner/inbox-filtre samt dokumentasjon av scenarier i `docs/profile_modes.md`.
 - [x] TLS kan toggles via miljøvariablene `MSGR_TLS_*` uten kodeendringer.
 - [x] Noise-transport og handshake styres av `NOISE_*`-variabler og `libmsgr_core`.
 - [x] Kun én Postgres-instans brukes i docker-stacken (`services.db`).

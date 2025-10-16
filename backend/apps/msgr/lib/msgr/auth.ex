@@ -9,9 +9,13 @@ defmodule Messngr.Auth do
   alias Messngr.Auth.Notifier
   alias Messngr.FeatureFlags
   alias Messngr.Noise.Handshake
+  alias Messngr.Noise.SessionStore
+  alias Messngr.Noise.SessionStore.Actor, as: NoiseActor
   alias Messngr.Transport.Noise.Session
   alias Messngr.Repo
   alias Messngr.RateLimiter
+
+  alias Ecto.NoResultsError
 
   @challenge_ttl_minutes 10
 
@@ -130,6 +134,40 @@ defmodule Messngr.Auth do
     end
   end
 
+  @spec switch_profile(String.t(), Ecto.UUID.t(), Ecto.UUID.t(), keyword()) ::
+          {:ok,
+           %{
+             session: Session.t(),
+             actor: NoiseActor.t(),
+             profile: Accounts.Profile.t(),
+             device: Accounts.Device.t() | nil,
+             token: String.t()
+           }}
+          | {:error, term()}
+  def switch_profile(encoded_token, account_id, profile_id, opts \\ []) do
+    with {:ok, raw_token} <- SessionStore.decode_token(encoded_token),
+         {:ok, session, %NoiseActor{} = actor} <- SessionStore.fetch(raw_token, opts),
+         :ok <- ensure_actor_account(actor, account_id),
+         {:ok, profile} <- Accounts.ensure_profile_for_account(account_id, profile_id),
+         {:ok, device} <- maybe_reassign_device(actor, profile),
+         {:ok, session, %NoiseActor{} = updated_actor} <-
+           SessionStore.switch_profile(raw_token, profile.id, opts) do
+      token = SessionStore.encode_token(Session.token(session))
+
+      {:ok,
+       %{
+         session: session,
+         actor: updated_actor,
+         profile: profile,
+         device: device,
+         token: token
+       }}
+    else
+      :error -> {:error, :invalid_token}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp handshake_actor(identity, device) do
     profile_id =
       cond do
@@ -198,6 +236,33 @@ defmodule Messngr.Auth do
         end
     end
   end
+
+  defp ensure_actor_account(%NoiseActor{account_id: actor_account_id}, account_id) do
+    if actor_account_id == to_string(account_id) do
+      :ok
+    else
+      {:error, :account_mismatch}
+    end
+  end
+
+  defp maybe_reassign_device(%NoiseActor{device_id: nil}, _profile), do: {:ok, nil}
+
+  defp maybe_reassign_device(%NoiseActor{device_id: device_id}, profile) when is_binary(device_id) do
+    device = Accounts.get_device!(device_id)
+
+    cond do
+      device.account_id != profile.account_id -> {:error, :device_mismatch}
+      true ->
+        case Accounts.update_device(device, %{profile_id: profile.id}) do
+          {:ok, updated} -> {:ok, updated}
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  rescue
+    NoResultsError -> {:error, :unknown_device}
+  end
+
+  defp maybe_reassign_device(_actor, _profile), do: {:ok, nil}
 
   defp constant_time_compare?(a, b) when is_binary(a) and is_binary(b) do
     byte_size(a) == byte_size(b) and Plug.Crypto.secure_compare(a, b)

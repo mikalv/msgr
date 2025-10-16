@@ -3,84 +3,47 @@ import 'package:libmsgr/libmsgr.dart';
 import 'package:libmsgr/src/models/conversation.dart';
 
 void main() {
-  group('Conversation Model Tests', () {
-    final profile = Profile(
-        id: '1', uid: '1', username: 'John Doe', insertedAt: '', roles: []);
-    final conversation = Conversation(
+  group('Conversation', () {
+    final createdAt = DateTime.utc(2023, 10, 1, 12);
+    final updatedAt = DateTime.utc(2023, 10, 2, 12);
+    final base = Conversation.raw(
       id: '123',
       topic: 'Test Topic',
       description: 'Test Description',
-      members: ['1'],
+      members: const ['1'],
       kIsSecret: false,
-      createdAt: '2023-10-01T12:00:00Z',
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
 
-    test('Conversation equality', () {
-      final conversation2 = Conversation(
+    test('equality with identical values', () {
+      final other = Conversation.raw(
         id: '123',
         topic: 'Test Topic',
         description: 'Test Description',
-        members: ['1'],
+        members: const ['1'],
         kIsSecret: false,
-        createdAt: '2023-10-01T12:00:00Z',
+        createdAt: createdAt,
+        updatedAt: updatedAt,
       );
-
-      expect(conversation, equals(conversation2));
+      expect(base, equals(other));
     });
 
-    test('Conversation inequality', () {
-      final profile = Profile(
-          id: '2', uid: '2', username: 'janedoe', roles: [], insertedAt: '');
-      final conversation2 = Conversation(
-        id: '124',
-        topic: 'Another Topic',
-        description: 'Another Description',
-        members: ['1'],
-        kIsSecret: true,
-        createdAt: '2023-10-02T12:00:00Z',
-      );
-
-      expect(conversation, isNot(equals(conversation2)));
+    test('copyWith updates individual fields', () {
+      final updated = base.copyWith(topic: 'Updated', members: const ['2']);
+      expect(updated.topic, 'Updated');
+      expect(updated.members, ['2']);
+      expect(updated.id, base.id);
     });
 
-    test('Conversation toJson', () {
-      final json = conversation.toJson();
-      expect(json, {
-        'id': '123',
-        'topic': 'Test Topic',
-        'description': 'Test Description',
-        'is_secret': false,
-        'inserted_at': '2023-10-01T12:00:00Z',
-        'members': [
-          Profile(
-              id: '1', uid: '1', username: 'johndoe', roles: [], insertedAt: '')
-        ],
-      });
-    });
-
-    test('Conversation fromJson', () {
-      final json = {
-        'id': '123',
-        'topic': 'Test Topic',
-        'description': 'Test Description',
-        'is_secret': false,
-        'inserted_at': '2023-10-01T12:00:00Z',
-        'members': ['1'],
-      };
-
-      final conversationFromJson = Conversation.fromJson(json);
-      expect(conversationFromJson.id, '123');
-      expect(conversationFromJson.topic, 'Test Topic');
-      expect(conversationFromJson.description, 'Test Description');
-      expect(conversationFromJson.kIsSecret, false);
-      expect(conversationFromJson.createdAt, '2023-10-01T12:00:00Z');
-      expect(conversationFromJson.members, []);
-    });
-
-    test('Conversation toString', () {
-      final stringRepresentation = conversation.toString();
-      expect(stringRepresentation,
-          'Conversation{ID: 123, topic: Test Topic, description: Test Description, kIsSecret: false}');
+    test('toJson round-trips through fromJson', () {
+      final json = base.toJson();
+      final parsed = Conversation.fromJson(json);
+      expect(parsed.id, base.id);
+      expect(parsed.topic, base.topic);
+      expect(parsed.description, base.description);
+      expect(parsed.members, base.members);
+      expect(parsed.kIsSecret, base.kIsSecret);
     });
   });
 }

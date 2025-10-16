@@ -58,11 +58,17 @@ class ContactDao {
   }
 
   Map<String, Object?> _toDbMap(String teamName, Profile contact) {
+    final createdAt = contact.createdAt ?? DateTime.now().toUtc();
+    final updatedAt = contact.updatedAt ?? createdAt;
+
     return <String, Object?>{
       'id': contact.id,
       'team_name': teamName,
       'uid': contact.uid,
       'username': contact.username,
+      'name': contact.name,
+      'slug': contact.slug,
+      'mode': contact.mode.value,
       'first_name': contact.firstName,
       'last_name': contact.lastName,
       'status': contact.status,
@@ -70,8 +76,13 @@ class ContactDao {
       'settings':
           contact.settings == null ? null : jsonEncode(contact.settings),
       'roles': jsonEncode(contact.roles),
-      'inserted_at': contact.createdAt.toIso8601String(),
-      'updated_at': contact.updatedAt.toIso8601String(),
+      'theme': jsonEncode(contact.theme.toJson()),
+      'notification_policy':
+          jsonEncode(contact.notificationPolicy.toJson()),
+      'security_policy': jsonEncode(contact.securityPolicy.toJson()),
+      'is_active': contact.isActive ? 1 : 0,
+      'inserted_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
     };
   }
 
@@ -86,18 +97,49 @@ class ContactDao {
         ? <dynamic>[]
         : List<dynamic>.from(jsonDecode(rolesJson) as List);
 
+    final themeJson = map['theme'] as String?;
+    final notificationJson = map['notification_policy'] as String?;
+    final securityJson = map['security_policy'] as String?;
+
+    final theme = themeJson == null
+        ? const ProfileThemePreferences()
+        : ProfileThemePreferences.fromJson(jsonDecode(themeJson));
+    final notificationPolicy = notificationJson == null
+        ? const ProfileNotificationPolicy()
+        : ProfileNotificationPolicy.fromJson(jsonDecode(notificationJson));
+    final securityPolicy = securityJson == null
+        ? const ProfileSecurityPolicy()
+        : ProfileSecurityPolicy.fromJson(jsonDecode(securityJson));
+
+    final createdAtRaw = map['inserted_at'] as String?;
+    final updatedAtRaw = map['updated_at'] as String?;
+
+    final createdAt =
+        createdAtRaw == null ? null : DateTime.tryParse(createdAtRaw);
+    final updatedAt =
+        updatedAtRaw == null ? null : DateTime.tryParse(updatedAtRaw);
+
     return Profile(
       id: map['id']! as String,
-      uid: map['uid']! as String,
-      username: map['username']! as String,
+      uid: map['uid'] as String?,
+      username: (map['username'] as String?) ??
+          (map['slug'] as String?) ??
+          (map['id'] as String? ?? 'profile'),
+      name: map['name'] as String?,
+      slug: map['slug'] as String?,
+      mode: ProfileModeX.fromString(map['mode'] as String?),
       firstName: map['first_name'] as String?,
       lastName: map['last_name'] as String?,
       status: map['status'] as String?,
       avatarUrl: map['avatar_url'] as String?,
+      theme: theme,
+      notificationPolicy: notificationPolicy,
+      securityPolicy: securityPolicy,
+      isActive: (map['is_active'] as int? ?? 0) != 0,
       settings: settings,
       roles: roles,
-      createdAt: DateTime.parse(map['inserted_at']! as String),
-      updatedAt: DateTime.parse(map['updated_at']! as String),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 }
