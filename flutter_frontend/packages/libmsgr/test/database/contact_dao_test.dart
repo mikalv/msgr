@@ -25,17 +25,25 @@ void main() {
       await databaseFactory.deleteDatabase(path);
     });
 
-    Profile _profile(String id, {String? username}) {
+    Profile _profile(String id, {String? username, ProfileMode mode = ProfileMode.private}) {
       return Profile(
         id: id,
-        uid: 'uid-$id',
         username: username ?? 'user-$id',
+        name: 'User $id',
+        slug: username ?? 'user-$id',
+        mode: mode,
+        uid: 'uid-$id',
         firstName: 'First$id',
         lastName: 'Last$id',
         status: 'online',
         avatarUrl: null,
         settings: const {'theme': 'dark'},
         roles: const [],
+        theme: const ProfileThemePreferences(primary: '#AA5500'),
+        notificationPolicy:
+            const ProfileNotificationPolicy(allowEmail: true),
+        securityPolicy:
+            const ProfileSecurityPolicy(sensitiveNotifications: SensitiveNotificationVisibility.hideAll),
         createdAt: DateTime.utc(2024, 1, 1),
         updatedAt: DateTime.utc(2024, 1, 2),
       );
@@ -50,7 +58,12 @@ void main() {
 
       expect(stored, hasLength(1));
       expect(stored.single.id, contact.id);
-      expect(stored.single.settings?['theme'], 'dark');
+      expect(stored.single.theme.primary, '#AA5500');
+      expect(stored.single.notificationPolicy.allowEmail, isTrue);
+      expect(
+        stored.single.securityPolicy.sensitiveNotifications,
+        SensitiveNotificationVisibility.hideAll,
+      );
     });
 
     test('filters by team and orders alphabetically', () async {

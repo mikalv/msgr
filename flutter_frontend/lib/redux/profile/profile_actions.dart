@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:libmsgr/libmsgr.dart';
+import 'package:messngr/services/api/chat_api.dart';
+import 'package:messngr/services/api/profile_api.dart';
 
 class ProfileActions {}
 
@@ -103,4 +107,72 @@ class OnUpdateProfileFailureAction extends ProfileActions {
   String toString() {
     return 'OnUpdateProfileFailureAction{msg: $msg}"}';
   }
+}
+
+class RefreshProfilesAction extends ProfileActions {
+  RefreshProfilesAction({required this.identity});
+
+  final AccountIdentity identity;
+
+  @override
+  String toString() {
+    return 'RefreshProfilesAction{identity: ${identity.accountId}/${identity.profileId}}';
+  }
+}
+
+class RefreshProfilesSuccessAction extends ProfileActions {
+  RefreshProfilesSuccessAction({required this.profiles});
+
+  final List<Profile> profiles;
+
+  @override
+  String toString() => 'RefreshProfilesSuccessAction{profiles: ${profiles.length}}';
+}
+
+class RefreshProfilesFailureAction extends ProfileActions {
+  RefreshProfilesFailureAction({required this.error});
+
+  final String error;
+
+  @override
+  String toString() => 'RefreshProfilesFailureAction{error: $error}';
+}
+
+class SwitchProfileAction extends ProfileActions {
+  SwitchProfileAction({
+    required this.identity,
+    required this.profileId,
+    Completer<ProfileSwitchResult>? completer,
+  }) : completer = completer ?? Completer<ProfileSwitchResult>();
+
+  final AccountIdentity identity;
+  final String profileId;
+  final Completer<ProfileSwitchResult> completer;
+
+  @override
+  String toString() => 'SwitchProfileAction{profileId: $profileId}';
+}
+
+class SwitchProfileSuccessAction extends ProfileActions {
+  SwitchProfileSuccessAction({
+    required this.profile,
+    required this.identity,
+    this.device,
+  });
+
+  final Profile profile;
+  final AccountIdentity identity;
+  final Map<String, dynamic>? device;
+
+  @override
+  String toString() => 'SwitchProfileSuccessAction{profile: ${profile.id}}';
+}
+
+class SwitchProfileFailureAction extends ProfileActions {
+  SwitchProfileFailureAction({required this.error});
+
+  final String error;
+
+  @override
+  String toString() => 'SwitchProfileFailureAction{error: $error}';
 }

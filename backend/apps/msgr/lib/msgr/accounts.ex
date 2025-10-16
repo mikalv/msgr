@@ -171,6 +171,43 @@ defmodule Messngr.Accounts do
     |> Repo.insert()
   end
 
+  @spec update_profile(Profile.t(), map()) :: {:ok, Profile.t()} | {:error, Ecto.Changeset.t()}
+  def update_profile(%Profile{} = profile, attrs) do
+    profile
+    |> Profile.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @spec delete_profile(Profile.t()) :: {:ok, Profile.t()} | {:error, term()}
+  def delete_profile(%Profile{} = profile) do
+    Repo.transaction(fn ->
+      total =
+        Repo.one(
+          from p in Profile,
+            where: p.account_id == ^profile.account_id,
+            select: count(p.id)
+        )
+
+      cond do
+        total <= 1 -> Repo.rollback(:cannot_delete_last_profile)
+        true -> Repo.delete(profile)
+      end
+    end)
+    |> case do
+      {:ok, {:ok, deleted}} -> {:ok, deleted}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @spec ensure_profile_for_account(Ecto.UUID.t(), Ecto.UUID.t()) ::
+          {:ok, Profile.t()} | {:error, :profile_not_found}
+  def ensure_profile_for_account(account_id, profile_id) do
+    case Repo.get_by(Profile, id: profile_id, account_id: account_id) do
+      %Profile{} = profile -> {:ok, profile}
+      nil -> {:error, :profile_not_found}
+    end
+  end
+
   @spec list_profiles(Ecto.UUID.t()) :: [Profile.t()]
   def list_profiles(account_id) do
     Repo.all(from p in Profile, where: p.account_id == ^account_id)

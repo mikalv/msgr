@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/redux/app_state.dart';
 import 'package:messngr/redux/navigation/navigation_actions.dart';
 import 'package:messngr/ui/widgets/CategorySelector.dart';
 import 'package:messngr/features/chat/chat_page.dart';
 import 'package:messngr/ui/widgets/conversation/conversations_list_widget.dart';
+import 'package:messngr/ui/widgets/profile/profile_mode_switcher.dart';
 import 'package:messngr/ui/widgets/room/room_list_widget.dart';
 import 'package:messngr/utils/flutter_redux.dart';
 import 'package:redux/redux.dart';
@@ -28,6 +30,7 @@ class HomePageState extends State<HomePage> {
   ];
 
   int _selectedCategory = 0;
+  ProfileMode? _activeModeFilter;
 
   void _handleCategoryChanged(int index) {
     if (_selectedCategory != index) {
@@ -72,6 +75,15 @@ class HomePageState extends State<HomePage> {
     Scaffold.maybeOf(context)?.openDrawer();
   }
 
+  void _handleInboxFilterChanged(ProfileMode? mode) {
+    if (_activeModeFilter == mode) {
+      return;
+    }
+    setState(() {
+      _activeModeFilter = mode;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = StoreProvider.of<AppState>(context);
@@ -89,6 +101,8 @@ class HomePageState extends State<HomePage> {
             onCreateRoom: () => _createRoom(store),
             onCreateConversation: () => _createConversation(store),
             onOpenDrawer: _openDrawer,
+            modeFilter: _activeModeFilter,
+            onModeFilterChanged: _handleInboxFilterChanged,
           );
         }
 
@@ -103,6 +117,8 @@ class HomePageState extends State<HomePage> {
             onCreateRoom: () => _createRoom(store),
             onCreateConversation: () => _createConversation(store),
             onOpenDrawer: _openDrawer,
+            modeFilter: _activeModeFilter,
+            onModeFilterChanged: _handleInboxFilterChanged,
           );
         }
 
@@ -116,6 +132,8 @@ class HomePageState extends State<HomePage> {
           onCreateRoom: () => _createRoom(store),
           onCreateConversation: () => _createConversation(store),
           onOpenDrawer: _openDrawer,
+          modeFilter: _activeModeFilter,
+          onModeFilterChanged: _handleInboxFilterChanged,
         );
       },
     );
@@ -133,6 +151,8 @@ class _HomeCompactLayout extends StatelessWidget {
     required this.onCreateRoom,
     required this.onCreateConversation,
     required this.onOpenDrawer,
+    required this.modeFilter,
+    required this.onModeFilterChanged,
   });
 
   final Store<AppState> store;
@@ -144,6 +164,8 @@ class _HomeCompactLayout extends StatelessWidget {
   final VoidCallback onCreateRoom;
   final VoidCallback onCreateConversation;
   final VoidCallback onOpenDrawer;
+  final ProfileMode? modeFilter;
+  final ValueChanged<ProfileMode?> onModeFilterChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -171,6 +193,11 @@ class _HomeCompactLayout extends StatelessWidget {
                     onOpenDrawer: onOpenDrawer,
                   ),
                   const SizedBox(height: 16),
+                  ProfileModeSwitcher(
+                    onFilterChanged: onModeFilterChanged,
+                    initialFilter: modeFilter,
+                  ),
+                  const SizedBox(height: 16),
                   Expanded(
                     child: _HomeChatPanel(compact: true),
                   ),
@@ -195,6 +222,8 @@ class _HomeTabletLayout extends StatelessWidget {
     required this.onCreateRoom,
     required this.onCreateConversation,
     required this.onOpenDrawer,
+    required this.modeFilter,
+    required this.onModeFilterChanged,
   });
 
   final Store<AppState> store;
@@ -206,6 +235,8 @@ class _HomeTabletLayout extends StatelessWidget {
   final VoidCallback onCreateRoom;
   final VoidCallback onCreateConversation;
   final VoidCallback onOpenDrawer;
+  final ProfileMode? modeFilter;
+  final ValueChanged<ProfileMode?> onModeFilterChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -231,6 +262,8 @@ class _HomeTabletLayout extends StatelessWidget {
                     onCategorySelected: onCategorySelected,
                     onCreateConversation: onCreateConversation,
                     onCreateRoom: onCreateRoom,
+                    modeFilter: modeFilter,
+                    onFilterChanged: onModeFilterChanged,
                   ),
                 ),
                 const SizedBox(width: 24),
@@ -270,6 +303,8 @@ class _HomeDesktopLayout extends StatelessWidget {
     required this.onCreateRoom,
     required this.onCreateConversation,
     required this.onOpenDrawer,
+    required this.modeFilter,
+    required this.onModeFilterChanged,
   });
 
   final Store<AppState> store;
@@ -281,6 +316,8 @@ class _HomeDesktopLayout extends StatelessWidget {
   final VoidCallback onCreateRoom;
   final VoidCallback onCreateConversation;
   final VoidCallback onOpenDrawer;
+  final ProfileMode? modeFilter;
+  final ValueChanged<ProfileMode?> onModeFilterChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -312,6 +349,8 @@ class _HomeDesktopLayout extends StatelessWidget {
                     store: store,
                     onCreateConversation: onCreateConversation,
                     onCreateRoom: onCreateRoom,
+                    modeFilter: modeFilter,
+                    onFilterChanged: onModeFilterChanged,
                   ),
                 ),
                 const SizedBox(width: 32),
@@ -475,6 +514,8 @@ class _HomeInboxPanel extends StatelessWidget {
     this.categories,
     this.selectedCategory,
     this.onCategorySelected,
+    required this.modeFilter,
+    required this.onFilterChanged,
   });
 
   final Store<AppState> store;
@@ -483,6 +524,8 @@ class _HomeInboxPanel extends StatelessWidget {
   final List<String>? categories;
   final int? selectedCategory;
   final ValueChanged<int>? onCategorySelected;
+  final ProfileMode? modeFilter;
+  final ValueChanged<ProfileMode?> onFilterChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -536,6 +579,11 @@ class _HomeInboxPanel extends StatelessWidget {
               contentPadding: const EdgeInsets.symmetric(vertical: 0),
             ),
           ),
+          const SizedBox(height: 16),
+          ProfileModeSwitcher(
+            onFilterChanged: onFilterChanged,
+            initialFilter: modeFilter,
+          ),
           if (categories != null &&
               selectedCategory != null &&
               onCategorySelected != null) ...[
@@ -580,6 +628,7 @@ class _HomeInboxPanel extends StatelessWidget {
                       context: context,
                       conversations: store.state.teamState?.conversations ?? [],
                       store: store,
+                      modeFilter: modeFilter,
                     ),
                   ],
                 ),

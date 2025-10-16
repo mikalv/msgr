@@ -29,12 +29,18 @@ class ProfileRepository extends BaseRepository<Profile> {
         Profile(
           id: 'system',
           username: 'system',
+          name: 'Msgr System',
+          slug: 'system',
           uid: 'system',
-          updatedAt: DateTime.now(),
-          createdAt: DateTime.now(),
+          mode: ProfileMode.work,
+          updatedAt: DateTime.now().toUtc(),
+          createdAt: DateTime.now().toUtc(),
           firstName: 'Msgr',
           lastName: 'System',
           roles: const [],
+          theme: const ProfileThemePreferences(),
+          notificationPolicy: const ProfileNotificationPolicy(),
+          securityPolicy: const ProfileSecurityPolicy(),
         ),
       );
     }
