@@ -81,6 +81,7 @@ graph LR
 * **Key Directory**: offentlig nøkkelinfo per konto/profil/enhet, attestasjonslogg.
 * **Gateways**: Slack‑webhook inn, Telegram‑bot, (senere DMA‑broer).
 * **Notif**: APNS/FCM; privacy‑bevisst payload (ingen innhold).
+* **Metrics Pipeline**: Telemetry‑handlere i Elixir som oversetter latens, leveringsrate og appstart-data til dashboards.
 
 ## 5. Sikkerhetsmodell (kort)
 
@@ -179,6 +180,30 @@ sequenceDiagram
 * PG→Citus sharding for messages; kaldt arkiv i egen cluster.
 * Media livssyklus (hot→warm→cold); dedup; CDN (EU‑edge).
 * Gateway‑arbeidere horisontalt; WS‑noder med sticky‑sessions.
+
+## 10. Profilnøkkel- og backuparkitektur
+
+* **Per-profil nøkkellager**: `profile_keys` lagrer fingerprint, krypteringsmetadata og klient-snapshotversjon. API-et `Messngr.Accounts.KeyStore` roterer og oppdaterer fingerprint som klienten kan speile.
+* **Backup-koder**: `profile_backup_codes` inneholder HMAC-saltede koder som kun deles én gang. Klienten lagrer plaintext sikkert for senere gjenoppretting.
+* **Klientpersistens**: Flutter lagrer `clientState` (fingerprint + snapshotversjon) fra opplastingsinstruksjonene slik at den vet når nøkler må rehydreres.
+
+## 11. Push-varsler og moduspåvirkning
+
+* **Token-registrering**: `Messngr.Notifications.register_push_token/2` persisterer FCM/APNs-tokens med modus og metadata i `device_push_tokens`.
+* **Policy-evaluering**: `Messngr.Notifications.PushDispatcher` sjekker profilens `notification_policy` (quiet hours, allow_push) og modus (Privat/Jobb/Familie) før leveranse.
+* **Adaptere**: Standard log-adapter, men grensesnittet kan byttes til FCM/APNs. Familie-modus hever prioritet, Jobb-modus leverer stille bakgrunnsvarsler.
+
+## 12. Media-opplasting og fremtidig kryptering
+
+* **Presigned URL**: Backend returnerer PUT/GET-instruksjon med `encryption`-placeholders (strategi, ciphertext-/nonce-feltnavn) og `clientState` for nøkkelsynk.
+* **Flutter-støtte**: Uploaderen inkluderer `encryption` og `clientState` både i metadata og top-level på meldingen for å forberede lokal caching og avspilling.
+* **Backend-payload**: `Media.consume_upload/4` legger på samme metadata i chatmeldingen slik at mottakere vet hvilken nøkkelversjon som kreves for dekryptering.
+
+## 13. Metrics-pipeline
+
+* **Telemetry-events**: `Messngr.Metrics.Pipeline.emit_*` standardiserer latens (ms), leveringsrate, appstart og composer-render.
+* **Reporter**: Standard logger (`Messngr.Metrics.Reporter.Log`), men kan byttes til Prometheus/OTel. Handlere regner ut `success_rate` før rapportering.
+* **Dashboards**: Pipeline gir enhetlige datastrømmer for Grafana med latens- og leveringspaneler samt appstart/composer-ytelse.
 
 ---
 

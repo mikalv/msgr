@@ -64,6 +64,18 @@ class ThumbnailUploadInfo {
           DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'method': method,
+      'url': url.toString(),
+      'headers': headers,
+      'bucket': bucket,
+      'objectKey': objectKey,
+      'publicUrl': publicUrl.toString(),
+      'expiresAt': expiresAt.toIso8601String(),
+    };
+  }
 }
 
 class PresignedUploadInfo {
@@ -77,6 +89,8 @@ class PresignedUploadInfo {
     required this.expiresAt,
     this.retentionExpiresAt,
     this.thumbnail,
+    required this.encryption,
+    required this.clientState,
   });
 
   final String method;
@@ -88,6 +102,8 @@ class PresignedUploadInfo {
   final DateTime expiresAt;
   final DateTime? retentionExpiresAt;
   final ThumbnailUploadInfo? thumbnail;
+  final UploadEncryptionDescriptor encryption;
+  final UploadClientState clientState;
 
   factory PresignedUploadInfo.fromJson(Map<String, dynamic> json) {
     final thumbnail = json['thumbnail_upload'] ?? json['thumbnailUpload'];
@@ -111,7 +127,30 @@ class PresignedUploadInfo {
       thumbnail: thumbnail is Map<String, dynamic>
           ? ThumbnailUploadInfo.fromJson(thumbnail)
           : null,
+      encryption: UploadEncryptionDescriptor.fromJson(
+          json['encryption'] as Map<String, dynamic>? ?? const {}),
+      clientState: UploadClientState.fromJson(
+          json['client_state'] as Map<String, dynamic>? ??
+              json['clientState'] as Map<String, dynamic>? ??
+              const {}),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'method': method,
+      'url': url.toString(),
+      'headers': headers,
+      'bucket': bucket,
+      'objectKey': objectKey,
+      'publicUrl': publicUrl.toString(),
+      'expiresAt': expiresAt.toIso8601String(),
+      if (retentionExpiresAt != null)
+        'retentionExpiresAt': retentionExpiresAt!.toIso8601String(),
+      'encryption': encryption.toJson(),
+      'clientState': clientState.toJson(),
+      if (thumbnail != null) 'thumbnail': thumbnail!.toJson(),
+    };
   }
 }
 
@@ -141,6 +180,67 @@ class MediaUploadSession {
       instructions: PresignedUploadInfo.fromJson(
           json['upload'] as Map<String, dynamic>? ?? const {}),
     );
+  }
+}
+
+class UploadEncryptionDescriptor {
+  const UploadEncryptionDescriptor({
+    required this.strategy,
+    required this.cipher,
+    required this.kmsKeyAlias,
+    required this.placeholders,
+  });
+
+  final String strategy;
+  final String cipher;
+  final String kmsKeyAlias;
+  final Map<String, dynamic> placeholders;
+
+  factory UploadEncryptionDescriptor.fromJson(Map<String, dynamic> json) {
+    return UploadEncryptionDescriptor(
+      strategy: json['strategy'] as String? ?? 'profile-enveloped',
+      cipher: json['cipher'] as String? ?? 'aes-256-gcm',
+      kmsKeyAlias: json['kmsKeyAlias'] as String? ?? json['kms_key_alias'] as String? ?? '',
+      placeholders: json['placeholders'] as Map<String, dynamic>? ?? const {},
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'strategy': strategy,
+      'cipher': cipher,
+      'kmsKeyAlias': kmsKeyAlias,
+      'placeholders': placeholders,
+    };
+  }
+}
+
+class UploadClientState {
+  const UploadClientState({
+    required this.profileId,
+    required this.profileKeyFingerprint,
+    required this.clientSnapshotVersion,
+  });
+
+  final String profileId;
+  final String? profileKeyFingerprint;
+  final int clientSnapshotVersion;
+
+  factory UploadClientState.fromJson(Map<String, dynamic> json) {
+    return UploadClientState(
+      profileId: json['profileId'] as String? ?? '',
+      profileKeyFingerprint: json['profileKeyFingerprint'] as String?,
+      clientSnapshotVersion:
+          (json['clientSnapshotVersion'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'profileId': profileId,
+      'profileKeyFingerprint': profileKeyFingerprint,
+      'clientSnapshotVersion': clientSnapshotVersion,
+    };
   }
 }
 

@@ -60,6 +60,10 @@ class ChatMediaUploader {
       'contentType': contentType,
       'byteSize': bytes.length,
     };
+    final encryption = session.instructions.encryption.toJson();
+    final clientState = session.instructions.clientState.toJson();
+    metadata['encryption'] = encryption;
+    metadata['clientState'] = clientState;
 
     final trimmedCaption = caption?.trim();
     if (trimmedCaption != null && trimmedCaption.isNotEmpty) {
@@ -113,6 +117,8 @@ class ChatMediaUploader {
       if (trimmedCaption != null && trimmedCaption.isNotEmpty)
         'body': trimmedCaption,
       'media': metadata,
+      'encryption': encryption,
+      'clientState': clientState,
     };
 
     return MediaUploadResult(kind: kind, message: message);
@@ -145,6 +151,10 @@ class ChatMediaUploader {
       'contentType': contentType,
       'byteSize': bytes.length,
     };
+    final encryption = session.instructions.encryption.toJson();
+    final clientState = session.instructions.clientState.toJson();
+    metadata['encryption'] = encryption;
+    metadata['clientState'] = clientState;
 
     if (trimmedCaption != null && trimmedCaption.isNotEmpty) {
       metadata['caption'] = trimmedCaption;
@@ -155,6 +165,8 @@ class ChatMediaUploader {
       if (trimmedCaption != null && trimmedCaption.isNotEmpty)
         'body': trimmedCaption,
       'media': metadata,
+      'encryption': encryption,
+      'clientState': clientState,
     };
 
     return MediaUploadResult(kind: 'voice', message: message);
