@@ -11,7 +11,8 @@ defmodule Messngr.Bridges.Auth.CredentialInbox do
   @default_ttl 300
 
   @spec put(String.t(), map(), keyword()) :: :ok | {:error, term()}
-  def put(session_id, payload, opts \\ []) when is_binary(session_id) and is_map(payload) do
+  def put(session_id, payload, opts \\ [])
+  def put(session_id, payload, opts) when is_binary(session_id) and is_map(payload) do
     ensure_table!()
 
     ttl = Keyword.get(opts, :ttl, @default_ttl)

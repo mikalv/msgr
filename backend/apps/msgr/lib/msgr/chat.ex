@@ -13,7 +13,6 @@ defmodule Messngr.Chat do
     Message,
     MessageReaction,
     MessageReceipt,
-    MessageThread,
     Participant,
     PinnedMessage
   }
@@ -436,7 +435,7 @@ defmodule Messngr.Chat do
 
   defp clamp_limit(_value), do: @default_limit
 
-  defp list_messages_before(conversation_id, before_id, limit)
+  defp list_messages_before(_conversation_id, _before_id, limit)
        when is_integer(limit) and limit <= 0 do
     empty_page()
   end
@@ -465,7 +464,7 @@ defmodule Messngr.Chat do
     %{entries: entries, meta: build_meta(conversation_id, entries, pivot, :before, has_more_before)}
   end
 
-  defp list_messages_after(conversation_id, after_id, limit)
+  defp list_messages_after(_conversation_id, _after_id, limit)
        when is_integer(limit) and limit <= 0 do
     empty_page()
   end
@@ -572,28 +571,28 @@ defmodule Messngr.Chat do
   end
 
   defp build_meta(conversation_id, entries, pivot, :before, has_more_before) do
-    first = List.first(entries) || pivot
-    last = List.last(entries) || pivot
+    first_entry = List.first(entries) || pivot
+    last_entry = List.last(entries) || pivot
 
     %{
-      start_cursor: cursor_id(List.first(entries)),
-      end_cursor: cursor_id(List.last(entries)),
+      start_cursor: cursor_id(first_entry),
+      end_cursor: cursor_id(last_entry),
       has_more: %{
         before: has_more_before,
-        after: has_more(conversation_id, last, :after)
+        after: has_more(conversation_id, last_entry, :after)
       }
     }
   end
 
   defp build_meta(conversation_id, entries, pivot, :after, has_more_after) do
-    first = List.first(entries) || pivot
-    last = List.last(entries) || pivot
+    first_entry = List.first(entries) || pivot
+    last_entry = List.last(entries) || pivot
 
     %{
-      start_cursor: cursor_id(List.first(entries)),
-      end_cursor: cursor_id(List.last(entries)),
+      start_cursor: cursor_id(first_entry),
+      end_cursor: cursor_id(last_entry),
       has_more: %{
-        before: has_more(conversation_id, first, :before),
+        before: has_more(conversation_id, first_entry, :before),
         after: has_more_after
       }
     }
@@ -1290,8 +1289,8 @@ defmodule Messngr.Chat do
         _ -> nil
       end
 
-    normalized_thumbnail = normalize_thumbnail(media)
-    normalized_waveform = normalize_waveform(media)
+    normalized_thumbnail = normalize_thumbnail_from_media(media)
+    normalized_waveform = normalize_waveform_from_media(media)
 
     media =
       media
@@ -1305,7 +1304,7 @@ defmodule Messngr.Chat do
     |> maybe_put_media_body(kind, normalized_caption)
   end
 
-  defp normalize_thumbnail(media) do
+  defp normalize_thumbnail_from_media(media) do
     thumb = media["thumbnail"] || media["thumbnailUrl"]
 
     cond do
@@ -1328,18 +1327,22 @@ defmodule Messngr.Chat do
     end
   end
 
-  defp normalize_waveform(media) do
+  defp normalize_waveform_from_media(media) do
     wave = media["waveform"] || media["waveForm"]
 
-    cond do
-      is_list(wave) -> Enum.map(wave, &normalize_waveform_point/1)
-      true -> nil
+    case wave do
+      list when is_list(list) ->
+        list
+        |> Enum.map(&normalize_waveform_media_point/1)
+        |> Enum.reject(&is_nil/1)
+
+      _ ->
+        nil
     end
   end
 
-  defp normalize_waveform_point(value) when is_number(value), do: clamp(round(value), 0, 100)
-
-  defp normalize_waveform_point(_), do: nil
+  defp normalize_waveform_media_point(value) when is_number(value), do: clamp(round(value), 0, 100)
+  defp normalize_waveform_media_point(_), do: nil
 
   defp maybe_put_waveform(media, nil), do: Map.delete(media, "waveform")
 
@@ -1382,8 +1385,8 @@ defmodule Messngr.Chat do
     end
   end
 
-  defp clamp(value, min, max) when value < min, do: min
-  defp clamp(value, min, max) when value > max, do: max
+  defp clamp(value, min, _max) when value < min, do: min
+  defp clamp(value, _min, max) when value > max, do: max
   defp clamp(value, _min, _max), do: value
 
   defp merge_payload(base, nil), do: base || %{}

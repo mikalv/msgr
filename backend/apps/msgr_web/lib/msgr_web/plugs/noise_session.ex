@@ -127,13 +127,22 @@ defmodule MessngrWeb.Plugs.NoiseSession do
     |> get_req_header("authorization")
     |> List.first()
     |> case do
-      "Noise " <> token when MapSet.member?(allowed_schemes, :noise) ->
-        normalize_token(token, :authorization)
+      "Noise " <> token ->
+        if MapSet.member?(allowed_schemes, :noise) do
+          normalize_token(token, :authorization)
+        else
+          :error
+        end
 
-      "Bearer " <> token when MapSet.member?(allowed_schemes, :bearer) ->
-        normalize_token(token, :authorization)
+      "Bearer " <> token ->
+        if MapSet.member?(allowed_schemes, :bearer) do
+          normalize_token(token, :authorization)
+        else
+          :error
+        end
 
-      _ -> :error
+      _ ->
+        :error
     end
   end
 

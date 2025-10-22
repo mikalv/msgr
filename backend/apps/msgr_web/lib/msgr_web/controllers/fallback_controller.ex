@@ -4,8 +4,8 @@ defmodule MessngrWeb.FallbackController do
   def call(conn, {:error, %Ecto.Changeset{} = changeset}) do
     conn
     |> put_status(:unprocessable_entity)
-    |> put_view(json: MessngrWeb.ErrorJSON)
-    |> render(MessngrWeb.ErrorJSON, "422.json", changeset: changeset)
+    |> put_view(MessngrWeb.ErrorJSON)
+    |> render("422.json", changeset: changeset)
   end
 
   def call(conn, {:error, :not_found}) do

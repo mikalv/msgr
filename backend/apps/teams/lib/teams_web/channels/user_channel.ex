@@ -19,6 +19,7 @@ defmodule TeamsWeb.UserChannel do
     end
   end
 
+  @impl true
   def handle_info(:after_join, socket) do
     tenant = socket.assigns[:tenant]
     uid = socket.assigns[:uid]

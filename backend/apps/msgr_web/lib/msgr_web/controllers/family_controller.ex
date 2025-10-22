@@ -24,6 +24,8 @@ defmodule MessngrWeb.FamilyController do
     end
   end
 
+  def create(_conn, _params), do: {:error, :bad_request}
+
   def show(conn, %{"id" => family_id}) do
     current_profile = conn.assigns.current_profile
 
@@ -34,6 +36,4 @@ defmodule MessngrWeb.FamilyController do
   rescue
     Ecto.NoResultsError -> {:error, :forbidden}
   end
-
-  def create(_conn, _params), do: {:error, :bad_request}
 end

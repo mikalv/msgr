@@ -2,7 +2,7 @@ defmodule TeamsWeb.Subdomain.InvitationController do
   use TeamsWeb, :controller
   require Logger
   import Plug.Conn
-  alias Teams.TenantModels.Invitation
+  alias Teams.TenantModels.{Invitation, Profile}
 
   def filter_invitation_for_json(inv), do: Map.drop(Map.from_struct(inv), [:__meta__, :updated_at, :inserted_at, :metadata])
 
@@ -14,12 +14,14 @@ defmodule TeamsWeb.Subdomain.InvitationController do
     {tenant, profile}
   end
 
-  def list(conn, params) do
-    {tenant, profile} = get_authed_context(conn)
+  def list(conn, _params) do
+    {_tenant, _profile} = get_authed_context(conn)
+    conn |> send_resp(501, Jason.encode!(%{error: "not_implemented"}))
   end
 
-  def get(conn, params) do
-    {tenant, profile} = get_authed_context(conn)
+  def get(conn, _params) do
+    {_tenant, _profile} = get_authed_context(conn)
+    conn |> send_resp(501, Jason.encode!(%{error: "not_implemented"}))
   end
 
   def create(conn, params) do
@@ -40,13 +42,15 @@ defmodule TeamsWeb.Subdomain.InvitationController do
       end
     else
       conn
-        |> send_resp(401, Jason.encode!(%{"error": "You don't have the roles or permission to create a new invitation!"}))
+      |> send_resp(401, Jason.encode!(%{error: "You don't have the roles or permission to create a new invitation!"}))
     end
   end
 
-  def update() do
+  def update(conn, _params) do
+    conn |> send_resp(405, Jason.encode!(%{error: "method_not_allowed"}))
   end
 
-  def delete() do
+  def delete(conn, _params) do
+    conn |> send_resp(405, Jason.encode!(%{error: "method_not_allowed"}))
   end
 end

@@ -146,7 +146,7 @@ defmodule Messngr.Auth do
           | {:error, term()}
   def switch_profile(encoded_token, account_id, profile_id, opts \\ []) do
     with {:ok, raw_token} <- SessionStore.decode_token(encoded_token),
-         {:ok, session, %NoiseActor{} = actor} <- SessionStore.fetch(raw_token, opts),
+         {:ok, _session, %NoiseActor{} = actor} <- SessionStore.fetch(raw_token, opts),
          :ok <- ensure_actor_account(actor, account_id),
          {:ok, profile} <- Accounts.ensure_profile_for_account(account_id, profile_id),
          {:ok, device} <- maybe_reassign_device(actor, profile),

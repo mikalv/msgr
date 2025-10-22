@@ -3,7 +3,7 @@ defmodule TeamsWeb.Subdomain.RoomsController do
   require Logger
   import Plug.Conn
   alias Teams.TenantModels.{Profile, Room}
-  alias TeamsWeb.MiddleLayer.RoomLayer
+  alias TeamsWeb.MiddleLayers.RoomLayer
 
   def filter_room_for_json(room), do: Map.drop(Map.from_struct(room), [:__meta__, :updated_at, :inserted_at, :metadata])
 
@@ -15,9 +15,10 @@ defmodule TeamsWeb.Subdomain.RoomsController do
     {tenant, profile}
   end
 
-  def list(conn, params) do
+  def list(conn, _params) do
     {tenant, profile} = get_authed_context(conn)
-    Room.list_with_me(tenant, profile)
+    rooms = Room.list_with_me(tenant, profile) |> Enum.map(&filter_room_for_json/1)
+    conn |> send_resp(200, Jason.encode!(rooms))
   end
 
   def create(conn, params) do
@@ -31,65 +32,65 @@ defmodule TeamsWeb.Subdomain.RoomsController do
 
       {:error, err} ->
         Logger.error "Error while trying to create room: #{inspect err}"
-        conn |> send_resp(500, Jason.encode!(%{"error": "Sorry! try again later"}))
+        conn |> send_resp(500, Jason.encode!(%{error: "Sorry! try again later"}))
 
       {:permission_error, err} ->
-        conn |> send_resp(401, Jason.encode!(%{"error": "You don't have the roles or permission to create a new room! (#{err})"}))
+        conn |> send_resp(401, Jason.encode!(%{error: "You don't have the roles or permission to create a new room! (#{err})"}))
     end
   end
 
-  def update(conn, params) do
-    {tenant, profile} = get_authed_context(conn)
-    room_id = params["room_id"]
+  def update(conn, _params) do
+    {_tenant, _profile} = get_authed_context(conn)
+    conn |> send_resp(405, Jason.encode!(%{error: "method_not_allowed"}))
   end
 
-  def get(conn, params) do
-    {tenant, profile} = get_authed_context(conn)
-    room_id = params["room_id"]
+  def get(conn, _params) do
+    {_tenant, _profile} = get_authed_context(conn)
+    conn |> send_resp(501, Jason.encode!(%{error: "not_implemented"}))
   end
 
-  def delete(conn, params) do
-    {tenant, profile} = get_authed_context(conn)
-    room_id = params["room_id"]
+  def delete(conn, _params) do
+    {_tenant, _profile} = get_authed_context(conn)
+    conn |> send_resp(405, Jason.encode!(%{error: "method_not_allowed"}))
   end
 
-  def history(conn, params) do
-    {tenant, profile} = get_authed_context(conn)
-    room_id = params["room_id"]
+  def history(conn, _params) do
+    {_tenant, _profile} = get_authed_context(conn)
+    conn |> send_resp(501, Jason.encode!(%{error: "not_implemented"}))
   end
 
-  def close(conn, params) do
-    {tenant, profile} = get_authed_context(conn)
-    room_id = params["room_id"]
+  def close(conn, _params) do
+    {_tenant, _profile} = get_authed_context(conn)
+    conn |> send_resp(501, Jason.encode!(%{error: "not_implemented"}))
   end
 
-  def join(conn, params) do
-    {tenant, profile} = get_authed_context(conn)
-    room_id = params["room_id"]
+  def join(conn, _params) do
+    {_tenant, _profile} = get_authed_context(conn)
+    conn |> send_resp(501, Jason.encode!(%{error: "not_implemented"}))
   end
 
-  def kick(conn, params) do
-    {tenant, profile} = get_authed_context(conn)
-    room_id = params["room_id"]
+  def kick(conn, _params) do
+    {_tenant, _profile} = get_authed_context(conn)
+    conn |> send_resp(501, Jason.encode!(%{error: "not_implemented"}))
   end
 
-  def leave(conn, params) do
-    {tenant, profile} = get_authed_context(conn)
-    room_id = params["room_id"]
+  def leave(conn, _params) do
+    {_tenant, _profile} = get_authed_context(conn)
+    conn |> send_resp(501, Jason.encode!(%{error: "not_implemented"}))
   end
 
-  def members(conn, params) do
-    {tenant, profile} = get_authed_context(conn)
-    room_id = params["room_id"]
+  def members(conn, _params) do
+    {_tenant, _profile} = get_authed_context(conn)
+    conn |> send_resp(501, Jason.encode!(%{error: "not_implemented"}))
   end
 
-  def replies(conn, params) do
-    {tenant, profile} = get_authed_context(conn)
-    room_id = params["room_id"]
+  def replies(conn, _params) do
+    {_tenant, _profile} = get_authed_context(conn)
+    conn |> send_resp(501, Jason.encode!(%{error: "not_implemented"}))
   end
 
-  def invite(conn, params) do
-    {tenant, profile} = get_authed_context(conn)
-    room_id = params["room_id"]
+  def invite(conn, _params) do
+    {_tenant, _profile} = get_authed_context(conn)
+    conn |> send_resp(501, Jason.encode!(%{error: "not_implemented"}))
   end
 end

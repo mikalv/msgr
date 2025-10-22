@@ -144,7 +144,8 @@ defmodule Messngr.Bridges.HealthReporter do
 
   defp emit_metrics(_name, _snapshot, _metadata), do: :ok
 
-  defp fetch(data, key, default \\ nil) when is_map(data) do
+  defp fetch(data, key, default \\ nil)
+  defp fetch(data, key, default) when is_map(data) do
     Map.get(data, key, Map.get(data, to_string(key), default))
   end
 

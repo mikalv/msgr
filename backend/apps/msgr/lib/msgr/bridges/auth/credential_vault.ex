@@ -12,6 +12,7 @@ defmodule Messngr.Bridges.Auth.CredentialVault do
   @spec store_tokens(String.t() | atom(), String.t(), map(), keyword()) ::
           {:ok, String.t()} | {:error, term()}
   def store_tokens(service, session_id, tokens, opts \\ [])
+  def store_tokens(service, session_id, tokens, opts)
       when is_map(tokens) and (is_binary(service) or is_atom(service)) and is_binary(session_id) do
     ensure_table!()
 

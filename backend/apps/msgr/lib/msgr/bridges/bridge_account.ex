@@ -12,7 +12,7 @@ defmodule Messngr.Bridges.BridgeAccount do
   import Ecto.Changeset
 
   alias Messngr.Accounts.Account
-  alias Messngr.Bridges.{BridgeChannel, BridgeContact}
+  alias Messngr.Bridges.{Channel, Contact}
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -28,8 +28,8 @@ defmodule Messngr.Bridges.BridgeAccount do
     field :last_synced_at, :utc_datetime
 
     belongs_to :account, Account
-    has_many :contacts, BridgeContact, preload_order: [asc: :display_name]
-    has_many :channels, BridgeChannel, preload_order: [asc: :name]
+    has_many :contacts, Contact, preload_order: [asc: :display_name]
+    has_many :channels, Channel, preload_order: [asc: :name]
 
     timestamps(type: :utc_datetime)
   end

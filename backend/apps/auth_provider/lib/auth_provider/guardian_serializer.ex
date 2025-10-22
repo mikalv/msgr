@@ -1,5 +1,4 @@
 defmodule AuthProvider.GuardianSerializer do
-  @behaviour Guardian.Serializer
   alias AuthProvider.Repo
   alias AuthProvider.Account.User
   def for_token(user = %User{}), do: { :ok, "uid:#{user.id}" }

@@ -6,7 +6,7 @@ defmodule Teams.SecureID do
     time = (System.os_time(:millisecond) - (@epoch*1000))
     tid = Integer.to_string(time, 16)
     encID = Hashids.encode(@quick_opts, intID)
-    "M:#{tid}:#{encID}"
+    "#{prefix}:#{tid}:#{encID}"
   end
 
   def revert_id!(encID) do

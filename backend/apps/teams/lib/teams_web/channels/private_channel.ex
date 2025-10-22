@@ -10,7 +10,7 @@ defmodule TeamsWeb.PrivateChannel do
     end
   end
 
-  def handle_in("file_chunk", {:binary, chunk}, socket) do
+  def handle_in("file_chunk", {:binary, _chunk}, socket) do
     {:reply, :ok, socket}
   end
 

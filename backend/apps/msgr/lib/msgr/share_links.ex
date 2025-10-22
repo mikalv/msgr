@@ -56,7 +56,8 @@ defmodule Messngr.ShareLinks do
   """
   @spec create_bridge_link(BridgeAccount.t(), atom() | String.t(), map()) ::
           {:ok, ShareLink.t()} | {:error, term()}
-  def create_bridge_link(%BridgeAccount{} = bridge_account, kind, attrs \\ %{}) do
+  def create_bridge_link(bridge_account, kind, attrs \\ %{})
+  def create_bridge_link(%BridgeAccount{} = bridge_account, kind, attrs) do
     params =
       attrs
       |> normalise_attrs()
@@ -74,11 +75,14 @@ defmodule Messngr.ShareLinks do
   defp maybe_attach_profile(params, %BridgeAccount{} = bridge_account, attrs) do
     attrs = normalise_attrs(attrs)
     profile_id = Map.get(attrs, :profile_id)
+    account_profile_id =
+      bridge_account
+      |> Map.from_struct()
+      |> Map.get(:profile_id)
 
     cond do
       is_binary(profile_id) -> Map.put(params, :profile_id, profile_id)
-      Map.has_key?(bridge_account, :profile_id) && bridge_account.profile_id ->
-        Map.put(params, :profile_id, bridge_account.profile_id)
+      is_binary(account_profile_id) -> Map.put(params, :profile_id, account_profile_id)
 
       true ->
         params

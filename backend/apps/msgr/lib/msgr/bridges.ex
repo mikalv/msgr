@@ -234,9 +234,6 @@ defmodule Messngr.Bridges do
     |> ensure_list()
   end
 
-  defp ensure_map(value) when is_map(value), do: value
-  defp ensure_map(_), do: %{}
-
   defp ensure_list(value) when is_list(value), do: value
   defp ensure_list(value) when is_nil(value), do: []
   defp ensure_list(_), do: []

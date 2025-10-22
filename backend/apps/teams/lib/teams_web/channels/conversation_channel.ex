@@ -1,6 +1,8 @@
 defmodule TeamsWeb.ConversationChannel do
   use TeamsWeb, :channel
 
+  alias Teams.TenantModels.Message
+
   @impl true
   def join("conversation:lobby", payload, socket) do
     if authorized?(payload) do
@@ -37,7 +39,6 @@ defmodule TeamsWeb.ConversationChannel do
   end
 
 
-  defp filter_room_for_json(room), do: Map.drop(Map.from_struct(room), [:__meta__])
   defp filter_msg_for_json(msg), do: Map.drop(Map.from_struct(msg), [:__meta__, :id, :metadata, :room, :conversation, :profile, :parent, :children])
 
 

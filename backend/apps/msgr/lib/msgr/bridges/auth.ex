@@ -323,7 +323,8 @@ defmodule Messngr.Bridges.Auth do
   """
   @spec start_session(Account.t() | Ecto.UUID.t(), String.t(), map()) ::
           {:ok, AuthSession.t()} | {:error, term()}
-  def start_session(%Account{id: account_id}, connector_id, attrs \\ %{}) do
+  def start_session(account, connector_id, attrs \\ %{})
+  def start_session(%Account{id: account_id}, connector_id, attrs) do
     start_session(account_id, connector_id, attrs)
   end
 

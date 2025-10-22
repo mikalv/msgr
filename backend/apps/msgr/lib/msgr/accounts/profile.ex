@@ -290,8 +290,12 @@ defmodule Messngr.Accounts.Profile do
 
   defp validate_required_hex(errors, map, key) do
     case Map.fetch(map, key) do
-      {:ok, value} when is_binary(value) and Regex.match?(~r/^#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/, value) ->
-        errors
+      {:ok, value} when is_binary(value) ->
+        if Regex.match?(~r/^#?(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/, value) do
+          errors
+        else
+          [{String.to_atom(key), "must be a hex colour (e.g. #AABBCC)"} | errors]
+        end
 
       {:ok, _} -> [{String.to_atom(key), "must be a hex colour (e.g. #AABBCC)"} | errors]
       :error -> [{String.to_atom(key), "is required"} | errors]
@@ -300,11 +304,14 @@ defmodule Messngr.Accounts.Profile do
 
   defp validate_inclusion(errors, map, key, allowed, message) do
     case Map.fetch(map, key) do
-      {:ok, value} when is_binary(value) and MapSet.member?(allowed, String.downcase(value)) ->
-        errors
+      {:ok, value} when is_binary(value) ->
+        downcased = String.downcase(value)
 
-      {:ok, value} when is_binary(value) and MapSet.member?(allowed, value) ->
-        errors
+        cond do
+          MapSet.member?(allowed, downcased) -> errors
+          MapSet.member?(allowed, value) -> errors
+          true -> [{String.to_atom(key), message} | errors]
+        end
 
       {:ok, _} -> [{String.to_atom(key), message} | errors]
       :error -> errors
@@ -313,10 +320,21 @@ defmodule Messngr.Accounts.Profile do
 
   defp validate_string(errors, map, key) do
     case Map.fetch(map, key) do
-      {:ok, value} when is_binary(value) and String.trim(value) != "" -> errors
-      {:ok, nil} -> errors
-      {:ok, _} -> [{String.to_atom(key), "must be a string"} | errors]
-      :error -> errors
+      {:ok, value} when is_binary(value) ->
+        if String.trim(value) != "" do
+          errors
+        else
+          [{String.to_atom(key), "must be a string"} | errors]
+        end
+
+      {:ok, nil} ->
+        errors
+
+      {:ok, _} ->
+        [{String.to_atom(key), "must be a string"} | errors]
+
+      :error ->
+        errors
     end
   end
 
@@ -324,11 +342,18 @@ defmodule Messngr.Accounts.Profile do
     trimmed_key = key |> String.split(".") |> List.last()
 
     case Map.fetch(map, trimmed_key) do
-      {:ok, value} when is_binary(value) and Regex.match?(~r/^(?:[01]\d|2[0-3]):[0-5]\d$/, value) ->
-        errors
+      {:ok, value} when is_binary(value) ->
+        if Regex.match?(~r/^(?:[01]\d|2[0-3]):[0-5]\d$/, value) do
+          errors
+        else
+          [{String.to_atom(key), "must be HH:MM"} | errors]
+        end
 
-      {:ok, _} -> [{String.to_atom(key), "must be HH:MM"} | errors]
-      :error -> errors
+      {:ok, _} ->
+        [{String.to_atom(key), "must be HH:MM"} | errors]
+
+      :error ->
+        errors
     end
   end
 

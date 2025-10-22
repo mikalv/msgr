@@ -52,9 +52,13 @@ defmodule Messngr.Application do
 
   defp maybe_bridge_health_child do
     case Application.get_env(:msgr, :bridge_health_reporter) do
-      opts when is_list(opts) and Keyword.get(opts, :enabled, false) ->
-        reporter_opts = Keyword.drop(opts, [:enabled])
-        [{Messngr.Bridges.HealthReporter, reporter_opts}]
+      opts when is_list(opts) ->
+        if Keyword.get(opts, :enabled, false) do
+          reporter_opts = Keyword.drop(opts, [:enabled])
+          [{Messngr.Bridges.HealthReporter, reporter_opts}]
+        else
+          []
+        end
 
       _other ->
         []

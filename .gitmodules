@@ -4,3 +4,6 @@
 [submodule "async_redux"]
   path = flutter_frontend/packages/async_redux
   url = https://github.com/marcglasberg/async_redux.git
+[submodule "wire-server"]
+	path = wire-server
+	url = https://github.com/wireapp/wire-server.git

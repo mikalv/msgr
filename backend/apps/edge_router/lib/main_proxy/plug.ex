@@ -14,7 +14,7 @@ defmodule MainProxy.Plug do
     #options = backends()
 
     backend = choose_backend(conn, backends)
-    #log_request("Backend chosen: #{inspect(backend)}")
+    log_request("Backend chosen: #{inspect(backend)}")
 
     case backend do
       %{phoenix_endpoint: phoenix_endpoint} -> phoenix_endpoint.call(conn, [])

@@ -14,7 +14,7 @@ defmodule TeamsWeb.Subdomain.ProfileController do
     {tenant, profile}
   end
 
-  def list(conn, params) do
+  def list(conn, _params) do
     tenant = conn.private[:subdomain]
     everyone = Profile.list(tenant) |> Enum.map(fn x -> filter_profile_for_json(x) end)
     conn
@@ -36,7 +36,7 @@ defmodule TeamsWeb.Subdomain.ProfileController do
     else
       Logger.warning "Found profile from before: #{inspect profile}"
       conn
-        |> send_resp(400, Jason.encode!(%{"error": "does already exist!"}))
+        |> send_resp(400, Jason.encode!(%{error: "does already exist!"}))
     end
   end
 
@@ -50,8 +50,8 @@ defmodule TeamsWeb.Subdomain.ProfileController do
         actual_update(conn, tenant, profile_id, params)
       else
         conn
-          |> send_resp(401, Jason.encode!(%{"error": "You're not allowed to update someone else's profile!"}))
-          |> halt()
+        |> send_resp(401, Jason.encode!(%{error: "You're not allowed to update someone else's profile!"}))
+        |> halt()
       end
     end
   end
@@ -63,8 +63,8 @@ defmodule TeamsWeb.Subdomain.ProfileController do
     conn |> send_resp(200, Jason.encode!(profile))
   end
 
-  def delete(conn, params) do
-    #
+  def delete(conn, _params) do
+    conn |> send_resp(405, Jason.encode!(%{error: "method_not_allowed"}))
   end
 
   defp actual_update(conn, tenant, profile_id, params) do

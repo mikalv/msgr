@@ -149,7 +149,7 @@ defmodule MessngrWeb.AIController do
     |> halt()
   end
 
-  defp handle_ai_error(conn, other) when is_atom(other) do
+  defp handle_ai_error(_conn, other) when is_atom(other) do
     {:error, other}
   end
 

@@ -2,7 +2,6 @@ defmodule MessngrWeb.NoiseHandshakeController do
   use MessngrWeb, :controller
 
   alias Messngr.Noise.DevHandshake
-  alias Messngr.Transport.Noise.Session
 
   action_fallback MessngrWeb.FallbackController
 

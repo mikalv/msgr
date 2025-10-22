@@ -13,7 +13,7 @@ defmodule Messngr.Bridges.Auth.Providers.Mock do
   alias Messngr.Bridges.AuthSession
 
   @impl true
-  def authorization_url(%AuthSession{} = session, state, opts) do
+  def authorization_url(%AuthSession{} = _session, state, opts) do
     callback_path = Keyword.fetch!(opts, :callback_path)
     code_challenge = Keyword.get(opts, :code_challenge)
 

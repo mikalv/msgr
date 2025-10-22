@@ -20,9 +20,9 @@ defmodule Messngr.Bridges.ContactProfile do
     field :canonical_name, :string
     field :metadata, :map, default: %{}
 
-    has_many :contacts, Contact
-    has_many :keys, ContactProfileKey
-    has_many :links, ProfileLink
+    has_many :contacts, Contact, foreign_key: :profile_id
+    has_many :keys, ContactProfileKey, foreign_key: :profile_id
+    has_many :links, ProfileLink, foreign_key: :profile_id
 
     timestamps(type: :utc_datetime)
   end

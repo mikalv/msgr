@@ -116,7 +116,7 @@ defmodule Messngr.Noise.KeyLoader do
   defp derive_public_with_enacl(private_key) do
     cond do
       function_exported?(:enacl, :curve25519_scalarmult_base, 1) ->
-        {:ok, :enacl.curve25519_scalarmult_base(private_key)}
+        {:ok, apply(:enacl, :curve25519_scalarmult_base, [private_key])}
 
       true ->
         :error

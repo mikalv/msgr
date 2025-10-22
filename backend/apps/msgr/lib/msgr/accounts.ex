@@ -300,7 +300,8 @@ defmodule Messngr.Accounts do
   """
   @spec import_contacts(Ecto.UUID.t(), [map()], keyword()) ::
           {:ok, [Contact.t()]} | {:error, term()}
-  def import_contacts(account_id, contacts_attrs, opts \\ []) when is_list(contacts_attrs) do
+  def import_contacts(account_id, contacts_attrs, opts \\ [])
+  def import_contacts(account_id, contacts_attrs, opts) when is_list(contacts_attrs) do
     profile_id = Keyword.get(opts, :profile_id)
 
     Repo.transaction(fn ->
@@ -791,7 +792,7 @@ defmodule Messngr.Accounts do
 
   defp find_identity_match(_), do: nil
 
-  defp do_find_identity(normalized, kind, value) do
+  defp do_find_identity(_normalized, kind, value) do
     case get_identity_by_channel(kind, value) do
       %Identity{} = identity ->
         account = Repo.preload(identity.account, :profiles)
