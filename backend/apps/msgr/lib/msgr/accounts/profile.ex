@@ -288,6 +288,7 @@ defmodule Messngr.Accounts.Profile do
     end
   end
 
+  @spec validate_required_hex([{atom(), String.t()}], map(), String.t()) :: [{atom(), String.t()}]
   defp validate_required_hex(errors, map, key) do
     case Map.fetch(map, key) do
       {:ok, value} when is_binary(value) ->
@@ -297,24 +298,65 @@ defmodule Messngr.Accounts.Profile do
           [{String.to_atom(key), "must be a hex colour (e.g. #AABBCC)"} | errors]
         end
 
-      {:ok, _} -> [{String.to_atom(key), "must be a hex colour (e.g. #AABBCC)"} | errors]
-      :error -> [{String.to_atom(key), "is required"} | errors]
+      {:ok, _} ->
+        [{key_atom, "must be a hex colour (e.g. #AABBCC)"} | errors]
+
+      :error ->
+        [{key_atom, "is required"} | errors]
     end
+  end
+
+  defp hex_colour?(value) do
+    normalized = String.trim(value)
+
+    length =
+      if String.starts_with?(normalized, "#") do
+        String.length(normalized) - 1
+      else
+        String.length(normalized)
+      end
+
+    length in [6, 8] and
+      normalized
+      |> String.trim_leading("#")
+      |> String.downcase()
+      |> String.to_charlist()
+      |> Enum.all?(&(&1 in ?0..?9 or &1 in ?a..?f))
   end
 
   defp validate_inclusion(errors, map, key, allowed, message) do
     case Map.fetch(map, key) do
       {:ok, value} when is_binary(value) ->
+<<<<<<< HEAD
         downcased = String.downcase(value)
+||||||| parent of 1441d7f (Misc)
+      {:ok, value} when is_binary(value) and MapSet.member?(allowed, String.downcase(value)) ->
+        errors
+=======
+        normalized = value |> String.trim() |> String.downcase()
+>>>>>>> 1441d7f (Misc)
 
+<<<<<<< HEAD
         cond do
           MapSet.member?(allowed, downcased) -> errors
           MapSet.member?(allowed, value) -> errors
           true -> [{String.to_atom(key), message} | errors]
+||||||| parent of 1441d7f (Misc)
+      {:ok, value} when is_binary(value) and MapSet.member?(allowed, value) ->
+        errors
+=======
+        if MapSet.member?(allowed, normalized) or MapSet.member?(allowed, value) do
+          errors
+        else
+          [{String.to_atom(key), message} | errors]
+>>>>>>> 1441d7f (Misc)
         end
 
-      {:ok, _} -> [{String.to_atom(key), message} | errors]
-      :error -> errors
+      {:ok, _} ->
+        [{String.to_atom(key), message} | errors]
+
+      :error ->
+        errors
     end
   end
 
@@ -330,11 +372,21 @@ defmodule Messngr.Accounts.Profile do
       {:ok, nil} ->
         errors
 
+<<<<<<< HEAD
       {:ok, _} ->
         [{String.to_atom(key), "must be a string"} | errors]
 
       :error ->
         errors
+||||||| parent of 1441d7f (Misc)
+      {:ok, value} when is_binary(value) and String.trim(value) != "" -> errors
+      {:ok, nil} -> errors
+      {:ok, _} -> [{String.to_atom(key), "must be a string"} | errors]
+      :error -> errors
+=======
+      {:ok, _} -> [{String.to_atom(key), "must be a string"} | errors]
+      :error -> errors
+>>>>>>> 1441d7f (Misc)
     end
   end
 
@@ -348,12 +400,28 @@ defmodule Messngr.Accounts.Profile do
         else
           [{String.to_atom(key), "must be HH:MM"} | errors]
         end
+<<<<<<< HEAD
+||||||| parent of 1441d7f (Misc)
+      {:ok, value} when is_binary(value) and Regex.match?(~r/^(?:[01]\d|2[0-3]):[0-5]\d$/, value) ->
+        errors
+=======
 
+      {:ok, _} ->
+        [{String.to_atom(key), "must be HH:MM"} | errors]
+>>>>>>> 1441d7f (Misc)
+
+<<<<<<< HEAD
       {:ok, _} ->
         [{String.to_atom(key), "must be HH:MM"} | errors]
 
       :error ->
         errors
+||||||| parent of 1441d7f (Misc)
+      {:ok, _} -> [{String.to_atom(key), "must be HH:MM"} | errors]
+      :error -> errors
+=======
+      :error -> errors
+>>>>>>> 1441d7f (Misc)
     end
   end
 

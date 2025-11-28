@@ -341,3 +341,17 @@ config :msgr, Messngr.Noise.DevHandshake,
   dev_handshake_config
   |> Keyword.put(:enabled, dev_handshake_enabled)
   |> Keyword.put(:allow_without_transport, dev_handshake_allow)
+
+guardian_schema = System.get_env("GUARDIAN_DB_SCHEMA", "guardian_tokens")
+guardian_interval_minutes =
+  System.get_env("GUARDIAN_DB_SWEEP_MINUTES", "60")
+  |> String.trim()
+  |> case do
+    "" -> 60
+    value -> String.to_integer(value)
+  end
+
+config :guardian, Guardian.DB,
+  repo: Messngr.Repo,
+  schema_name: guardian_schema,
+  sweep_interval: :timer.minutes(guardian_interval_minutes)

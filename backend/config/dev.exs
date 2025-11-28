@@ -119,5 +119,10 @@ config :msgr_web, :prometheus,
   port: String.to_integer(System.get_env("PROMETHEUS_PORT", "9568")),
   name: :prometheus_metrics_dev
 
+config :guardian, Guardian.DB,
+  repo: Messngr.Repo,
+  schema_name: "guardian_tokens",
+  sweep_interval: :timer.hours(1)
+
 config :phoenix, :stacktrace_depth, 20
 config :phoenix, :plug_init_mode, :runtime

@@ -70,6 +70,11 @@ config :msgr, Messngr.ShareLinks,
   msgr_host: System.get_env("SHARE_LINK_HOST", "share"),
   msgr_path_segments: share_link_segments
 
+config :guardian, Guardian.DB,
+  repo: Messngr.Repo,
+  schema_name: "guardian_tokens",
+  sweep_interval: :timer.minutes(60)
+
 host = System.get_env("PHX_HOST", "localhost")
 
 config :msgr_web, MessngrWeb.Endpoint,

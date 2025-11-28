@@ -11,6 +11,11 @@ config :msgr, Messngr.Repo,
 config :msgr, :feature_flags, noise_handshake_required: false
 config :msgr, :dns_cluster_query, :ignore
 
+config :guardian, Guardian.DB,
+  repo: Messngr.Repo,
+  schema_name: "guardian_tokens_test",
+  sweep_interval: :timer.minutes(60)
+
 config :msgr, :llm_client, Messngr.AI.LlmClientMock
 
 config :msgr_web, MessngrWeb.Endpoint,
