@@ -72,6 +72,7 @@ class MsgrConnection {
     _presence.onSync = presenceOnSync;
     final repos = LibMsgr().repositoryFactory.getRepositories(tenant);
     await repos.messageRepository.onConnectionChanged(isConnected: true);
+    unawaited(_replayPendingMessages());
   }
 
   void _handleDisconnect(event) {
@@ -79,6 +80,11 @@ class MsgrConnection {
     _connected = false;
     final repos = LibMsgr().repositoryFactory.getRepositories(tenant);
     unawaited(repos.messageRepository.onConnectionChanged(isConnected: false));
+  }
+
+  Future<void> _replayPendingMessages() async {
+    final repos = LibMsgr().repositoryFactory.getRepositories(tenant);
+    await repos.messageRepository.processPendingQueue();
   }
 
   List<Room> _handleRoomsPacket(
@@ -180,52 +186,73 @@ class MsgrConnection {
 
   Push? sendMessage(String destID, MMessage msg) {
     final key = (msg.roomID != null) ? 'room:$destID' : 'conversation:$destID';
-    if (_socket.channels.containsKey(key)) {
-      final chl = _socket.channels[key]!;
-      SocketTelemetry.instance.messageSent(
+    if (!_connected) {
+      _log.warning('Socket disconnected; queuing message ${msg.id} for retry');
+      SocketTelemetry.instance.messageRetryScheduled(
         conversationId: msg.conversationID ?? msg.roomID ?? destID,
         messageId: msg.id,
-        metadata: {'topic': key},
+        metadata: {
+          'topic': key,
+          'reason': 'socket_disconnected',
+        },
       );
-
-      final push = chl.push('create:msg', msg.toMap());
-      push?.future.then((response) {
-        final repos = LibMsgr().repositoryFactory.getRepositories(tenant);
-        repos.messageRepository.updateDeliveryStatus(
-          msg.id,
-          MessageDeliveryStatus.delivered,
-          isServerAck: true,
-        );
-        SocketTelemetry.instance.messageAcknowledged(
-          conversationId: msg.conversationID ?? msg.roomID ?? destID,
-          messageId: msg.id,
-          metadata: {
-            'topic': key,
-            'status': response?.status ?? 'ok',
-          },
-        );
-      }).catchError((error) {
-        final repos = LibMsgr().repositoryFactory.getRepositories(tenant);
-        repos.messageRepository.updateDeliveryStatus(
-          msg.id,
-          MessageDeliveryStatus.failed,
-        );
-        SocketTelemetry.instance.messageAcknowledged(
-          conversationId: msg.conversationID ?? msg.roomID ?? destID,
-          messageId: msg.id,
-          metadata: {
-            'topic': key,
-            'status': 'error',
-            'error': error.toString(),
-          },
-        );
-      });
-
-      return push;
-    } else {
-      _log.severe('Channel $destID not found!');
-      throw Exception('Channel $destID not found!');
+      return null;
     }
+
+    if (!_socket.channels.containsKey(key)) {
+      _log.warning('Channel $key not found; queuing message ${msg.id} for retry');
+      SocketTelemetry.instance.messageRetryScheduled(
+        conversationId: msg.conversationID ?? msg.roomID ?? destID,
+        messageId: msg.id,
+        metadata: {
+          'topic': key,
+          'reason': 'channel_missing',
+        },
+      );
+      return null;
+    }
+
+    final chl = _socket.channels[key]!;
+    SocketTelemetry.instance.messageSent(
+      conversationId: msg.conversationID ?? msg.roomID ?? destID,
+      messageId: msg.id,
+      metadata: {'topic': key},
+    );
+
+    final push = chl.push('create:msg', msg.toMap());
+    push?.future.then((response) {
+      final repos = LibMsgr().repositoryFactory.getRepositories(tenant);
+      repos.messageRepository.updateDeliveryStatus(
+        msg.id,
+        MessageDeliveryStatus.delivered,
+        isServerAck: true,
+      );
+      SocketTelemetry.instance.messageAcknowledged(
+        conversationId: msg.conversationID ?? msg.roomID ?? destID,
+        messageId: msg.id,
+        metadata: {
+          'topic': key,
+          'status': response?.status ?? 'ok',
+        },
+      );
+    }).catchError((error) {
+      final repos = LibMsgr().repositoryFactory.getRepositories(tenant);
+      repos.messageRepository.updateDeliveryStatus(
+        msg.id,
+        MessageDeliveryStatus.failed,
+      );
+      SocketTelemetry.instance.messageAcknowledged(
+        conversationId: msg.conversationID ?? msg.roomID ?? destID,
+        messageId: msg.id,
+        metadata: {
+          'topic': key,
+          'status': 'error',
+          'error': error.toString(),
+        },
+      );
+    });
+
+    return push;
   }
 
   Push? createRoom(String profileID, String roomName, String roomDescription,
