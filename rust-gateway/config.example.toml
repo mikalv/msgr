@@ -1,0 +1,29 @@
+[server]
+http_port = 8443
+grpc_port = 50051
+# Server static key (base64-encoded 32 bytes)
+server_static_key = "YOUR_SERVER_STATIC_KEY_BASE64"
+# Backend URL to proxy to
+backend_url = "http://localhost:4000"
+# Proxy timeout in seconds
+proxy_timeout = 30
+
+[transport]
+mode = "uds"  # or "mtls"
+socket_path = "/var/run/noise-gateway/noise.sock"
+
+# For mTLS mode:
+# mode = "mtls"
+# listen_addr = "0.0.0.0:50051"
+# ca_cert = "/path/to/ca.pem"
+# server_cert = "/path/to/server.pem"
+# server_key = "/path/to/server-key.pem"
+
+[session]
+default_ttl_seconds = 300
+cleanup_interval_seconds = 60
+max_sessions = 1000000
+
+[logging]
+level = "info"
+format = "json"  # or "pretty"

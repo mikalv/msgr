@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package noise.v1;
+
+// Noise Gateway service for Elixir backend communication
+service NoiseBackend {
+  // Notify backend about new session (callback from handshake creation)
+  rpc NotifyNewSession(SessionNotification) returns (SessionAck);
+
+  // Verify session token (called by Elixir when client authenticates)
+  rpc VerifyToken(VerifyTokenRequest) returns (VerifyTokenResponse);
+
+  // Validate device public key and get device info (called during handshake)
+  rpc ValidateDevice(ValidateDeviceRequest) returns (ValidateDeviceResponse);
+
+  // Bind account/profile to session (after OTP verification)
+  rpc BindAccount(BindAccountRequest) returns (BindAccountResponse);
+
+  // Delete session (cleanup)
+  rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
+
+  // Health check
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+// ===== Session Notifications =====
+
+message SessionNotification {
+  string session_id = 1;
+  string session_token = 2;
+  string pattern = 3;  // NKpsk0, XXpsk3, IKpsk2
+  bytes handshake_hash = 4;
+  string device_key = 5;  // Base64-encoded server public key
+  int64 created_at = 6;   // Unix timestamp
+  int32 ttl_seconds = 7;
+}
+
+message SessionAck {
+  bool acknowledged = 1;
+}
+
+// ===== Token Verification =====
+
+message VerifyTokenRequest {
+  string session_token = 1;
+}
+
+message VerifyTokenResponse {
+  bool valid = 1;
+  optional string session_id = 2;
+  optional int32 remaining_ttl = 3;
+  optional SessionMetadata metadata = 4;
+}
+
+message SessionMetadata {
+  optional string account_id = 1;
+  optional string profile_id = 2;
+  optional string device_id = 3;
+  bytes handshake_hash = 4;
+  string pattern = 5;
+}
+
+// ===== Device Validation =====
+
+message ValidateDeviceRequest {
+  string device_public_key = 1;  // Base64-encoded X25519 public key
+}
+
+message ValidateDeviceResponse {
+  bool valid = 1;
+  optional string device_id = 2;
+  optional string account_id = 3;
+  optional string profile_id = 4;
+  optional bool enabled = 5;
+  optional string error = 6;
+}
+
+// ===== Account Binding =====
+
+message BindAccountRequest {
+  string session_id = 1;
+  string session_token = 2;
+  string account_id = 3;
+  optional string profile_id = 4;
+  optional string device_id = 5;
+}
+
+message BindAccountResponse {
+  bool success = 1;
+  optional string error = 2;
+}
+
+// ===== Session Deletion =====
+
+message DeleteSessionRequest {
+  string session_id = 1;
+}
+
+message DeleteSessionResponse {
+  bool deleted = 1;
+}
+
+// ===== Health Check =====
+
+message HealthRequest {}
+
+message HealthResponse {
+  string status = 1;  // "SERVING" | "NOT_SERVING"
+  uint64 active_sessions = 2;
+  uint64 uptime_seconds = 3;
+}

@@ -1,0 +1,30 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config
+config.local.toml
+*.env
+.env.local
+
+# Certificates (don't commit real certs!)
+certs/*.pem
+certs/*.key
+!certs/.gitkeep
+
+# Build
+build/
+dist/

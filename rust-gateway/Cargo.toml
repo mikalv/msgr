@@ -1,0 +1,94 @@
+[package]
+name = "rust-gateway"
+version = "0.1.0"
+edition = "2021"
+authors = ["Kommunikasjon Team"]
+description = "Rust Noise Protocol Gateway for offloading crypto from Elixir/OTP"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "noise-gateway"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+tokio-stream = "0.1"
+
+# HTTP server (for REST API and Proxy)
+axum = "0.7"
+tower = { version = "0.5", features = ["full"] }
+tower-http = { version = "0.6", features = ["trace", "cors", "compression-gzip"] }
+hyper = "1.5"
+hyper-util = { version = "0.1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json"] }
+url = "2.5"
+
+# gRPC (for Elixir backend communication)
+tonic = "0.12"
+tonic-build = "0.12"
+tonic-reflection = "0.12"
+prost = "0.13"
+
+# Noise Protocol implementation
+snow = "0.9"
+
+# Cryptography
+aes-gcm = "0.10"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+ed25519-dalek = "2"
+sha2 = "0.10"
+hkdf = "0.12"
+rand = "0.8"
+subtle = "2.6"
+
+# Concurrent hashmap for session store
+dashmap = "6.1"
+
+# TLS
+rustls = "0.23"
+tokio-rustls = "0.26"
+rustls-pemfile = "2.2"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+
+# Time/Duration
+chrono = { version = "0.4", features = ["serde"] }
+
+# UUID
+uuid = { version = "1.11", features = ["v4", "serde"] }
+
+# Base64
+base64 = "0.22"
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Metrics
+prometheus = { version = "0.13", features = ["process"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Configuration
+config = "0.14"
+
+# Environment variables
+dotenvy = "0.15"
+
+[build-dependencies]
+tonic-build = "0.12"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = true
