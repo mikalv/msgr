@@ -6,6 +6,7 @@ import 'package:libmsgr/src/database/daos/message_dao.dart';
 import 'package:libmsgr/src/database/daos/outgoing_message_dao.dart';
 import 'package:libmsgr/src/database/database.dart';
 import 'package:libmsgr/src/repositories/message_repository.dart';
+import 'package:libmsgr/src/telemetry/socket_telemetry.dart';
 import 'package:mockito/mockito.dart';
 import 'package:phoenix_socket/phoenix_socket.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -26,6 +27,8 @@ void main() {
   late MockMsgrConnection connection;
   late MockPush push;
   late Completer<dynamic> pushCompleter;
+  late StreamSubscription<SocketEvent> telemetrySubscription;
+  final List<SocketEvent> telemetry = [];
   var connected = true;
 
   setUp(() async {
@@ -37,10 +40,14 @@ void main() {
     push = MockPush();
     pushCompleter = Completer<dynamic>();
     connected = true;
+    telemetry.clear();
 
     when(connection.isConnected()).thenAnswer((_) => connected);
     when(push.future).thenAnswer((_) => pushCompleter.future);
     when(connection.sendMessage(any, any)).thenReturn(push);
+
+    telemetrySubscription =
+        SocketTelemetry.instance.events.listen(telemetry.add);
 
     repository = MessageRepository(
       teamName: 'team-a',
@@ -54,6 +61,7 @@ void main() {
     final path = databaseService.instance.path;
     await databaseService.instance.close();
     await databaseFactory.deleteDatabase(path);
+    await telemetrySubscription.cancel();
   });
 
   MMessage _sampleMessage({String id = 'msg-1', String? roomId, String? conversationId}) {
@@ -88,6 +96,47 @@ void main() {
     final delivered = await messageDao.getMessagesForTeam('team-a');
     expect(delivered.single.deliveryStatus, MessageDeliveryStatus.delivered);
     verify(connection.sendMessage('team-a.room-1', any)).called(1);
+  });
+
+  test('emits telemetry for retry scheduling and success after reconnection',
+      () async {
+    connected = false;
+    when(connection.sendMessage(any, any)).thenReturn(null);
+    final msg = _sampleMessage(roomId: 'room-telemetry');
+
+    await repository.sendMessageToRoom(msg);
+
+    expect(
+      telemetry.where((e) => e.name == 'message.retry_scheduled'),
+      isNotEmpty,
+    );
+
+    connected = true;
+    pushCompleter = Completer<dynamic>();
+    when(push.future).thenAnswer((_) => pushCompleter.future);
+    when(connection.sendMessage(any, any)).thenReturn(push);
+
+    // Mark the previous attempt as failed to trigger a retry attempt count > 1
+    final pending = (await outgoingDao.getPending('team-a')).single;
+    await outgoingDao.markAttempt(
+      'team-a',
+      pending.message.id,
+      attemptedAt: DateTime.now().subtract(const Duration(seconds: 5)),
+      attemptCount: 1,
+      message: pending.message.copyWith(
+        deliveryStatus: MessageDeliveryStatus.pending,
+      ),
+    );
+
+    await repository.processPendingQueue();
+
+    pushCompleter.complete({'status': 'ok'});
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(
+      telemetry.where((e) => e.name == 'message.retry_succeeded'),
+      isNotEmpty,
+    );
   });
 
   test('retries pending messages when the connection comes back', () async {
@@ -127,5 +176,31 @@ void main() {
 
     final stored = await messageDao.getMessagesForTeam('team-a');
     expect(stored.single.deliveryStatus, MessageDeliveryStatus.failed);
+  });
+
+  test('emits telemetry when retries are exhausted', () async {
+    connected = true;
+    final msg = _sampleMessage(roomId: 'room-4', id: 'exhaust-msg');
+
+    await repository.sendMessageToRoom(msg);
+
+    // Force the entry to exceed the max attempts
+    final entry = (await outgoingDao.getPending('team-a')).single;
+    await outgoingDao.markAttempt(
+      'team-a',
+      entry.message.id,
+      attemptedAt: DateTime.now().subtract(const Duration(minutes: 1)),
+      attemptCount: 5,
+      message: entry.message,
+    );
+
+    await repository.processPendingQueue();
+
+    final stored = await messageDao.getMessagesForTeam('team-a');
+    expect(stored.single.deliveryStatus, MessageDeliveryStatus.failed);
+    expect(
+      telemetry.where((e) => e.name == 'message.retry_exhausted'),
+      isNotEmpty,
+    );
   });
 }

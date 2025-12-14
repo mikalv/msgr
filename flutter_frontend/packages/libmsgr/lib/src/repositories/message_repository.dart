@@ -6,6 +6,7 @@ import 'package:libmsgr/src/database/daos/message_dao.dart';
 import 'package:libmsgr/src/database/daos/outgoing_message_dao.dart';
 import 'package:libmsgr/src/models/outgoing_message.dart';
 import 'package:libmsgr/src/repositories/base.dart';
+import 'package:libmsgr/src/telemetry/socket_telemetry.dart';
 import 'package:libmsgr/src/typedefs.dart';
 import 'package:phoenix_socket/phoenix_socket.dart';
 
@@ -258,6 +259,14 @@ class MessageRepository extends BaseRepository<MMessage> {
             entry.message.id,
             MessageDeliveryStatus.failed,
           );
+          SocketTelemetry.instance.messageRetryExhausted(
+            conversationId: entry.message.conversationID ?? entry.message.roomID,
+            messageId: entry.message.id,
+            metadata: {
+              'attempts': entry.attemptCount,
+              'topic': entry.topic,
+            },
+          );
           await _outgoingDao.delete(teamName, entry.message.id);
           continue;
         }
@@ -305,6 +314,15 @@ class MessageRepository extends BaseRepository<MMessage> {
     final wsConn = _connectionProvider();
     if (wsConn == null || !wsConn.isConnected()) {
       log.warning('No active websocket connection; will retry ${entry.message.id}');
+      SocketTelemetry.instance.messageRetryScheduled(
+        conversationId: entry.message.conversationID ?? entry.message.roomID,
+        messageId: entry.message.id,
+        metadata: {
+          'attempts': entry.attemptCount,
+          'topic': entry.topic,
+          'reason': 'connection_unavailable',
+        },
+      );
       _scheduleRetry();
       return null;
     }
@@ -328,14 +346,45 @@ class MessageRepository extends BaseRepository<MMessage> {
     final push = wsConn.sendMessage(entry.topic, updatedEntry.message);
     if (push == null) {
       log.severe('Error sending message: Push is null');
+      updateDeliveryStatus(entry.message.id, MessageDeliveryStatus.pending);
+      SocketTelemetry.instance.messageRetryScheduled(
+        conversationId: entry.message.conversationID ?? entry.message.roomID,
+        messageId: entry.message.id,
+        metadata: {
+          'attempts': updatedEntry.attemptCount,
+          'topic': entry.topic,
+          'reason': 'channel_unavailable',
+        },
+      );
       _scheduleRetry();
       return null;
     }
 
     push.future.then((value) async {
+      if (updatedEntry.attemptCount > 1) {
+        SocketTelemetry.instance.messageRetrySucceeded(
+          conversationId: updatedEntry.message.conversationID ?? updatedEntry.message.roomID,
+          messageId: updatedEntry.message.id,
+          metadata: {
+            'attempts': updatedEntry.attemptCount,
+            'topic': entry.topic,
+          },
+        );
+      }
       await _outgoingDao.delete(teamName, entry.message.id);
     }).catchError((e) async {
       log.severe('Error sending message ${entry.message.id}: $e');
+      updateDeliveryStatus(entry.message.id, MessageDeliveryStatus.pending);
+      SocketTelemetry.instance.messageRetryScheduled(
+        conversationId: entry.message.conversationID ?? entry.message.roomID,
+        messageId: entry.message.id,
+        metadata: {
+          'attempts': updatedEntry.attemptCount,
+          'topic': entry.topic,
+          'reason': 'send_error',
+          'error': e.toString(),
+        },
+      );
       _scheduleRetry();
     });
     return push;

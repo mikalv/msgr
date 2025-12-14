@@ -56,6 +56,45 @@ class SocketTelemetry {
     );
   }
 
+  void messageRetryScheduled({
+    String? conversationId,
+    String? messageId,
+    Map<String, Object?> metadata = const {},
+  }) {
+    _record(
+      name: 'message.retry_scheduled',
+      conversationId: conversationId,
+      messageId: messageId,
+      metadata: metadata,
+    );
+  }
+
+  void messageRetrySucceeded({
+    String? conversationId,
+    String? messageId,
+    Map<String, Object?> metadata = const {},
+  }) {
+    _record(
+      name: 'message.retry_succeeded',
+      conversationId: conversationId,
+      messageId: messageId,
+      metadata: metadata,
+    );
+  }
+
+  void messageRetryExhausted({
+    String? conversationId,
+    String? messageId,
+    Map<String, Object?> metadata = const {},
+  }) {
+    _record(
+      name: 'message.retry_exhausted',
+      conversationId: conversationId,
+      messageId: messageId,
+      metadata: metadata,
+    );
+  }
+
   void typingStarted({
     String? conversationId,
     String? threadId,

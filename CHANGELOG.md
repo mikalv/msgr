@@ -64,6 +64,10 @@
 - Completed the CLI migration by deleting the legacy `libmsgr/tool` forwarder,
   fixing the standalone `libmsgr_cli` binary and pointing integration tests to
   `packages/libmsgr_cli/bin/msgr.dart`.
+- Hardened the Flutter websocket send path with offline detection, queued
+  retries (exponential backoff, max-attempt tracking), reconnection replay, and
+  telemetry for retry outcomes so clients can surface resilient delivery states
+  to users and logs.
 
 ### Observability
 
