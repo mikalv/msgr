@@ -66,6 +66,8 @@ secret_key =
 
 config :msgr_web, MessngrWeb.Endpoint,
   http: [
+    # Bind to localhost only - Rust Gateway handles external connections
+    ip: {127, 0, 0, 1},
     port: String.to_integer(System.get_env("PORT", "4000"))
   ],
   secret_key_base: secret_key,

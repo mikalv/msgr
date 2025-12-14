@@ -18,6 +18,31 @@ services:
       timeout: 5s
       retries: 5
 
+  rust_gateway:
+    build:
+      context: ./rust-gateway
+      dockerfile: Dockerfile
+    container_name: msgr_rust_gateway
+    environment:
+      HTTP_PORT: 8443
+      GRPC_PORT: 50051
+      SERVER_STATIC_KEY: JPyIbVodh4N+o1F98UFcPdK3TeZ3t6VjkxTsauDiLYc=
+      BACKEND_URL: http://backend:4000
+      ELIXIR_GRPC_URL: http://backend:50052
+      SESSION_DEFAULT_TTL_SECONDS: 3600
+      SESSION_CLEANUP_INTERVAL_SECONDS: 300
+      SESSION_MAX_SESSIONS: 10000
+      RUST_LOG: info,rust_gateway=debug
+      LOG_FORMAT: pretty
+    ports:
+      - "8443:8443"
+      - "50051:50051"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8443/gateway/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
     build:
       context: ./backend
@@ -38,6 +63,9 @@ services:
       POSTGRES_USERNAME: postgres
       POSTGRES_PASSWORD: postgres
       PORT: 4000
+      RUST_GATEWAY_HOST: rust_gateway
+      RUST_GATEWAY_GRPC_PORT: 50051
+      RUST_GATEWAY_SERVER_PORT: 50052
       MSGR_WEB_LEGACY_ACTOR_HEADERS: ${MSGR_WEB_LEGACY_ACTOR_HEADERS:-false}
       SECRET_KEY_BASE: 3X6X5EiV0HEhNAZCFKuGcZNl14Q8U5hZ4qQlR9VuQ07oVcTyVwW7BrPPW5zSOdaT
       NOISE_TRANSPORT_ENABLED: ${NOISE_TRANSPORT_ENABLED:-false}
@@ -64,6 +92,7 @@ services:
       - node_modules:/app/apps/msgr_web/assets/node_modules
     ports:
       - "4000:4000"
+      - "50052:50052"
       - "${MSGR_TLS_PORT:-4443}:${MSGR_TLS_PORT:-4443}"
       - "${NOISE_TRANSPORT_PORT:-5443}:${NOISE_TRANSPORT_PORT:-5443}"
     tty: true
