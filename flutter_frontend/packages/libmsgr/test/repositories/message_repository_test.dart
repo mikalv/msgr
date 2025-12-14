@@ -77,11 +77,16 @@ void main() {
     var pending = await outgoingDao.getPending('team-a');
     expect(pending, hasLength(1));
 
+    final storedMessages = await messageDao.getMessagesForTeam('team-a');
+    expect(storedMessages.single.deliveryStatus, MessageDeliveryStatus.sending);
+
     pushCompleter.complete({'status': 'ok'});
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     pending = await outgoingDao.getPending('team-a');
     expect(pending, isEmpty);
+    final delivered = await messageDao.getMessagesForTeam('team-a');
+    expect(delivered.single.deliveryStatus, MessageDeliveryStatus.delivered);
     verify(connection.sendMessage('team-a.room-1', any)).called(1);
   });
 
@@ -110,5 +115,17 @@ void main() {
 
     pending = await outgoingDao.getPending('team-a');
     expect(pending, isEmpty);
+  });
+
+  test('marks message as failed on socket error', () async {
+    final msg = _sampleMessage(roomId: 'room-3', id: 'fail-msg');
+
+    await repository.sendMessageToRoom(msg);
+
+    pushCompleter.completeError(Exception('boom'));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final stored = await messageDao.getMessagesForTeam('team-a');
+    expect(stored.single.deliveryStatus, MessageDeliveryStatus.failed);
   });
 }

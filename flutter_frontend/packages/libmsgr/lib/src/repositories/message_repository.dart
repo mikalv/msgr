@@ -42,6 +42,42 @@ class MessageRepository extends BaseRepository<MMessage> {
     }
   }
 
+  void updateDeliveryStatus(
+    String messageId,
+    MessageDeliveryStatus status, {
+    bool? isServerAck,
+  }) {
+    final message = _findMessage(messageId);
+
+    if (message == null) {
+      return;
+    }
+
+    final updated = message.copyWith(
+      deliveryStatus: status,
+      isServerAck: isServerAck ?? message.isServerAck,
+    );
+    _saveMessage(updated);
+  }
+
+  MMessage? _findMessage(String messageId) {
+    try {
+      return items.firstWhere((m) => m.id == messageId);
+    } catch (_) {
+      log.warning('Message $messageId not found when updating status');
+      return null;
+    }
+  }
+
+  void _saveMessage(MMessage message) {
+    final exists = items.any((element) => element.id == message.id);
+    if (exists) {
+      updateItem(message);
+    } else {
+      addItem(message);
+    }
+  }
+
   @override
   void fillLocalCache(List<MMessage> items) {
     super.fillLocalCache(items);
@@ -173,14 +209,20 @@ class MessageRepository extends BaseRepository<MMessage> {
 
   Future<Push?> sendMessageToRoom(MMessage msg) {
     return _enqueueAndSend(
-      msg.copyWith(isServerAck: false),
+      msg.copyWith(
+        isServerAck: false,
+        deliveryStatus: MessageDeliveryStatus.pending,
+      ),
       '$teamName.${msg.roomID!}',
     );
   }
 
   Future<Push?> sendMessageToConversation(MMessage msg) {
     return _enqueueAndSend(
-      msg.copyWith(isServerAck: false),
+      msg.copyWith(
+        isServerAck: false,
+        deliveryStatus: MessageDeliveryStatus.pending,
+      ),
       '$teamName.${msg.conversationID!}',
     );
   }
@@ -211,6 +253,10 @@ class MessageRepository extends BaseRepository<MMessage> {
         if (entry.attemptCount >= _maxAttempts) {
           log.warning(
             'Dropping message ${entry.message.id} after $_maxAttempts failed attempts',
+          );
+          updateDeliveryStatus(
+            entry.message.id,
+            MessageDeliveryStatus.failed,
           );
           await _outgoingDao.delete(teamName, entry.message.id);
           continue;
@@ -246,6 +292,8 @@ class MessageRepository extends BaseRepository<MMessage> {
   }
 
   Future<Push?> _enqueueAndSend(MMessage msg, String topic) async {
+    _saveMessage(msg);
+
     final entry = OutgoingMessage(message: msg, topic: topic);
     await _outgoingDao.enqueue(teamName, entry);
     final push = await _sendQueuedMessage(entry);
@@ -260,8 +308,12 @@ class MessageRepository extends BaseRepository<MMessage> {
       _scheduleRetry();
       return null;
     }
+    updateDeliveryStatus(entry.message.id, MessageDeliveryStatus.sending);
 
     final updatedEntry = entry.copyWith(
+      message: entry.message.copyWith(
+        deliveryStatus: MessageDeliveryStatus.sending,
+      ),
       lastAttemptAt: DateTime.now(),
       attemptCount: entry.attemptCount + 1,
     );
@@ -270,9 +322,10 @@ class MessageRepository extends BaseRepository<MMessage> {
       entry.message.id,
       attemptedAt: updatedEntry.lastAttemptAt!,
       attemptCount: updatedEntry.attemptCount,
+      message: updatedEntry.message,
     );
 
-    final push = wsConn.sendMessage(entry.topic, entry.message);
+    final push = wsConn.sendMessage(entry.topic, updatedEntry.message);
     if (push == null) {
       log.severe('Error sending message: Push is null');
       _scheduleRetry();

@@ -190,6 +190,12 @@ class MsgrConnection {
 
       final push = chl.push('create:msg', msg.toMap());
       push?.future.then((response) {
+        final repos = LibMsgr().repositoryFactory.getRepositories(tenant);
+        repos.messageRepository.updateDeliveryStatus(
+          msg.id,
+          MessageDeliveryStatus.delivered,
+          isServerAck: true,
+        );
         SocketTelemetry.instance.messageAcknowledged(
           conversationId: msg.conversationID ?? msg.roomID ?? destID,
           messageId: msg.id,
@@ -199,6 +205,11 @@ class MsgrConnection {
           },
         );
       }).catchError((error) {
+        final repos = LibMsgr().repositoryFactory.getRepositories(tenant);
+        repos.messageRepository.updateDeliveryStatus(
+          msg.id,
+          MessageDeliveryStatus.failed,
+        );
         SocketTelemetry.instance.messageAcknowledged(
           conversationId: msg.conversationID ?? msg.roomID ?? destID,
           messageId: msg.id,

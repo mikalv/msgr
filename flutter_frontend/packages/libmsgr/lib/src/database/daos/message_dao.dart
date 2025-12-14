@@ -98,6 +98,7 @@ class MessageDao {
       'in_reply_to_id': message.inReplyToMsgID,
       'is_server_ack': boolToInt(message.isServerAck),
       'is_msg_read': boolToInt(message.isMsgRead),
+      'delivery_status': message.deliveryStatus.name,
     };
   }
 
@@ -114,6 +115,10 @@ class MessageDao {
       inReplyToMsgID: map['in_reply_to_id'] as String?,
       isServerAck: intToBool(map['is_server_ack']! as int),
       isMsgRead: intToBool(map['is_msg_read']! as int),
+      deliveryStatus: MessageDeliveryStatus.values.firstWhere(
+        (status) => status.name == map['delivery_status']! as String,
+        orElse: () => MessageDeliveryStatus.delivered,
+      ),
     );
   }
 }
