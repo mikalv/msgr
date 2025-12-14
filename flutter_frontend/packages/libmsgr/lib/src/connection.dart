@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:libmsgr/libmsgr.dart';
 import 'package:libmsgr/src/telemetry/socket_telemetry.dart';
 import 'package:libmsgr/src/typedefs.dart';
@@ -68,11 +70,15 @@ class MsgrConnection {
     userChannel = joinChannel('user:$userID');
     _presence = PhoenixPresence(channel: userChannel);
     _presence.onSync = presenceOnSync;
+    final repos = LibMsgr().repositoryFactory.getRepositories(tenant);
+    await repos.messageRepository.onConnectionChanged(isConnected: true);
   }
 
   void _handleDisconnect(event) {
     _log.info('[-] Socket disconnected! event: ${event.toString()}');
     _connected = false;
+    final repos = LibMsgr().repositoryFactory.getRepositories(tenant);
+    unawaited(repos.messageRepository.onConnectionChanged(isConnected: false));
   }
 
   List<Room> _handleRoomsPacket(

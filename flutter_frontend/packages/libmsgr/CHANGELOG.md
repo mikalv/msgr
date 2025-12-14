@@ -2,6 +2,8 @@
 
 - Removed the deprecated `tool/msgr_cli.dart` forwarder now that the standalone
   `libmsgr_cli` package is used directly.
+- Added a durable outgoing message queue with persisted retries/backoff and
+  acknowledgement cleanup for websocket sends.
 
 ## 0.1.2
 

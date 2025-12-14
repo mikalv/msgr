@@ -142,6 +142,9 @@
 - Hardened media signing by requiring environment-provided secrets, binding
   checksums into presigned URLs, and covering the behaviour with tests and
   updated operator docs so alpha deployments can trust object storage links.
+- Added a durable Flutter websocket outgoing message queue that persists
+  unsent/ack-pending messages, retries with backoff on reconnect, and clears
+  entries once delivery is confirmed.
 - Enforced Noise handshake verification by default, removed legacy header fallbacks,
   and wired OTP challenges to rate limiting plus email/SMS delivery so passwordless
   auth is safe to expose to alpha testers.
