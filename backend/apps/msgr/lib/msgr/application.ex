@@ -35,6 +35,7 @@ defmodule Messngr.Application do
       ]
       |> Kernel.++(maybe_noise_registry_child())
       |> Kernel.++(maybe_bridge_health_child())
+      |> Kernel.++(maybe_rust_gateway_grpc_server())
 
     Supervisor.start_link(children, strategy: :one_for_one, name: Messngr.Supervisor)
   end
@@ -62,6 +63,21 @@ defmodule Messngr.Application do
 
       _other ->
         []
+    end
+  end
+
+  defp maybe_rust_gateway_grpc_server do
+    # Start gRPC server for Rust Gateway to call
+    # Listens on port configured in :rust_gateway_server_port (default 50052)
+    port = Application.get_env(:msgr, :rust_gateway_server_port, 50052)
+
+    if Application.get_env(:msgr, :rust_gateway_grpc_enabled, true) do
+      [
+        {GRPC.Server.Supervisor,
+         endpoint: Messngr.RustGateway.Endpoint, port: port, start_server: true}
+      ]
+    else
+      []
     end
   end
 end

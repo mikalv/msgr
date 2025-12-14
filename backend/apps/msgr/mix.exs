@@ -51,6 +51,8 @@ defmodule Messngr.MixProject do
       {:guardian_db, "~> 3.0"},
       {:llm_gateway, in_umbrella: true},
       {:plug_crypto, "~> 2.0"},
+      {:grpc, "~> 0.9.0"},
+      {:protobuf, "~> 0.12.0"},
       {:mox, "~> 0.5", only: :test}
     ]
   end

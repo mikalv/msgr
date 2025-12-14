@@ -1,16 +1,16 @@
 defmodule MessngrWeb.Plugs.CurrentActor do
   @moduledoc """
-  Backwards-compatible wrapper around `MessngrWeb.Plugs.NoiseSession` so existing
-  pipelines keep working while Noise authentication is rolled out.
+  Wrapper around `MessngrWeb.Plugs.SessionContext` for extracting session
+  information from Rust Gateway headers.
   """
 
-  alias MessngrWeb.Plugs.NoiseSession
+  alias MessngrWeb.Plugs.SessionContext
 
   @behaviour Plug
 
   @impl Plug
-  def init(opts), do: NoiseSession.init(opts)
+  def init(opts), do: SessionContext.init(opts)
 
   @impl Plug
-  def call(conn, opts), do: NoiseSession.call(conn, opts)
+  def call(conn, opts), do: SessionContext.call(conn, opts)
 end

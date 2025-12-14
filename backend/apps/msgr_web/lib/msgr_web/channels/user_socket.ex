@@ -1,7 +1,7 @@
 defmodule MessngrWeb.UserSocket do
   use Phoenix.Socket
   require Logger
-  alias MessngrWeb.Plugs.NoiseSession
+  alias Messngr.Accounts
 
   # A Socket handler
   #
@@ -37,31 +37,42 @@ defmodule MessngrWeb.UserSocket do
   # See `Phoenix.Token` documentation for examples in
   # performing token verification on connect.
   @impl true
-  def connect(params, socket, connect_info) do
-    case resolve_token(params, connect_info) do
-      {:ok, token} ->
-        case NoiseSession.verify_token(token) do
-          {:ok, actor} ->
-            Logger.debug("WebSocket authenticated via Noise session",
-              account_id: actor.account.id,
-              profile_id: actor.profile.id
-            )
+  def connect(params, socket, _connect_info) do
+    # Rust Gateway validates session and passes account/profile IDs
+    account_id = params["account_id"]
+    profile_id = params["profile_id"]
+    device_id = params["device_id"]
+    session_id = params["session_id"]
 
-            {:ok,
-             socket
-             |> assign(:current_account, actor.account)
-             |> assign(:current_profile, actor.profile)
-             |> maybe_assign_device(actor.device)
-             |> assign(:noise_session_token, actor.encoded_token)
-             |> assign(:noise_session, actor.session)}
+    Logger.debug("WebSocket connection attempt",
+      account_id: account_id,
+      profile_id: profile_id,
+      session_id: session_id
+    )
 
-          {:error, reason} ->
-            Logger.warning("Noise session verification failed", reason: inspect(reason))
-            :error
-        end
+    with {:ok, account_id} <- validate_uuid(account_id, "account_id"),
+         {:ok, profile_id} <- validate_uuid(profile_id, "profile_id"),
+         account when not is_nil(account) <- load_account(account_id),
+         profile when not is_nil(profile) <- load_profile(profile_id, account) do
+      socket =
+        socket
+        |> assign(:current_account, account)
+        |> assign(:current_profile, profile)
+        |> assign(:account_id, account_id)
+        |> assign(:profile_id, profile_id)
+        |> assign(:session_id, session_id)
 
-      :error ->
-        Logger.warning("Missing Noise session token for websocket connection")
+      socket = if device_id, do: maybe_assign_device(socket, device_id, account), else: socket
+
+      Logger.debug("WebSocket authenticated",
+        account_id: account_id,
+        profile_id: profile_id
+      )
+
+      {:ok, socket}
+    else
+      error ->
+        Logger.warning("WebSocket authentication failed", error: inspect(error))
         :error
     end
   end
@@ -83,23 +94,51 @@ defmodule MessngrWeb.UserSocket do
   @impl true
   def id(_socket), do: nil
 
-  defp resolve_token(params, connect_info) do
-    with :error <- normalize_token(Map.get(params, "noise_session")),
-         :error <- normalize_token(Map.get(params, "token")),
-         :error <- normalize_token(connect_info |> Map.get(:session, %{}) |> Map.get("noise_session_token")) do
-      :error
-    else
-      {:ok, token} -> {:ok, token}
+  defp validate_uuid(nil, _field), do: {:error, :missing_id}
+  defp validate_uuid("", _field), do: {:error, :empty_id}
+
+  defp validate_uuid(id, _field) when is_binary(id) do
+    case Ecto.UUID.cast(id) do
+      {:ok, uuid} -> {:ok, uuid}
+      :error -> {:error, :invalid_uuid}
     end
   end
 
-  defp normalize_token(token) when is_binary(token) do
-    trimmed = String.trim(token)
-    if trimmed == "", do: :error, else: {:ok, trimmed}
+  defp validate_uuid(_id, _field), do: {:error, :invalid_type}
+
+  defp load_account(account_id) do
+    Accounts.get_account!(account_id)
+  rescue
+    _ -> nil
   end
 
-  defp normalize_token(_), do: :error
+  defp load_profile(profile_id, account) do
+    profile = Accounts.get_profile!(profile_id)
 
-  defp maybe_assign_device(socket, nil), do: socket
-  defp maybe_assign_device(socket, device), do: assign(socket, :current_device, device)
+    if profile.account_id == account.id do
+      profile
+    else
+      Logger.warning("Profile does not belong to account",
+        profile_id: profile_id,
+        profile_account_id: profile.account_id,
+        account_id: account.id
+      )
+
+      nil
+    end
+  rescue
+    _ -> nil
+  end
+
+  defp maybe_assign_device(socket, device_id, account) do
+    device = Accounts.get_device!(device_id)
+
+    if device.account_id == account.id && device.enabled do
+      assign(socket, :current_device, device)
+    else
+      socket
+    end
+  rescue
+    _ -> socket
+  end
 end
