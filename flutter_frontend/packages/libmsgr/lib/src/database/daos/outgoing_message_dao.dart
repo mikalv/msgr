@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:libmsgr/src/database/constants.dart';
 import 'package:libmsgr/src/models/outgoing_message.dart';
+import 'package:libmsgr/libmsgr.dart';
 import 'package:sqflite_sqlcipher/sqflite.dart';
 
 class OutgoingMessageDao {
@@ -20,12 +23,14 @@ class OutgoingMessageDao {
     String messageId, {
     required DateTime attemptedAt,
     required int attemptCount,
+    MMessage? message,
   }) async {
     await _db.update(
       outgoingMessagesTable,
       <String, Object?>{
         'last_attempt_at': attemptedAt.toIso8601String(),
         'attempt_count': attemptCount,
+        if (message != null) 'payload': jsonEncode(message.toMap()),
       },
       where: 'message_id = ? AND team_name = ?',
       whereArgs: [messageId, teamName],

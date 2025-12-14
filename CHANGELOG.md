@@ -4,6 +4,9 @@
 
 ### Architecture checklist
 
+- Added delivery status tracking for messages (pending/sending/delivered/failed),
+  persisted in the local database with migration, websocket callbacks, and
+  repository notifications so UIs can show sending/failed indicators.
 - Modellert utvidede profilpreferanser (tema, varsel- og sikkerhetspolicyer) på
   Flutter, eksponerte `ProfileApi` for CRUD/bytte, la til modus-veksler med
   banner/inbox-filtre samt dokumentasjon av scenarier i `docs/profile_modes.md`.

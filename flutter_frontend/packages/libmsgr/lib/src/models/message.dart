@@ -2,6 +2,13 @@
 import 'package:libmsgr/src/models/base.dart';
 import 'package:meta/meta.dart';
 
+enum MessageDeliveryStatus {
+  pending,
+  sending,
+  delivered,
+  failed,
+}
+
 /// Represents a message model in the application.
 ///
 /// This class extends from `BaseModel` and is used to define the structure
@@ -19,6 +26,7 @@ class MMessage extends BaseModel {
   final String? inReplyToMsgID;
   final bool isServerAck;
   final bool isMsgRead;
+  final MessageDeliveryStatus deliveryStatus;
 
   bool get hasReactions => false;
 
@@ -33,7 +41,8 @@ class MMessage extends BaseModel {
       super.id = 'server-will-set-it',
       this.isServerAck = true,
       this.kIsSystemMsg = false,
-      this.isMsgRead = false}) {
+      this.isMsgRead = false,
+      this.deliveryStatus = MessageDeliveryStatus.delivered}) {
     if (conversationID == null && roomID == null) {
       throw ArgumentError('Either conversationID or roomID must be provided');
     }
@@ -46,7 +55,8 @@ class MMessage extends BaseModel {
         conversationID: conversationID,
         roomID: roomID,
         createdAt: DateTime.now(),
-        updatedAt: DateTime.now());
+        updatedAt: DateTime.now(),
+        deliveryStatus: MessageDeliveryStatus.delivered);
   }
 
   @override
@@ -62,7 +72,8 @@ class MMessage extends BaseModel {
           updatedAt == other.updatedAt &&
           kIsSystemMsg == other.kIsSystemMsg &&
           inReplyToMsgID == other.inReplyToMsgID &&
-          isMsgRead == other.isMsgRead;
+          isMsgRead == other.isMsgRead &&
+          deliveryStatus == other.deliveryStatus;
 
   @override
   int get hashCode =>
@@ -76,7 +87,8 @@ class MMessage extends BaseModel {
       updatedAt.hashCode ^
       kIsSystemMsg.hashCode ^
       inReplyToMsgID.hashCode ^
-      isMsgRead.hashCode;
+      isMsgRead.hashCode ^
+      deliveryStatus.hashCode;
 
   factory MMessage.fromMap(Map<String, dynamic> map) {
     return MMessage.raw(
@@ -105,6 +117,7 @@ class MMessage extends BaseModel {
           : map['is_msg_read'] == null
               ? false
               : (map['is_msg_read'] as num) != 0,
+      deliveryStatus: _statusFromValue(map['delivery_status']),
     );
   }
 
@@ -121,6 +134,7 @@ class MMessage extends BaseModel {
       'in_reply_to_id': inReplyToMsgID,
       'is_server_ack': isServerAck,
       'is_msg_read': isMsgRead,
+      'delivery_status': deliveryStatus.name,
     };
   }
 
@@ -135,7 +149,8 @@ class MMessage extends BaseModel {
         'inserted_at': String createdAt,
         'updated_at': String updatedAt,
         'is_system_msg': bool? kIsSystemMsg,
-        'in_reply_to_id': String? replyToID
+        'in_reply_to_id': String? replyToID,
+        'delivery_status': String? deliveryStatus,
       } =>
         MMessage.raw(
             id: id,
@@ -146,7 +161,8 @@ class MMessage extends BaseModel {
             createdAt: DateTime.parse(createdAt),
             updatedAt: DateTime.parse(updatedAt),
             kIsSystemMsg: kIsSystemMsg ?? false,
-            inReplyToMsgID: replyToID),
+            inReplyToMsgID: replyToID,
+            deliveryStatus: _statusFromValue(deliveryStatus)),
       _ => throw const FormatException('Failed to load message.'),
     };
   }
@@ -160,7 +176,8 @@ class MMessage extends BaseModel {
         'inserted_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
         'is_system_msg': kIsSystemMsg,
-        'in_reply_to_id': inReplyToMsgID
+        'in_reply_to_id': inReplyToMsgID,
+        'delivery_status': deliveryStatus.name
       };
 
   @override
@@ -184,6 +201,7 @@ class MMessage extends BaseModel {
     String? inReplyToMsgID,
     bool? isServerAck,
     bool? isMsgRead,
+    MessageDeliveryStatus? deliveryStatus,
   }) {
     return MMessage.raw(
       id: id ?? this.id,
@@ -197,6 +215,26 @@ class MMessage extends BaseModel {
       inReplyToMsgID: inReplyToMsgID ?? this.inReplyToMsgID,
       isServerAck: isServerAck ?? this.isServerAck,
       isMsgRead: isMsgRead ?? this.isMsgRead,
+      deliveryStatus: deliveryStatus ?? this.deliveryStatus,
     );
+  }
+
+  static MessageDeliveryStatus _statusFromValue(dynamic value) {
+    if (value == null) {
+      return MessageDeliveryStatus.delivered;
+    }
+
+    if (value is MessageDeliveryStatus) {
+      return value;
+    }
+
+    if (value is String) {
+      return MessageDeliveryStatus.values.firstWhere(
+        (status) => status.name == value,
+        orElse: () => MessageDeliveryStatus.delivered,
+      );
+    }
+
+    return MessageDeliveryStatus.delivered;
   }
 }

@@ -72,6 +72,7 @@ Future<void> createDatabase(Database db, int version) async {
       in_reply_to_id TEXT,
       is_server_ack INTEGER NOT NULL,
       is_msg_read INTEGER NOT NULL,
+      delivery_status TEXT NOT NULL,
       PRIMARY KEY (id, team_name)
     )''',
   );

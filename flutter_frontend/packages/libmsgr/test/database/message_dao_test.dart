@@ -43,6 +43,7 @@ void main() {
       expect(stored, hasLength(1));
       expect(stored.single.id, message.id);
       expect(stored.single.content, message.content);
+      expect(stored.single.deliveryStatus, MessageDeliveryStatus.delivered);
     });
 
     test('filters by team name', () async {
