@@ -87,4 +87,21 @@ Future<void> createDatabase(Database db, int version) async {
   await db.execute(
     'CREATE INDEX messages_profile_idx ON $messagesTable(team_name, profile_id)',
   );
+
+  await db.execute(
+    '''
+    CREATE TABLE $outgoingMessagesTable (
+      message_id TEXT NOT NULL,
+      team_name TEXT NOT NULL,
+      topic TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      last_attempt_at TEXT,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (message_id, team_name)
+    )''',
+  );
+
+  await db.execute(
+    'CREATE INDEX outgoing_messages_team_idx ON $outgoingMessagesTable(team_name)',
+  );
 }

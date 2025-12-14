@@ -1,20 +1,39 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:libmsgr/libmsgr.dart';
 import 'package:libmsgr/src/database/daos/message_dao.dart';
+import 'package:libmsgr/src/database/daos/outgoing_message_dao.dart';
+import 'package:libmsgr/src/models/outgoing_message.dart';
 import 'package:libmsgr/src/repositories/base.dart';
 import 'package:libmsgr/src/typedefs.dart';
 import 'package:phoenix_socket/phoenix_socket.dart';
 
-class MessageRepository extends BaseRepository<MMessage> {
-  final MessagesInTransit _outgoingMessages = [];
-  final MessageDao _dao;
+typedef MsgrConnectionProvider = MsgrConnection? Function();
 
-  MessageRepository({required super.teamName, required MessageDao dao})
-      : _dao = dao {
+class MessageRepository extends BaseRepository<MMessage> {
+  MessageRepository({
+    required super.teamName,
+    required MessageDao dao,
+    OutgoingMessageDao? outgoingMessageDao,
+    MsgrConnectionProvider? connectionProvider,
+  })  : _dao = dao,
+        _outgoingDao = outgoingMessageDao ??
+            OutgoingMessageDao(LibMsgr().databaseService.instance),
+        _connectionProvider = connectionProvider ??
+            () => LibMsgr().getWebsocketConnection() {
     log.info('MessageRepository is starting up.');
     unawaited(_hydrateFromDisk());
   }
+
+  static const Duration _baseBackoff = Duration(seconds: 2);
+  static const int _maxAttempts = 5;
+
+  final MessageDao _dao;
+  final OutgoingMessageDao _outgoingDao;
+  final MsgrConnectionProvider _connectionProvider;
+  Timer? _retryTimer;
+  bool _processingQueue = false;
 
   Future<void> _hydrateFromDisk() async {
     final stored = await _dao.getMessagesForTeam(teamName);
@@ -152,37 +171,134 @@ class MessageRepository extends BaseRepository<MMessage> {
     return listen;
   }
 
-  Push? sendMessageToRoom(MMessage msg) {
-    _outgoingMessages.add(msg);
-    final wsConn = LibMsgr().getWebsocketConnection();
-    Push? p = wsConn?.sendMessage('$teamName.${msg.roomID!}', msg);
-    if (p == null) {
-      log.severe('Error sending message: Push is null');
-      return null;
-    }
-    p.future.then((value) {
-      _outgoingMessages.remove(msg);
-    });
-    p.future.catchError((e) {
-      log.severe('Error sending message: $e');
-    });
-    return p;
+  Future<Push?> sendMessageToRoom(MMessage msg) {
+    return _enqueueAndSend(
+      msg.copyWith(isServerAck: false),
+      '$teamName.${msg.roomID!}',
+    );
   }
 
-  Push? sendMessageToConversation(MMessage msg) {
-    _outgoingMessages.add(msg);
-    final wsConn = LibMsgr().getWebsocketConnection();
-    Push? p = wsConn?.sendMessage('$teamName.${msg.conversationID!}', msg);
-    if (p == null) {
-      log.severe('Error sending message: Push is null');
+  Future<Push?> sendMessageToConversation(MMessage msg) {
+    return _enqueueAndSend(
+      msg.copyWith(isServerAck: false),
+      '$teamName.${msg.conversationID!}',
+    );
+  }
+
+  Future<void> processPendingQueue() async {
+    if (_processingQueue) {
+      return;
+    }
+    _processingQueue = true;
+
+    try {
+      final pending = await _outgoingDao.getPending(teamName);
+
+      if (pending.isEmpty) {
+        _retryTimer?.cancel();
+        _retryTimer = null;
+        return;
+      }
+
+      final now = DateTime.now();
+      Duration? nextAttemptIn;
+
+      for (final entry in pending) {
+        final delay = _backoffFor(entry);
+        final lastAttempt = entry.lastAttemptAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final nextAttemptAt = lastAttempt.add(delay);
+
+        if (entry.attemptCount >= _maxAttempts) {
+          log.warning(
+            'Dropping message ${entry.message.id} after $_maxAttempts failed attempts',
+          );
+          await _outgoingDao.delete(teamName, entry.message.id);
+          continue;
+        }
+
+        if (nextAttemptAt.isAfter(now)) {
+          final remaining = nextAttemptAt.difference(now);
+          if (nextAttemptIn == null || remaining < nextAttemptIn) {
+            nextAttemptIn = remaining;
+          }
+          continue;
+        }
+
+        await _sendQueuedMessage(entry);
+      }
+
+      if (nextAttemptIn != null) {
+        _retryTimer?.cancel();
+        _retryTimer = Timer(nextAttemptIn, processPendingQueue);
+      }
+    } finally {
+      _processingQueue = false;
+    }
+  }
+
+  Future<void> onConnectionChanged({required bool isConnected}) async {
+    if (isConnected) {
+      await processPendingQueue();
+    } else {
+      _retryTimer?.cancel();
+      _retryTimer = Timer(_baseBackoff, processPendingQueue);
+    }
+  }
+
+  Future<Push?> _enqueueAndSend(MMessage msg, String topic) async {
+    final entry = OutgoingMessage(message: msg, topic: topic);
+    await _outgoingDao.enqueue(teamName, entry);
+    final push = await _sendQueuedMessage(entry);
+    await processPendingQueue();
+    return push;
+  }
+
+  Future<Push?> _sendQueuedMessage(OutgoingMessage entry) async {
+    final wsConn = _connectionProvider();
+    if (wsConn == null || !wsConn.isConnected()) {
+      log.warning('No active websocket connection; will retry ${entry.message.id}');
+      _scheduleRetry();
       return null;
     }
-    p.future.then((value) {
-      _outgoingMessages.remove(msg);
+
+    final updatedEntry = entry.copyWith(
+      lastAttemptAt: DateTime.now(),
+      attemptCount: entry.attemptCount + 1,
+    );
+    await _outgoingDao.markAttempt(
+      teamName,
+      entry.message.id,
+      attemptedAt: updatedEntry.lastAttemptAt!,
+      attemptCount: updatedEntry.attemptCount,
+    );
+
+    final push = wsConn.sendMessage(entry.topic, entry.message);
+    if (push == null) {
+      log.severe('Error sending message: Push is null');
+      _scheduleRetry();
+      return null;
+    }
+
+    push.future.then((value) async {
+      await _outgoingDao.delete(teamName, entry.message.id);
+    }).catchError((e) async {
+      log.severe('Error sending message ${entry.message.id}: $e');
+      _scheduleRetry();
     });
-    p.future.catchError((e) {
-      log.severe('Error sending message: $e');
-    });
-    return p;
+    return push;
+  }
+
+  Duration _backoffFor(OutgoingMessage entry) {
+    final multiplier = math.pow(2, entry.attemptCount).toInt();
+    final seconds = (_baseBackoff.inSeconds * multiplier).clamp(
+      _baseBackoff.inSeconds,
+      60,
+    );
+    return Duration(seconds: seconds);
+  }
+
+  void _scheduleRetry() {
+    _retryTimer?.cancel();
+    _retryTimer = Timer(_baseBackoff, processPendingQueue);
   }
 }

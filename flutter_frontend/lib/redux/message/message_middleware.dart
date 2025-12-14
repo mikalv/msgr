@@ -23,7 +23,7 @@ void Function(
       final repos = LibMsgr()
           .repositoryFactory
           .getRepositories(store.state.authState.currentTeamName!);
-      final push = repos.messageRepository.sendMessageToRoom(action.msg);
+      final push = await repos.messageRepository.sendMessageToRoom(action.msg);
       if (push == null) {
         const error = 'Failed to enqueue message.';
         action.completer.completeError(error);

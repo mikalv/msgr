@@ -19,3 +19,4 @@ const omemoTrustTable = 'OmemoTrustTable';
 const notificationsTable = 'Notifications';
 const groupchatTable = 'Groupchat';
 const groupchatMembersTable = 'GroupchatMembers';
+const outgoingMessagesTable = 'OutgoingMessages';

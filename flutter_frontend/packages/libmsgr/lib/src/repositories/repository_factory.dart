@@ -1,5 +1,6 @@
 import 'package:libmsgr/src/database/daos/contact_dao.dart';
 import 'package:libmsgr/src/database/daos/message_dao.dart';
+import 'package:libmsgr/src/database/daos/outgoing_message_dao.dart';
 import 'package:libmsgr/src/database/database.dart';
 import 'package:libmsgr/src/typedefs.dart';
 
@@ -35,6 +36,7 @@ class TeamRepositories {
   TeamRepositories(this.teamName, this.database) {
     final db = database.instance;
     final messageDao = MessageDao(db);
+    final outgoingDao = OutgoingMessageDao(db);
     final contactDao = ContactDao(db);
 
     roomRepository = RoomRepository(teamName: teamName);
@@ -42,6 +44,7 @@ class TeamRepositories {
     messageRepository = MessageRepository(
       teamName: teamName,
       dao: messageDao,
+      outgoingMessageDao: outgoingDao,
     );
     profileRepository = ProfileRepository(
       teamName: teamName,

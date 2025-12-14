@@ -6,7 +6,6 @@ typedef ConversationCacheType = Map<String, Conversation>;
 typedef ConversationList = List<Conversation>;
 
 typedef MessageCacheType = Map<String, List<MMessage>>;
-typedef MessagesInTransit = List<MMessage>;
 typedef MessageList = List<MMessage>;
 
 typedef ProfileCacheType = Map<String, Profile>;
