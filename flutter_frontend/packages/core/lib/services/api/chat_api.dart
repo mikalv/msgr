@@ -1,0 +1,491 @@
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+import 'package:messngr/config/app_constants.dart';
+import 'package:messngr/features/chat/models/chat_message.dart';
+import 'package:messngr/features/chat/models/chat_thread.dart';
+
+class ApiException implements Exception {
+  ApiException(this.statusCode, this.body);
+
+  final int statusCode;
+  final String body;
+
+  @override
+  String toString() => 'ApiException(statusCode: $statusCode, body: $body)';
+}
+
+class AccountIdentity {
+  const AccountIdentity({
+    required this.accountId,
+    required this.profileId,
+    required this.noiseToken,
+    this.noiseSessionId,
+  });
+
+  final String accountId;
+  final String profileId;
+  final String noiseToken;
+  final String? noiseSessionId;
+}
+
+class ThumbnailUploadInfo {
+  const ThumbnailUploadInfo({
+    required this.method,
+    required this.url,
+    required this.headers,
+    required this.bucket,
+    required this.objectKey,
+    required this.publicUrl,
+    required this.expiresAt,
+  });
+
+  final String method;
+  final Uri url;
+  final Map<String, String> headers;
+  final String bucket;
+  final String objectKey;
+  final Uri publicUrl;
+  final DateTime expiresAt;
+
+  factory ThumbnailUploadInfo.fromJson(Map<String, dynamic> json) {
+    return ThumbnailUploadInfo(
+      method: json['method'] as String? ?? 'PUT',
+      url: Uri.parse(json['url'] as String? ?? ''),
+      headers: _stringMap(json['headers'] as Map<String, dynamic>? ?? const {}),
+      bucket: json['bucket'] as String? ?? '',
+      objectKey:
+          json['object_key'] as String? ?? json['objectKey'] as String? ?? '',
+      publicUrl: Uri.parse(
+          json['public_url'] as String? ?? json['publicUrl'] as String? ?? ''),
+      expiresAt: DateTime.tryParse(json['expires_at'] as String? ??
+              json['expiresAt'] as String? ??
+              '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'method': method,
+      'url': url.toString(),
+      'headers': headers,
+      'bucket': bucket,
+      'objectKey': objectKey,
+      'publicUrl': publicUrl.toString(),
+      'expiresAt': expiresAt.toIso8601String(),
+    };
+  }
+}
+
+class PresignedUploadInfo {
+  const PresignedUploadInfo({
+    required this.method,
+    required this.url,
+    required this.headers,
+    required this.bucket,
+    required this.objectKey,
+    required this.publicUrl,
+    required this.expiresAt,
+    this.retentionExpiresAt,
+    this.thumbnail,
+    required this.encryption,
+    required this.clientState,
+  });
+
+  final String method;
+  final Uri url;
+  final Map<String, String> headers;
+  final String bucket;
+  final String objectKey;
+  final Uri publicUrl;
+  final DateTime expiresAt;
+  final DateTime? retentionExpiresAt;
+  final ThumbnailUploadInfo? thumbnail;
+  final UploadEncryptionDescriptor encryption;
+  final UploadClientState clientState;
+
+  factory PresignedUploadInfo.fromJson(Map<String, dynamic> json) {
+    final thumbnail = json['thumbnail_upload'] ?? json['thumbnailUpload'];
+    return PresignedUploadInfo(
+      method: json['method'] as String? ?? 'PUT',
+      url: Uri.parse(json['url'] as String? ?? ''),
+      headers: _stringMap(json['headers'] as Map<String, dynamic>? ?? const {}),
+      bucket: json['bucket'] as String? ?? '',
+      objectKey:
+          json['object_key'] as String? ?? json['objectKey'] as String? ?? '',
+      publicUrl: Uri.parse(
+          json['public_url'] as String? ?? json['publicUrl'] as String? ?? ''),
+      expiresAt: DateTime.tryParse(json['expires_at'] as String? ??
+              json['expiresAt'] as String? ??
+              '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      retentionExpiresAt: DateTime.tryParse(
+          json['retention_expires_at'] as String? ??
+              json['retentionExpiresAt'] as String? ??
+              ''),
+      thumbnail: thumbnail is Map<String, dynamic>
+          ? ThumbnailUploadInfo.fromJson(thumbnail)
+          : null,
+      encryption: UploadEncryptionDescriptor.fromJson(
+          json['encryption'] as Map<String, dynamic>? ?? const {}),
+      clientState: UploadClientState.fromJson(
+          json['client_state'] as Map<String, dynamic>? ??
+              json['clientState'] as Map<String, dynamic>? ??
+              const {}),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'method': method,
+      'url': url.toString(),
+      'headers': headers,
+      'bucket': bucket,
+      'objectKey': objectKey,
+      'publicUrl': publicUrl.toString(),
+      'expiresAt': expiresAt.toIso8601String(),
+      if (retentionExpiresAt != null)
+        'retentionExpiresAt': retentionExpiresAt!.toIso8601String(),
+      'encryption': encryption.toJson(),
+      'clientState': clientState.toJson(),
+      if (thumbnail != null) 'thumbnail': thumbnail!.toJson(),
+    };
+  }
+}
+
+class MediaUploadSession {
+  const MediaUploadSession({
+    required this.id,
+    required this.kind,
+    required this.contentType,
+    required this.byteSize,
+    required this.instructions,
+  });
+
+  final String id;
+  final String kind;
+  final String contentType;
+  final int byteSize;
+  final PresignedUploadInfo instructions;
+
+  factory MediaUploadSession.fromJson(Map<String, dynamic> json) {
+    return MediaUploadSession(
+      id: json['id'] as String? ?? '',
+      kind: json['kind'] as String? ?? 'file',
+      contentType: json['content_type'] as String? ??
+          json['contentType'] as String? ??
+          'application/octet-stream',
+      byteSize: (json['byte_size'] as num?)?.toInt() ?? 0,
+      instructions: PresignedUploadInfo.fromJson(
+          json['upload'] as Map<String, dynamic>? ?? const {}),
+    );
+  }
+}
+
+class UploadEncryptionDescriptor {
+  const UploadEncryptionDescriptor({
+    required this.strategy,
+    required this.cipher,
+    required this.kmsKeyAlias,
+    required this.placeholders,
+  });
+
+  final String strategy;
+  final String cipher;
+  final String kmsKeyAlias;
+  final Map<String, dynamic> placeholders;
+
+  factory UploadEncryptionDescriptor.fromJson(Map<String, dynamic> json) {
+    return UploadEncryptionDescriptor(
+      strategy: json['strategy'] as String? ?? 'profile-enveloped',
+      cipher: json['cipher'] as String? ?? 'aes-256-gcm',
+      kmsKeyAlias: json['kmsKeyAlias'] as String? ?? json['kms_key_alias'] as String? ?? '',
+      placeholders: json['placeholders'] as Map<String, dynamic>? ?? const {},
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'strategy': strategy,
+      'cipher': cipher,
+      'kmsKeyAlias': kmsKeyAlias,
+      'placeholders': placeholders,
+    };
+  }
+}
+
+class UploadClientState {
+  const UploadClientState({
+    required this.profileId,
+    required this.profileKeyFingerprint,
+    required this.clientSnapshotVersion,
+  });
+
+  final String profileId;
+  final String? profileKeyFingerprint;
+  final int clientSnapshotVersion;
+
+  factory UploadClientState.fromJson(Map<String, dynamic> json) {
+    return UploadClientState(
+      profileId: json['profileId'] as String? ?? '',
+      profileKeyFingerprint: json['profileKeyFingerprint'] as String?,
+      clientSnapshotVersion:
+          (json['clientSnapshotVersion'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'profileId': profileId,
+      'profileKeyFingerprint': profileKeyFingerprint,
+      'clientSnapshotVersion': clientSnapshotVersion,
+    };
+  }
+}
+
+class ChatApi {
+  ChatApi({http.Client? client}) : _client = client ?? http.Client();
+
+  final http.Client _client;
+
+  Future<ChatThread> ensureDirectConversation({
+    required AccountIdentity current,
+    required String targetProfileId,
+  }) async {
+    final response = await _client.post(
+      backendApiUri('conversations'),
+      headers: _authHeaders(current),
+      body: jsonEncode({'target_profile_id': targetProfileId}),
+    );
+
+    final decoded = _decodeBody(response);
+    final data = decoded['data'] as Map<String, dynamic>;
+    return ChatThread.fromJson(data);
+  }
+
+  Future<List<ChatThread>> listConversations({
+    required AccountIdentity current,
+  }) async {
+    final response = await _client.get(
+      backendApiUri('conversations'),
+      headers: _authHeaders(current),
+    );
+
+    final decoded = _decodeBody(response);
+    final data = decoded['data'] as List<dynamic>? ?? const [];
+    return data
+        .map((raw) => ChatThread.fromJson(raw as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<ChatThread> createGroupConversation({
+    required AccountIdentity current,
+    required String topic,
+    required List<String> participantIds,
+    ChatStructureType structureType = ChatStructureType.friends,
+  }) async {
+    final response = await _client.post(
+      backendApiUri('conversations'),
+      headers: _authHeaders(current),
+      body: jsonEncode({
+        'kind': 'group',
+        'topic': topic,
+        'participant_ids': participantIds,
+        'structure_type': _structureTypeToJson(structureType),
+      }),
+    );
+
+    final decoded = _decodeBody(response);
+    final data = decoded['data'] as Map<String, dynamic>;
+    return ChatThread.fromJson(data);
+  }
+
+  Future<ChatThread> createChannelConversation({
+    required AccountIdentity current,
+    required String topic,
+    List<String> participantIds = const [],
+    ChatStructureType structureType = ChatStructureType.project,
+    ChatVisibility visibility = ChatVisibility.team,
+  }) async {
+    final response = await _client.post(
+      backendApiUri('conversations'),
+      headers: _authHeaders(current),
+      body: jsonEncode({
+        'kind': 'channel',
+        'topic': topic,
+        'participant_ids': participantIds,
+        'structure_type': _structureTypeToJson(structureType),
+        'visibility': _visibilityToJson(visibility),
+      }),
+    );
+
+    final decoded = _decodeBody(response);
+    final data = decoded['data'] as Map<String, dynamic>;
+    return ChatThread.fromJson(data);
+  }
+
+  Future<List<ChatMessage>> fetchMessages({
+    required AccountIdentity current,
+    required String conversationId,
+    int limit = 50,
+  }) async {
+    final uri = backendApiUri(
+      'conversations/$conversationId/messages',
+      queryParameters: {'limit': '$limit'},
+    );
+
+    final response = await _client.get(uri, headers: _authHeaders(current));
+
+    final decoded = _decodeBody(response);
+    final data = decoded['data'] as List<dynamic>;
+    return data
+        .map((raw) => ChatMessage.fromJson(raw as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<ChatMessage> sendStructuredMessage({
+    required AccountIdentity current,
+    required String conversationId,
+    Map<String, dynamic>? message,
+    String? body,
+    String? kind,
+    Map<String, dynamic>? media,
+    Map<String, dynamic>? payload,
+  }) async {
+    final Map<String, dynamic> payloadMap = {};
+    if (message != null) {
+      payloadMap.addAll(message);
+    }
+    if (body != null && body.isNotEmpty) {
+      payloadMap['body'] = body;
+    }
+    if (kind != null && kind.isNotEmpty) {
+      payloadMap['kind'] = kind;
+    }
+    if (media != null && media.isNotEmpty) {
+      payloadMap['media'] = media;
+    }
+    if (payload != null && payload.isNotEmpty) {
+      payloadMap['payload'] = payload;
+    }
+
+    if (payloadMap.isEmpty) {
+      throw ArgumentError('message payload cannot be empty');
+    }
+
+    final response = await _client.post(
+      backendApiUri('conversations/$conversationId/messages'),
+      headers: _authHeaders(current),
+      body: jsonEncode({'message': payloadMap}),
+    );
+
+    final decoded = _decodeBody(response);
+    return ChatMessage.fromJson(decoded['data'] as Map<String, dynamic>);
+  }
+
+  Future<ChatMessage> sendMessage({
+    required AccountIdentity current,
+    required String conversationId,
+    required String body,
+  }) {
+    return sendStructuredMessage(
+      current: current,
+      conversationId: conversationId,
+      body: body,
+    );
+  }
+
+  Future<MediaUploadSession> createMediaUpload({
+    required AccountIdentity current,
+    required String conversationId,
+    required String kind,
+    required String contentType,
+    required int byteSize,
+    String? filename,
+  }) async {
+    final response = await _client.post(
+      backendApiUri('conversations/$conversationId/uploads'),
+      headers: _authHeaders(current),
+      body: jsonEncode({
+        'upload': {
+          'kind': kind,
+          'content_type': contentType,
+          'byte_size': byteSize,
+          if (filename != null) 'filename': filename,
+        }
+      }),
+    );
+
+    final decoded = _decodeBody(response);
+    final data = decoded['data'] as Map<String, dynamic>;
+    return MediaUploadSession.fromJson(data);
+  }
+
+  Map<String, String> _authHeaders(AccountIdentity identity) {
+    final token = identity.noiseToken.trim();
+    if (token.isEmpty) {
+      throw ApiException(
+        401,
+        'Missing Noise session token for account ${identity.accountId}',
+      );
+    }
+
+    return {
+      'Content-Type': 'application/json',
+      'x-account-id': identity.accountId,
+      'x-profile-id': identity.profileId,
+      'Authorization': 'Noise $token',
+    };
+  }
+
+  String _structureTypeToJson(ChatStructureType type) {
+    switch (type) {
+      case ChatStructureType.family:
+        return 'family';
+      case ChatStructureType.business:
+        return 'business';
+      case ChatStructureType.friends:
+        return 'friends';
+      case ChatStructureType.project:
+        return 'project';
+      case ChatStructureType.other:
+        return 'other';
+    }
+  }
+
+  String _visibilityToJson(ChatVisibility visibility) {
+    switch (visibility) {
+      case ChatVisibility.private:
+        return 'private';
+      case ChatVisibility.team:
+        return 'team';
+    }
+  }
+
+  Map<String, String> _stringHeaders(Map<dynamic, dynamic> headers) {
+    return headers
+        .map((key, value) => MapEntry(key.toString(), value.toString()));
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value is String && value.isNotEmpty) {
+      return DateTime.tryParse(value);
+    }
+    return null;
+  }
+
+  Map<String, dynamic> _decodeBody(http.Response response) {
+    final body = response.body.isEmpty ? '{}' : response.body;
+    final decoded = jsonDecode(body) as Map<String, dynamic>;
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return decoded;
+    }
+    throw ApiException(response.statusCode, response.body);
+  }
+
+  static Map<String, String> _stringMap(Map<String, dynamic> input) {
+    return input.map((key, value) =>
+        MapEntry(key.toString(), value == null ? '' : value.toString()));
+  }
+}

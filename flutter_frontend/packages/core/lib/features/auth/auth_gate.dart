@@ -1,0 +1,120 @@
+import 'package:flutter/material.dart';
+import 'package:messngr/features/auth/auth_identity_store.dart';
+import 'package:messngr/features/auth/dev_login_page.dart';
+import 'package:messngr/services/api/chat_api.dart';
+import 'package:provider/provider.dart';
+
+class AuthSession {
+  const AuthSession({
+    required this.identity,
+    required this.signOut,
+    required this.updateIdentity,
+  });
+
+  final AccountIdentity identity;
+  final Future<void> Function() signOut;
+  final Future<void> Function(AccountIdentity identity, {String? displayName})
+      updateIdentity;
+}
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  final AuthIdentityStore _store = AuthIdentityStore.instance;
+  AccountIdentity? _identity;
+  String? _displayName;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadIdentity();
+  }
+
+  Future<void> _loadIdentity() async {
+    final identity = await _store.load();
+    final displayName = await _store.displayName();
+    if (!mounted) return;
+    setState(() {
+      _identity = identity;
+      _displayName = displayName;
+      _loading = false;
+    });
+  }
+
+  Future<void> _handleSignedIn(DevLoginResult result) async {
+    await _store.save(
+      result.identity,
+      displayName: result.displayName,
+      noiseSessionId: result.noiseSessionId,
+      devicePrivateKey: result.devicePrivateKey,
+      devicePublicKey: result.devicePublicKey,
+    );
+    if (!mounted) return;
+    setState(() {
+      _identity = result.identity;
+      _displayName = result.displayName;
+    });
+  }
+
+  Future<void> _handleSignOut() async {
+    await _store.clear();
+    if (!mounted) return;
+    setState(() {
+      _identity = null;
+      _displayName = null;
+    });
+  }
+
+  Future<void> _handleIdentityUpdated(AccountIdentity identity,
+      {String? displayName}) async {
+    await _store.save(
+      identity,
+      displayName: displayName ?? _displayName,
+      noiseSessionId: identity.noiseSessionId,
+    );
+    if (!mounted) return;
+    setState(() {
+      _identity = identity;
+      if (displayName != null && displayName.isNotEmpty) {
+        _displayName = displayName;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_identity == null) {
+      return DevLoginPage(onSignedIn: _handleSignedIn);
+    }
+
+    final session = AuthSession(
+      identity: _identity!,
+      signOut: _handleSignOut,
+      updateIdentity: _handleIdentityUpdated,
+    );
+    return MultiProvider(
+      providers: [
+        Provider<AuthSession>.value(value: session),
+        Provider<AccountIdentity>.value(value: session.identity),
+        Provider<String?>.value(value: _displayName),
+      ],
+      child: widget.child,
+    );
+  }
+}
