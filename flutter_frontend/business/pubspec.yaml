@@ -1,0 +1,40 @@
+name: msgr_business
+description: Msgr Business - Team collaboration and workspace messaging
+publish_to: 'none'
+version: 0.1.1+1
+
+environment:
+  sdk: ^3.5.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Core shared package
+  core:
+    path: ../packages/core
+
+  # Riverpod for state management
+  flutter_riverpod: ^2.6.1
+
+  # Navigation
+  go_router: ^14.2.7
+
+dev_dependencies:
+  flutter_launcher_icons: ^0.13.1
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+# App icons configuration
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/business_icon.png"
+  adaptive_icon_background: "#2196F3"
+  adaptive_icon_foreground: "assets/icon/business_icon_foreground.png"
+
+flutter:
+  uses-material-design: true
