@@ -1,24 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/navigation/navigation_actions.dart';
+import 'package:messngr/providers/auth_provider.dart';
 import 'package:messngr/ui/widgets/CategorySelector.dart';
 import 'package:messngr/features/chat/chat_page.dart';
 import 'package:messngr/ui/widgets/conversation/conversations_list_widget.dart';
 import 'package:messngr/ui/widgets/profile/profile_mode_switcher.dart';
 import 'package:messngr/ui/widgets/room/room_list_widget.dart';
-import 'package:messngr/utils/flutter_redux.dart';
-import 'package:redux/redux.dart';
+import 'package:go_router/go_router.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
   HomePageState createState() => HomePageState();
 }
 
-class HomePageState extends State<HomePage> {
+class HomePageState extends ConsumerState<HomePage> {
   static const double _tabletBreakpoint = 900;
   static const double _desktopBreakpoint = 1280;
 
@@ -40,35 +39,28 @@ class HomePageState extends State<HomePage> {
     }
   }
 
-  void _openSettings(Store<AppState> store) {
-    store.dispatch(
-      NavigateShellToNewRouteAction(route: AppNavigation.settingsPath),
-    );
+  void _openSettings() {
+    context.go(AppNavigation.settingsPath);
   }
 
-  void _openInvite(Store<AppState> store) {
-    store.dispatch(
-      NavigateShellToNewRouteAction(route: AppNavigation.inviteMemberPath),
-    );
+  void _openInvite() {
+    context.go(AppNavigation.inviteMemberPath);
   }
 
-  void _createRoom(Store<AppState> store) {
-    final teamName = store.state.authState.currentTeamName;
-    if (teamName == null) {
+  void _createRoom() {
+    final currentTeam = ref.read(currentTeamProvider);
+    if (currentTeam == null) {
       return;
     }
-    store.dispatch(NavigateShellToNewRouteAction(
-        route: AppNavigation.createRoomPath + teamName, kUsePush: true));
+    context.push(AppNavigation.createRoomPath + currentTeam.name);
   }
 
-  void _createConversation(Store<AppState> store) {
-    final teamName = store.state.authState.currentTeamName;
-    if (teamName == null) {
+  void _createConversation() {
+    final currentTeam = ref.read(currentTeamProvider);
+    if (currentTeam == null) {
       return;
     }
-    store.dispatch(NavigateShellToNewRouteAction(
-        route: AppNavigation.createConversationPath + teamName,
-        kUsePush: true));
+    context.push(AppNavigation.createConversationPath + currentTeam.name);
   }
 
   void _openDrawer() {
@@ -86,20 +78,17 @@ class HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final store = StoreProvider.of<AppState>(context);
-
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= _desktopBreakpoint) {
           return _HomeDesktopLayout(
-            store: store,
             categories: _categories,
             selectedCategory: _selectedCategory,
             onCategorySelected: _handleCategoryChanged,
-            onInvite: () => _openInvite(store),
-            onSettings: () => _openSettings(store),
-            onCreateRoom: () => _createRoom(store),
-            onCreateConversation: () => _createConversation(store),
+            onInvite: _openInvite,
+            onSettings: _openSettings,
+            onCreateRoom: _createRoom,
+            onCreateConversation: _createConversation,
             onOpenDrawer: _openDrawer,
             modeFilter: _activeModeFilter,
             onModeFilterChanged: _handleInboxFilterChanged,
@@ -108,14 +97,13 @@ class HomePageState extends State<HomePage> {
 
         if (constraints.maxWidth >= _tabletBreakpoint) {
           return _HomeTabletLayout(
-            store: store,
             categories: _categories,
             selectedCategory: _selectedCategory,
             onCategorySelected: _handleCategoryChanged,
-            onInvite: () => _openInvite(store),
-            onSettings: () => _openSettings(store),
-            onCreateRoom: () => _createRoom(store),
-            onCreateConversation: () => _createConversation(store),
+            onInvite: _openInvite,
+            onSettings: _openSettings,
+            onCreateRoom: _createRoom,
+            onCreateConversation: _createConversation,
             onOpenDrawer: _openDrawer,
             modeFilter: _activeModeFilter,
             onModeFilterChanged: _handleInboxFilterChanged,
@@ -123,14 +111,13 @@ class HomePageState extends State<HomePage> {
         }
 
         return _HomeCompactLayout(
-          store: store,
           categories: _categories,
           selectedCategory: _selectedCategory,
           onCategorySelected: _handleCategoryChanged,
-          onInvite: () => _openInvite(store),
-          onSettings: () => _openSettings(store),
-          onCreateRoom: () => _createRoom(store),
-          onCreateConversation: () => _createConversation(store),
+          onInvite: _openInvite,
+          onSettings: _openSettings,
+          onCreateRoom: _createRoom,
+          onCreateConversation: _createConversation,
           onOpenDrawer: _openDrawer,
           modeFilter: _activeModeFilter,
           onModeFilterChanged: _handleInboxFilterChanged,
@@ -142,7 +129,6 @@ class HomePageState extends State<HomePage> {
 
 class _HomeCompactLayout extends StatelessWidget {
   const _HomeCompactLayout({
-    required this.store,
     required this.categories,
     required this.selectedCategory,
     required this.onCategorySelected,
@@ -154,8 +140,6 @@ class _HomeCompactLayout extends StatelessWidget {
     required this.modeFilter,
     required this.onModeFilterChanged,
   });
-
-  final Store<AppState> store;
   final List<String> categories;
   final int selectedCategory;
   final ValueChanged<int> onCategorySelected;
@@ -213,7 +197,6 @@ class _HomeCompactLayout extends StatelessWidget {
 
 class _HomeTabletLayout extends StatelessWidget {
   const _HomeTabletLayout({
-    required this.store,
     required this.categories,
     required this.selectedCategory,
     required this.onCategorySelected,
@@ -225,8 +208,6 @@ class _HomeTabletLayout extends StatelessWidget {
     required this.modeFilter,
     required this.onModeFilterChanged,
   });
-
-  final Store<AppState> store;
   final List<String> categories;
   final int selectedCategory;
   final ValueChanged<int> onCategorySelected;
@@ -256,7 +237,6 @@ class _HomeTabletLayout extends StatelessWidget {
                 SizedBox(
                   width: 340,
                   child: _HomeInboxPanel(
-                    store: store,
                     categories: categories,
                     selectedCategory: selectedCategory,
                     onCategorySelected: onCategorySelected,
@@ -294,7 +274,6 @@ class _HomeTabletLayout extends StatelessWidget {
 
 class _HomeDesktopLayout extends StatelessWidget {
   const _HomeDesktopLayout({
-    required this.store,
     required this.categories,
     required this.selectedCategory,
     required this.onCategorySelected,
@@ -306,8 +285,6 @@ class _HomeDesktopLayout extends StatelessWidget {
     required this.modeFilter,
     required this.onModeFilterChanged,
   });
-
-  final Store<AppState> store;
   final List<String> categories;
   final int selectedCategory;
   final ValueChanged<int> onCategorySelected;
@@ -346,7 +323,6 @@ class _HomeDesktopLayout extends StatelessWidget {
                 SizedBox(
                   width: 360,
                   child: _HomeInboxPanel(
-                    store: store,
                     onCreateConversation: onCreateConversation,
                     onCreateRoom: onCreateRoom,
                     modeFilter: modeFilter,
@@ -506,9 +482,8 @@ class _SidebarButton extends StatelessWidget {
   }
 }
 
-class _HomeInboxPanel extends StatelessWidget {
+class _HomeInboxPanel extends ConsumerWidget {
   const _HomeInboxPanel({
-    required this.store,
     required this.onCreateConversation,
     required this.onCreateRoom,
     this.categories,
@@ -517,8 +492,6 @@ class _HomeInboxPanel extends StatelessWidget {
     required this.modeFilter,
     required this.onFilterChanged,
   });
-
-  final Store<AppState> store;
   final VoidCallback onCreateConversation;
   final VoidCallback onCreateRoom;
   final List<String>? categories;
@@ -528,7 +501,7 @@ class _HomeInboxPanel extends StatelessWidget {
   final ValueChanged<ProfileMode?> onFilterChanged;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
     return Container(
@@ -620,14 +593,11 @@ class _HomeInboxPanel extends StatelessWidget {
                   children: [
                     RoomListWidget(
                       context: context,
-                      rooms: store.state.teamState?.rooms ?? [],
-                      store: store,
+                      modeFilter: modeFilter,
                     ),
                     const SizedBox(height: 24),
                     ConversationsListWidget(
                       context: context,
-                      conversations: store.state.teamState?.conversations ?? [],
-                      store: store,
                       modeFilter: modeFilter,
                     ),
                   ],

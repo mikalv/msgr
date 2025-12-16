@@ -1,38 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/config/theme.dart';
 import 'package:messngr/config/theme/channel_list_view_theme.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/navigation/navigation_actions.dart';
-import 'package:redux/redux.dart';
+import 'package:messngr/providers/auth_provider.dart';
+import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-class RoomListItem extends StatefulWidget {
-  final Store<AppState> store;
+class RoomListItem extends ConsumerStatefulWidget {
   final Room room;
   final int index;
   const RoomListItem(
       {super.key,
-      required this.store,
       required this.room,
       required this.index});
 
   @override
-  State<RoomListItem> createState() => _RoomListItemState();
+  ConsumerState<RoomListItem> createState() => _RoomListItemState();
 }
 
-class _RoomListItemState extends State<RoomListItem> {
+class _RoomListItemState extends ConsumerState<RoomListItem> {
   late final MessageRepository messageRepository;
   late final ProfileRepository profileRepository;
 
   @override
   void initState() {
-    final repos = LibMsgr()
-        .repositoryFactory
-        .getRepositories(widget.store.state.teamState!.selectedTeam!.name);
-    messageRepository = repos.messageRepository;
-    profileRepository = repos.profileRepository;
+    final currentTeam = ref.read(currentTeamProvider);
+    if (currentTeam != null) {
+      final repos = LibMsgr()
+          .repositoryFactory
+          .getRepositories(currentTeam.name);
+      messageRepository = repos.messageRepository;
+      profileRepository = repos.profileRepository;
+    }
     super.initState();
   }
 
@@ -53,13 +54,12 @@ class _RoomListItemState extends State<RoomListItem> {
       lastMsgTimeString = timeago.format(lastMessage.updatedAt);
     }
     return GestureDetector(
-      onTap: () => widget.store.dispatch(NavigateShellToNewRouteAction(
-          route: '${AppNavigation.roomsPath}/${widget.room.id}',
-          context: context,
-          kRouteArgs: {
-            'teamName': widget.store.state.teamState!.selectedTeam!.name
-          },
-          kUsePush: false)),
+      onTap: () {
+        final currentTeam = ref.read(currentTeamProvider);
+        if (currentTeam != null) {
+          context.go('${AppNavigation.roomsPath}/${widget.room.id}');
+        }
+      },
       child: Container(
         margin: theme.data.margin,
         padding: theme.data.padding,

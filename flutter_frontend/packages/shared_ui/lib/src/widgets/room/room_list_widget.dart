@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/config/theme.dart';
-import 'package:messngr/providers/auth_provider.dart';
-import 'package:messngr/providers/team_provider.dart';
+import 'package:messngr/redux/app_state.dart';
+import 'package:messngr/redux/navigation/navigation_actions.dart';
 import 'package:messngr/ui/widgets/room/room_list_item.dart';
-import 'package:go_router/go_router.dart';
+import 'package:messngr/utils/flutter_redux.dart';
 
-class RoomListWidget extends ConsumerWidget {
+class RoomListWidget extends StatelessWidget {
   const RoomListWidget({
     super.key,
     required this.context,
-    this.modeFilter,
+    required this.rooms,
+    required this.store,
   });
 
-  final BuildContext context;
-  final ProfileMode? modeFilter;
+  final dynamic context;
+  final dynamic rooms;
+  final dynamic store;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final rooms = ref.watch(roomsProvider);
+  Widget build(BuildContext context) {
     final theList = ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -28,7 +28,7 @@ class RoomListWidget extends ConsumerWidget {
       itemBuilder: (BuildContext context, int index) {
         final Room room = rooms[index];
         return RoomListItem(
-            key: Key(room.id), room: room, index: index);
+            key: Key(room.id), store: store, room: room, index: index);
       },
     );
     return Column(
@@ -44,10 +44,11 @@ class RoomListWidget extends ConsumerWidget {
             IconButton(
               icon: const Icon(Icons.add_comment),
               onPressed: () {
-                final currentTeam = ref.read(currentTeamProvider);
-                if (currentTeam != null) {
-                  context.push(AppNavigation.createRoomPath + currentTeam.name);
-                }
+                StoreProvider.of<AppState>(context).dispatch(
+                    NavigateShellToNewRouteAction(
+                        route: AppNavigation.createRoomPath +
+                            store.state.authState.currentTeamName!,
+                        kUsePush: true));
               },
             )
           ],

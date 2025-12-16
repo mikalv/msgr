@@ -1,16 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:messngr/config/app_constants.dart';
 import 'package:messngr/config/theme.dart';
 import 'package:messngr/config/themedata.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/authentication/auth_actions.dart';
-import 'package:messngr/redux/setup.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/services/app_localizations.dart';
-import 'package:messngr/utils/flutter_redux.dart';
 import 'package:messngr/services/localization/translator.dart';
-import 'package:redux/redux.dart';
 import 'package:messngr/ui/widgets/misc/connectivity_banner.dart';
 
 class MessngrApp extends StatelessWidget {
@@ -38,7 +34,6 @@ class MessngrWrapper extends StatefulWidget {
 class _MessngrWrapperState extends State<MessngrWrapper>
     with TickerProviderStateMixin {
   Locale? _locale;
-  final Future<Store<AppState>> reduxStore = ReduxSetup.getReduxStore();
 
   _MessngrWrapperState();
 
@@ -51,10 +46,7 @@ class _MessngrWrapperState extends State<MessngrWrapper>
   @override
   void initState() {
     super.initState();
-    reduxStore.then((store) {
-      store.dispatch(VerifyAuthStateAction());
-      store.dispatch(OpenWebsocketIfNotAlready());
-    });
+    // TODO: Initialize auth state and WebSocket connection here
     getLocale().then((locale) {
       setState(() {
         _locale = locale;
@@ -116,50 +108,35 @@ class _MessngrWrapperState extends State<MessngrWrapper>
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-        future: reduxStore,
-        builder:
-            (BuildContext context, AsyncSnapshot<Store<AppState>> snapshot) {
-          switch (snapshot.connectionState) {
-            case ConnectionState.waiting:
-              return loadingScreen();
-            default:
-              if (snapshot.hasError) {
-                return Text('Error: ${snapshot.error}');
-              } else {
-                final appThemeData = AppThemeData();
-                return StoreProvider(
-                    store: snapshot.data!,
-                    child: AppTheme(
-                        data: appThemeData,
-                        child: MaterialApp.router(
-                          title: appTitle,
-                          theme: materialThemeData,
-                          debugShowCheckedModeBanner: false,
-                          builder: (context, child) =>
-                              ConnectivityBanner(child: child),
-                          localizationsDelegates: const [
-                            AppLocalizations.delegate,
-                            DefaultMaterialLocalizations.delegate,
-                            DefaultCupertinoLocalizations.delegate,
-                            DefaultWidgetsLocalizations.delegate,
-                          ],
-                          supportedLocales: kSupportedLocales,
-                          localeResolutionCallback: (locale, supportedLocales) {
-                            for (var supportedLocale in supportedLocales) {
-                              if (supportedLocale.languageCode ==
-                                      locale!.languageCode &&
-                                  supportedLocale.countryCode ==
-                                      locale.countryCode) {
-                                return supportedLocale;
-                              }
-                            }
-                          },
-                          routerConfig: AppNavigation.router,
-                        )));
+    final appThemeData = AppThemeData();
+    return ProviderScope(
+      child: AppTheme(
+        data: appThemeData,
+        child: MaterialApp.router(
+          title: appTitle,
+          theme: materialThemeData,
+          debugShowCheckedModeBanner: false,
+          builder: (context, child) => ConnectivityBanner(child: child),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            DefaultMaterialLocalizations.delegate,
+            DefaultCupertinoLocalizations.delegate,
+            DefaultWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: kSupportedLocales,
+          localeResolutionCallback: (locale, supportedLocales) {
+            for (var supportedLocale in supportedLocales) {
+              if (supportedLocale.languageCode == locale!.languageCode &&
+                  supportedLocale.countryCode == locale.countryCode) {
+                return supportedLocale;
               }
-          }
-        });
+            }
+            return null;
+          },
+          routerConfig: AppNavigation.router,
+        ),
+      ),
+    );
   }
 }
 

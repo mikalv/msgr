@@ -1,0 +1,38 @@
+name: shared_ui
+description: Shared UI components for Msgr apps (workspace and personal)
+version: 0.1.0
+publish_to: 'none'
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Core packages from monorepo
+  msgr_messages:
+    path: ../msgr_messages
+  libmsgr:
+    path: ../libmsgr
+
+  # UI dependencies
+  flutter_markdown: ^0.7.3+2
+  flutter_svg: ^2.0.10+1
+  cached_network_image: ^3.3.1
+  image_picker: ^1.1.2
+  file_picker: ^8.1.2
+
+  # Utilities
+  provider: ^6.1.2
+  equatable: ^2.0.5
+  intl: ^0.20.2
+  timeago: ^3.7.0
+
+  # Media
+  video_player: ^2.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0

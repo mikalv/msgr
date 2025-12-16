@@ -1,42 +1,41 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/config/theme.dart';
 import 'package:messngr/config/theme/channel_list_view_theme.dart';
-import 'package:messngr/providers/auth_provider.dart';
-import 'package:go_router/go_router.dart';
+import 'package:messngr/redux/app_state.dart';
+import 'package:messngr/redux/navigation/navigation_actions.dart';
+import 'package:redux/redux.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 /// This is the conversations list item widget, used to display a single conversation in the conversations list.
 /// It is used by the [ConversationsListWidget] widget.
 /// It is similar to the [RoomListItem] widget.
-class ConversationsListItem extends ConsumerStatefulWidget {
+class ConversationsListItem extends StatefulWidget {
+  final Store<AppState> store;
   final Conversation conversation;
   final int index;
   const ConversationsListItem(
       {super.key,
+      required this.store,
       required this.conversation,
       required this.index});
 
   @override
-  ConsumerState<ConversationsListItem> createState() => _ConversationsListItemState();
+  State<ConversationsListItem> createState() => _ConversationsListItemState();
 }
 
-class _ConversationsListItemState extends ConsumerState<ConversationsListItem> {
+class _ConversationsListItemState extends State<ConversationsListItem> {
   late final MessageRepository messageRepository;
   late final ProfileRepository profileRepository;
 
   @override
   void initState() {
-    final currentTeam = ref.read(currentTeamProvider);
-    if (currentTeam != null) {
-      final repos = LibMsgr()
-          .repositoryFactory
-          .getRepositories(currentTeam.name);
-      messageRepository = repos.messageRepository;
-      profileRepository = repos.profileRepository;
-    }
+    final repos = LibMsgr()
+        .repositoryFactory
+        .getRepositories(widget.store.state.teamState!.selectedTeam!.name);
+    messageRepository = repos.messageRepository;
+    profileRepository = repos.profileRepository;
     super.initState();
   }
 
@@ -58,12 +57,13 @@ class _ConversationsListItemState extends ConsumerState<ConversationsListItem> {
       lastMsgTimeString = timeago.format(lastMessage.updatedAt);
     }
     return GestureDetector(
-      onTap: () {
-        final currentTeam = ref.read(currentTeamProvider);
-        if (currentTeam != null) {
-          context.go('${AppNavigation.conversationsPath}/${widget.conversation.id}');
-        }
-      },
+      onTap: () => widget.store.dispatch(NavigateShellToNewRouteAction(
+          route: '${AppNavigation.conversationsPath}/${widget.conversation.id}',
+          context: context,
+          kRouteArgs: {
+            'teamName': widget.store.state.teamState!.selectedTeam!.name
+          },
+          kUsePush: false)),
       child: Container(
         margin: theme.data.margin,
         padding: theme.data.padding,
@@ -82,7 +82,8 @@ class _ConversationsListItemState extends ConsumerState<ConversationsListItem> {
                       children: <Widget>[
                         Text(
                           widget.conversation
-                              .conversationName(ref.read(currentTeamProvider)?.name ?? '')
+                              .conversationName(widget
+                                  .store.state.teamState!.selectedTeam!.name)
                               .toLowerCase(),
                           style: theme.data.titleStyle,
                         ),
