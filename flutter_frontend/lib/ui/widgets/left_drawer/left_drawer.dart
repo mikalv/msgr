@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/redux/app_state.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:messngr/providers/auth_provider.dart';
 import 'package:messngr/ui/pages/invite_page/invite_page.dart';
-import 'package:messngr/utils/flutter_redux.dart';
 
-class LeftDrawer extends StatelessWidget {
+class LeftDrawer extends ConsumerWidget {
   const LeftDrawer({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final store = StoreProvider.of<AppState>(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
 
-    final teams = store.state.authState.teams;
-    final activeTeamID = store.state.teamState?.selectedTeam?.id;
+    final teams = authState.teams;
+    final activeTeamID = authState.currentTeam?.id;
 
     final List<Widget> teamListTile = teams.map((team) {
       return ListTile(
@@ -34,9 +34,9 @@ class LeftDrawer extends StatelessWidget {
         children: [
           UserAccountsDrawerHeader(
             accountName:
-                Text(store.state.authState.currentProfile?.username ?? ''),
+                Text(authState.currentProfile?.username ?? ''),
             accountEmail: Text(
-                store.state.authState.currentUser?.identifier ?? 'Faen da'),
+                authState.currentUser?.identifier ?? 'Faen da'),
             decoration:
                 const BoxDecoration(color: Color.fromARGB(255, 135, 43, 73)),
           ),

@@ -3,21 +3,20 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/authentication/auth_actions.dart';
-import 'package:messngr/utils/flutter_redux.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:messngr/providers/auth_provider.dart';
 import 'package:pinput/pinput.dart';
 import 'package:smart_auth/smart_auth.dart';
 import 'package:libmsgr/src/registration_service.dart';
 
-class PinputLoginCode extends StatefulWidget {
+class PinputLoginCode extends ConsumerStatefulWidget {
   const PinputLoginCode({super.key});
 
   @override
-  State<PinputLoginCode> createState() => _PinputLoginCodeState();
+  ConsumerState<PinputLoginCode> createState() => _PinputLoginCodeState();
 }
 
-class _PinputLoginCodeState extends State<PinputLoginCode> {
+class _PinputLoginCodeState extends ConsumerState<PinputLoginCode> {
   late final SmsRetriever smsRetriever;
   late final TextEditingController pinController;
   late final FocusNode focusNode;
@@ -51,30 +50,47 @@ class _PinputLoginCodeState extends State<PinputLoginCode> {
   sendCodeToServer(context, pin) async {
     debugPrint('onCompleted: $pin');
 
-    final completer = Completer();
-    completer.future.then((val) {
-      debugPrint('User: ${val.toString()}');
-      //StoreProvider.of<AppState>(context).dispatch(NavigateToNewRouteAction(route: AppNavigation.selectTeamPath));
-    }).catchError((error) {
+    try {
+      final authState = ref.read(authProvider);
+      final challengeId = authState.pendingChallengeId;
+      final displayName = authState.pendingDisplayName;
+
+      if (challengeId == null) {
+        debugPrint('ERROR: No pending challenge ID');
+        return;
+      }
+
+      if (authState.pendingMsisdn != null) {
+        // Phone login
+        final user = await reg.submitMsisdnCodeForToken(
+          challengeId: challengeId,
+          code: pin,
+          displayName: displayName,
+        );
+        if (user != null) {
+          ref.read(authProvider.notifier).setCurrentUser(user);
+          debugPrint('User logged in: ${user.toString()}');
+        }
+      } else if (authState.pendingEmail != null) {
+        // Email login
+        final user = await reg.submitEmailCodeForToken(
+          challengeId: challengeId,
+          code: pin,
+          displayName: displayName,
+        );
+        if (user != null) {
+          ref.read(authProvider.notifier).setCurrentUser(user);
+          debugPrint('User logged in: ${user.toString()}');
+        }
+      }
+    } catch (error) {
       debugPrint('ERROR: $error');
-    });
-    final store = StoreProvider.of<AppState>(context);
-    if (store.state.authState.pendingMsisdn != null) {
-      store.dispatch(LogInMsisdnAction(
-          msisdn: store.state.authState.pendingMsisdn!,
-          code: pin,
-          completer: completer));
-    } else {
-      store.dispatch(LogInEmailAction(
-          email: store.state.authState.pendingEmail!,
-          code: pin,
-          completer: completer));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = StoreProvider.of<AppState>(context).state.authState;
+    final authState = ref.watch(authProvider);
     final targetHint = authState.pendingTargetHint ??
         authState.pendingEmail ??
         authState.pendingMsisdn;

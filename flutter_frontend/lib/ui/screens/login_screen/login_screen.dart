@@ -1,25 +1,24 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/utils/flutter_redux.dart';
+import 'package:messngr/providers/auth_provider.dart';
 import 'package:libmsgr/libmsgr.dart';
 
 import '../../widgets/auth/auth_input_decoration.dart';
 import '../../widgets/auth/auth_shell.dart';
-import '../../../redux/app_state.dart';
-import '../../../redux/authentication/auth_actions.dart';
 
 enum _LoginMethod { email, phone }
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _displayNameController = TextEditingController();
@@ -45,37 +44,50 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit(BuildContext context) async {
-    final store = StoreProvider.of<AppState>(context);
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    final completer = Completer<AuthChallenge?>();
-
-    switch (_methodNotifier.value) {
-      case _LoginMethod.email:
-        store.dispatch(RequestCodeEmailAction(
-          email: _emailController.text.trim(),
-          displayName: _displayNameController.text.trim().isEmpty
-              ? null
-              : _displayNameController.text.trim(),
-          completer: completer,
-        ));
-        break;
-      case _LoginMethod.phone:
-        store.dispatch(RequestCodeMsisdnAction(
-          msisdn: _phoneController.text.trim(),
-          displayName: _displayNameController.text.trim().isEmpty
-              ? null
-              : _displayNameController.text.trim(),
-          completer: completer,
-        ));
-        break;
-    }
-
     try {
-      await completer.future;
+      AuthChallenge? challenge;
+
+      switch (_methodNotifier.value) {
+        case _LoginMethod.email:
+          final email = _emailController.text.trim();
+          final displayName = _displayNameController.text.trim().isEmpty
+              ? null
+              : _displayNameController.text.trim();
+
+          // TODO: Implement proper email auth via authProvider
+          challenge = await _registrationService.requestForSignInCodeEmail(email);
+
+          ref.read(authProvider.notifier).setPendingData(
+            email: email,
+            displayName: displayName,
+            challengeId: challenge?.id,
+            channel: 'email',
+          );
+          break;
+
+        case _LoginMethod.phone:
+          final msisdn = _phoneController.text.trim();
+          final displayName = _displayNameController.text.trim().isEmpty
+              ? null
+              : _displayNameController.text.trim();
+
+          // TODO: Implement proper phone auth via authProvider
+          challenge = await _registrationService.requestForSignInCodeMsisdn(msisdn);
+
+          ref.read(authProvider.notifier).setPendingData(
+            msisdn: msisdn,
+            displayName: displayName,
+            challengeId: challenge?.id,
+            channel: 'sms',
+          );
+          break;
+      }
+
       if (!mounted) return;
       AppNavigation.router.push(AppNavigation.loginCodePath);
     } catch (error) {
@@ -249,7 +261,6 @@ class _LoginScreenState extends State<LoginScreen> {
       footer: [
         TextButton.icon(
           onPressed: () async {
-            final store = StoreProvider.of<AppState>(context);
             final user = await _registrationService.completeOidc(
               provider: 'preview',
               subject: 'local-user',
@@ -268,12 +279,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               );
             } else {
-              store.dispatch(OnAuthenticatedAction(user: user));
-              final teamCompleter = Completer();
-              store.dispatch(ListMyTeamsRequestAction(
-                  accessToken: user.accessToken, completer: teamCompleter));
+              // TODO: Implement proper OIDC flow in authProvider
+              // For now, navigate to team selection
+              // ref.read(authProvider.notifier).setCurrentUser(user);
               try {
-                await teamCompleter.future;
+                // Fetch teams (TODO: implement in provider)
                 if (!mounted) return;
                 AppNavigation.router.push(AppNavigation.selectTeamPath);
               } catch (error) {

@@ -1,16 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/features/auth/auth_gate.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/profile/profile_actions.dart';
-import 'package:messngr/services/api/profile_api.dart';
-import 'package:messngr/utils/flutter_redux.dart';
-import 'package:provider/provider.dart';
-import 'package:redux/redux.dart';
+import 'package:messngr/providers/api_providers.dart';
+import 'package:messngr/providers/auth_provider.dart';
+import 'package:messngr/providers/team_provider.dart';
+import 'package:provider/provider.dart' as provider;
 
-class ProfileModeSwitcher extends StatefulWidget {
+class ProfileModeSwitcher extends ConsumerStatefulWidget {
   const ProfileModeSwitcher({
     super.key,
     this.onFilterChanged,
@@ -21,10 +20,10 @@ class ProfileModeSwitcher extends StatefulWidget {
   final ProfileMode? initialFilter;
 
   @override
-  State<ProfileModeSwitcher> createState() => _ProfileModeSwitcherState();
+  ConsumerState<ProfileModeSwitcher> createState() => _ProfileModeSwitcherState();
 }
 
-class _ProfileModeSwitcherState extends State<ProfileModeSwitcher> {
+class _ProfileModeSwitcherState extends ConsumerState<ProfileModeSwitcher> {
   bool _requestedInitial = false;
   String? _pendingProfileId;
   String? _error;
@@ -40,10 +39,9 @@ class _ProfileModeSwitcherState extends State<ProfileModeSwitcher> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_requestedInitial) {
-      final session = Provider.of<AuthSession>(context, listen: false);
-      StoreProvider.of<AppState>(context).dispatch(
-        RefreshProfilesAction(identity: session.identity),
-      );
+      // TODO: Implement profile refresh via provider
+      // final session = Provider.of<AuthSession>(context, listen: false);
+      // ref.read(teamProvider.notifier).loadProfiles();
       _requestedInitial = true;
     }
   }
@@ -59,31 +57,40 @@ class _ProfileModeSwitcherState extends State<ProfileModeSwitcher> {
   }
 
   Future<void> _handleSwitch(
-    _ProfileSwitcherViewModel viewModel,
+    Profile currentProfile,
     Profile target,
   ) async {
     if (_pendingProfileId == target.id) {
       return;
     }
-    if (viewModel.currentProfile?.id == target.id) {
+    if (currentProfile.id == target.id) {
       return;
     }
 
-    final session = Provider.of<AuthSession>(context, listen: false);
-    final completer = Completer<ProfileSwitchResult>();
+    final session = provider.Provider.of<AuthSession>(context, listen: false);
+
     setState(() {
       _pendingProfileId = target.id;
       _error = null;
     });
 
-    viewModel.onSwitch(session.identity, target.id, completer);
-
     try {
-      final result = await completer.future;
+      // Use authProvider's switchProfile method
+      final api = ref.read(profileApiProvider);
+      final result = await api.switchProfile(
+        identity: session.identity,
+        profileId: target.id,
+      );
+
+      // Update session with new identity
       await session.updateIdentity(
         result.identity,
         displayName: result.profile.displayName,
       );
+
+      // Update Riverpod state - this will trigger UI updates automatically
+      ref.read(authProvider.notifier).setCurrentProfile(result.profile);
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -107,104 +114,58 @@ class _ProfileModeSwitcherState extends State<ProfileModeSwitcher> {
 
   @override
   Widget build(BuildContext context) {
-    return StoreConnector<AppState, _ProfileSwitcherViewModel>(
-      converter: (store) => _ProfileSwitcherViewModel.fromStore(store),
-      distinct: true,
-      builder: (context, viewModel) {
-        if (viewModel.profiles.isEmpty) {
-          return const SizedBox.shrink();
-        }
+    final profiles = ref.watch(profilesProvider);
+    final currentProfile = ref.watch(currentProfileProvider);
 
-        final theme = Theme.of(context);
-        final isSwitching = _pendingProfileId != null;
+    if (profiles.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (viewModel.currentProfile != null)
-              _ProfileModeBanner(profile: viewModel.currentProfile!),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: viewModel.profiles.map((profile) {
-                final selected = profile.id == viewModel.currentProfile?.id;
-                final busy = isSwitching && _pendingProfileId == profile.id;
-                final icon = _modeIcon(profile.mode, theme);
-                return ChoiceChip(
-                  label: Text(profile.displayName),
-                  avatar: Icon(icon, size: 18),
-                  selected: selected,
-                  onSelected: busy
-                      ? null
-                      : (_) => _handleSwitch(viewModel, profile),
-                  selectedColor: theme.colorScheme.primary.withOpacity(0.2),
-                  showCheckmark: false,
-                );
-              }).toList(),
+    final theme = Theme.of(context);
+    final isSwitching = _pendingProfileId != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (currentProfile != null)
+          _ProfileModeBanner(profile: currentProfile),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: profiles.map((profile) {
+            final selected = profile.id == currentProfile?.id;
+            final busy = isSwitching && _pendingProfileId == profile.id;
+            final icon = _modeIcon(profile.mode, theme);
+            return ChoiceChip(
+              label: Text(profile.displayName),
+              avatar: Icon(icon, size: 18),
+              selected: selected,
+              onSelected: (busy || currentProfile == null)
+                  ? null
+                  : (_) => _handleSwitch(currentProfile, profile),
+              selectedColor: theme.colorScheme.primary.withOpacity(0.2),
+              showCheckmark: false,
+            );
+          }).toList(),
+        ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              _error!,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.error),
             ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  _error!,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.error),
-                ),
-              ),
-            const SizedBox(height: 12),
-            _InboxFilterRow(
-              activeFilter: _activeFilter,
-              onChanged: _updateFilter,
-            ),
-          ],
-        );
-      },
+          ),
+        const SizedBox(height: 12),
+        _InboxFilterRow(
+          activeFilter: _activeFilter,
+          onChanged: _updateFilter,
+        ),
+      ],
     );
   }
-}
-
-class _ProfileSwitcherViewModel {
-  _ProfileSwitcherViewModel({
-    required this.profiles,
-    required this.currentProfile,
-    required this.onSwitch,
-  });
-
-  final List<Profile> profiles;
-  final Profile? currentProfile;
-  final void Function(AccountIdentity identity, String profileId,
-      Completer<ProfileSwitchResult> completer) onSwitch;
-
-  factory _ProfileSwitcherViewModel.fromStore(Store<AppState> store) {
-    final profiles = store.state.teamState?.profiles ?? const <Profile>[];
-    final current = store.state.authState.currentProfile;
-    return _ProfileSwitcherViewModel(
-      profiles: profiles,
-      currentProfile: current,
-      onSwitch: (identity, profileId, completer) {
-        store.dispatch(SwitchProfileAction(
-          identity: identity,
-          profileId: profileId,
-          completer: completer,
-        ));
-      },
-    );
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is _ProfileSwitcherViewModel &&
-            _listEquals(profiles, other.profiles) &&
-            currentProfile == other.currentProfile;
-  }
-
-  @override
-  int get hashCode => Object.hash(
-        Object.hashAll(profiles),
-        currentProfile,
-      );
 }
 
 class _ProfileModeBanner extends StatelessWidget {
@@ -289,15 +250,6 @@ class _InboxFilterRow extends StatelessWidget {
       ],
     );
   }
-}
-
-bool _listEquals(List<Profile> a, List<Profile> b) {
-  if (identical(a, b)) return true;
-  if (a.length != b.length) return false;
-  for (var i = 0; i < a.length; i++) {
-    if (a[i] != b[i]) return false;
-  }
-  return true;
 }
 
 IconData _modeIcon(ProfileMode mode, ThemeData theme) {

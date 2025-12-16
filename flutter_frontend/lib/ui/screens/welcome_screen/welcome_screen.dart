@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/navigation/navigation_actions.dart';
 import 'package:messngr/services/app_localizations.dart';
 import 'package:messngr/ui/screens/welcome_screen/onboarding.dart';
-import 'package:messngr/utils/flutter_redux.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -25,9 +23,7 @@ class WelcomeScreen extends StatelessWidget {
                     child:
                         Text(AppLocalizations.of(context)!.translate('login')),
                     onPressed: () {
-                      StoreProvider.of<AppState>(context).dispatch(
-                          NavigateToNewRouteAction(
-                              route: AppNavigation.registerPath));
+                      context.push(AppNavigation.registerPath);
                     }),
               ],
             )

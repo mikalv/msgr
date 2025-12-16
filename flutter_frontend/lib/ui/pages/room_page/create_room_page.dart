@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/config/themedata.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/navigation/navigation_actions.dart';
+import 'package:messngr/providers/auth_provider.dart';
 import 'package:messngr/ui/widgets/custom_switch.dart';
 import 'package:messngr/ui/widgets/dropdown_search/dropdown_search.dart';
-import 'package:messngr/utils/flutter_redux.dart';
 
-class CreateRoomPage extends StatefulWidget {
+class CreateRoomPage extends ConsumerStatefulWidget {
   final String teamName;
   const CreateRoomPage({super.key, required this.teamName});
 
   @override
-  State<CreateRoomPage> createState() => _CreateRoomPageState();
+  ConsumerState<CreateRoomPage> createState() => _CreateRoomPageState();
 }
 
-class _CreateRoomPageState extends State<CreateRoomPage> {
+class _CreateRoomPageState extends ConsumerState<CreateRoomPage> {
   final TextEditingController _roomNameController = TextEditingController();
   final TextEditingController _roomDescriptionController =
       TextEditingController();
@@ -50,19 +50,24 @@ class _CreateRoomPageState extends State<CreateRoomPage> {
       // Logic to create a new chat room
       print(
           'Room create request: $roomName, Description: $roomDescription, Members: $selectedMembers');
-      final store = StoreProvider.of<AppState>(context);
+
+      final currentProfile = ref.read(currentProfileProvider);
+      if (currentProfile == null) {
+        print('No current profile');
+        return;
+      }
 
       final RoomRepository roomRepository = repos.roomRepository;
       final fpush = roomRepository.createRoom(
-          profileID: store.state.authState.currentProfile?.id,
+          profileID: currentProfile.id,
           roomName: roomName,
           roomDescription: roomDescription,
           isSecret: false,
           members: selectedMembers.map((e) => e.id).toList());
       fpush?.future.then((msg) {
         print('Room created successfully');
-        store.dispatch(NavigateShellToNewRouteAction(
-            route: AppNavigation.dashboardPath, kRouteDoPopInstead: true));
+        if (!mounted) return;
+        context.go(AppNavigation.dashboardPath);
       }).onError((error, stackTrace) {
         print('Error creating room: $error');
       });

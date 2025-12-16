@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:messngr/features/bridges/pages/bridge_hub_page.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/authentication/auth_actions.dart';
-import 'package:messngr/utils/flutter_redux.dart';
+import 'package:messngr/providers/auth_provider.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
@@ -23,8 +22,8 @@ class SettingsPage extends StatelessWidget {
             icon: Icons.logout,
             title: 'Logg ut',
             subtitle: 'Fjern denne enheten fra kontoen din.',
-            onTap: () {
-              StoreProvider.of<AppState>(context).dispatch(LogOutAction());
+            onTap: () async {
+              await ref.read(authProvider.notifier).logout();
             },
           ),
           const SizedBox(height: 32),

@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:messngr/config/themedata.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/authentication/auth_actions.dart';
-import 'package:messngr/utils/flutter_redux.dart';
 import 'package:messngr/utils/lower_case_text_formatter.dart';
 
 class RegisterNewTeamScreen extends StatelessWidget {
@@ -99,11 +96,17 @@ class RegisterNewTeamScreen extends StatelessWidget {
                     const SizedBox(height: 16.0),
                     ElevatedButton(
                       child: const Text('Create new team'),
-                      onPressed: () => {
-                        StoreProvider.of<AppState>(context).dispatch(
-                            CreateTeamRequestAction(
-                                teamName: teamNameCtrl.text,
-                                teamDesc: teamDescCtrl.text))
+                      onPressed: () {
+                        // TODO: Implement team creation via authProvider
+                        // await ref.read(authProvider.notifier).createTeam(
+                        //   teamName: teamNameCtrl.text,
+                        //   teamDesc: teamDescCtrl.text,
+                        // );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Team creation not implemented yet'),
+                          ),
+                        );
                       },
                     )
                   ],

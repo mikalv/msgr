@@ -1,17 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/message/message_actions.dart';
-import 'package:messngr/redux/navigation/navigation_actions.dart';
+import 'package:messngr/providers/auth_provider.dart';
 import 'package:messngr/ui/widgets/message/message_list_widget.dart';
 import 'package:messngr/ui/widgets/message/message_widget.dart';
 import 'package:messngr/ui/widgets/message_composer/message_composer.dart';
-import 'package:messngr/utils/flutter_redux.dart';
 
-class ConversationPage extends StatefulWidget {
+class ConversationPage extends ConsumerStatefulWidget {
   final String title;
   //final String roomID;
   late final Conversation conversation;
@@ -29,10 +28,10 @@ class ConversationPage extends StatefulWidget {
   }
 
   @override
-  _ConversationPageState createState() => _ConversationPageState();
+  ConsumerState<ConversationPage> createState() => _ConversationPageState();
 }
 
-class _ConversationPageState extends State<ConversationPage> {
+class _ConversationPageState extends ConsumerState<ConversationPage> {
   final TextEditingController _newMessageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode composerFocusNode = FocusNode();
@@ -86,38 +85,35 @@ class _ConversationPageState extends State<ConversationPage> {
           if (_newMessageController.text == '') {
             return;
           }
-          final store = StoreProvider.of<AppState>(context);
-          Completer completer = Completer();
-          completer.future.then(
-            (value) {
-              _newMessageController.clear();
-            },
-          ).catchError((error) {
-            print('Error: $error');
-          });
-          var msg = MMessage(
-            content: _newMessageController.text,
-            fromProfileID: store.state.authState.currentProfile!.id,
-            conversationID: widget.conversation.id,
-          );
-          store.dispatch(
-            SendMessageAction(
-              msg: msg,
-              completer: completer,
-            ),
-          );
+          final currentProfile = ref.read(currentProfileProvider);
+          if (currentProfile == null) {
+            print('No current profile');
+            return;
+          }
+
+          // TODO: Implement proper message sending via provider
+          // For now, directly use messageRepository
+          try {
+            var msg = MMessage(
+              content: _newMessageController.text,
+              fromProfileID: currentProfile.id,
+              conversationID: widget.conversation.id,
+            );
+            messageRepository.sendMessageToConversation(msg);
+            _newMessageController.clear();
+          } catch (error) {
+            print('Error sending message: $error');
+          }
         });
   }
 
   @override
   Widget build(BuildContext context) {
-    final store = StoreProvider.of<AppState>(context);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => store.dispatch(NavigateShellToNewRouteAction(
-              route: AppNavigation.dashboardPath, kRouteDoPopInstead: false)),
+          onPressed: () => context.go(AppNavigation.dashboardPath),
         ),
         iconTheme: const IconThemeData(
           color: Colors.black, //change your color here

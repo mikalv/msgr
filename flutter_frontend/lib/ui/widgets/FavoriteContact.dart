@@ -1,21 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_profile_picture/flutter_profile_picture.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/ui/pages/conversation_page/conversation_page.dart';
-import 'package:messngr/ui/pages/room_page/room_page.dart';
-import 'package:messngr/utils/flutter_redux.dart';
+import 'package:messngr/providers/team_provider.dart';
 
-class FavoriteContacts extends StatefulWidget {
+class FavoriteContacts extends ConsumerWidget {
   const FavoriteContacts({super.key});
 
   @override
-  State<FavoriteContacts> createState() => _FavoriteContactsState();
-}
-
-class _FavoriteContactsState extends State<FavoriteContacts> {
-  @override
-  Widget build(BuildContext context) {
-    final roomList = StoreProvider.of<AppState>(context).state.teamState!.rooms;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final roomList = ref.watch(roomsProvider);
     print('roomList: ${roomList}');
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10.0),

@@ -1,20 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/authentication/auth_actions.dart';
-import 'package:messngr/redux/navigation/navigation_actions.dart';
-import 'package:messngr/utils/flutter_redux.dart';
+import 'package:messngr/providers/auth_provider.dart';
 
-class SelectCurrentTeamScreen extends StatelessWidget {
+class SelectCurrentTeamScreen extends ConsumerWidget {
   const SelectCurrentTeamScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final teamListe = StoreProvider.of<AppState>(context)
-        .state
-        .authState
-        .teams
+  Widget build(BuildContext context, WidgetRef ref) {
+    final teams = ref.watch(authProvider).teams;
+
+    final teamListe = teams
         .map<Widget>(
           (e) => ListTile(
             title: Text(e.name),
@@ -22,10 +20,11 @@ class SelectCurrentTeamScreen extends StatelessWidget {
             tileColor: Colors.blue,
             minVerticalPadding: 20,
             horizontalTitleGap: 100,
-            onTap: () {
-              var hm = SelectAndAuthWithTeamAction(teamName: e.name);
-              print('Debug: ${hm.toString()}');
-              StoreProvider.of<AppState>(context).dispatch(hm);
+            onTap: () async {
+              // TODO: Implement selectAndAuthWithTeam in authProvider
+              await ref.read(authProvider.notifier).selectTeam(e);
+              if (!context.mounted) return;
+              context.go(AppNavigation.dashboardPath);
             },
           ),
         )
@@ -68,10 +67,8 @@ class SelectCurrentTeamScreen extends StatelessWidget {
                     ...teamListe,
                     ElevatedButton(
                       child: const Text('Create new team'),
-                      onPressed: () => {
-                        StoreProvider.of<AppState>(context).dispatch(
-                            NavigateToNewRouteAction(
-                                route: AppNavigation.registerTeamPath))
+                      onPressed: () {
+                        context.push(AppNavigation.registerTeamPath);
                       },
                     )
                   ],
