@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:logging/logging.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/config/app_constants.dart';
 import 'package:messngr/config/themedata.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/invitation/invitation_actions.dart';
-import 'package:messngr/redux/navigation/navigation_actions.dart';
+import 'package:messngr/providers/auth_provider.dart';
+import 'package:messngr/providers/team_provider.dart';
 import 'package:messngr/ui/widgets/MobileInputWithOutline.dart';
 import 'package:messngr/ui/widgets/custom_switch.dart';
-import 'package:messngr/utils/flutter_redux.dart';
 
-class InvitePage extends StatefulWidget {
+class InvitePage extends ConsumerStatefulWidget {
   const InvitePage({super.key});
 
   @override
-  State<InvitePage> createState() => _InvitePageState();
+  ConsumerState<InvitePage> createState() => _InvitePageState();
 }
 
-class _InvitePageState extends State<InvitePage> {
+class _InvitePageState extends ConsumerState<InvitePage> {
   final Logger _log = Logger('_InvitePageState');
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final _msisdnFieldCtrl = TextEditingController();
@@ -32,21 +32,41 @@ class _InvitePageState extends State<InvitePage> {
     super.dispose();
   }
 
-  _inviteTeammate(context) {
-    return () {
-      final store = StoreProvider.of<AppState>(context);
-      if (useMsisdnForInvitation) {
-        store.dispatch(InviteUserToTeamAction(
-            identifier: phoneNumber!,
-            teamName: store.state.teamState!.selectedTeam!.name));
-      } else {
-        store.dispatch(InviteUserToTeamAction(
-            identifier: _emailFieldCtrl.text,
-            teamName: store.state.teamState!.selectedTeam!.name));
-      }
-      store.dispatch(NavigateShellToNewRouteAction(
-          route: AppNavigation.homePath, kRouteDoPopInstead: true));
-    };
+  Future<void> _inviteTeammate(BuildContext context) async {
+    final authState = ref.read(authProvider);
+    final currentTeam = authState.currentTeam;
+    final currentProfile = authState.currentProfile;
+
+    if (currentTeam == null || currentProfile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a team first')),
+      );
+      return;
+    }
+
+    final identifier = useMsisdnForInvitation ? phoneNumber! : _emailFieldCtrl.text;
+
+    try {
+      await ref.read(teamProvider.notifier).inviteUser(
+        teamName: currentTeam.name,
+        profileId: currentProfile.id,
+        identifier: identifier,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invitation sent successfully')),
+      );
+
+      context.go(AppNavigation.homePath);
+    } catch (error) {
+      _log.severe('Failed to send invitation', error);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send invitation: $error')),
+      );
+    }
   }
 
   String? validateEmail(String? value) {
@@ -115,13 +135,11 @@ class _InvitePageState extends State<InvitePage> {
 
   @override
   Widget build(BuildContext context) {
-    final store = StoreProvider.of<AppState>(context);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => store.dispatch(NavigateShellToNewRouteAction(
-              route: AppNavigation.dashboardPath)),
+          onPressed: () => context.go(AppNavigation.dashboardPath),
         ),
         title: const Text('Invite Teammates'),
       ),
@@ -150,7 +168,7 @@ class _InvitePageState extends State<InvitePage> {
                 inputWidget(),
                 const SizedBox(height: 16.0),
                 ElevatedButton(
-                  onPressed: _inviteTeammate(context),
+                  onPressed: () => _inviteTeammate(context),
                   child: const Text('Send Invitation'),
                 ),
               ],

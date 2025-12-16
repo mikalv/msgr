@@ -1,27 +1,26 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:logging/logging.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/authentication/auth_actions.dart';
-import 'package:messngr/redux/navigation/navigation_actions.dart';
+import 'package:messngr/providers/auth_provider.dart';
 import 'package:messngr/ui/widgets/MobileInputWithOutline.dart';
 import 'package:messngr/ui/widgets/PhoneField/phone_number.dart';
 import 'package:messngr/ui/widgets/PhoneField/countries.dart';
 import 'package:messngr/ui/widgets/auth/auth_input_decoration.dart';
 import 'package:messngr/ui/widgets/auth/auth_shell.dart';
-import 'package:messngr/utils/flutter_redux.dart';
 
-class RegisterUserScreen extends StatefulWidget {
+class RegisterUserScreen extends ConsumerStatefulWidget {
   const RegisterUserScreen({super.key});
 
   @override
-  State<RegisterUserScreen> createState() => _RegisterUserScreenState();
+  ConsumerState<RegisterUserScreen> createState() => _RegisterUserScreenState();
 }
 
-class _RegisterUserScreenState extends State<RegisterUserScreen> {
+class _RegisterUserScreenState extends ConsumerState<RegisterUserScreen> {
   final Logger _log = Logger('_RegisterUserScreenState');
   final _msisdnFieldCtrl = TextEditingController();
   final _emailFieldCtrl = TextEditingController();
@@ -130,34 +129,29 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
       return;
     }
 
-    final completer = Completer();
     final displayName = _displayNameController.text.trim().isEmpty
         ? null
         : _displayNameController.text.trim();
 
-    if (useMsisdnForAuth) {
-      final phoneNumber = _phone!.completeNumber;
-      _log.info('Requesting login for number $phoneNumber');
-      StoreProvider.of<AppState>(context).dispatch(RequestCodeMsisdnAction(
-        msisdn: phoneNumber,
-        displayName: displayName,
-        completer: completer,
-      ));
-    } else {
-      final email = _emailFieldCtrl.text.trim();
-      _log.info('Requesting login for email $email');
-      StoreProvider.of<AppState>(context).dispatch(RequestCodeEmailAction(
-        email: email,
-        displayName: displayName,
-        completer: completer,
-      ));
-    }
-
     try {
-      await completer.future;
+      if (useMsisdnForAuth) {
+        final phoneNumber = _phone!.completeNumber;
+        _log.info('Requesting login for number $phoneNumber');
+        await ref.read(authProvider.notifier).loginWithEmailOrPhone(
+          phoneNumber,
+          displayName: displayName,
+        );
+      } else {
+        final email = _emailFieldCtrl.text.trim();
+        _log.info('Requesting login for email $email');
+        await ref.read(authProvider.notifier).loginWithEmailOrPhone(
+          email,
+          displayName: displayName,
+        );
+      }
+
       if (!mounted) return;
-      StoreProvider.of<AppState>(context).dispatch(
-          NavigateToNewRouteAction(route: AppNavigation.registerCodePath));
+      context.go(AppNavigation.registerCodePath);
     } catch (error, stackTrace) {
       _log.severe(error, stackTrace);
       if (!mounted) return;

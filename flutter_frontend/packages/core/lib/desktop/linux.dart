@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/authentication/auth_actions.dart';
-import 'package:messngr/redux/setup.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:messngr/services/localization/translator.dart';
-import 'package:redux/redux.dart';
 
 class LinuxApp extends StatefulWidget {
   const LinuxApp({super.key});
@@ -19,7 +16,6 @@ class LinuxApp extends StatefulWidget {
 
 class _LinuxAppState extends State<LinuxApp> {
   Locale? _locale;
-  final Future<Store<AppState>> reduxStore = ReduxSetup.getReduxStore();
 
   _LinuxAppState();
 
@@ -42,10 +38,6 @@ class _LinuxAppState extends State<LinuxApp> {
   @override
   void initState() {
     super.initState();
-    reduxStore.then((store) {
-      store.dispatch(VerifyAuthStateAction());
-      store.dispatch(OpenWebsocketIfNotAlready());
-    });
     getLocale().then((locale) {
       setState(() {
         _locale = locale;

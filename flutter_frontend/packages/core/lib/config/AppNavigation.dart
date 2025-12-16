@@ -1,10 +1,11 @@
 // ignore_for_file: slash_for_doc_comments
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:logging/logging.dart';
 import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/redux/app_state.dart';
+import 'package:messngr/providers/auth_provider.dart';
 import 'package:messngr/services/navigator_observer.dart';
 import 'package:messngr/ui/pages/conversation_page/create_conversation_page.dart';
 import 'package:messngr/ui/pages/home_page/home_page.dart';
@@ -21,7 +22,6 @@ import 'package:messngr/ui/screens/register_screen/register_new_team_screen.dart
 import 'package:messngr/ui/screens/select_current_team_screen.dart';
 import 'package:messngr/ui/screens/register_screen/register_user_screen.dart';
 import 'package:messngr/ui/screens/welcome_screen/welcome_screen.dart';
-import 'package:messngr/utils/flutter_redux.dart';
 
 ///
 /// AppNavigation
@@ -134,8 +134,11 @@ class AppNavigation {
   }
 
   String? redirectWhenNotLoggedIn(BuildContext context, GoRouterState state) {
-    if (StoreProvider.of<AppState>(context).state.authState.currentUser ==
-        null) {
+    // Access auth state via ProviderScope
+    final container = ProviderScope.containerOf(context);
+    final currentUser = container.read(currentUserProvider);
+
+    if (currentUser == null) {
       _log.info(
           'Redirecting user cause redirectWhenNotLoggedIn (from route ${state.path} to route $welcomePath)');
       return welcomePath;
@@ -144,8 +147,11 @@ class AppNavigation {
   }
 
   String? redirectWhenLoggedIn(BuildContext context, GoRouterState state) {
-    if (StoreProvider.of<AppState>(context).state.authState.currentUser !=
-        null) {
+    // Access auth state via ProviderScope
+    final container = ProviderScope.containerOf(context);
+    final currentUser = container.read(currentUserProvider);
+
+    if (currentUser != null) {
       _log.info(
           'Redirecting user cause redirectWhenLoggedIn (from route ${state.path} to route $dashboardPath)');
       return dashboardPath;

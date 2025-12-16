@@ -1,17 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/config/app_constants.dart';
 import 'package:messngr/config/theme.dart';
 import 'package:messngr/config/themedata.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/authentication/auth_actions.dart';
-import 'package:messngr/redux/setup.dart';
 import 'package:messngr/services/app_localizations.dart';
 import 'package:messngr/services/localization/translator.dart';
 import 'package:messngr/ui/screens/error_screen/error_screen.dart';
-import 'package:messngr/utils/flutter_redux.dart';
-import 'package:redux/redux.dart';
 
 class WebApp extends StatefulWidget {
   const WebApp({super.key});
@@ -30,7 +26,6 @@ class _WebAppState extends State<WebApp>
   Locale? _locale;
   bool hasFocus = true;
   Brightness? _brightness;
-  final Future<Store<AppState>> reduxStore = ReduxSetup.getReduxStore();
 
   _WebAppState();
 
@@ -53,10 +48,6 @@ class _WebAppState extends State<WebApp>
   @override
   void initState() {
     super.initState();
-    reduxStore.then((store) {
-      store.dispatch(VerifyAuthStateAction());
-      store.dispatch(OpenWebsocketIfNotAlready());
-    });
     getLocale().then((locale) {
       setState(() {
         _locale = locale;
@@ -114,51 +105,31 @@ class _WebAppState extends State<WebApp>
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: reduxStore,
-      builder: (BuildContext context, AsyncSnapshot<Store<AppState>> snapshot) {
-        switch (snapshot.connectionState) {
-          case ConnectionState.waiting:
-            return loadingScreen();
-          default:
-            if (snapshot.hasError) {
-              return Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: ErrorScreen(error: snapshot.error));
-            } else {
-              final appThemeData = AppThemeData(brightness: _brightness);
-              return StoreProvider(
-                  store: snapshot.data!,
-                  child: AppTheme(
-                    data: appThemeData,
-                    child: CupertinoApp.router(
-                      title: appTitle,
-                      debugShowCheckedModeBanner: false,
-                      theme: appThemeData.getCupertinoThemeData(_brightness),
-                      localizationsDelegates: const [
-                        AppLocalizations.delegate,
-                        DefaultMaterialLocalizations.delegate,
-                        DefaultCupertinoLocalizations.delegate,
-                        DefaultWidgetsLocalizations.delegate,
-                      ],
-                      supportedLocales: kSupportedLocales,
-                      localeResolutionCallback: (locale, supportedLocales) {
-                        for (var supportedLocale in supportedLocales) {
-                          if (supportedLocale.languageCode ==
-                                  locale!.languageCode &&
-                              supportedLocale.countryCode ==
-                                  locale.countryCode) {
-                            return supportedLocale;
-                          }
-                        }
-                        return null;
-                      },
-                      routerConfig: AppNavigation.router,
-                    ),
-                  ));
+    final appThemeData = AppThemeData(brightness: _brightness);
+    return AppTheme(
+      data: appThemeData,
+      child: CupertinoApp.router(
+        title: appTitle,
+        debugShowCheckedModeBanner: false,
+        theme: appThemeData.getCupertinoThemeData(_brightness),
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          DefaultMaterialLocalizations.delegate,
+          DefaultCupertinoLocalizations.delegate,
+          DefaultWidgetsLocalizations.delegate,
+        ],
+        supportedLocales: kSupportedLocales,
+        localeResolutionCallback: (locale, supportedLocales) {
+          for (var supportedLocale in supportedLocales) {
+            if (supportedLocale.languageCode == locale!.languageCode &&
+                supportedLocale.countryCode == locale.countryCode) {
+              return supportedLocale;
             }
-        }
-      },
+          }
+          return null;
+        },
+        routerConfig: AppNavigation.router,
+      ),
     );
   }
 }

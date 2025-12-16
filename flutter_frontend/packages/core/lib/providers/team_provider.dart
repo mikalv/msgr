@@ -136,6 +136,21 @@ class TeamNotifier extends StateNotifier<TeamState> {
   void clear() {
     state = const TeamState();
   }
+
+  /// Send invitation to a user
+  Future<void> inviteUser({
+    required String teamName,
+    required String profileId,
+    required String identifier,
+  }) async {
+    try {
+      final connection = LibMsgr().connection;
+      connection.sendInvitation(teamName, profileId, identifier);
+    } catch (e) {
+      state = state.copyWith(error: e as Exception);
+      rethrow;
+    }
+  }
 }
 
 /// Team state provider

@@ -24,5 +24,9 @@
 	<array>
 		<string>$(AppIdentifierPrefix)dev.meeh.messngr</string>
 	</array>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.dev.meeh.messngr</string>
+	</array>
 </dict>
 </plist>

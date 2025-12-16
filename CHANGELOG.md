@@ -61,6 +61,9 @@
 - Added `scripts/start_stack.sh` and `scripts/run_flutter.sh` to capture the
   recommended `docker compose`/`flutter run` incantations and documented the
   demoflyt (<1s send→ack, re-login) in `docs/backend_setup.md`.
+- Ensured the `rust-gateway` Docker build installs `protobuf-compiler` in the
+  builder stage so `cargo build --release` succeeds with the required `protoc`
+  binary.
 - Completed the CLI migration by deleting the legacy `libmsgr/tool` forwarder,
   fixing the standalone `libmsgr_cli` binary and pointing integration tests to
   `packages/libmsgr_cli/bin/msgr.dart`.

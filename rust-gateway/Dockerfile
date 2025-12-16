@@ -3,6 +3,11 @@ FROM rustlang/rust:nightly as builder
 
 WORKDIR /usr/src/app
 
+# Install build dependencies
+RUN apt-get update && \
+    apt-get install -y protobuf-compiler && \
+    rm -rf /var/lib/apt/lists/*
+
 # Copy manifests
 COPY Cargo.toml Cargo.lock ./
 COPY build.rs ./
@@ -19,7 +24,7 @@ FROM debian:bookworm-slim
 
 # Install runtime dependencies
 RUN apt-get update && \
-    apt-get install -y ca-certificates curl && \
+    apt-get install -y ca-certificates curl protobuf-compiler && \
     rm -rf /var/lib/apt/lists/*
 
 # Create app user

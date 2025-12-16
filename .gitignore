@@ -1,4 +1,6 @@
 rust-gateway/target/
+flutter_frontend/personal/build/
+flutter_frontend/business/build/
 DerivedData/
 target/
 node_modules/

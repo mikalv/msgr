@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/profile/profile_actions.dart';
-import 'package:messngr/utils/flutter_redux.dart';
+import 'package:messngr/config/AppNavigation.dart';
+import 'package:messngr/providers/auth_provider.dart';
 
-class CreateProfileScreen extends StatefulWidget {
+class CreateProfileScreen extends ConsumerStatefulWidget {
   const CreateProfileScreen({super.key});
 
   @override
-  State<CreateProfileScreen> createState() => _CreateProfileScreenState();
+  ConsumerState<CreateProfileScreen> createState() => _CreateProfileScreenState();
 }
 
-class _CreateProfileScreenState extends State<CreateProfileScreen> {
+class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
   final _userNameCtrl = TextEditingController();
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
@@ -122,12 +124,39 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                     border: borderStyle)),
             ElevatedButton(
               child: const Text('Create profile and start chat'),
-              onPressed: () => {
-                StoreProvider.of<AppState>(context).dispatch(
-                    CreateProfileAction(
-                        username: _userNameCtrl.text,
-                        firstName: _firstNameCtrl.text,
-                        lastName: _lastNameCtrl.text))
+              onPressed: () async {
+                final authState = ref.read(authProvider);
+                final currentTeam = authState.currentTeam;
+                final currentUser = authState.currentUser;
+
+                if (currentTeam == null || currentUser == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please select a team first')),
+                  );
+                  return;
+                }
+
+                try {
+                  final reg = RegistrationService();
+                  final profile = await reg.createProfileForTeam(
+                    teamName: currentTeam.name,
+                    token: currentUser.accessToken,
+                    username: _userNameCtrl.text,
+                    firstName: _firstNameCtrl.text,
+                    lastName: _lastNameCtrl.text,
+                  );
+
+                  if (profile != null && mounted) {
+                    ref.read(authProvider.notifier).setCurrentProfile(profile);
+                    context.go(AppNavigation.dashboardPath);
+                  }
+                } catch (error) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to create profile: $error')),
+                    );
+                  }
+                }
               },
             )
           ],
