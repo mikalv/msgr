@@ -9,6 +9,7 @@ import 'package:logging/logging.dart';
 import 'package:sqflite_common/src/sql_builder.dart';
 import 'package:sqflite_sqlcipher/sqflite.dart';
 import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 
 /// Data passed to the migrations.
 typedef DatabaseMigrationData = (Database, Logger);
@@ -32,12 +33,15 @@ class DatabaseService {
   Database get instance => database;
 
   Future<void> initialize() async {
-    final dbPath = path.join(
-      await getDatabasesPath(),
-      'msgr.db',
-    );
+    // Use shared directory for database so both apps can access it
+    final sharedDir = await getApplicationSupportDirectory();
+    final dbPath = path.join(sharedDir.path, 'msgr.db');
+
+    // TODO: Generate and securely store database password
+    // For now using hardcoded password (should be changed to keychain-based)
     final dbPassword = "hmm";
-    //await GetIt.I.get<XmppStateService>().getOrCreateDatabaseKey();
+
+    _log.info('Database path: $dbPath');
 
     // Just some sanity checks
     final version = migrations.last.version;
