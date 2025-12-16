@@ -50,14 +50,39 @@ class TeamNotifier extends StateNotifier<TeamState> {
   Future<void> loadTeamData(String teamName) async {
     state = state.copyWith(isLoading: true);
     try {
-      // TODO: Implement loading logic using LibMsgr
-      // This should fetch rooms, conversations, and profiles
-      state = state.copyWith(isLoading: false);
+      // Get repositories from LibMsgr for this team
+      final repositories = LibMsgr().repositoryFactory.getRepositories(teamName);
+
+      // Subscribe to repository changes
+      repositories.conversationRepository.subscribe((conversations) {
+        state = state.copyWith(conversations: conversations);
+      });
+
+      repositories.roomRepository.subscribe((rooms) {
+        state = state.copyWith(rooms: rooms);
+      });
+
+      repositories.profileRepository.subscribe((profiles) {
+        state = state.copyWith(profiles: profiles);
+      });
+
+      // Load initial data from repositories
+      final conversations = repositories.conversationRepository.items;
+      final rooms = repositories.roomRepository.items;
+      final profiles = repositories.profileRepository.items;
+
+      state = state.copyWith(
+        conversations: conversations,
+        rooms: rooms,
+        profiles: profiles,
+        isLoading: false,
+      );
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
         error: e as Exception,
       );
+      rethrow;
     }
   }
 

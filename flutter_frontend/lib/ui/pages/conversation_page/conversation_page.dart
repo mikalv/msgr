@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/providers/auth_provider.dart';
+import 'package:messngr/providers/websocket_provider.dart';
 import 'package:messngr/ui/widgets/message/message_list_widget.dart';
 import 'package:messngr/ui/widgets/message/message_widget.dart';
 import 'package:messngr/ui/widgets/message_composer/message_composer.dart';
@@ -77,29 +78,23 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
               .addPostFrameCallback((_) => _scrollToBottom());
         },
         onChanged: (p0) {
-          // TODO: Add a timer here, for signaling "is typing" to the server
-          //print(p0);
+          // Send typing indicator to server
+          ref.read(webSocketProvider.notifier).sendTypingIndicator(
+                conversationId: widget.conversation.id,
+              );
         },
         onSubmitted: (String msg) {
           print('submitted: ${_newMessageController.text}');
           if (_newMessageController.text == '') {
             return;
           }
-          final currentProfile = ref.read(currentProfileProvider);
-          if (currentProfile == null) {
-            print('No current profile');
-            return;
-          }
 
-          // TODO: Implement proper message sending via provider
-          // For now, directly use messageRepository
+          // Send message via WebSocket provider
           try {
-            var msg = MMessage(
-              content: _newMessageController.text,
-              fromProfileID: currentProfile.id,
-              conversationID: widget.conversation.id,
-            );
-            messageRepository.sendMessageToConversation(msg);
+            ref.read(webSocketProvider.notifier).sendMessage(
+                  content: _newMessageController.text,
+                  conversationId: widget.conversation.id,
+                );
             _newMessageController.clear();
           } catch (error) {
             print('Error sending message: $error');

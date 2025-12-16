@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/providers/auth_provider.dart';
+import 'package:messngr/providers/websocket_provider.dart';
 
 class SelectCurrentTeamScreen extends ConsumerWidget {
   const SelectCurrentTeamScreen({super.key});
@@ -21,10 +22,21 @@ class SelectCurrentTeamScreen extends ConsumerWidget {
             minVerticalPadding: 20,
             horizontalTitleGap: 100,
             onTap: () async {
-              // TODO: Implement selectAndAuthWithTeam in authProvider
-              await ref.read(authProvider.notifier).selectTeam(e);
-              if (!context.mounted) return;
-              context.go(AppNavigation.dashboardPath);
+              try {
+                // Select team and get access token
+                await ref.read(authProvider.notifier).selectTeam(e);
+
+                // Connect to WebSocket
+                await ref.read(webSocketProvider.notifier).connect();
+
+                if (!context.mounted) return;
+                context.go(AppNavigation.dashboardPath);
+              } catch (error) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to connect: $error')),
+                );
+              }
             },
           ),
         )
