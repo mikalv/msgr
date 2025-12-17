@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:messngr/services/localization/translator.dart';
+import 'package:core/services/localization/translator.dart';
 
 class LinuxApp extends StatefulWidget {
   const LinuxApp({super.key});

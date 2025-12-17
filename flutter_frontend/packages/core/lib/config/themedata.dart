@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/config/app_constants.dart';
+import 'package:core/config/app_constants.dart';
 
 final borderColor = messngrGrey.withOpacity(0.2);
 final borderStyle = OutlineInputBorder(

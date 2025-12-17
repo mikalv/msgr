@@ -1,4 +1,4 @@
-import 'package:messngr/services/api/chat_api.dart';
+import 'package:core/services/api/chat_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Persists the current account/profile identity locally so the chat feature

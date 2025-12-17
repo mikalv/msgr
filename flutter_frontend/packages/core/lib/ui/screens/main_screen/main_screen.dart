@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/ui/widgets/inner_drawer.dart';
-import 'package:messngr/ui/widgets/scaffolds/ScaffoldWithNavigationBar.dart';
-import 'package:messngr/ui/widgets/scaffolds/ScaffoldWithNavigationRail.dart';
+import 'package:core/config/AppNavigation.dart';
+import 'package:core/config/app_constants.dart';
+import 'package:core/ui/widgets/inner_drawer.dart';
+import 'package:core/ui/widgets/scaffolds/ScaffoldWithNavigationBar.dart';
+import 'package:core/ui/widgets/scaffolds/ScaffoldWithNavigationRail.dart';
 
 class MainScreen extends StatefulWidget {
   final StatefulNavigationShell child;

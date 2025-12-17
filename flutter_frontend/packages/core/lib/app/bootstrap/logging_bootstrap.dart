@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:logging/logging.dart';
-import 'package:messngr/services/logging/open_observe_log_client.dart';
+import 'package:core/services/logging/open_observe_log_client.dart';
 
 /// Configures the global [Logger] instance used by the application.
 ///

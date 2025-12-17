@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:messngr/features/chat/models/chat_message.dart';
-import 'package:messngr/features/chat/widgets/chat_bubble.dart';
+import 'package:core/features/chat/models/chat_message.dart';
+import 'package:core/features/chat/widgets/chat_bubble.dart';
 
 class ChatTimeline extends StatefulWidget {
   const ChatTimeline({

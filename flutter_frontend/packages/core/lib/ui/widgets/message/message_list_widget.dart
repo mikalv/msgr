@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:libmsgr/libmsgr.dart';
-import 'package:messngr/ui/widgets/message/message_widget.dart';
-import 'package:messngr/ui/widgets/misc/better_stream_builder.dart';
+import 'package:core/ui/widgets/message/message_widget.dart';
+import 'package:core/ui/widgets/misc/better_stream_builder.dart';
 
 typedef VoidCallBackWithFuture = Future<void> Function();
 

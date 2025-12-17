@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/ui/widgets/slider/CustomSlidingMenu.dart';
+import 'package:core/ui/widgets/slider/CustomSlidingMenu.dart';
 
 class CustomSlidingWidget extends StatefulWidget {
   final Widget menu;

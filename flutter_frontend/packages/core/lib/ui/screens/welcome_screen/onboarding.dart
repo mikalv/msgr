@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/ui/screens/welcome_screen/items.dart';
+import 'package:core/ui/screens/welcome_screen/items.dart';
 
 class OnboardingComponent extends StatefulWidget {
   const OnboardingComponent({super.key});

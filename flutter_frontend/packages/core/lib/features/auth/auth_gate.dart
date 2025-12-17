@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/features/auth/auth_identity_store.dart';
-import 'package:messngr/features/auth/dev_login_page.dart';
-import 'package:messngr/services/api/chat_api.dart';
+import 'package:core/features/auth/auth_identity_store.dart';
+import 'package:core/features/auth/dev_login_page.dart';
+import 'package:core/services/api/chat_api.dart';
 import 'package:provider/provider.dart';
 
 class AuthSession {

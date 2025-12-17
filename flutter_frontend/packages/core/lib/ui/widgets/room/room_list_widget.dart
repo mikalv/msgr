@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:libmsgr/libmsgr.dart';
-import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/config/theme.dart';
-import 'package:messngr/providers/auth_provider.dart';
-import 'package:messngr/providers/team_provider.dart';
-import 'package:messngr/ui/widgets/room/room_list_item.dart';
+import 'package:core/config/AppNavigation.dart';
+import 'package:core/config/theme.dart';
+import 'package:core/providers/auth_provider.dart';
+import 'package:core/providers/team_provider.dart';
+import 'package:core/ui/widgets/room/room_list_item.dart';
 import 'package:go_router/go_router.dart';
 
 class RoomListWidget extends ConsumerWidget {

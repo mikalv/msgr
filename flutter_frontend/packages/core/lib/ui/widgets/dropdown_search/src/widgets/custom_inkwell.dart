@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/ui/widgets/dropdown_search/src/properties/dropdown_props.dart';
+import 'package:core/ui/widgets/dropdown_search/src/properties/dropdown_props.dart';
 
 class CustomInkWell extends StatelessWidget {
   final ClickProps clickProps;

@@ -1,4 +1,4 @@
-import 'package:messngr/features/chat/media/chat_media_attachment.dart';
+import 'package:core/features/chat/media/chat_media_attachment.dart';
 
 class ComposerSubmission {
   const ComposerSubmission({

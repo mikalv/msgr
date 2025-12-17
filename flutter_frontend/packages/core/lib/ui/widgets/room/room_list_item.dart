@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:libmsgr/libmsgr.dart';
-import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/config/theme.dart';
-import 'package:messngr/config/theme/channel_list_view_theme.dart';
-import 'package:messngr/providers/auth_provider.dart';
+import 'package:core/config/AppNavigation.dart';
+import 'package:core/config/theme.dart';
+import 'package:core/config/theme/channel_list_view_theme.dart';
+import 'package:core/providers/auth_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 

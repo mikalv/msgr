@@ -1,9 +1,9 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/features/chat/models/chat_message.dart';
-import 'package:messngr/features/chat/models/chat_thread.dart';
+import 'package:core/config/app_constants.dart';
+import 'package:core/features/chat/models/chat_message.dart';
+import 'package:core/features/chat/models/chat_thread.dart';
 
 class ApiException implements Exception {
   ApiException(this.statusCode, this.body);

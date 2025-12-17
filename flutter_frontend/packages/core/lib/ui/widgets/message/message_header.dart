@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:libmsgr/libmsgr.dart';
-import 'package:messngr/config/theme.dart';
+import 'package:core/config/theme.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 class MessageWidgetHeader extends StatelessWidget {

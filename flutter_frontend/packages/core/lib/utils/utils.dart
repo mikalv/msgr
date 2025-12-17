@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:messngr/config/app_constants.dart';
+import 'package:core/config/app_constants.dart';
 
 class Messngr {
   static void toast(String message) {

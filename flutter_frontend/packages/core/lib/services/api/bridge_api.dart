@@ -1,10 +1,10 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/config/backend_environment.dart';
-import 'package:messngr/features/bridges/models/bridge_auth_session.dart';
-import 'package:messngr/features/bridges/models/bridge_catalog_entry.dart';
+import 'package:core/config/app_constants.dart';
+import 'package:core/config/backend_environment.dart';
+import 'package:core/features/bridges/models/bridge_auth_session.dart';
+import 'package:core/features/bridges/models/bridge_catalog_entry.dart';
 
 import 'chat_api.dart' show AccountIdentity, ApiException;
 

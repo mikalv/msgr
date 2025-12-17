@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:messngr/features/chat/state/pinned_messages_notifier.dart';
+import 'package:core/features/chat/state/pinned_messages_notifier.dart';
 
 class PinnedMessageBanner extends StatelessWidget {
   const PinnedMessageBanner({

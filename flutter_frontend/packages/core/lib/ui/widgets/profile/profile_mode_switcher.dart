@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:libmsgr/libmsgr.dart';
-import 'package:messngr/features/auth/auth_gate.dart';
-import 'package:messngr/providers/api_providers.dart';
-import 'package:messngr/providers/auth_provider.dart';
-import 'package:messngr/providers/team_provider.dart';
+import 'package:core/features/auth/auth_gate.dart';
+import 'package:core/providers/api_providers.dart';
+import 'package:core/providers/auth_provider.dart';
+import 'package:core/providers/team_provider.dart';
 import 'package:provider/provider.dart' as provider;
 
 class ProfileModeSwitcher extends ConsumerStatefulWidget {

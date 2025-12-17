@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:libmsgr/libmsgr.dart';
-import 'package:messngr/config/platform_ext.dart';
+import 'package:core/config/platform_ext.dart';
 
 const _kCommandTrigger = '/';
 const _kMentionTrigger = '@';

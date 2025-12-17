@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:messngr/config/app_constants.dart';
+import 'package:core/config/app_constants.dart';
 
 class SideMenuFooter extends StatelessWidget {
   final List<FooterOption> options;

@@ -1,4 +1,4 @@
-part of 'package:messngr/features/chat/widgets/chat_composer.dart';
+part of 'package:core/features/chat/widgets/chat_composer.dart';
 
 enum ComposerSendState { idle, sending, queuedOffline, failed }
 

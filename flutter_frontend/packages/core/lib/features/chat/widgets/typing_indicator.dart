@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/features/chat/state/typing_participants_notifier.dart';
+import 'package:core/features/chat/state/typing_participants_notifier.dart';
 
 class TypingIndicator extends StatelessWidget {
   const TypingIndicator({super.key, required this.participants});

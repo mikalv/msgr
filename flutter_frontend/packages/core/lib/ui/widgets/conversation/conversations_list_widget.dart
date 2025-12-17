@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:libmsgr/libmsgr.dart';
-import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/config/theme.dart';
-import 'package:messngr/providers/auth_provider.dart';
-import 'package:messngr/providers/team_provider.dart';
-import 'package:messngr/ui/widgets/conversation/conversations_list_item.dart';
+import 'package:core/config/AppNavigation.dart';
+import 'package:core/config/theme.dart';
+import 'package:core/providers/auth_provider.dart';
+import 'package:core/providers/team_provider.dart';
+import 'package:core/ui/widgets/conversation/conversations_list_item.dart';
 import 'package:go_router/go_router.dart';
 
 /// This widget is used to display a list of conversations.

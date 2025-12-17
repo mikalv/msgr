@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/utils/extensions.dart';
+import 'package:core/utils/extensions.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Launch URL

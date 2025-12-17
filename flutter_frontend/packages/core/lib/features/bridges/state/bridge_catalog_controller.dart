@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:messngr/features/bridges/models/bridge_catalog_entry.dart';
-import 'package:messngr/services/api/bridge_api.dart';
-import 'package:messngr/services/api/chat_api.dart';
+import 'package:core/features/bridges/models/bridge_catalog_entry.dart';
+import 'package:core/services/api/bridge_api.dart';
+import 'package:core/services/api/chat_api.dart';
 
 /// Holds catalog state for bridge connectors, including loading and filter
 /// helpers.

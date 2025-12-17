@@ -137,7 +137,7 @@ services:
     volumes:
       - openobserve_data:/data
     ports:
-      - "5080:5080"
+      - "5088:5080"
     restart: unless-stopped
 
   stonemq:

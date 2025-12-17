@@ -1,7 +1,7 @@
 import 'package:libmsgr/libmsgr.dart';
-import 'package:messngr/utils/device_info_impl.dart';
-import 'package:messngr/utils/secure_store_impl.dart';
-import 'package:messngr/utils/shared_preferences_impl.dart';
+import 'package:core/utils/device_info_impl.dart';
+import 'package:core/utils/secure_store_impl.dart';
+import 'package:core/utils/shared_preferences_impl.dart';
 
 /// Configures the [LibMsgr] singleton with the concrete platform adapters
 /// used by the legacy application.

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/features/chat/widgets/chat_composer.dart';
+import 'package:core/features/chat/widgets/chat_composer.dart';
 
 class ChatComposerDemo extends StatefulWidget {
   const ChatComposerDemo({super.key});

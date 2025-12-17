@@ -1,13 +1,13 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/config/theme.dart';
-import 'package:messngr/config/themedata.dart';
-import 'package:messngr/services/app_localizations.dart';
-import 'package:messngr/services/localization/translator.dart';
-import 'package:messngr/ui/widgets/desktop/TitlebarSafeArea.dart';
+import 'package:core/config/AppNavigation.dart';
+import 'package:core/config/app_constants.dart';
+import 'package:core/config/theme.dart';
+import 'package:core/config/themedata.dart';
+import 'package:core/services/app_localizations.dart';
+import 'package:core/services/localization/translator.dart';
+import 'package:core/ui/widgets/desktop/TitlebarSafeArea.dart';
 import 'package:window_manager/window_manager.dart';
 
 class WindowsApp extends StatefulWidget {

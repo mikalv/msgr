@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/ui/chat_kit/chat_kit.dart';
+import 'package:core/ui/chat_kit/chat_kit.dart';
 
 class ChannelListPage extends StatelessWidget {
   const ChannelListPage({super.key});

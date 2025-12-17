@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import 'package:messngr/features/chat/models/reaction_aggregate.dart';
+import 'package:core/features/chat/models/reaction_aggregate.dart';
 
 import 'presence_badge.dart';
 import 'reaction_picker.dart';

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:messngr/features/bridges/models/bridge_auth_session.dart';
-import 'package:messngr/services/api/bridge_api.dart';
-import 'package:messngr/services/api/chat_api.dart';
+import 'package:core/features/bridges/models/bridge_auth_session.dart';
+import 'package:core/services/api/bridge_api.dart';
+import 'package:core/services/api/chat_api.dart';
 
 /// Handles lifecycle operations for a single bridge authentication session.
 class BridgeSessionController extends ChangeNotifier {

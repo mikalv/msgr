@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/ui/widgets/auth/auth_shell.dart';
-import 'package:messngr/ui/widgets/pinput_login_code.dart';
+import 'package:core/ui/widgets/auth/auth_shell.dart';
+import 'package:core/ui/widgets/pinput_login_code.dart';
 
 class CodeScreen extends StatelessWidget {
   const CodeScreen({super.key});

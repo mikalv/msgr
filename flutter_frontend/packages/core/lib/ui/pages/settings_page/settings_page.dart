@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:messngr/features/bridges/pages/bridge_hub_page.dart';
-import 'package:messngr/providers/auth_provider.dart';
+import 'package:core/features/bridges/pages/bridge_hub_page.dart';
+import 'package:core/providers/auth_provider.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});

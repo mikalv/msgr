@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 
-import 'package:messngr/config/logging_environment.dart';
+import 'package:core/config/logging_environment.dart';
 
 class OpenObserveLogClient {
   OpenObserveLogClient._(this._environment, this._client);

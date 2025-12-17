@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:messngr/config/theme.dart';
+import 'package:core/config/theme.dart';
 
 class AppScaffoldTheme extends InheritedTheme {
   final AppScaffoldThemeData data;

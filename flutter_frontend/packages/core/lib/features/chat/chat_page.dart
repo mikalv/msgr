@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/features/auth/auth_gate.dart';
-import 'package:messngr/features/chat/models/chat_thread.dart';
-import 'package:messngr/features/chat/state/chat_view_model.dart';
-import 'package:messngr/features/chat/state/typing_participants_notifier.dart';
-import 'package:messngr/features/chat/widgets/chat_composer.dart';
-import 'package:messngr/features/chat/widgets/chat_theme.dart';
-import 'package:messngr/features/chat/widgets/pinned_message_banner.dart';
-import 'package:messngr/features/chat/widgets/typing_indicator.dart';
-import 'package:messngr/ui/chat_kit/chat_kit.dart';
+import 'package:core/features/auth/auth_gate.dart';
+import 'package:core/features/chat/models/chat_thread.dart';
+import 'package:core/features/chat/state/chat_view_model.dart';
+import 'package:core/features/chat/state/typing_participants_notifier.dart';
+import 'package:core/features/chat/widgets/chat_composer.dart';
+import 'package:core/features/chat/widgets/chat_theme.dart';
+import 'package:core/features/chat/widgets/pinned_message_banner.dart';
+import 'package:core/features/chat/widgets/typing_indicator.dart';
+import 'package:core/ui/chat_kit/chat_kit.dart';
 import 'package:provider/provider.dart';
-import 'package:messngr/services/api/chat_api.dart';
+import 'package:core/services/api/chat_api.dart';
 
 class ChatPage extends StatelessWidget {
   const ChatPage({super.key});

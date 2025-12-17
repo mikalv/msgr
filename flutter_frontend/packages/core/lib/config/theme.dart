@@ -1,10 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:messngr/config/theme/app_scaffold_theme.dart';
-import 'package:messngr/config/theme/channel_list_view_theme.dart';
-import 'package:messngr/config/theme/color_theme.dart';
-import 'package:messngr/config/theme/message_widget_theme.dart';
-import 'package:messngr/config/theme/text_theme.dart';
+import 'package:core/config/theme/app_scaffold_theme.dart';
+import 'package:core/config/theme/channel_list_view_theme.dart';
+import 'package:core/config/theme/color_theme.dart';
+import 'package:core/config/theme/message_widget_theme.dart';
+import 'package:core/config/theme/text_theme.dart';
 
 /// {@template appTheme}
 /// Inherited widget providing the [AppThemeData] to the widget tree

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/ui/widgets/dropdown_search/dropdown_search.dart';
+import 'package:core/ui/widgets/dropdown_search/dropdown_search.dart';
 
 class DropdownButtonProps extends IconButtonProps {
   final Widget iconOpened;

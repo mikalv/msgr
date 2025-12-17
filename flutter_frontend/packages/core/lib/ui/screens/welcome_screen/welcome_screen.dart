@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/services/app_localizations.dart';
-import 'package:messngr/ui/screens/welcome_screen/onboarding.dart';
+import 'package:core/config/AppNavigation.dart';
+import 'package:core/services/app_localizations.dart';
+import 'package:core/ui/screens/welcome_screen/onboarding.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});

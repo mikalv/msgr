@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/utils/emoji_parser.dart';
+import 'package:core/config/app_constants.dart';
+import 'package:core/utils/emoji_parser.dart';
 
 /// Extensions on [Uri]
 extension UriX on Uri {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/config/themedata.dart';
-import 'package:messngr/ui/widgets/scaffolds/base_scaffold.dart';
+import 'package:core/config/themedata.dart';
+import 'package:core/ui/widgets/scaffolds/base_scaffold.dart';
 
 class ErrorScreen extends StatefulWidget {
   final dynamic error;

@@ -1,10 +1,10 @@
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
-import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/desktop/linux.dart';
-import 'package:messngr/desktop/macos.dart';
-import 'package:messngr/desktop/windows.dart';
+import 'package:core/config/app_constants.dart';
+import 'package:core/desktop/linux.dart';
+import 'package:core/desktop/macos.dart';
+import 'package:core/desktop/windows.dart';
 import 'package:window_manager/window_manager.dart';
 
 Future<void> runDesktopApp() async {

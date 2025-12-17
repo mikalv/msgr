@@ -3,10 +3,10 @@ import 'dart:io' show Platform, exit;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:messngr/app/bootstrap/bootstrapper.dart';
-import 'package:messngr/desktop/web.dart';
-import 'package:messngr/main_desktop.dart';
-import 'package:messngr/main_mobile.dart';
+import 'package:core/app/bootstrap/bootstrapper.dart';
+import 'package:core/desktop/web.dart';
+import 'package:core/main_desktop.dart';
+import 'package:core/main_mobile.dart';
 import 'package:overlay_support/overlay_support.dart';
 import 'package:logging/logging.dart';
 

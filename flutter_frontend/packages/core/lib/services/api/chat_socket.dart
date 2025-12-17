@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:messngr/config/backend_environment.dart';
-import 'package:messngr/features/chat/models/chat_message.dart';
-import 'package:messngr/features/chat/models/reaction_aggregate.dart';
-import 'package:messngr/services/api/chat_api.dart';
-import 'package:messngr/services/api/chat_realtime_event.dart';
+import 'package:core/config/backend_environment.dart';
+import 'package:core/features/chat/models/chat_message.dart';
+import 'package:core/features/chat/models/reaction_aggregate.dart';
+import 'package:core/services/api/chat_api.dart';
+import 'package:core/services/api/chat_realtime_event.dart';
 import 'package:phoenix_socket/phoenix_socket.dart';
 
 /// Abstraksjon for realtime-klient slik at view-modellen kan stubbes i tester.

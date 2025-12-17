@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:messngr/ui/widgets/platform_widget_builder/src/platform_widget_base.dart';
+import 'package:core/ui/widgets/platform_widget_builder/src/platform_widget_base.dart';
 
 /// A widget that will only be built for the specific Platforms:
 ///

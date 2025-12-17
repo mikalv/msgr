@@ -4,14 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:logging/logging.dart';
-import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/providers/auth_provider.dart';
-import 'package:messngr/ui/widgets/MobileInputWithOutline.dart';
-import 'package:messngr/ui/widgets/PhoneField/phone_number.dart';
-import 'package:messngr/ui/widgets/PhoneField/countries.dart';
-import 'package:messngr/ui/widgets/auth/auth_input_decoration.dart';
-import 'package:messngr/ui/widgets/auth/auth_shell.dart';
+import 'package:core/config/AppNavigation.dart';
+import 'package:core/config/app_constants.dart';
+import 'package:core/providers/auth_provider.dart';
+import 'package:core/ui/widgets/MobileInputWithOutline.dart';
+import 'package:core/ui/widgets/PhoneField/phone_number.dart';
+import 'package:core/ui/widgets/PhoneField/countries.dart';
+import 'package:core/ui/widgets/auth/auth_input_decoration.dart';
+import 'package:core/ui/widgets/auth/auth_shell.dart';
 
 class RegisterUserScreen extends ConsumerStatefulWidget {
   const RegisterUserScreen({super.key});

@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:messngr/ui/widgets/platform_widget_builder/src/platform_widget.dart';
+import 'package:core/ui/widgets/platform_widget_builder/src/platform_widget.dart';
 
 /// A widget-building function that includes the child widget.
 typedef PlatformTargetBuilder = Widget? Function(

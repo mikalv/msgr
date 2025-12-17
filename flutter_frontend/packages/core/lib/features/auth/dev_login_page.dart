@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/config/backend_environment.dart';
-import 'package:messngr/services/api/auth_api.dart';
-import 'package:messngr/services/api/chat_api.dart' show AccountIdentity, ApiException;
+import 'package:core/config/backend_environment.dart';
+import 'package:core/services/api/auth_api.dart';
+import 'package:core/services/api/chat_api.dart' show AccountIdentity, ApiException;
 
 class DevLoginResult {
   const DevLoginResult({

@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:messngr/services/api/auth_api.dart';
-import 'package:messngr/services/api/bridge_api.dart';
-import 'package:messngr/services/api/chat_api.dart';
-import 'package:messngr/services/api/contact_api.dart';
-import 'package:messngr/services/api/profile_api.dart';
+import 'package:core/services/api/auth_api.dart';
+import 'package:core/services/api/bridge_api.dart';
+import 'package:core/services/api/chat_api.dart';
+import 'package:core/services/api/contact_api.dart';
+import 'package:core/services/api/profile_api.dart';
 
 /// Auth API provider for dependency injection
 final authApiProvider = Provider<AuthApi>((ref) {

@@ -1,7 +1,7 @@
 import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
-import 'package:messngr/features/chat/models/reaction_aggregate.dart';
+import 'package:core/features/chat/models/reaction_aggregate.dart';
 
 class ReactionAggregatorNotifier extends ChangeNotifier {
   final Map<String, List<ReactionAggregate>> _aggregates = {};

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/ui/widgets/scaffolds/base_scaffold.dart';
+import 'package:core/ui/widgets/scaffolds/base_scaffold.dart';
 
 class LoadingScreen extends StatefulWidget {
   const LoadingScreen({super.key});

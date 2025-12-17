@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:messngr/config/app_constants.dart';
+import 'package:core/config/app_constants.dart';
 
 import 'chat_api.dart' show AccountIdentity, ApiException;
 

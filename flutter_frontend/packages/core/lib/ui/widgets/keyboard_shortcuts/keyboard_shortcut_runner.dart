@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/ui/widgets/keyboard_shortcuts/intents.dart';
-import 'package:messngr/ui/widgets/keyboard_shortcuts/keysets.dart';
+import 'package:core/ui/widgets/keyboard_shortcuts/intents.dart';
+import 'package:core/ui/widgets/keyboard_shortcuts/keysets.dart';
 
 /// A widget that executes functions when specific physical keyboard shortcuts
 /// are performed.

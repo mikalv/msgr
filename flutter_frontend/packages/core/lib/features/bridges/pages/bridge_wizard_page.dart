@@ -1,11 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:messngr/features/bridges/models/bridge_auth_session.dart';
-import 'package:messngr/features/bridges/models/bridge_catalog_entry.dart';
-import 'package:messngr/features/bridges/state/bridge_session_controller.dart';
-import 'package:messngr/services/api/bridge_api.dart';
-import 'package:messngr/services/api/chat_api.dart';
+import 'package:core/features/bridges/models/bridge_auth_session.dart';
+import 'package:core/features/bridges/models/bridge_catalog_entry.dart';
+import 'package:core/features/bridges/state/bridge_session_controller.dart';
+import 'package:core/services/api/bridge_api.dart';
+import 'package:core/services/api/chat_api.dart';
 import 'package:provider/provider.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 

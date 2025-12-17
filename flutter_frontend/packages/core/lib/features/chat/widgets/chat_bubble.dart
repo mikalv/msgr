@@ -3,8 +3,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:messngr/features/chat/models/chat_message.dart';
-import 'package:messngr/features/chat/widgets/chat_theme.dart';
+import 'package:core/features/chat/models/chat_message.dart';
+import 'package:core/features/chat/widgets/chat_theme.dart';
 import 'package:msgr_messages/msgr_messages.dart';
 
 class ChatBubble extends StatelessWidget {

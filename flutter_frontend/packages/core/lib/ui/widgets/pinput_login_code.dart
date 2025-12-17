@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:messngr/providers/auth_provider.dart';
+import 'package:core/providers/auth_provider.dart';
 import 'package:pinput/pinput.dart';
 import 'package:smart_auth/smart_auth.dart';
 import 'package:libmsgr/src/registration_service.dart';
@@ -51,40 +51,15 @@ class _PinputLoginCodeState extends ConsumerState<PinputLoginCode> {
     debugPrint('onCompleted: $pin');
 
     try {
-      final authState = ref.read(authProvider);
-      final challengeId = authState.pendingChallengeId;
-      final displayName = authState.pendingDisplayName;
-
-      if (challengeId == null) {
-        debugPrint('ERROR: No pending challenge ID');
-        return;
-      }
-
-      if (authState.pendingMsisdn != null) {
-        // Phone login
-        final user = await reg.submitMsisdnCodeForToken(
-          challengeId: challengeId,
-          code: pin,
-          displayName: displayName,
-        );
-        if (user != null) {
-          ref.read(authProvider.notifier).setCurrentUser(user);
-          debugPrint('User logged in: ${user.toString()}');
-        }
-      } else if (authState.pendingEmail != null) {
-        // Email login
-        final user = await reg.submitEmailCodeForToken(
-          challengeId: challengeId,
-          code: pin,
-          displayName: displayName,
-        );
-        if (user != null) {
-          ref.read(authProvider.notifier).setCurrentUser(user);
-          debugPrint('User logged in: ${user.toString()}');
-        }
-      }
+      await ref.read(authProvider.notifier).verifyCode(pin);
+      debugPrint('User logged in successfully');
     } catch (error) {
       debugPrint('ERROR: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Feil kode: $error')),
+        );
+      }
     }
   }
 

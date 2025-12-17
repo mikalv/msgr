@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:messngr/features/chat/state/chat_cache_repository.dart';
-import 'package:messngr/features/chat/widgets/chat_composer.dart';
+import 'package:core/features/chat/state/chat_cache_repository.dart';
+import 'package:core/features/chat/widgets/chat_composer.dart';
 
 class ComposerDraftAutosaveManager {
   ComposerDraftAutosaveManager({

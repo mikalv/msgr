@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
-import 'package:messngr/app/bootstrap/device_context_bootstrap.dart';
-import 'package:messngr/app/bootstrap/libmsgr_bootstrap.dart';
-import 'package:messngr/app/bootstrap/logging_bootstrap.dart';
-import 'package:messngr/config/AppNavigation.dart';
+import 'package:core/app/bootstrap/device_context_bootstrap.dart';
+import 'package:core/app/bootstrap/libmsgr_bootstrap.dart';
+import 'package:core/app/bootstrap/logging_bootstrap.dart';
+import 'package:core/config/AppNavigation.dart';
 
 /// Handles the one-time initialization required before any Flutter widgets are
 /// rendered.

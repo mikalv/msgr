@@ -2,8 +2,8 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:libmsgr/libmsgr.dart';
-import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/services/api/chat_api.dart';
+import 'package:core/config/app_constants.dart';
+import 'package:core/services/api/chat_api.dart';
 
 class ProfileSwitchResult {
   const ProfileSwitchResult({

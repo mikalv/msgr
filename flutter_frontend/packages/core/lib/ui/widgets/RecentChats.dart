@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/ui/widgets/conversation/conversations_list_widget.dart';
-import 'package:messngr/ui/widgets/room/room_list_widget.dart';
+import 'package:core/ui/widgets/conversation/conversations_list_widget.dart';
+import 'package:core/ui/widgets/room/room_list_widget.dart';
 
 class RecentChats extends StatelessWidget {
   const RecentChats({Key? key}) : super(key: key);

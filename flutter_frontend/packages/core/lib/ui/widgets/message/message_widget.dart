@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:libmsgr/libmsgr.dart';
-import 'package:messngr/config/theme.dart';
-import 'package:messngr/ui/widgets/message/message_header.dart';
-import 'package:messngr/utils/helpers.dart';
+import 'package:core/config/theme.dart';
+import 'package:core/ui/widgets/message/message_header.dart';
+import 'package:core/utils/helpers.dart';
 
 class MessageWidget extends StatelessWidget {
   final MMessage message;

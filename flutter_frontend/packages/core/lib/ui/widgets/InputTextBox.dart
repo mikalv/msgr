@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:messngr/config/app_constants.dart';
+import 'package:core/config/app_constants.dart';
 
 class InputTextBox extends StatefulWidget {
   final Color? boxbcgcolor;

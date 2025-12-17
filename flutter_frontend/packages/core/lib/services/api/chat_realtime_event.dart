@@ -1,5 +1,5 @@
-import 'package:messngr/features/chat/models/chat_message.dart';
-import 'package:messngr/features/chat/models/reaction_aggregate.dart';
+import 'package:core/features/chat/models/chat_message.dart';
+import 'package:core/features/chat/models/reaction_aggregate.dart';
 
 /// Base type for realtime events levert fra chatkanalen.
 abstract class ChatRealtimeEvent {

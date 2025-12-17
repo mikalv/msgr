@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_profile_picture/flutter_profile_picture.dart';
-import 'package:messngr/config/AppNavigation.dart';
+import 'package:core/config/AppNavigation.dart';
 
 class ContactItem extends StatelessWidget {
   const ContactItem({super.key});

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/ui/widgets/dropdown_search/src/properties/dropdown_props.dart';
-import 'package:messngr/ui/widgets/dropdown_search/src/widgets/custom_inkwell.dart';
+import 'package:core/ui/widgets/dropdown_search/src/properties/dropdown_props.dart';
+import 'package:core/ui/widgets/dropdown_search/src/widgets/custom_inkwell.dart';
 
 typedef WidgetCheckBox = Widget Function(BuildContext context, bool isChecked);
 

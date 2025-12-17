@@ -4,12 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:libmsgr/libmsgr.dart';
-import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/providers/auth_provider.dart';
-import 'package:messngr/providers/websocket_provider.dart';
-import 'package:messngr/ui/widgets/message/message_list_widget.dart';
-import 'package:messngr/ui/widgets/message/message_widget.dart';
-import 'package:messngr/ui/widgets/message_composer/message_composer.dart';
+import 'package:core/config/AppNavigation.dart';
+import 'package:core/providers/auth_provider.dart';
+import 'package:core/providers/websocket_provider.dart';
+import 'package:core/ui/widgets/message/message_list_widget.dart';
+import 'package:core/ui/widgets/message/message_widget.dart';
+import 'package:core/ui/widgets/message_composer/message_composer.dart';
 
 class ConversationPage extends ConsumerStatefulWidget {
   final String title;

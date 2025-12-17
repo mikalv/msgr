@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:messngr/providers/auth_provider.dart';
-import 'package:messngr/ui/pages/invite_page/invite_page.dart';
+import 'package:core/providers/auth_provider.dart';
+import 'package:core/ui/pages/invite_page/invite_page.dart';
 
 class LeftDrawer extends ConsumerWidget {
   const LeftDrawer({super.key});

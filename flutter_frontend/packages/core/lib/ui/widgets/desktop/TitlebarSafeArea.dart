@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
-import 'package:messngr/config/app_constants.dart';
+import 'package:core/config/app_constants.dart';
 
 class _MacOSTitlebarSafeArea extends StatefulWidget {
   final Widget child;

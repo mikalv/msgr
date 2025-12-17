@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:libmsgr/libmsgr.dart';
-import 'package:messngr/providers/api_providers.dart';
-import 'package:messngr/services/api/chat_api.dart';
+import 'package:core/providers/api_providers.dart';
+import 'package:core/services/api/chat_api.dart';
 
 /// Auth state class holding authentication data
 class AuthState {

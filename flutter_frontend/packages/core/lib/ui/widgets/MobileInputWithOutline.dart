@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/services/localization/translator.dart';
-import 'package:messngr/ui/widgets/PhoneField/intl_phone_field.dart';
-import 'package:messngr/ui/widgets/PhoneField/phone_number.dart';
+import 'package:core/config/app_constants.dart';
+import 'package:core/services/localization/translator.dart';
+import 'package:core/ui/widgets/PhoneField/intl_phone_field.dart';
+import 'package:core/ui/widgets/PhoneField/phone_number.dart';
 
 class MobileInputWithOutline extends StatefulWidget {
   final String? initialCountryCode;

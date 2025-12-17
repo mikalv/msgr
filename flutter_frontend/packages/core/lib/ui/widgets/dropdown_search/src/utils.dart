@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/ui/widgets/dropdown_search/src/properties/menu_props.dart';
+import 'package:core/ui/widgets/dropdown_search/src/properties/menu_props.dart';
 
 RelativeRect getPosition(RenderBox dropdown, RenderBox overlay, Size menuSize,
     MenuAlign? menuAlign) {

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:messngr/ui/widgets/dropdown_search/src/widgets/custom_inkwell.dart';
+import 'package:core/ui/widgets/dropdown_search/src/widgets/custom_inkwell.dart';
 
 import '../../dropdown_search.dart';
 import 'checkbox_widget.dart';

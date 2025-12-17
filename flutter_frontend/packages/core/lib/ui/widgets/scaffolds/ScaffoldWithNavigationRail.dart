@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/ui/widgets/left_drawer/left_drawer.dart';
-import 'package:messngr/ui/widgets/scaffolds/base_scaffold.dart';
+import 'package:core/config/AppNavigation.dart';
+import 'package:core/ui/widgets/left_drawer/left_drawer.dart';
+import 'package:core/ui/widgets/scaffolds/base_scaffold.dart';
 
 class ScaffoldWithNavigationRail extends StatelessWidget {
   const ScaffoldWithNavigationRail({

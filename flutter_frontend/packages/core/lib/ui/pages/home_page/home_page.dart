@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:libmsgr/libmsgr.dart';
-import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/providers/auth_provider.dart';
-import 'package:messngr/ui/widgets/CategorySelector.dart';
-import 'package:messngr/features/chat/chat_page.dart';
-import 'package:messngr/ui/widgets/conversation/conversations_list_widget.dart';
-import 'package:messngr/ui/widgets/profile/profile_mode_switcher.dart';
-import 'package:messngr/ui/widgets/room/room_list_widget.dart';
+import 'package:core/config/AppNavigation.dart';
+import 'package:core/providers/auth_provider.dart';
+import 'package:core/ui/widgets/CategorySelector.dart';
+import 'package:core/features/chat/chat_page.dart';
+import 'package:core/ui/widgets/conversation/conversations_list_widget.dart';
+import 'package:core/ui/widgets/profile/profile_mode_switcher.dart';
+import 'package:core/ui/widgets/room/room_list_widget.dart';
 import 'package:go_router/go_router.dart';
 
 class HomePage extends ConsumerStatefulWidget {

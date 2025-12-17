@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_profile_picture/flutter_profile_picture.dart';
-import 'package:messngr/providers/team_provider.dart';
+import 'package:core/providers/team_provider.dart';
 
 class FavoriteContacts extends ConsumerWidget {
   const FavoriteContacts({super.key});

@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:messngr/config/AppNavigation.dart';
-import 'package:messngr/providers/auth_provider.dart';
+import 'package:core/config/AppNavigation.dart';
+import 'package:core/providers/auth_provider.dart';
 import 'package:libmsgr/libmsgr.dart';
 
 import '../../widgets/auth/auth_input_decoration.dart';
@@ -50,40 +50,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
 
     try {
-      AuthChallenge? challenge;
+      final displayName = _displayNameController.text.trim().isEmpty
+          ? null
+          : _displayNameController.text.trim();
 
       switch (_methodNotifier.value) {
         case _LoginMethod.email:
           final email = _emailController.text.trim();
-          final displayName = _displayNameController.text.trim().isEmpty
-              ? null
-              : _displayNameController.text.trim();
-
-          // TODO: Implement proper email auth via authProvider
-          challenge = await _registrationService.requestForSignInCodeEmail(email);
-
-          ref.read(authProvider.notifier).setPendingData(
-            email: email,
+          await ref.read(authProvider.notifier).loginWithEmailOrPhone(
+            email,
             displayName: displayName,
-            challengeId: challenge?.id,
-            channel: 'email',
           );
           break;
 
         case _LoginMethod.phone:
           final msisdn = _phoneController.text.trim();
-          final displayName = _displayNameController.text.trim().isEmpty
-              ? null
-              : _displayNameController.text.trim();
-
-          // TODO: Implement proper phone auth via authProvider
-          challenge = await _registrationService.requestForSignInCodeMsisdn(msisdn);
-
-          ref.read(authProvider.notifier).setPendingData(
-            msisdn: msisdn,
+          await ref.read(authProvider.notifier).loginWithEmailOrPhone(
+            msisdn,
             displayName: displayName,
-            challengeId: challenge?.id,
-            channel: 'sms',
           );
           break;
       }
