@@ -79,7 +79,7 @@ class RegistrationApi {
     required String identifier,
     required String deviceId,
   }) async {
-    final url = _resolver.resolveAuth('/api/auth/challenge');
+    final url = _resolver.resolveAuth('/api/v1/auth/challenge');
     final body = {
       'channel': channel,
       'identifier': identifier,
@@ -101,20 +101,20 @@ class RegistrationApi {
     required String challengeId,
     required String code,
     String? displayName,
-    String? noiseSessionId,
-    String? noiseSignature,
+    String? sessionId,
+    String? sessionToken,
     DateTime? lastHandshakeAt,
   }) async {
-    final url = _resolver.resolveAuth('/api/auth/verify');
+    final url = _resolver.resolveAuth('/api/v1/auth/verify');
     final payload = {
       'challenge_id': challengeId,
       'code': code,
       if (displayName != null && displayName.isNotEmpty)
         'display_name': displayName,
-      if (noiseSessionId != null && noiseSessionId.isNotEmpty)
-        'noise_session_id': noiseSessionId,
-      if (noiseSignature != null && noiseSignature.isNotEmpty)
-        'noise_signature': noiseSignature,
+      if (sessionId != null && sessionId.isNotEmpty)
+        'session_id': sessionId,
+      if (sessionToken != null && sessionToken.isNotEmpty)
+        'session_token': sessionToken,
       if (lastHandshakeAt != null)
         'last_handshake_at': lastHandshakeAt.toUtc().toIso8601String(),
     };
@@ -130,11 +130,15 @@ class RegistrationApi {
   }
 
   Future<NoiseHandshakeSession?> createNoiseHandshake() async {
-    final url = _resolver.resolveAuth('/api/noise/handshake');
+    final url = _resolver.resolveAuth('/noise/handshake');
     final response = await _client.post(
       url,
       headers: _jsonHeaders(),
-      body: jsonEncode(const {}),
+      body: jsonEncode({
+        'pattern': 'NKpsk0',
+        'psk': MsgrConstants.noiseDevPsk,
+        'ttl_seconds': 3600,
+      }),
     );
 
     if (response.statusCode != 200) {
@@ -142,12 +146,8 @@ class RegistrationApi {
     }
 
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-    final data = decoded['data'];
-    if (data is! Map<String, dynamic>) {
-      return null;
-    }
 
-    final session = NoiseHandshakeSession.fromJson(data);
+    final session = NoiseHandshakeSession.fromJson(decoded);
     if (session.sessionId.isEmpty ||
         session.signature.isEmpty ||
         session.deviceKey.isEmpty) {
@@ -163,7 +163,7 @@ class RegistrationApi {
     String? email,
     String? name,
   }) async {
-    final url = _resolver.resolveAuth('/api/auth/oidc');
+    final url = _resolver.resolveAuth('/api/v1/auth/oidc');
     final payload = {
       'provider': provider,
       'subject': subject,

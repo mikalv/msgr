@@ -150,8 +150,8 @@ class RegistrationServiceCore {
       challengeId: challengeId,
       code: code,
       displayName: displayName,
-      noiseSessionId: handshake?.sessionId,
-      noiseSignature: handshake?.signature,
+      sessionId: handshake?.sessionId,
+      sessionToken: handshake?.sessionToken,
       lastHandshakeAt: handshake != null ? DateTime.now().toUtc() : null,
     );
     if (response == null) {

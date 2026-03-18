@@ -1,17 +1,14 @@
 import Config
 
 listen_ip =
-  System.get_env("PHX_LISTEN_IP", "127.0.0.1")
-  |> String.split(".")
-  |> Enum.reduce_while([], fn part, acc ->
-    case Integer.parse(part) do
-      {value, ""} when value in 0..255 -> {:cont, [value | acc]}
-      _ -> {:halt, :error}
-    end
-  end)
-  |> case do
-    [d, c, b, a] -> {a, b, c, d}
-    _ -> {127, 0, 0, 1}
+  case System.get_env("PHX_LISTEN_IP", "0.0.0.0") do
+    ip_string when is_binary(ip_string) ->
+      ip_string
+      |> String.split(".")
+      |> Enum.map(&String.to_integer/1)
+      |> List.to_tuple()
+    _ ->
+      {0, 0, 0, 0}
   end
 
 config :msgr, Messngr.Repo,
@@ -29,6 +26,9 @@ config :msgr, :noise,
   default_static_key: {:base64, "CI11hCvbZNQaeEW5Yt7ttmN09Sf+bNSNAXXfPn4f+vI="},
   env_var: "NOISE_STATIC_KEY",
   secret_field: "private"
+
+# Noise has been moved to Rust Gateway, so we disable the Elixir Noise Session Registry
+config :msgr, :noise_session_registry, enabled: false
 
 config :msgr, Messngr.Noise.DevHandshake,
   enabled: true,

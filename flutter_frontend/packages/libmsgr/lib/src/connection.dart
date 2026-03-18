@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:libmsgr/libmsgr.dart';
 import 'package:libmsgr/src/telemetry/socket_telemetry.dart';
 import 'package:libmsgr/src/typedefs.dart';
 import 'package:libmsgr/src/utils/events.dart';
+import 'package:libmsgr_core/libmsgr_core.dart';
 import 'package:logging/logging.dart';
 import 'package:phoenix_socket/phoenix_socket.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 class MsgrConnection {
   late PhoenixSocket _socket;
@@ -14,21 +18,33 @@ class MsgrConnection {
   final ReduxDispatchCallback dispatchFn;
   final String tenant;
   final String userID;
+  final String? _accessToken;
   bool _connected = false;
+  NoiseHandshakeResult? _noiseHandshake;
 
   final Logger _log = Logger('MsgrConnection');
   final IDelegate<String> connectDelegate = Delegate();
   final List<PhoenixChannel> _connectedChannels = [];
 
   MsgrConnection(String serverUrl, Map<String, String> params, this.tenant,
-      this.userID, this.dispatchFn) {
-    _socket = PhoenixSocket(serverUrl,
-        socketOptions: PhoenixSocketOptions(params: params));
+      this.userID, this.dispatchFn)
+      : _accessToken = params['token'] {
+    // If NOISE is enabled, we'll create the socket later after handshake
+    if (!MsgrConstants.useNoiseProtocol) {
+      _socket = PhoenixSocket(serverUrl,
+          socketOptions: PhoenixSocketOptions(params: params));
+    }
   }
 
   List<PhoenixChannel> get connectedChannels => _connectedChannels;
 
   connect() async {
+    // Perform NOISE handshake if enabled
+    if (MsgrConstants.useNoiseProtocol) {
+      await _performNoiseHandshake();
+      await _createNoiseSocket();
+    }
+
     await _socket.connect();
     _socket.errorStream.listen(_handleError);
     _socket.closeStream.listen(_handleDisconnect);
@@ -36,6 +52,60 @@ class MsgrConnection {
     /*_socket.streamForTopic('room:lobby').listen((onData) {
       _log.info('ondata: $onData');
     });*/
+  }
+
+  /// Perform NOISE protocol handshake with the gateway
+  Future<void> _performNoiseHandshake() async {
+    _log.info('Performing NOISE handshake with ${MsgrConstants.noiseGatewayUrl}');
+
+    final psk = base64.decode(MsgrConstants.noiseDevPsk);
+    final handshakeService = NoiseHandshakeService(
+      gatewayUrl: MsgrConstants.noiseGatewayUrl,
+      psk: Uint8List.fromList(psk),
+    );
+
+    _noiseHandshake = await handshakeService.performHandshake();
+
+    _log.info('NOISE handshake completed. Session: ${_noiseHandshake!.sessionId}');
+  }
+
+  /// Create PhoenixSocket with NOISE-encrypted WebSocket channel
+  Future<void> _createNoiseSocket() async {
+    if (_noiseHandshake == null) {
+      throw StateError('NOISE handshake must be performed before creating socket');
+    }
+
+    final serverUrl = ServerResolver.getTeamWebSocketServer(tenant);
+
+    _log.info('Creating NOISE-encrypted socket to $serverUrl');
+
+    // Pre-create the NOISE WebSocket channel
+    // PhoenixSocket will call the factory synchronously, but we already have
+    // the channel ready from the handshake
+    NoiseWebSocketChannel? preCreatedChannel;
+
+    WebSocketChannel Function(Uri) channelFactory = (Uri uri) {
+      if (preCreatedChannel != null) {
+        final channel = preCreatedChannel;
+        preCreatedChannel = null; // Use it only once
+        return channel!;
+      }
+      throw StateError('NOISE WebSocket channel was not pre-created');
+    };
+
+    // Create the channel asynchronously before PhoenixSocket tries to use it
+    preCreatedChannel = await NoiseWebSocketChannel.connect(
+      url: serverUrl,
+      sessionToken: _noiseHandshake!.sessionToken,
+      sendCipher: _noiseHandshake!.sendCipher,
+      receiveCipher: _noiseHandshake!.receiveCipher,
+    );
+
+    _socket = PhoenixSocket(
+      serverUrl,
+      socketOptions: PhoenixSocketOptions(params: {'token': _accessToken ?? ''}),
+      webSocketChannelFactory: channelFactory,
+    );
   }
 
   PhoenixChannel joinChannel(topic) {

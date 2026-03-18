@@ -30,14 +30,32 @@ defmodule Messngr.Chat.WatcherPruner do
   """
   @spec child_spec(keyword()) :: Supervisor.child_spec() | nil
   def child_spec(opts) do
-    case Keyword.get(opts, :enabled, true) do
+    Logger.info("🔍 WatcherPruner.child_spec called with opts: #{inspect(opts)}")
+
+    enabled = Keyword.get(opts, :enabled, true)
+    Logger.info("🔍 WatcherPruner enabled: #{enabled}")
+
+    case enabled do
       true ->
+        Logger.info("🔍 WatcherPruner building child spec...")
         name = Keyword.get(opts, :name, __MODULE__)
         interval = normalize_interval(opts)
 
-        Supervisor.child_spec({__MODULE__, [name: name, interval: interval]}, id: name)
+        Logger.info("🔍 WatcherPruner config: name=#{name}, interval=#{interval}")
+
+        result = %{
+          id: name,
+          start: {__MODULE__, :start_link, [[name: name, interval: interval]]},
+          restart: :permanent,
+          shutdown: 5000,
+          type: :worker
+        }
+
+        Logger.info("✅ WatcherPruner child spec created")
+        result
 
       _ ->
+        Logger.info("⏭️  WatcherPruner disabled, returning nil")
         nil
     end
   end

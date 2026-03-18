@@ -19,7 +19,7 @@ dependencies:
     path: ../libmsgr_core
   get_it: ^7.7.0
   uuid: ^4.4.2
-  shared_preferences: ^2.3.2
+  # shared_preferences: ^2.3.2  # Moved - now injected from consuming apps
 
   # Crypto
   cryptography: ^2.7.0
@@ -39,18 +39,18 @@ dependencies:
   #flipperkit_redux_middleware: ^0.0.4
 
 
-  # This is for the storage layer (db)
-  drift: ^2.20.0
-  drift_flutter: ^0.2.0
-  encrypted_drift:
-    git:
-      url: https://github.com/simolus3/drift.git
-      path: extras/encryption
+  # This is for the storage layer (db) - note: implementations are now separate
+  # drift: ^2.20.0  # Moved - used in storage implementations
+  # drift_flutter: ^0.2.0  # Moved - Flutter-specific storage
+  # encrypted_drift:  # Moved - Flutter-specific storage
+  #   git:
+  #     url: https://github.com/simolus3/drift.git
+  #     path: extras/encryption
 
-  # Database
-  sqflite: ^2.3.3+2
-  sqflite_common: ^2.5.4+4
-  sqflite_sqlcipher: ^3.4.0
+  # Database - kept for interface compatibility
+  sqflite_common: ^2.5.4+4  # Pure Dart interfaces
+  # sqflite: ^2.3.3+2  # Moved to dev_dependencies - Flutter-specific
+  # sqflite_sqlcipher: ^3.4.0  # Moved to dev_dependencies - Flutter-specific
   #sqflite_migration: ^0.3.0
   meta: ^1.15.0
   # HTTP Client
@@ -68,8 +68,18 @@ dependencies:
   built_value: ^8.9.2
   path: ^1.8.0
 
-dev_dependencies:
+  # Pure Dart storage (for CLI/Server apps that use libmsgr)
   sqflite_common_ffi: ^2.3.3+1
+
+dev_dependencies:
+  # Flutter-specific storage (for Flutter apps that use libmsgr)
+  sqflite: ^2.3.3+2
+  sqflite_sqlcipher: ^3.4.0
+  path_provider: ^2.1.4
+  drift: ^2.20.0
+  drift_flutter: ^0.2.0
+  shared_preferences: ^2.3.2
+
   # CLI Example
   cli_menu: ^0.4.0+1
   cli_util: ^0.4.1

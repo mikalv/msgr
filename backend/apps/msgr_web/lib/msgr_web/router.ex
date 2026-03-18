@@ -18,12 +18,18 @@ defmodule MessngrWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  # Health and Metrics endpoints (no authentication required)
+  scope "/", MessngrWeb do
+    get "/health", HealthController, :health
+    get "/metrics", HealthController, :metrics
+  end
+
   scope "/api", MessngrWeb do
     pipe_through :api
 
-    post "/auth/challenge", AuthController, :challenge
-    post "/auth/verify", AuthController, :verify
-    post "/auth/oidc", AuthController, :oidc
+    post "/v1/auth/challenge", AuthController, :challenge
+    post "/v1/auth/verify", AuthController, :verify
+    post "/v1/auth/oidc", AuthController, :oidc
     # Noise handshake is now handled by Rust Gateway
     resources "/users", AccountController, only: [:index, :create, :update]
   end

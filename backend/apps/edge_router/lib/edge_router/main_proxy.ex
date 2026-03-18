@@ -12,6 +12,20 @@ defmodule EdgeRouter.MainProxy do
   @impl MainProxy.Proxy
   def backends do
     [
+      # Health and Metrics endpoints (highest priority)
+      %{
+        verb: ~r/get/i,
+        path: ~r{^/health$},
+        plug: MainProxy.Plug.Health,
+        opts: []
+      },
+      %{
+        verb: ~r/get/i,
+        path: ~r{^/metrics$},
+        plug: MainProxy.Plug.Metrics,
+        opts: []
+      },
+      # Domain-based routing
       %{
         domain: "msgr" <> main_domain(),
         phoenix_endpoint: MessngrWeb.Endpoint
@@ -33,6 +47,7 @@ defmodule EdgeRouter.MainProxy do
         domain: "teams-slackapi" <> main_domain(),
         phoenix_endpoint: SlackApiWeb.Endpoint
       },
+      # Test endpoint
       %{
         verb: ~r/get/i,
         path: ~r{^/main-proxy-plug-test$},

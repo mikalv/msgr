@@ -16,13 +16,17 @@ tokio = { version = "1.40", features = ["full"] }
 tokio-stream = "0.1"
 
 # HTTP server (for REST API and Proxy)
-axum = "0.7"
+axum = { version = "0.7", features = ["ws"] }
 tower = { version = "0.5", features = ["full"] }
 tower-http = { version = "0.6", features = ["trace", "cors", "compression-gzip"] }
 hyper = "1.5"
 hyper-util = { version = "0.1", features = ["full"] }
 reqwest = { version = "0.12", features = ["json"] }
 url = "2.5"
+
+# WebSocket (for backend connection)
+tokio-tungstenite = "0.21"
+futures-util = "0.3"
 
 # gRPC (for Elixir backend communication)
 tonic = "0.12"

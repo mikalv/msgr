@@ -64,10 +64,22 @@ secret_key =
       value
   end
 
+listen_ip =
+  case System.get_env("PHX_LISTEN_IP", "127.0.0.1") do
+    ip_string when is_binary(ip_string) ->
+      ip_string
+      |> String.split(".")
+      |> Enum.map(&String.to_integer/1)
+      |> List.to_tuple()
+    _ ->
+      {127, 0, 0, 1}
+  end
+
 config :msgr_web, MessngrWeb.Endpoint,
   http: [
-    # Bind to localhost only - Rust Gateway handles external connections
-    ip: {127, 0, 0, 1},
+    # Bind address controlled by PHX_LISTEN_IP env var (default: 127.0.0.1)
+    # In Docker, set PHX_LISTEN_IP=0.0.0.0 to allow external access
+    ip: listen_ip,
     port: String.to_integer(System.get_env("PORT", "4000"))
   ],
   secret_key_base: secret_key,
@@ -148,7 +160,8 @@ else
   end
 end
 
-noise_config = Application.get_env(:msgr, :noise, [])
+# Noise configuration removed - now handled by Rust gateway
+# noise_config = Application.get_env(:msgr, :noise, [])
 
 prometheus_config = Application.get_env(:msgr_web, :prometheus, [])
 
@@ -237,112 +250,11 @@ config :msgr, Messngr.Chat.WatcherPruner,
   |> Keyword.put(:enabled, watcher_pruner_enabled)
   |> Keyword.put(:interval_ms, watcher_pruner_interval)
 
-noise_enabled =
-  bool_env.(
-    System.get_env("NOISE_TRANSPORT_ENABLED"),
-    Keyword.get(noise_config, :enabled, false)
-  )
+# Noise configuration removed - now handled by Rust gateway
+# All Noise transport and key management is done in the Rust gateway service
+# which communicates with Elixir via gRPC
 
-noise_port =
-  port_env.(
-    System.get_env("NOISE_TRANSPORT_PORT"),
-    Keyword.get(noise_config, :transport_port, 5_443),
-    "NOISE_TRANSPORT_PORT"
-  )
-
-base_noise_config =
-  noise_config
-  |> Keyword.put(:enabled, noise_enabled)
-  |> Keyword.put(:transport_port, noise_port)
-
-config :msgr, :noise, base_noise_config
-
-if noise_enabled do
-  noise_opts =
-    [
-      env_var: Keyword.get(base_noise_config, :env_var, "NOISE_STATIC_KEY"),
-      default: Keyword.get(base_noise_config, :default_static_key),
-      secret_id:
-        System.get_env("NOISE_STATIC_KEY_SECRET_ID") || Keyword.get(base_noise_config, :secret_id),
-      secret_field:
-        System.get_env("NOISE_STATIC_KEY_SECRET_FIELD") ||
-          Keyword.get(base_noise_config, :secret_field),
-      secret_region:
-        System.get_env("NOISE_STATIC_KEY_SECRET_REGION") ||
-          Keyword.get(base_noise_config, :secret_region)
-    ]
-    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-
-  noise_key_result = Messngr.Noise.KeyLoader.load(noise_opts)
-
-  noise_private_key =
-    case {noise_key_result, config_env()} do
-      {{:ok, key}, _env} ->
-        key
-
-      {{:error, :no_default_key}, :dev} ->
-        Logger.warning("Noise static key default missing in dev; generating ephemeral key")
-        case :crypto.generate_key(:ecdh, :x25519) do
-          {private, _public} -> private
-          {:ok, {private, _public}} -> private
-        end
-
-      {{:error, reason}, env} when env in [:prod, :staging] ->
-        raise "Noise static key could not be loaded: #{inspect(reason)}"
-
-      {{:error, reason}, _env} ->
-        Logger.warning("Noise static key unavailable, continuing without static key", reason: inspect(reason))
-        nil
-    end
-
-  if noise_private_key do
-    public_key = Messngr.Noise.KeyLoader.public_key(noise_private_key)
-    fingerprint = Messngr.Noise.KeyLoader.fingerprint(noise_private_key)
-
-    rotated_at =
-      with value when is_binary(value) <- System.get_env("NOISE_STATIC_KEY_ROTATED_AT"),
-           {:ok, timestamp, _} <- DateTime.from_iso8601(value) do
-        timestamp
-      else
-        _ -> DateTime.utc_now()
-      end
-
-    Logger.info("Loaded Noise static key", fingerprint: fingerprint, port: noise_port)
-
-    config :msgr, :noise,
-      Keyword.merge(base_noise_config,
-        private_key: noise_private_key,
-        public_key: public_key,
-        private_key_base64: Base.encode64(noise_private_key),
-        public_key_base64: Base.encode64(public_key),
-        fingerprint: fingerprint,
-        protocol: Messngr.Noise.KeyLoader.protocol(),
-        prologue: Messngr.Noise.KeyLoader.prologue(),
-        rotated_at: rotated_at
-      )
-  end
-else
-  Logger.info("Noise transport disabled; skipping static key load", port: noise_port)
-end
-
-dev_handshake_config = Application.get_env(:msgr, Messngr.Noise.DevHandshake, [])
-
-dev_handshake_enabled =
-  bool_env.(
-    System.get_env("NOISE_DEV_HANDSHAKE_ENABLED"),
-    Keyword.get(dev_handshake_config, :enabled, false)
-  )
-
-dev_handshake_allow =
-  bool_env.(
-    System.get_env("NOISE_DEV_HANDSHAKE_ALLOW_DISABLED"),
-    Keyword.get(dev_handshake_config, :allow_without_transport, false)
-  )
-
-config :msgr, Messngr.Noise.DevHandshake,
-  dev_handshake_config
-  |> Keyword.put(:enabled, dev_handshake_enabled)
-  |> Keyword.put(:allow_without_transport, dev_handshake_allow)
+# DevHandshake configuration removed - part of Noise which is now in Rust gateway
 
 guardian_schema = System.get_env("GUARDIAN_DB_SCHEMA", "guardian_tokens")
 guardian_interval_minutes =

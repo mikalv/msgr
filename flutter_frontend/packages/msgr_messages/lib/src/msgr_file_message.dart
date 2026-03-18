@@ -41,43 +41,6 @@ class MsgrFileMessage extends MsgrAuthoredMessage {
   /// Optional caption supplied by the author.
   final String? caption;
 
-  /// Recreates a [MsgrFileMessage] from a serialised map.
-  factory MsgrFileMessage.fromMap(Map<String, dynamic> map) {
-    final author = MsgrAuthoredMessage.readAuthorMap(map);
-    return MsgrFileMessage(
-      id: map['id'] as String,
-      url: map['url'] as String? ?? '',
-      fileName: map['fileName'] as String? ?? map['name'] as String? ?? '',
-      mimeType: map['mimeType'] as String? ?? map['contentType'] as String?,
-      byteSize: (map['byteSize'] as num?)?.toInt(),
-      caption: map['caption'] as String?,
-      profileId: author.profileId,
-      profileName: author.profileName,
-      profileMode: author.profileMode,
-      status: author.status,
-      sentAt: author.sentAt,
-      insertedAt: author.insertedAt,
-      isLocal: author.isLocal,
-      theme: MsgrMessage.readTheme(map),
-    );
-  }
-
-  /// Creates a copy with the provided overrides.
-  /// Download URL for the file resource.
-  final String url;
-
-  /// Original filename supplied by the uploader.
-  final String fileName;
-
-  /// Total size of the file in bytes, when available.
-  final int? byteSize;
-
-  /// MIME type describing the contents of the file.
-  final String? mimeType;
-
-  /// Optional caption or description associated with the file.
-  final String? caption;
-
   /// Optional checksum for integrity validation.
   final String? checksum;
 
@@ -91,9 +54,6 @@ class MsgrFileMessage extends MsgrAuthoredMessage {
     String? fileName,
     String? mimeType,
     int? byteSize,
-    String? caption,
-    int? byteSize,
-    String? mimeType,
     String? caption,
     String? checksum,
     String? thumbnailUrl,

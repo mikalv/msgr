@@ -228,6 +228,17 @@ defmodule Messngr.Accounts do
   @spec get_device!(Ecto.UUID.t()) :: Device.t()
   def get_device!(id), do: Repo.get!(Device, id) |> Repo.preload([:account, :profile])
 
+  @spec get_device_by_public_key(String.t()) :: Device.t() | nil
+  def get_device_by_public_key(device_public_key) when is_binary(device_public_key) do
+    with {:ok, %{encoded: normalized}} <- normalize_device_public_key(device_public_key) do
+      Repo.get_by(Device, device_public_key: normalized)
+      |> Repo.preload([:account, :profile])
+    else
+      :none -> nil
+      {:error, _reason} -> nil
+    end
+  end
+
   @spec get_device_by_public_key(Ecto.UUID.t(), String.t()) :: Device.t() | nil
   def get_device_by_public_key(account_id, device_public_key) do
     with {:ok, %{encoded: normalized}} <- normalize_device_public_key(device_public_key) do

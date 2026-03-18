@@ -27,6 +27,11 @@ export 'src/models/auth_challenge.dart';
 
 export 'src/registration_service.dart';
 export 'src/services/contact_api.dart';
+export 'src/connection.dart';
+
+// NOISE Protocol
+export 'src/noise_handshake_service.dart';
+export 'src/noise_websocket.dart';
 
 export 'src/lib_constants.dart';
 export 'src/telemetry/socket_telemetry.dart';

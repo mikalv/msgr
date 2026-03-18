@@ -54,15 +54,15 @@ class TeamNotifier extends StateNotifier<TeamState> {
       final repositories = LibMsgr().repositoryFactory.getRepositories(teamName);
 
       // Subscribe to repository changes
-      repositories.conversationRepository.subscribe((conversations) {
+      repositories.conversationRepository.addListener((conversations) {
         state = state.copyWith(conversations: conversations);
       });
 
-      repositories.roomRepository.subscribe((rooms) {
+      repositories.roomRepository.addListener((rooms) {
         state = state.copyWith(rooms: rooms);
       });
 
-      repositories.profileRepository.subscribe((profiles) {
+      repositories.profileRepository.addListener((profiles) {
         state = state.copyWith(profiles: profiles);
       });
 
@@ -144,7 +144,10 @@ class TeamNotifier extends StateNotifier<TeamState> {
     required String identifier,
   }) async {
     try {
-      final connection = LibMsgr().connection;
+      final connection = LibMsgr().getWebsocketConnection();
+      if (connection == null) {
+        throw Exception('No websocket connection available');
+      }
       connection.sendInvitation(teamName, profileId, identifier);
     } catch (e) {
       state = state.copyWith(error: e as Exception);

@@ -13,6 +13,9 @@ class NKPSK0HandshakeState extends IHandshakeState {
 
   Uint8List? prologue;
 
+  // Public getter for symmetric state (needed for split() in NKpsk0 initiator)
+  SymmetricState get symmetricState => _symmetricState;
+
   NKPSK0HandshakeState.responder(
       this._s, this._psk, this._hash, elliptic.Curve curve,
       {this.prologue})

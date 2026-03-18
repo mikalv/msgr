@@ -94,12 +94,12 @@ class ProfileThemePreferences {
     }
     final map = _coerceMap(json);
     return ProfileThemePreferences(
-      mode: _string(map['mode'], fallback: 'system'),
-      variant: _string(map['variant'], fallback: 'default'),
-      primary: _string(map['primary'], fallback: '#4C6EF5'),
-      accent: _string(map['accent'], fallback: '#EDF2FF'),
-      background: _string(map['background'], fallback: '#0B1B3A'),
-      contrast: _string(map['contrast'], fallback: '#F8F9FA'),
+      mode: _string(map != null ? map['mode'] : null, fallback: 'system') ?? 'system',
+      variant: _string(map != null ? map['variant'] : null, fallback: 'default') ?? 'default',
+      primary: _string(map != null ? map['primary'] : null, fallback: '#4C6EF5') ?? '#4C6EF5',
+      accent: _string(map != null ? map['accent'] : null, fallback: '#EDF2FF') ?? '#EDF2FF',
+      background: _string(map != null ? map['background'] : null, fallback: '#0B1B3A') ?? '#0B1B3A',
+      contrast: _string(map != null ? map['contrast'] : null, fallback: '#F8F9FA') ?? '#F8F9FA',
     );
   }
 
@@ -164,9 +164,9 @@ class ProfileNotificationQuietHours {
   factory ProfileNotificationQuietHours.fromJson(dynamic json) {
     final map = _coerceMap(json);
     return ProfileNotificationQuietHours(
-      enabled: _bool(map['enabled'], fallback: false),
-      start: _string(map['start'], fallback: '22:00'),
-      end: _string(map['end'], fallback: '07:00'),
+      enabled: _bool(map != null ? map['enabled'] : null, fallback: false),
+      start: _string(map != null ? map['start'] : null, fallback: '22:00') ?? '22:00',
+      end: _string(map != null ? map['end'] : null, fallback: '07:00') ?? '07:00',
     );
   }
 
@@ -227,17 +227,17 @@ class ProfileNotificationPolicy {
     }
 
     final map = _coerceMap(json);
-    final mutedLabels = _coerceList(map['muted_labels'])
+    final mutedLabels = _coerceList(map != null ? map['muted_labels'] : null)
         .map((value) => value.toString())
         .where((value) => value.trim().isNotEmpty)
         .toList(growable: false);
 
     return ProfileNotificationPolicy(
-      allowPush: _bool(map['allow_push'], fallback: true),
-      allowEmail: _bool(map['allow_email'], fallback: false),
-      allowSms: _bool(map['allow_sms'], fallback: false),
+      allowPush: _bool(map != null ? map['allow_push'] : null, fallback: true),
+      allowEmail: _bool(map != null ? map['allow_email'] : null, fallback: false),
+      allowSms: _bool(map != null ? map['allow_sms'] : null, fallback: false),
       mutedLabels: mutedLabels,
-      quietHours: ProfileNotificationQuietHours.fromJson(map['quiet_hours']),
+      quietHours: ProfileNotificationQuietHours.fromJson(map != null ? map['quiet_hours'] : null),
     );
   }
 
@@ -334,12 +334,12 @@ class ProfileSecurityPolicy {
 
     final map = _coerceMap(json);
     return ProfileSecurityPolicy(
-      requiresPin: _bool(map['requires_pin'], fallback: false),
-      biometricsEnabled: _bool(map['biometrics_enabled'], fallback: false),
-      lockAfterMinutes: _int(map['lock_after_minutes'], fallback: 5),
+      requiresPin: _bool(map != null ? map['requires_pin'] : null, fallback: false),
+      biometricsEnabled: _bool(map != null ? map['biometrics_enabled'] : null, fallback: false),
+      lockAfterMinutes: _int(map != null ? map['lock_after_minutes'] : null, fallback: 5),
       sensitiveNotifications:
           SensitiveNotificationVisibilityX.fromString(
-        _string(map['sensitive_notifications'], fallback: 'hide_content'),
+        _string(map != null ? map['sensitive_notifications'] : null, fallback: 'hide_content'),
       ),
     );
   }
@@ -570,7 +570,7 @@ class Profile extends BaseModel {
     return Profile(
       id: _string(map['id'], fallback: ''),
       uid: _string(map['uid']),
-      username: username,
+      username: username ?? 'unknown',
       name: _string(map['name']),
       slug: _string(map['slug']),
       mode: ProfileModeX.fromString(_string(map['mode'], fallback: 'unknown')),

@@ -21,13 +21,13 @@ class Dbkeys {
 }
 
 class DeviceInfoImpl implements ADeviceInfo {
-  static DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+  static final DeviceInfoPlugin _deviceInfoPlugin = DeviceInfoPlugin();
 
   @override
   Future<Map<dynamic, dynamic>> extractInformation() async {
     var mapDeviceInfo = {};
     if (kIsWeb) {
-      WebBrowserInfo webInfo = await deviceInfo.webBrowserInfo;
+      WebBrowserInfo webInfo = await _deviceInfoPlugin.webBrowserInfo;
       // TODO: Maybe we should use a more unique identifier?
       var randomString = DateTime.now().toIso8601String();
       var deviceIdStr =
@@ -45,7 +45,7 @@ class DeviceInfoImpl implements ADeviceInfo {
       };
     } else {
       if (Platform.isAndroid == true) {
-        AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+        AndroidDeviceInfo androidInfo = await _deviceInfoPlugin.androidInfo;
         var deviceIdStr = androidInfo.id + androidInfo.board;
         mapDeviceInfo = {
           Dbkeys.deviceInfoDEVICEIDStr: deviceIdStr,
@@ -59,7 +59,7 @@ class DeviceInfoImpl implements ADeviceInfo {
           Dbkeys.deviceInfoLOGINTIMESTAMP: DateTime.now().toIso8601String(),
         };
       } else if (Platform.isIOS == true) {
-        IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
+        IosDeviceInfo iosInfo = await _deviceInfoPlugin.iosInfo;
         var deviceIdStr =
             iosInfo.systemName + iosInfo.model + iosInfo.systemVersion;
         mapDeviceInfo = {
@@ -74,7 +74,7 @@ class DeviceInfoImpl implements ADeviceInfo {
           Dbkeys.deviceInfoLOGINTIMESTAMP: DateTime.now().toIso8601String(),
         };
       } else if (Platform.isMacOS) {
-        MacOsDeviceInfo macOSInfo = await deviceInfo.macOsInfo;
+        MacOsDeviceInfo macOSInfo = await _deviceInfoPlugin.macOsInfo;
         var deviceIdStr = macOSInfo.systemGUID! +
             macOSInfo.arch +
             macOSInfo.model +
@@ -94,6 +94,12 @@ class DeviceInfoImpl implements ADeviceInfo {
       }
     }
     return mapDeviceInfo;
+  }
+
+  @override
+  Future<Map<String, dynamic>> deviceInfo() async {
+    final info = await extractInformation();
+    return Map<String, dynamic>.from(info);
   }
 
   @override

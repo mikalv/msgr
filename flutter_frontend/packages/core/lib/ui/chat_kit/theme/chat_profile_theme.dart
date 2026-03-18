@@ -32,15 +32,15 @@ class ChatProfileThemeData {
     required ThemeData theme,
     MsgrMessageTheme? messageTheme,
   }) {
-    final baseBubble = messageTheme?.bubbleColor != null
-        ? Color(messageTheme!.bubbleColor!)
+    final baseBubble = messageTheme != null
+        ? _parseColor(messageTheme.primaryColor) ?? theme.colorScheme.primaryContainer
         : theme.colorScheme.primaryContainer;
-    final baseAccent = messageTheme?.highlightColor != null
-        ? Color(messageTheme!.highlightColor!)
+    final baseAccent = messageTheme != null
+        ? _parseColor(messageTheme.primaryColor) ?? theme.colorScheme.primary
         : theme.colorScheme.primary;
 
-    final textColor = messageTheme?.textColor != null
-        ? Color(messageTheme!.textColor!)
+    final textColor = messageTheme != null
+        ? _parseColor(messageTheme.outgoingBubble.textColor) ?? theme.colorScheme.onPrimaryContainer
         : theme.colorScheme.onPrimaryContainer;
 
     final gradient = LinearGradient(
@@ -60,10 +60,19 @@ class ChatProfileThemeData {
         color: textColor,
         height: 1.35,
       ),
-      presenceColor: messageTheme?.presenceColor != null
-          ? Color(messageTheme!.presenceColor!)
-          : baseAccent,
+      presenceColor: baseAccent,
     );
+  }
+
+  /// Helper method to parse hex color strings
+  static Color? _parseColor(String? colorString) {
+    if (colorString == null || colorString.isEmpty) return null;
+    try {
+      final hexColor = colorString.replaceAll('#', '');
+      return Color(int.parse('FF$hexColor', radix: 16));
+    } catch (e) {
+      return null;
+    }
   }
 }
 

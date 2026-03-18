@@ -6,6 +6,7 @@ import 'package:libmsgr/libmsgr.dart';
 import 'package:libmsgr/src/connection.dart';
 import 'package:libmsgr/src/database/database.dart';
 import 'package:libmsgr/src/server_resolver.dart';
+import 'package:libmsgr/src/storage/storage_interface.dart';
 import 'package:libmsgr_core/libmsgr_core.dart';
 import 'package:libmsgr/src/typedefs.dart';
 import 'package:logging/logging.dart';
@@ -41,6 +42,8 @@ class LibMsgr {
   ASharedPreferences? _sharedPreferences;
   ASecureStorage? _secureStorageInstance;
   ADeviceInfo? _deviceInfo;
+  StorageProvider? _storageProvider;
+  PathProvider? _pathProvider;
   String? _currentUserID;
   String? _currentTeamID;
   bool hasBootstrapped = false;
@@ -79,6 +82,16 @@ class LibMsgr {
   set sharedPreferences(val) {
     _log.finest('Shared Preferences is set.');
     _sharedPreferences = val;
+  }
+
+  set storageProvider(StorageProvider val) {
+    _log.finest('Storage Provider is set.');
+    _storageProvider = val;
+  }
+
+  set pathProvider(PathProvider val) {
+    _log.finest('Path Provider is set.');
+    _pathProvider = val;
   }
 
   factory LibMsgr() {
@@ -134,13 +147,22 @@ class LibMsgr {
     if (_deviceInfo == null) {
       throw 'Can\'t bootstrap without a DeviceInfo instance! check your implementation!';
     }
+    if (_storageProvider == null) {
+      throw 'Can\'t bootstrap without a StorageProvider instance! Set libmsgr.storageProvider before bootstrapping.';
+    }
+    if (_pathProvider == null) {
+      throw 'Can\'t bootstrap without a PathProvider instance! Set libmsgr.pathProvider before bootstrapping.';
+    }
 
     // Load cryptographic keys
     _keyManager = KeyManager(storage: _secureStorageInstance!);
     await _keyManager.getOrGenerateDeviceId();
     _authRepository = AuthRepository(teamName: 'dummy');
 
-    _databaseService = DatabaseService();
+    _databaseService = DatabaseService(
+      storageProvider: _storageProvider!,
+      pathProvider: _pathProvider!,
+    );
     await _databaseService.initialize();
     _repositoryFactory = RepositoryFactory(database: _databaseService);
 

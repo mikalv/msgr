@@ -107,11 +107,8 @@ class WebSocketNotifier extends StateNotifier<WebSocketState> {
 
     // Create message object
     final message = MMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
       content: content,
-      createdAt: DateTime.now().toUtc(),
-      updatedAt: DateTime.now().toUtc(),
-      senderID: currentProfile.id,
+      fromProfileID: currentProfile.id,
       conversationID: conversationId,
       roomID: roomId,
     );

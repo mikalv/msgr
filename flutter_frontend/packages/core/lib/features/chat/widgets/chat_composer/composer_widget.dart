@@ -6,7 +6,7 @@ const _linkUrlFieldKey = ValueKey('composerLinkUrlField');
 enum _FormattingAction { bold, italic, strike, code, link, bullet, quote }
 
 class ChatComposer extends StatefulWidget {
-  const ChatComposer({
+  ChatComposer({
     super.key,
     required this.controller,
     required this.onSubmit,
@@ -25,7 +25,7 @@ class ChatComposer extends StatefulWidget {
   final List<SlashCommand> availableCommands;
   final List<ComposerMention> availableMentions;
   final ChatVoiceRecorder voiceRecorder;
-  final FilePickerPlatform? filePicker;
+  final dynamic filePicker;  // TODO: Add proper FilePickerPlatform type when available
 
   @override
   State<ChatComposer> createState() => _ChatComposerState();
@@ -210,57 +210,57 @@ class _ChatComposerState extends State<ChatComposer>
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          _ComposerIconButton(
-                            icon: Icons.emoji_emotions_outlined,
-                            tooltip: 'Emoji',
-                            isActive: _showEmoji,
-                            onTap: isBusy ? null : _toggleEmoji,
-                          ),
-                          if (!isCompact) const SizedBox(width: 8),
-                          _ComposerIconButton(
-                            icon: Icons.attach_file,
-                            tooltip: 'Legg ved fil',
-                            onTap: isBusy ? null : _pickFiles,
-                          ),
-                          const SizedBox(width: 8),
-                          _ComposerIconButton(
-                            icon: Icons.camera_alt_outlined,
-                            tooltip: 'Åpne kamera',
-                            onTap: isBusy ? null : _capturePhoto,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _ComposerTextField(
-                              controller: _textController,
-                              focusNode: _focusNode,
-                              onSubmitted: (_) => _submit(),
-                              isSending: isBusy,
-                              placeholder: isCompact
-                                  ? 'Melding'
-                                  : 'Del en oppdatering eller skriv / for kommandoer',
-                              minLines: _lineSpan,
-                              maxLines: _lineSpan,
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            _ComposerIconButton(
+                              icon: Icons.emoji_emotions_outlined,
+                              tooltip: 'Emoji',
+                              isActive: _showEmoji,
+                              onTap: isBusy ? null : _toggleEmoji,
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          _VoiceRecorderButton(
-                            isRecording: widget.voiceRecorder.isRecording,
-                            onStart: _startRecording,
-                            onStop: _stopRecording,
-                            isEnabled: !isBusy,
-                          ),
-                          const SizedBox(width: 8),
-                          _SendButton(
-                            isEnabled: _canSend,
-                            isSending: isBusy,
-                            onPressed:
-                                _canSend ? () => _submit(forceSend: true) : null,
-                          ),
-                        ],
-                      ),
+                            if (!isCompact) const SizedBox(width: 8),
+                            _ComposerIconButton(
+                              icon: Icons.attach_file,
+                              tooltip: 'Legg ved fil',
+                              onTap: isBusy ? null : _pickFiles,
+                            ),
+                            const SizedBox(width: 8),
+                            _ComposerIconButton(
+                              icon: Icons.camera_alt_outlined,
+                              tooltip: 'Åpne kamera',
+                              onTap: isBusy ? null : _capturePhoto,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _ComposerTextField(
+                                controller: _textController,
+                                focusNode: _focusNode,
+                                onSubmitted: (_) => _submit(),
+                                isSending: isBusy,
+                                placeholder: isCompact
+                                    ? 'Melding'
+                                    : 'Del en oppdatering eller skriv / for kommandoer',
+                                minLines: _lineSpan,
+                                maxLines: _lineSpan,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            _VoiceRecorderButton(
+                              isRecording: widget.voiceRecorder.isRecording,
+                              onStart: _startRecording,
+                              onStop: _stopRecording,
+                              isEnabled: !isBusy,
+                            ),
+                            const SizedBox(width: 8),
+                            _SendButton(
+                              isEnabled: _canSend,
+                              isSending: isBusy,
+                              onPressed:
+                                  _canSend ? () => _submit(forceSend: true) : null,
+                            ),
+                          ],
+                        ),
                       if (autosaveStatus != ComposerAutosaveStatus.idle)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
@@ -374,6 +374,7 @@ class _ChatComposerState extends State<ChatComposer>
                 ),
               ),
             ),
+          ),
           ],
         ),
       ),
@@ -503,7 +504,10 @@ class _ChatComposerState extends State<ChatComposer>
   void _handleVoiceState(ChatVoiceState state) {
     setState(() {});
     if (!state.isRecording) {
-      widget.controller.setVoiceNote(widget.controller.value.voiceNote);
+      final voiceNote = widget.controller.value.voiceNote;
+      if (voiceNote != null) {
+        widget.controller.setVoiceNote(voiceNote);
+      }
     }
   }
 

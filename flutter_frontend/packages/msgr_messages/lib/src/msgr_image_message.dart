@@ -119,13 +119,10 @@ class MsgrImageMessage extends MsgrAuthoredMessage {
     return MsgrImageMessage(
       id: map['id'] as String,
       url: map['url'] as String? ?? '',
-      thumbnailUrl: thumbnailUrl,
+      thumbnailUrl: map['thumbnailUrl'] as String? ?? map['thumbnail'] as String? ?? thumbnailUrl,
       thumbnailWidth: thumbnailWidth,
       thumbnailHeight: thumbnailHeight,
-      description: map['description'] as String?,
-      thumbnailUrl: map['thumbnailUrl'] as String? ?? map['thumbnail'] as String?,
-      description:
-          map['description'] as String? ?? map['caption'] as String?,
+      description: map['description'] as String? ?? map['caption'] as String?,
       width: (map['width'] as num?)?.toInt(),
       height: (map['height'] as num?)?.toInt(),
       kind: kind,

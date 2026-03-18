@@ -1,11 +1,11 @@
 import 'package:libmsgr/src/database/constants.dart';
-import 'package:sqflite_sqlcipher/sqlite_api.dart';
+import 'package:libmsgr/src/storage/storage_interface.dart';
 
-Future<void> configureDatabase(Database db) async {
+Future<void> configureDatabase(DatabaseConnection db) async {
   await db.execute('PRAGMA foreign_keys = OFF');
 }
 
-Future<void> createDatabase(Database db, int version) async {
+Future<void> createDatabase(DatabaseConnection db) async {
   // XMPP state
   await db.execute(
     '''

@@ -83,7 +83,7 @@ class AuthApi {
 
     final sessionId = data['session_id'] as String? ?? '';
     if (sessionId.isEmpty) {
-      throw const ApiException(500, 'noise_handshake_missing_session');
+      throw ApiException(500, 'noise_handshake_missing_session');
     }
 
     final serverMap = data['server'] as Map<String, dynamic>? ?? const {};
@@ -121,7 +121,7 @@ class AuthApi {
     final decoded = _decodeBody(response);
     final id = decoded['id'] as String? ?? '';
     if (id.isEmpty) {
-      throw const ApiException(500, 'challenge_missing_id');
+      throw ApiException(500, 'challenge_missing_id');
     }
 
     final expires = decoded['expires_at'] as String? ?? '';
@@ -161,13 +161,13 @@ class AuthApi {
     final noiseToken = noise['token'] as String? ?? '';
     final noiseId = noise['id'] as String? ?? noiseSessionId;
     if (noiseToken.isEmpty) {
-      throw const ApiException(500, 'noise_session_missing_token');
+      throw ApiException(500, 'noise_session_missing_token');
     }
 
     final accountId = account['id'] as String? ?? '';
     final profileId = profile['id'] as String? ?? '';
     if (accountId.isEmpty || profileId.isEmpty) {
-      throw const ApiException(500, 'auth_session_missing_profile');
+      throw ApiException(500, 'auth_session_missing_profile');
     }
 
     return AuthSessionResult(

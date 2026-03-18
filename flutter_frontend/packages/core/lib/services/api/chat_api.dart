@@ -76,6 +76,11 @@ class ThumbnailUploadInfo {
       'expiresAt': expiresAt.toIso8601String(),
     };
   }
+
+  static Map<String, String> _stringMap(Map<String, dynamic> input) {
+    return input.map((key, value) =>
+        MapEntry(key.toString(), value == null ? '' : value.toString()));
+  }
 }
 
 class PresignedUploadInfo {
@@ -151,6 +156,11 @@ class PresignedUploadInfo {
       'clientState': clientState.toJson(),
       if (thumbnail != null) 'thumbnail': thumbnail!.toJson(),
     };
+  }
+
+  static Map<String, String> _stringMap(Map<String, dynamic> input) {
+    return input.map((key, value) =>
+        MapEntry(key.toString(), value == null ? '' : value.toString()));
   }
 }
 

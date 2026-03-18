@@ -183,7 +183,7 @@ class _ChannelSidebar extends StatelessWidget {
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: () => _showStartConversationDialog(context, viewModel),
-            icon: const Icon(Icons.chat_add_rounded),
+            icon: const Icon(Icons.add_comment_rounded),
             label: const Text('Ny samtale'),
           ),
           const SizedBox(height: 16),
@@ -471,7 +471,7 @@ class _EmptyConversationState extends StatelessWidget {
           const SizedBox(height: 24),
           FilledButton.icon(
             onPressed: isLoading ? null : onStartConversation,
-            icon: const Icon(Icons.chat_add_rounded),
+            icon: const Icon(Icons.add_comment_rounded),
             label: const Text('Start ny samtale'),
           ),
         ],

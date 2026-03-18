@@ -27,17 +27,33 @@ defmodule Messngr.Media.RetentionPruner do
   """
   @spec child_spec(keyword()) :: Supervisor.child_spec() | nil
   def child_spec(opts) do
-    case Keyword.get(opts, :enabled, true) do
+    Logger.info("🔍 RetentionPruner.child_spec called with opts: #{inspect(opts)}")
+
+    enabled = Keyword.get(opts, :enabled, true)
+    Logger.info("🔍 RetentionPruner enabled: #{enabled}")
+
+    case enabled do
       true ->
+        Logger.info("🔍 RetentionPruner building child spec...")
         name = Keyword.get(opts, :name, __MODULE__)
         interval = Keyword.get(opts, :interval_ms, Keyword.get(opts, :interval, @default_interval))
         batch_size = Keyword.get(opts, :batch_size, @default_batch_size)
 
-        Supervisor.child_spec({__MODULE__, [name: name, interval: interval, batch_size: batch_size]},
-          id: name
-        )
+        Logger.info("🔍 RetentionPruner config: name=#{name}, interval=#{interval}, batch_size=#{batch_size}")
+
+        result = %{
+          id: name,
+          start: {__MODULE__, :start_link, [[name: name, interval: interval, batch_size: batch_size]]},
+          restart: :permanent,
+          shutdown: 5000,
+          type: :worker
+        }
+
+        Logger.info("✅ RetentionPruner child spec created")
+        result
 
       _ ->
+        Logger.info("⏭️  RetentionPruner disabled, returning nil")
         nil
     end
   end

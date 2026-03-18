@@ -3,12 +3,12 @@ import 'dart:convert';
 import 'package:libmsgr/src/database/constants.dart';
 import 'package:libmsgr/src/models/outgoing_message.dart';
 import 'package:libmsgr/libmsgr.dart';
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:libmsgr/src/storage/storage_interface.dart';
 
 class OutgoingMessageDao {
   const OutgoingMessageDao(this._db);
 
-  final Database _db;
+  final DatabaseConnection _db;
 
   Future<void> enqueue(String teamName, OutgoingMessage entry) async {
     await _db.insert(

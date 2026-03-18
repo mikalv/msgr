@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:libmsgr/libmsgr.dart';
+import 'package:libmsgr/src/connection.dart';
 import 'package:libmsgr/src/database/daos/message_dao.dart';
 import 'package:libmsgr/src/database/daos/outgoing_message_dao.dart';
 import 'package:libmsgr/src/models/outgoing_message.dart';
@@ -22,7 +23,7 @@ class MessageRepository extends BaseRepository<MMessage> {
         _outgoingDao = outgoingMessageDao ??
             OutgoingMessageDao(LibMsgr().databaseService.instance),
         _connectionProvider = connectionProvider ??
-            () => LibMsgr().getWebsocketConnection() {
+            (() => LibMsgr().getWebsocketConnection()) {
     log.info('MessageRepository is starting up.');
     unawaited(_hydrateFromDisk());
   }

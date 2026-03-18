@@ -8,11 +8,11 @@ class MsgrHosts {
   /// Production auth API host.
   static const String authApiServer = 'auth.msgr.no';
 
-  /// Local development auth host (nip.io).
-  static const String localAuthApiServer = 'auth.7f000001.nip.io:4080';
+  /// Local development auth host (nip.io) - points to Rust Gateway with NOISE.
+  static const String localAuthApiServer = 'clients.7f000001.nip.io:8443';
 
-  /// Local development messaging host (nip.io).
-  static const String localApiServer = 'teams.7f000001.nip.io:4080';
+  /// Local development messaging host (nip.io) - points to Rust Gateway with NOISE.
+  static const String localApiServer = 'clients.7f000001.nip.io:8443';
 }
 
 /// Shared string constants used across adapters.
@@ -23,4 +23,14 @@ class MsgrConstants {
   static const String kIsDeviceRegisteredWithServerNameStr =
       'isDeviceRegisteredWithServer';
   static const String kUserAgentNameString = 'MsgrApp-v1';
+
+  /// Enable NOISE protocol for WebSocket connections (local development only)
+  static const bool useNoiseProtocol = localDevelopment;
+
+  /// Gateway URL for NOISE handshake (local development)
+  static const String noiseGatewayUrl = 'http://clients.7f000001.nip.io:8443';
+
+  /// Pre-shared key for NOISE protocol (development only - replace in production!)
+  /// This is a 32-byte key encoded as base64
+  static const String noiseDevPsk = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=';
 }

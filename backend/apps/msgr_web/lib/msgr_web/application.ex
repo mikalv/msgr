@@ -7,11 +7,17 @@ defmodule MessngrWeb.Application do
 
   @impl true
   def start(_type, _args) do
+    require Logger
+    Logger.info("🌟 Starting MessngrWeb.Application...")
+
+    Logger.info("📦 Initializing prometheus_child...")
     prometheus_child =
       :msgr_web
       |> Application.get_env(:prometheus, [])
       |> prometheus_child_spec()
+    Logger.info("✅ prometheus_child initialized: #{inspect(prometheus_child)}")
 
+    Logger.info("📦 Building MessngrWeb children list...")
     children =
       [
         MessngrWeb.Telemetry,
@@ -23,11 +29,17 @@ defmodule MessngrWeb.Application do
         MessngrWeb.Endpoint
       ]
       |> Enum.reject(&is_nil/1)
+    Logger.info("✅ MessngrWeb children list built with #{length(children)} items")
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: MessngrWeb.Supervisor]
-    Supervisor.start_link(children, opts)
+
+    Logger.info("🔧 Starting MessngrWeb supervisor...")
+    result = Supervisor.start_link(children, opts)
+
+    Logger.info("✅ MessngrWeb supervisor started successfully!")
+    result
   end
 
   @doc false

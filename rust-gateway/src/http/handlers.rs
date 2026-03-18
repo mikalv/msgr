@@ -1,12 +1,13 @@
 use crate::error::Result;
-use crate::noise::{create_handshake, HandshakePattern};
+use crate::noise::{create_handshake, process_message, HandshakePattern};
 use crate::session::SessionStore;
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{body::Bytes, extract::{Path, State}, http::StatusCode, Json};
 use base64::Engine;
 use chrono::Duration;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::debug;
+use uuid::Uuid;
 
 /// Application state shared across HTTP handlers
 #[derive(Clone)]
@@ -118,4 +119,45 @@ fn generate_signature(data: &str, key: &str) -> String {
     let result = hasher.finalize();
 
     base64::prelude::BASE64_STANDARD.encode(result)
+}
+
+/// Response from processing a handshake message
+#[derive(Debug, Serialize)]
+pub struct ProcessHandshakeMessageResponse {
+    /// Response message (base64, if server needs to respond)
+    pub response_message: Option<String>,
+    /// Whether handshake is complete
+    pub handshake_complete: bool,
+    /// Session ID
+    pub session_id: String,
+}
+
+/// Process a handshake message from the client
+pub async fn process_handshake_message_handler(
+    Path(session_id): Path<Uuid>,
+    State(state): State<Arc<AppState>>,
+    body: Bytes,
+) -> Result<Json<ProcessHandshakeMessageResponse>> {
+    debug!(
+        session_id = %session_id,
+        message_len = body.len(),
+        "Received handshake message"
+    );
+
+    // Decode the incoming message (assuming it's sent as raw bytes)
+    let message = body.to_vec();
+
+    // Process the message through the NOISE protocol
+    let response = process_message(&state.session_store, &session_id, &message).await?;
+
+    // Encode response message if present
+    let response_message = response
+        .response_message
+        .map(|msg| base64::prelude::BASE64_STANDARD.encode(&msg));
+
+    Ok(Json(ProcessHandshakeMessageResponse {
+        response_message,
+        handshake_complete: response.handshake_complete,
+        session_id: session_id.to_string(),
+    }))
 }

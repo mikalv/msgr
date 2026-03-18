@@ -1,10 +1,10 @@
 import 'package:libmsgr/src/database/constants.dart';
 import 'package:libmsgr/src/database/database.dart';
+import 'package:libmsgr/src/storage/storage_interface.dart';
 import 'package:logging/logging.dart';
-import 'package:sqflite_sqlcipher/sqflite.dart';
 
 Future<void> upgradeFromV4ToV5(DatabaseMigrationData data) async {
-  final (Database db, Logger log) = data;
+  final (DatabaseConnection db, Logger log) = data;
 
   log.info('Adding $outgoingMessagesTable table for durable outgoing messages');
 

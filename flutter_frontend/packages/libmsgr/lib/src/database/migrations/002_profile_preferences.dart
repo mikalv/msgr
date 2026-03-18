@@ -1,10 +1,10 @@
 import 'package:libmsgr/src/database/constants.dart';
 import 'package:libmsgr/src/database/database.dart';
+import 'package:libmsgr/src/storage/storage_interface.dart';
 import 'package:logging/logging.dart';
-import 'package:sqflite_sqlcipher/sqflite.dart';
 
 Future<void> upgradeFromV3ToV4(DatabaseMigrationData data) async {
-  final (Database db, Logger log) = data;
+  final (DatabaseConnection db, Logger log) = data;
 
   log.info('Adding profile preference columns to $contactsTable');
 
@@ -13,7 +13,8 @@ Future<void> upgradeFromV3ToV4(DatabaseMigrationData data) async {
       await db.execute(
         'ALTER TABLE $contactsTable ADD COLUMN $name $definition',
       );
-    } on DatabaseException catch (error) {
+    } catch (error) {
+      // Check if it's a duplicate column error
       if (!error.toString().contains('duplicate column name')) {
         rethrow;
       }

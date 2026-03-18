@@ -1,6 +1,10 @@
 import 'dart:io';
 import 'package:logging/logging.dart';
+import 'package:libmsgr/libmsgr.dart';
+import 'package:libmsgr/storage.dart';
 import 'package:libmsgr/src/registration_service.dart';
+import 'package:test_client/cli_providers.dart';
+import 'package:path/path.dart' as path;
 
 void main(List<String> arguments) async {
   // Setup logging
@@ -21,6 +25,28 @@ void main(List<String> arguments) async {
   log.info('Testing authentication flow against backend');
 
   try {
+    // Bootstrap LibMsgr with CLI providers
+    log.info('\n--- Bootstrapping LibMsgr ---');
+
+    // Get storage path
+    final home = Platform.environment['HOME']!;
+    final storagePath = path.join(home, '.msgr_test_client');
+    final storageDir = Directory(storagePath);
+    if (!await storageDir.exists()) {
+      await storageDir.create(recursive: true);
+    }
+    log.info('Using storage path: $storagePath');
+
+    // Initialize LibMsgr
+    final libmsgr = LibMsgr();
+    libmsgr.storageProvider = FfiStorageProvider();
+    libmsgr.pathProvider = CliPathProvider();
+    libmsgr.secureStorage = CliSecureStorage(storagePath);
+    libmsgr.sharedPreferences = CliKeyValueStore(storagePath);
+    libmsgr.deviceInfoInstance = CliDeviceInfo();
+
+    await libmsgr.bootstrapLibrary();
+    log.info('✅ LibMsgr bootstrapped successfully');
 
     // Test 1: Request authentication code
     log.info('\n--- Test 1: Request Authentication Code ---');
@@ -66,8 +92,7 @@ void main(List<String> arguments) async {
 
     log.info('✅ User authenticated:');
     log.info('  User ID: ${user.id}');
-    log.info('  Email: ${user.email}');
-    log.info('  Display Name: ${user.displayName}');
+    log.info('  Identifier: ${user.identifier}');
     log.info('  Access Token: ${user.accessToken.substring(0, 20)}...');
     log.info('  Refresh Token: ${user.refreshToken.substring(0, 20)}...');
 

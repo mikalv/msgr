@@ -5,6 +5,7 @@ pub mod http;
 pub mod noise;
 pub mod proxy;
 pub mod session;
+pub mod websocket;
 
 pub use config::Config;
 pub use error::{GatewayError, Result};

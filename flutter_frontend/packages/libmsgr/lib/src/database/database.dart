@@ -5,14 +5,12 @@ import 'package:libmsgr/src/database/migrations/001_add_messages_and_contacts.da
 import 'package:libmsgr/src/database/migrations/002_profile_preferences.dart';
 import 'package:libmsgr/src/database/migrations/003_outgoing_message_queue.dart';
 import 'package:libmsgr/src/database/migrations/004_message_delivery_status.dart';
+import 'package:libmsgr/src/storage/storage_interface.dart';
 import 'package:logging/logging.dart';
-import 'package:sqflite_common/src/sql_builder.dart';
-import 'package:sqflite_sqlcipher/sqflite.dart';
 import 'package:path/path.dart' as path;
-import 'package:path_provider/path_provider.dart';
 
 /// Data passed to the migrations.
-typedef DatabaseMigrationData = (Database, Logger);
+typedef DatabaseMigrationData = (DatabaseConnection, Logger);
 
 //@internal
 const List<Migration<DatabaseMigrationData>> migrations = [
@@ -27,15 +25,31 @@ class DatabaseService {
   /// Logger.
   final Logger _log = Logger('DatabaseService');
 
-  /// The database.
-  late Database database;
+  /// The storage provider (injected).
+  final StorageProvider _storageProvider;
 
-  Database get instance => database;
+  /// The path provider (injected).
+  final PathProvider _pathProvider;
+
+  /// The database connection.
+  late DatabaseConnection database;
+
+  DatabaseConnection get instance => database;
+
+  /// Create a new DatabaseService with injected dependencies.
+  ///
+  /// [storageProvider] - Implementation of database storage (sqflite, FFI, etc)
+  /// [pathProvider] - Implementation of path resolution (Flutter, CLI, etc)
+  DatabaseService({
+    required StorageProvider storageProvider,
+    required PathProvider pathProvider,
+  })  : _storageProvider = storageProvider,
+        _pathProvider = pathProvider;
 
   Future<void> initialize() async {
     // Use shared directory for database so both apps can access it
-    final sharedDir = await getApplicationSupportDirectory();
-    final dbPath = path.join(sharedDir.path, 'msgr.db');
+    final sharedDir = await _pathProvider.getApplicationSupportDirectory();
+    final dbPath = path.join(sharedDir, 'msgr.db');
 
     // TODO: Generate and securely store database password
     // For now using hardcoded password (should be changed to keychain-based)
@@ -56,10 +70,12 @@ class DatabaseService {
       'The last migration must have the largest version',
     );
 
-    database = await openDatabase(
-      dbPath,
-      password: dbPassword,
-      version: version,
+    database = await _storageProvider.openDatabase(
+      DatabaseConfig(
+        filename: dbPath,
+        password: dbPassword,
+        version: version,
+      ),
       onCreate: createDatabase,
       onConfigure: (db) async {
         // In order to do schema changes during database upgrades, we disable foreign
@@ -85,61 +101,12 @@ class DatabaseService {
 
     _log.finest('Database setup done');
   }
-}
 
-extension DatabaseHelpers on Database {
-  /// Count the number of rows in [table] where [where] with the arguments [whereArgs]
-  /// matches.
-  Future<int> count(
-    String table,
-    String where,
-    List<Object?> whereArgs,
-  ) async {
-    return Sqflite.firstIntValue(
-      await rawQuery(
-        'SELECT COUNT(*) FROM $table WHERE $where',
-        whereArgs,
-      ),
-    )!;
-  }
-
-  /// Like insert but returns the affected row.
-  Future<Map<String, Object?>> insertAndReturn(
-    String table,
-    Map<String, Object?> values,
-  ) async {
-    final q = SqlBuilder.insert(
-      table,
-      values,
-    );
-
-    final result = await rawQuery(
-      '${q.sql} RETURNING *',
-      q.arguments,
-    );
-    assert(result.length == 1, 'Only one row must be returned');
-    return result.first;
-  }
-
-  /// Like update but returns the affected row.
-  Future<Map<String, Object?>> updateAndReturn(
-    String table,
-    Map<String, Object?> values, {
-    required String where,
-    required List<Object?> whereArgs,
-  }) async {
-    final q = SqlBuilder.update(
-      table,
-      values,
-      where: where,
-      whereArgs: whereArgs,
-    );
-
-    final result = await rawQuery(
-      '${q.sql} RETURNING *',
-      q.arguments,
-    );
-    assert(result.length == 1, 'Only one row must be returned');
-    return result.first;
+  /// Close the database connection.
+  Future<void> close() async {
+    await _storageProvider.close();
   }
 }
+
+// Note: DatabaseHelpers extension is now defined in storage_interface.dart
+// and applies to DatabaseConnection instead of sqflite's Database

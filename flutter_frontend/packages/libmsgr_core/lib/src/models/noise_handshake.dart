@@ -1,6 +1,7 @@
 class NoiseHandshakeSession {
   NoiseHandshakeSession({
     required this.sessionId,
+    required this.sessionToken,
     required this.signature,
     required this.deviceKey,
     required this.devicePrivateKey,
@@ -9,6 +10,7 @@ class NoiseHandshakeSession {
   });
 
   final String sessionId;
+  final String sessionToken;
   final String signature;
   final String deviceKey;
   final String devicePrivateKey;
@@ -23,6 +25,7 @@ class NoiseHandshakeSession {
 
     return NoiseHandshakeSession(
       sessionId: data['session_id'] as String? ?? '',
+      sessionToken: data['session_token'] as String? ?? '',
       signature: data['signature'] as String? ?? '',
       deviceKey: data['device_key'] as String? ?? '',
       devicePrivateKey: data['device_private_key'] as String? ?? '',

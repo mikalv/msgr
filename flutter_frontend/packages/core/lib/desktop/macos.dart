@@ -155,30 +155,32 @@ class _MacOSAppState extends State<MacOSApp>
   @override
   Widget build(BuildContext context) {
     final appThemeData = AppThemeData(brightness: _brightness);
-    return TitlebarSafeArea(
-      child: AppTheme(
-        data: appThemeData,
-        child: CupertinoApp.router(
-          title: appTitle,
-          debugShowCheckedModeBanner: false,
-          theme: appThemeData.getCupertinoThemeData(_brightness),
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            DefaultMaterialLocalizations.delegate,
-            DefaultCupertinoLocalizations.delegate,
-            DefaultWidgetsLocalizations.delegate,
-          ],
-          supportedLocales: kSupportedLocales,
-          localeResolutionCallback: (locale, supportedLocales) {
-            for (var supportedLocale in supportedLocales) {
-              if (supportedLocale.languageCode == locale!.languageCode &&
-                  supportedLocale.countryCode == locale.countryCode) {
-                return supportedLocale;
+    return ProviderScope(
+      child: TitlebarSafeArea(
+        child: AppTheme(
+          data: appThemeData,
+          child: CupertinoApp.router(
+            title: appTitle,
+            debugShowCheckedModeBanner: false,
+            theme: appThemeData.getCupertinoThemeData(_brightness),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              DefaultMaterialLocalizations.delegate,
+              DefaultCupertinoLocalizations.delegate,
+              DefaultWidgetsLocalizations.delegate,
+            ],
+            supportedLocales: kSupportedLocales,
+            localeResolutionCallback: (locale, supportedLocales) {
+              for (var supportedLocale in supportedLocales) {
+                if (supportedLocale.languageCode == locale!.languageCode &&
+                    supportedLocale.countryCode == locale.countryCode) {
+                  return supportedLocale;
+                }
               }
-            }
-            return null;
-          },
-          routerConfig: AppNavigation.router,
+              return null;
+            },
+            routerConfig: AppNavigation.router,
+          ),
         ),
       ),
     );

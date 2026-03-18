@@ -28,9 +28,13 @@ class ServerResolver {
   }
 
   /// Returns the websocket endpoint base for the given [teamName].
+  ///
+  /// NOTE: In local development with Rust Gateway + NOISE, we use a single
+  /// WebSocket connection for all teams at /socket/websocket.
+  /// The teamName parameter is kept for API compatibility but not used in the URL.
   String resolveTeamWebSocket(String teamName) {
     return MsgrConstants.localDevelopment
-        ? 'ws://$teamName.${MsgrHosts.localApiServer}/ws/$teamName/websocket'
+        ? 'ws://${MsgrHosts.localApiServer}/socket/websocket'
         : 'wss://$teamName.${MsgrHosts.apiServer}/ws/$teamName/websocket';
   }
 

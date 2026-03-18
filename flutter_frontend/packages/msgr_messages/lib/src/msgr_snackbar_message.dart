@@ -23,7 +23,7 @@ enum MsgrSnackbarIntent {
 @immutable
 class MsgrSnackbarMessage extends Equatable {
   /// Creates a snackbar description.
-  const MsgrSnackbarMessage({
+  MsgrSnackbarMessage({
     required this.id,
     required this.title,
     this.body,
@@ -34,7 +34,7 @@ class MsgrSnackbarMessage extends Equatable {
   })  : duration = duration ?? const Duration(seconds: 4),
         metadata = metadata == null
             ? const {}
-            : Map.unmodifiable(Map.of(metadata));
+            : metadata;
 
   /// Unique identifier for the snackbar, useful when tracking dismissals.
   final String id;

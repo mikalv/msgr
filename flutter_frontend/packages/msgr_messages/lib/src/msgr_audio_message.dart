@@ -24,7 +24,6 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
     super.insertedAt,
     super.isLocal,
     super.theme,
-    MsgrMessageKind kind = MsgrMessageKind.audio,
   })  : assert(kind == MsgrMessageKind.audio || kind == MsgrMessageKind.voice),
         super(kind: kind);
 
@@ -64,7 +63,6 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
     DateTime? insertedAt,
     bool? isLocal,
     MsgrMessageTheme? theme,
-    MsgrMessageKind? kind,
   }) {
     final resolvedKind = kind ?? this.kind;
     assert(resolvedKind == MsgrMessageKind.audio ||
@@ -86,15 +84,12 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
       insertedAt: insertedAt ?? this.insertedAt,
       isLocal: isLocal ?? this.isLocal,
       theme: theme ?? this.theme,
-      kind: kind ?? this.kind,
     );
   }
 
   /// Recreates an [MsgrAudioMessage] from a serialised map.
   factory MsgrAudioMessage.fromMap(Map<String, dynamic> map) {
     final author = MsgrAuthoredMessage.readAuthorMap(map);
-    final type = map['type'] as String? ?? 'audio';
-    final kind = type == 'voice' ? MsgrMessageKind.voice : MsgrMessageKind.audio;
     final type = map['type'] as String?;
     final kind = type == MsgrMessageKind.voice.name
         ? MsgrMessageKind.voice
@@ -131,7 +126,6 @@ class MsgrAudioMessage extends MsgrAuthoredMessage {
       insertedAt: author.insertedAt,
       isLocal: author.isLocal,
       theme: MsgrMessage.readTheme(map),
-      kind: kind,
     );
   }
 

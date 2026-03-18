@@ -59,6 +59,7 @@ services:
       MIX_ENV: dev
       PHX_SERVER: "true"
       PHX_LISTEN_IP: 0.0.0.0
+      PHX_HOST: 0.0.0.0
       POSTGRES_HOST: db
       POSTGRES_USERNAME: postgres
       POSTGRES_PASSWORD: postgres
