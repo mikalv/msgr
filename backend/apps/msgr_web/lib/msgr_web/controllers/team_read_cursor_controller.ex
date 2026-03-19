@@ -9,7 +9,7 @@ defmodule MessngrWeb.TeamReadCursorController do
   @doc "PUT /api/teams/:slug/channels/:channel_id/read_cursor — mark channel as read"
   def update(conn, %{"channel_id" => channel_id} = params) do
     prefix = conn.assigns.tenant_prefix
-    account = conn.assigns.current_actor
+    account = conn.assigns.current_account
     last_read_message_id = params["last_read_message_id"]
 
     unless last_read_message_id do

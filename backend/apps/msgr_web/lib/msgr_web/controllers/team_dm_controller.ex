@@ -9,7 +9,7 @@ defmodule MessngrWeb.TeamDmController do
   @doc "POST /api/teams/:slug/dms — create a DM channel"
   def create(conn, params) do
     prefix = conn.assigns.tenant_prefix
-    account = conn.assigns.current_actor
+    account = conn.assigns.current_account
 
     profile = TeamManagement.get_profile_for_account(prefix, account.id)
 

@@ -16,7 +16,7 @@ defmodule MessngrWeb.TeamProfileController do
   @doc "PUT /api/teams/:slug/profiles/me — update my team profile"
   def update(conn, params) do
     prefix = conn.assigns.tenant_prefix
-    account = conn.assigns.current_actor
+    account = conn.assigns.current_account
 
     case TeamManagement.get_profile_for_account(prefix, account.id) do
       nil ->

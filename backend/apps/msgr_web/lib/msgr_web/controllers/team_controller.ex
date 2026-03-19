@@ -7,14 +7,14 @@ defmodule MessngrWeb.TeamController do
 
   @doc "GET /api/teams — list teams for current account"
   def index(conn, _params) do
-    account = conn.assigns.current_actor
+    account = conn.assigns.current_account
     teams = TeamManagement.list_teams_for_account(account.id)
     json(conn, %{data: Enum.map(teams, &team_json/1)})
   end
 
   @doc "POST /api/teams — create a new team"
   def create(conn, params) do
-    account = conn.assigns.current_actor
+    account = conn.assigns.current_account
 
     attrs = %{
       name: params["name"],
@@ -35,7 +35,7 @@ defmodule MessngrWeb.TeamController do
 
   @doc "POST /api/teams/:slug/join — join a team"
   def join(conn, %{"slug" => slug}) do
-    account = conn.assigns.current_actor
+    account = conn.assigns.current_account
 
     case TeamManagement.get_team_by_slug(slug) do
       nil ->

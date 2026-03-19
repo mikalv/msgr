@@ -9,7 +9,7 @@ defmodule MessngrWeb.TeamReactionController do
   @doc "POST /api/teams/:slug/channels/:channel_id/messages/:message_id/reactions — toggle reaction"
   def toggle(conn, %{"message_id" => message_id} = params) do
     prefix = conn.assigns.tenant_prefix
-    account = conn.assigns.current_actor
+    account = conn.assigns.current_account
     emoji = params["emoji"]
 
     unless emoji do

@@ -11,7 +11,7 @@ defmodule MessngrWeb.TeamMediaController do
   @doc "POST /api/teams/:slug/media/presign — presigned upload URL"
   def presign(conn, params) do
     prefix = conn.assigns.tenant_prefix
-    account = conn.assigns.current_actor
+    account = conn.assigns.current_account
     team = conn.assigns.current_team
 
     profile = TeamManagement.get_profile_for_account(prefix, account.id)

@@ -16,7 +16,7 @@ defmodule MessngrWeb.TeamChannelController do
   @doc "POST /api/teams/:slug/channels — create a channel"
   def create(conn, params) do
     prefix = conn.assigns.tenant_prefix
-    account = conn.assigns.current_actor
+    account = conn.assigns.current_account
 
     profile = TeamManagement.get_profile_for_account(prefix, account.id)
 
