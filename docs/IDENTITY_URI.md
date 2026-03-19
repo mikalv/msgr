@@ -82,16 +82,30 @@ Every URI has a corresponding web URL for browser access and sharing:
 
 | Purpose              | Format                                    | Example                                |
 |----------------------|-------------------------------------------|----------------------------------------|
+| Profile (vanity)     | `https://æ.me/@user`                      | `https://æ.me/@mikalv`                |
 | Profile (short)      | `https://msgr.no/@user`                   | `https://msgr.no/@mikalv`             |
 | Profile (team)       | `https://team.msgr.no/@user`              | `https://eyr.msgr.no/@mikalv`         |
 | Profile (bridged)    | `https://bridge.team.msgr.no/@user`       | `https://slack-v1.eyr.msgr.no/@mikalv`|
-| DM action            | `https://msgr.no/@user?action=dm`         | `https://msgr.no/@mikalv?action=dm`   |
+| DM action            | `https://æ.me/@user?action=dm`            | `https://æ.me/@mikalv?action=dm`      |
 | Channel invite       | `https://team.msgr.no/#channel`           | `https://eyr.msgr.no/#general`        |
 | Team invite          | `https://team.msgr.no/invite/CODE`        | `https://eyr.msgr.no/invite/abc123`   |
 
+### Vanity short URL: æ.me
+
+`æ.me` (Norwegian/Trøndersk for "me") serves as the vanity short URL for user profiles:
+
+```
+https://æ.me/@mikalv          — shortest shareable profile link
+https://æ.me/@mikalv?action=dm — deep link to start DM
+```
+
+`æ.me/@user` redirects to `msgr.no/@user` or attempts `msgr://` deep link if app is installed. Ideal for business cards, social media bios, and sharing.
+
+The IDN (Internationalized Domain Name) is `xn--4ca.me` in punycode.
+
 ### Browser behavior
 
-When visiting a web URL:
+When visiting a web URL (including æ.me):
 
 1. **App installed + logged in** → attempt `msgr://` deep link to open in app
 2. **Logged in (browser)** → show profile with actions (Send DM, Invite, etc.)
