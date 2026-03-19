@@ -202,11 +202,17 @@ defmodule Messngr.Auth do
   end
 
   defp deliver_challenge(challenge, code) do
-    case Notifier.deliver_challenge(challenge, code) do
-      :ok -> :ok
-      {:error, reason} ->
-        Repo.delete(challenge)
-        {:error, reason}
+    if Application.get_env(:msgr_web, :expose_otp_codes, false) do
+      # Dev mode: skip actual delivery, OTP code is returned in API response
+      Logger.info("Dev mode: OTP code #{code} for #{challenge.target} (not delivered)")
+      :ok
+    else
+      case Notifier.deliver_challenge(challenge, code) do
+        :ok -> :ok
+        {:error, reason} ->
+          Repo.delete(challenge)
+          {:error, reason}
+      end
     end
   end
 
