@@ -72,8 +72,12 @@ defmodule Teams.TenantModels.Channel do
   def create(prefix, attrs) do
     cs = changeset(%__MODULE__{}, attrs)
 
-    require Logger
-    Logger.info("Channel.create changeset: valid=#{cs.valid?} changes=#{inspect(cs.changes)} errors=#{inspect(cs.errors)}")
+    IO.puts("=== CHANNEL CREATE DEBUG ===")
+    IO.puts("attrs: #{inspect(attrs)}")
+    IO.puts("changeset valid: #{cs.valid?}")
+    IO.puts("changeset changes: #{inspect(cs.changes)}")
+    IO.puts("changeset errors: #{inspect(cs.errors)}")
+    IO.puts("=== END DEBUG ===")
 
     Teams.Repo.insert(cs, prefix: prefix)
   end
