@@ -14,6 +14,7 @@ defmodule TeamsWeb.UserSocket do
   channel "user:*", TeamsWeb.UserChannel
   channel "team:*", TeamsWeb.TeamChannel
   channel "call:*", TeamsWeb.CallChannel
+  channel "presence:*", TeamsWeb.PresenceChannel
 
   #
   # To create a channel file, use the mix task:

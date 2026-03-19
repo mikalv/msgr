@@ -1,51 +1,100 @@
 defmodule TeamsWeb.TeamChannel do
+  @moduledoc """
+  Team-wide channel for broadcasting structural events like
+  new channels, member joins/leaves, and channel updates.
+
+  Topic: "team:{slug}"
+  """
+
   use TeamsWeb, :channel
+  require Logger
+
+  alias Messngr.Teams
+  alias Messngr.Channels
 
   @impl true
-  def join("team:lobby", payload, socket) do
-    {:ok, socket}
-  end
+  def join("team:" <> slug, _payload, socket) do
+    account_id = socket.assigns[:uid]
+    tenant = socket.assigns[:tenant]
 
-  @impl true
-  def join("team:invite", payload, socket) do
-    profile_id = socket.assigns[:profile_id]
-    team = socket.assigns[:tenant]
-    profile = Teams.TenantModels.Profile.get_by_id(team, profile_id)
-    if authorized_to_invite?(team, profile) do
-      {:ok, socket}
-    else
-      {:error, %{reason: "unauthorized"}}
+    case Teams.get_team_by_slug(slug) do
+      nil ->
+        {:error, %{reason: "team_not_found"}}
+
+      team ->
+        if Teams.member?(team.id, account_id) do
+          socket =
+            socket
+            |> assign(:team_slug, slug)
+            |> assign(:team_id, team.id)
+            |> assign(:prefix, team.schema_name)
+
+          {:ok, socket}
+        else
+          {:error, %{reason: "not_a_member"}}
+        end
     end
   end
 
-  @impl true
-  def handle_in("invite:user", %{"identifier" => whotoinvite, "team_name" => teamName, "profile_id" => profileID} = payload, %{topic: "team:invite"} = socket) do
-    profile = Teams.TenantModels.Profile.get_by_id(teamName, profileID)
-    if authorized_to_invite?(teamName, profile) do
-      TeamsWeb.MiddleLayers.InviteLayer.invite_user(teamName, profile, whotoinvite)
-      {:reply, {:ok, %{status: "ack"}}, socket}
-    else
-      {:reply, {:error, %{reason: "unauthorized"}}, socket}
-    end
-  end
+  # ── Incoming events ──────────────────────────────────────────
 
-  # Channels can be used in a request/response fashion
-  # by sending replies to requests from the client
   @impl true
   def handle_in("ping", payload, socket) do
     {:reply, {:ok, payload}, socket}
   end
 
-  # It is also common to receive messages from the client and
-  # broadcast to everyone in the current topic (team:lobby).
-  @impl true
-  def handle_in("shout", payload, socket) do
-    broadcast(socket, "shout", payload)
-    {:noreply, socket}
+  # ── Broadcasting helpers (called from controllers/contexts) ──
+
+  @doc """
+  Broadcasts that a new channel was created in the team.
+  Call from channel creation logic:
+
+      TeamsWeb.Endpoint.broadcast("team:#{slug}", "new:channel", payload)
+  """
+  def broadcast_new_channel(slug, channel) do
+    TeamsWeb.Endpoint.broadcast("team:#{slug}", "new:channel", %{
+      id: channel.id,
+      name: channel.name,
+      slug: channel.slug,
+      icon: channel.icon,
+      kind: channel.kind,
+      visibility: channel.visibility,
+      topic: channel.topic
+    })
   end
 
-  # Add authorization logic here as required.
-  defp authorized_to_invite?(team, profile) do
-    Teams.TenantModels.Profile.can?(team, profile, "can_invite_user")
+  @doc """
+  Broadcasts that a member joined the team.
+  """
+  def broadcast_member_joined(slug, profile) do
+    TeamsWeb.Endpoint.broadcast("team:#{slug}", "member:joined", %{
+      profile_id: profile.id,
+      display_name: profile.display_name,
+      avatar_url: profile.avatar_url,
+      role: profile.role
+    })
+  end
+
+  @doc """
+  Broadcasts that a member left the team.
+  """
+  def broadcast_member_left(slug, profile_id) do
+    TeamsWeb.Endpoint.broadcast("team:#{slug}", "member:left", %{
+      profile_id: profile_id
+    })
+  end
+
+  @doc """
+  Broadcasts that a channel was updated (topic, icon, etc.).
+  """
+  def broadcast_channel_updated(slug, channel) do
+    TeamsWeb.Endpoint.broadcast("team:#{slug}", "channel:updated", %{
+      id: channel.id,
+      name: channel.name,
+      slug: channel.slug,
+      icon: channel.icon,
+      topic: channel.topic,
+      visibility: channel.visibility
+    })
   end
 end

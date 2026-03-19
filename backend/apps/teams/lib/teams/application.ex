@@ -20,6 +20,7 @@ defmodule Teams.Application do
       # Start to serve requests, typically the last entry
       TeamsWeb.Endpoint,
       TeamsWeb.UserPresence,
+      TeamsWeb.TeamPresence,
       {ChannelWatcher, :channels}
     ]
 

@@ -1,122 +1,252 @@
 defmodule TeamsWeb.ChatChannel do
+  @moduledoc """
+  Per-channel realtime messaging: messages, threads, reactions,
+  typing indicators, and read cursors.
+
+  Topic: "channel:{channel_id}"
+
+  Socket assigns expected from UserSocket:
+    - :uid (account_id)
+    - :tenant (schema prefix)
+    - :profile_id
+  """
+
   use TeamsWeb, :channel
-  alias TeamsWeb.UserPresence
-  alias Teams.TenantModels.{Profile, Message}
-  alias TeamsWeb.MiddleLayers.ChannelLayer
   require Logger
 
-  intercept ["new_msg", "user_joined"]
+  alias Messngr.{Messages, Channels, Reactions}
+  alias Teams.TenantModels.{Channel, ChannelMembership, ReadCursor}
 
   @impl true
-  def join("channel:lobby", payload, socket) do
-    if authorized?(payload) do
-      #Logger.info "socket: #{inspect socket}"
-      send(self(), :after_join)
-      {:ok, socket}
-    else
-      {:error, %{reason: "unauthorized"}}
+  def join("channel:" <> channel_id, _payload, socket) do
+    prefix = socket.assigns[:tenant]
+    profile_id = socket.assigns[:profile_id]
+
+    case Channels.get_channel(prefix, channel_id) do
+      nil ->
+        {:error, %{reason: "channel_not_found"}}
+
+      channel ->
+        if has_access?(prefix, channel, profile_id) do
+          socket =
+            socket
+            |> assign(:channel_id, channel_id)
+            |> assign(:prefix, prefix)
+
+          send(self(), :after_join)
+          {:ok, socket}
+        else
+          {:error, %{reason: "unauthorized"}}
+        end
     end
   end
 
-  alias Phoenix.Socket.Broadcast
-  def handle_info(%Broadcast{topic: topic, event: event, payload: payload}, socket) do
-    Logger.info "handle_info: topic=#{topic} event=#{event} socket=#{inspect socket}"
-    push(socket, event, payload)
-    {:noreply, socket}
-  end
-
-  def join("channel:" <> destdata, _payload, socket) do
-    [team, channel_id] = String.split(destdata, ".")
-    uid = socket.assigns[:uid]
-    Logger.info "Joining channel: #{channel_id} for user: #{uid} team #{team}"
-    :ok = ChannelWatcher.monitor(:channels, self(), {__MODULE__, :leave, [channel_id, uid]})
-    {:ok, socket}
-  end
-
-  def join("channel:" <> _private_channel_id, _params, _socket) do
-    {:error, %{reason: "unauthorized"}}
-  end
-
-  def handle_info(:after_join, socket) do
-    {:ok, _} =
-    UserPresence.track(socket, socket.assigns.uid, %{
-        online_at: inspect(System.system_time(:second))
-      })
-
-    push(socket, "presence_state", UserPresence.list(socket))
-    {:noreply, socket}
-  end
-
-  # Channels can be used in a request/response fashion
-  # by sending replies to requests from the client
   @impl true
+  def handle_info(:after_join, socket) do
+    # Push the current read cursor for this profile so the client
+    # knows where they left off.
+    prefix = socket.assigns[:prefix]
+    channel_id = socket.assigns[:channel_id]
+    profile_id = socket.assigns[:profile_id]
+
+    case ReadCursor.get(prefix, channel_id, profile_id) do
+      nil -> :ok
+      cursor ->
+        push(socket, "read_cursor:updated", %{
+          channel_id: channel_id,
+          profile_id: profile_id,
+          last_read_message_id: cursor.last_read_message_id
+        })
+    end
+
+    {:noreply, socket}
+  end
+
+  # ── Incoming events ──────────────────────────────────────────
+
+  @impl true
+  def handle_in("new:message", %{"content" => content} = payload, socket) do
+    prefix = socket.assigns[:prefix]
+    channel_id = socket.assigns[:channel_id]
+    profile_id = socket.assigns[:profile_id]
+
+    attrs = %{
+      channel_id: channel_id,
+      sender_profile_id: profile_id,
+      content: content,
+      media_refs: Map.get(payload, "media_refs", [])
+    }
+
+    case Messages.create_message(prefix, attrs) do
+      {:ok, message} ->
+        message = Messages.get_message(prefix, message.id)
+
+        broadcast!(socket, "new:message", serialize_message(message))
+        {:reply, {:ok, %{id: message.id}}, socket}
+
+      {:error, changeset} ->
+        Logger.warning("Failed to create message: #{inspect(changeset)}")
+        {:reply, {:error, %{reason: "invalid_message"}}, socket}
+    end
+  end
+
+  def handle_in("new:thread_reply", %{"thread_parent_id" => parent_id, "content" => content} = payload, socket) do
+    prefix = socket.assigns[:prefix]
+    channel_id = socket.assigns[:channel_id]
+    profile_id = socket.assigns[:profile_id]
+
+    attrs = %{
+      channel_id: channel_id,
+      sender_profile_id: profile_id,
+      thread_parent_id: parent_id,
+      content: content,
+      media_refs: Map.get(payload, "media_refs", [])
+    }
+
+    case Messages.create_message(prefix, attrs) do
+      {:ok, message} ->
+        message = Messages.get_message(prefix, message.id)
+
+        broadcast!(socket, "new:thread_reply", %{
+          thread_parent_id: parent_id,
+          message: serialize_message(message)
+        })
+
+        {:reply, {:ok, %{id: message.id}}, socket}
+
+      {:error, changeset} ->
+        Logger.warning("Failed to create thread reply: #{inspect(changeset)}")
+        {:reply, {:error, %{reason: "invalid_message"}}, socket}
+    end
+  end
+
+  def handle_in("toggle:reaction", %{"message_id" => message_id, "emoji" => emoji}, socket) do
+    prefix = socket.assigns[:prefix]
+    profile_id = socket.assigns[:profile_id]
+
+    case Reactions.toggle_reaction(prefix, message_id, profile_id, emoji) do
+      {:ok, _result} ->
+        reactions = Reactions.list_reactions(prefix, message_id)
+
+        broadcast!(socket, "reaction:updated", %{
+          message_id: message_id,
+          reactions: serialize_reactions(reactions)
+        })
+
+        {:reply, :ok, socket}
+
+      {:error, reason} ->
+        Logger.warning("Failed to toggle reaction: #{inspect(reason)}")
+        {:reply, {:error, %{reason: "reaction_failed"}}, socket}
+    end
+  end
+
+  def handle_in("typing:start", _payload, socket) do
+    profile_id = socket.assigns[:profile_id]
+
+    broadcast_from!(socket, "typing:update", %{
+      profile_id: profile_id,
+      is_typing: true
+    })
+
+    {:noreply, socket}
+  end
+
+  def handle_in("typing:stop", _payload, socket) do
+    profile_id = socket.assigns[:profile_id]
+
+    broadcast_from!(socket, "typing:update", %{
+      profile_id: profile_id,
+      is_typing: false
+    })
+
+    {:noreply, socket}
+  end
+
+  def handle_in("update:read_cursor", %{"last_read_message_id" => message_id}, socket) do
+    prefix = socket.assigns[:prefix]
+    channel_id = socket.assigns[:channel_id]
+    profile_id = socket.assigns[:profile_id]
+
+    case ReadCursor.upsert(prefix, %{
+           channel_id: channel_id,
+           profile_id: profile_id,
+           last_read_message_id: message_id
+         }) do
+      {:ok, _cursor} ->
+        # Broadcast to the sender's other devices via the user-specific topic
+        broadcast!(socket, "read_cursor:updated", %{
+          channel_id: channel_id,
+          profile_id: profile_id,
+          last_read_message_id: message_id
+        })
+
+        {:reply, :ok, socket}
+
+      {:error, reason} ->
+        Logger.warning("Failed to update read cursor: #{inspect(reason)}")
+        {:reply, {:error, %{reason: "cursor_update_failed"}}, socket}
+    end
+  end
+
   def handle_in("ping", payload, socket) do
     {:reply, {:ok, payload}, socket}
   end
 
-  def handle_in("leave", _payload, socket) do
-    {:stop, :normal, socket}
-  end
+  # ── Private ──────────────────────────────────────────────────
 
-  def handle_in("create:channel", payload, socket) do
-    team = payload["team"]
-    profile_id = payload["profile_id"]
-    options = payload["options"]
-    members = Map.get(payload, "members", [])
-    Logger.info "Got create:channel: #{inspect payload}"
-    case ChannelLayer.create_channel(team, profile_id, options, members) do
-      {:ok, channel} ->
-        Logger.info "Channel created: #{inspect channel}"
-        broadcast!(socket, "new:channel", %{"team" => team, "channels" => [filter_channel_for_json(channel)]})
-        {:reply, {:ok, %{"channel" => filter_channel_for_json(channel)}}, socket}
+  defp has_access?(prefix, channel, profile_id) do
+    # Public channels are accessible to all team members.
+    # Private channels / DMs require membership.
+    case channel.visibility do
+      "public" ->
+        true
 
-      {:error, err} ->
-        Logger.error "Error while trying to create channel: #{inspect err}"
-        {:reply, {:error, %{"status" => "error", "details" => "Error while trying to create channel!"}}, socket}
-
-      {:permission_error, err} ->
-        {:reply, {:error, %{"status" => "error", "details" => "You don't have the roles or permission to create a new channel! (#{err})"}}, socket}
+      "private" ->
+        members = ChannelMembership.members_of(prefix, channel.id)
+        Enum.any?(members, fn m -> m.profile_id == profile_id end)
     end
   end
 
-  def handle_in("create:msg", payload, %{topic: "channel:" <> destdata} = socket) do
-    [team, channel_id] = String.split(destdata, ".")
-    Logger.info "Got create:msg: #{inspect payload} socket: #{inspect socket}"
-    message = Message.create_channel_message(team, channel_id, payload["profile_id"], payload["content"])
-    Logger.info "Message created: #{inspect message}"
-    broadcast!(socket, "new:msg", filter_msg_for_json(message))
-    {:reply, {:ok, %{"message" => "ack"}}, socket}
+  defp serialize_message(nil), do: nil
+
+  defp serialize_message(message) do
+    %{
+      id: message.id,
+      channel_id: message.channel_id,
+      sender_profile_id: message.sender_profile_id,
+      thread_parent_id: message.thread_parent_id,
+      content: message.content,
+      media_refs: message.media_refs,
+      edited_at: message.edited_at,
+      inserted_at: message.inserted_at,
+      sender_profile: serialize_profile(message.sender_profile),
+      reactions: serialize_reactions(message.reactions)
+    }
   end
 
-  # It is also common to receive messages from the client and
-  # broadcast to everyone in the current topic (channel:lobby).
-  @impl true
-  def handle_in("shout", payload, socket) do
-    broadcast(socket, "shout", payload)
-    {:noreply, socket}
+  defp serialize_profile(%Ecto.Association.NotLoaded{}), do: nil
+
+  defp serialize_profile(nil), do: nil
+
+  defp serialize_profile(profile) do
+    %{
+      id: profile.id,
+      display_name: profile.display_name,
+      avatar_url: profile.avatar_url,
+      role: profile.role
+    }
   end
 
-  def handle_out("user_joined", msg, socket) do
-    push(socket, "user_joined", msg)
-    #{:noreply, socket}
-  end
+  defp serialize_reactions(%Ecto.Association.NotLoaded{}), do: []
 
-  def handle_out("new:msg", msg, socket) do
-    push(socket, "new:msg", msg)
-  end
-
-  def leave(channel_id, uid) do
-    Logger.info "Leaving channel: #{channel_id} for user: #{uid}"
-    ChannelWatcher.unmonitor(:channels, self())
-  end
-
-
-  defp filter_channel_for_json(channel), do: Map.drop(Map.from_struct(channel), [:__meta__])
-  defp filter_msg_for_json(msg), do: Map.drop(Map.from_struct(msg), [:__meta__, :id, :metadata, :channel, :conversation, :profile, :parent, :children])
-
-
-  # Add authorization logic here as required.
-  defp authorized?(_payload) do
-    true
+  defp serialize_reactions(reactions) when is_list(reactions) do
+    Enum.map(reactions, fn r ->
+      %{
+        message_id: r.message_id,
+        profile_id: r.profile_id,
+        emoji: r.emoji
+      }
+    end)
   end
 end
