@@ -1,0 +1,63 @@
+/// Data models for the app shell layout.
+///
+/// These are lightweight value classes used by the team rail, channel sidebar,
+/// and DM list. They will eventually be replaced by real domain models once
+/// the backend integration is wired up.
+
+enum ChannelKind { public, private, announcement }
+
+class MockTeam {
+  const MockTeam({
+    required this.id,
+    required this.name,
+    required this.slug,
+    required this.iconEmoji,
+    this.unreadCount = 0,
+  });
+
+  final String id;
+  final String name;
+  final String slug;
+  final String iconEmoji;
+  final int unreadCount;
+}
+
+class MockChannel {
+  const MockChannel({
+    required this.id,
+    required this.name,
+    required this.slug,
+    required this.iconEmoji,
+    required this.kind,
+    this.unreadCount = 0,
+    this.hasDraft = false,
+    this.lastActivityAt,
+  });
+
+  final String id;
+  final String name;
+  final String slug;
+  final String iconEmoji;
+  final ChannelKind kind;
+  final int unreadCount;
+  final bool hasDraft;
+  final DateTime? lastActivityAt;
+}
+
+class MockDmContact {
+  const MockDmContact({
+    required this.id,
+    required this.name,
+    this.avatarUrl,
+    this.isOnline = false,
+    this.unreadCount = 0,
+    this.lastActivityAt,
+  });
+
+  final String id;
+  final String name;
+  final String? avatarUrl;
+  final bool isOnline;
+  final int unreadCount;
+  final DateTime? lastActivityAt;
+}
