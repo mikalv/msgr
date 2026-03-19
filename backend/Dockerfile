@@ -43,10 +43,12 @@ RUN mix deps.get --only $MIX_ENV && mix deps.compile
 COPY apps apps
 COPY rel rel
 
-# Compile assets for web apps
-RUN cd apps/msgr_web       && mix assets.deploy && cd /app \
- && cd apps/auth_provider  && mix assets.deploy && cd /app \
- && cd apps/teams          && mix assets.deploy && cd /app
+# Compile assets for web apps (skip if no assets directory)
+RUN for app in msgr_web auth_provider teams; do \
+      if [ -d "apps/$app/assets" ]; then \
+        cd "/app/apps/$app" && mix assets.deploy && cd /app; \
+      fi; \
+    done
 
 # Compile and build the release
 RUN mix compile
