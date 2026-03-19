@@ -1,7 +1,7 @@
 defmodule MessngrWeb.TeamReadCursorController do
   use MessngrWeb, :controller
 
-  alias Messngr.Teams
+  alias Teams.TeamManagement
   alias Teams.TenantModels.ReadCursor
 
   action_fallback MessngrWeb.FallbackController
@@ -15,7 +15,7 @@ defmodule MessngrWeb.TeamReadCursorController do
     unless last_read_message_id do
       {:error, :bad_request}
     else
-      profile = Teams.get_profile_for_account(prefix, account.id)
+      profile = TeamManagement.get_profile_for_account(prefix, account.id)
 
       unless profile do
         {:error, :forbidden}

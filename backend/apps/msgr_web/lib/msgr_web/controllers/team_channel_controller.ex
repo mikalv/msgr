@@ -2,7 +2,7 @@ defmodule MessngrWeb.TeamChannelController do
   use MessngrWeb, :controller
 
   alias Teams.Channels
-  alias Messngr.Teams
+  alias Teams.TeamManagement
 
   action_fallback MessngrWeb.FallbackController
 
@@ -18,7 +18,7 @@ defmodule MessngrWeb.TeamChannelController do
     prefix = conn.assigns.tenant_prefix
     account = conn.assigns.current_actor
 
-    profile = Teams.get_profile_for_account(prefix, account.id)
+    profile = TeamManagement.get_profile_for_account(prefix, account.id)
 
     unless profile do
       {:error, :forbidden}

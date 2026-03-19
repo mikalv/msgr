@@ -1,7 +1,7 @@
 defmodule MessngrWeb.TeamProfileController do
   use MessngrWeb, :controller
 
-  alias Messngr.Teams
+  alias Teams.TeamManagement
   alias Teams.TenantModels.Profile
 
   action_fallback MessngrWeb.FallbackController
@@ -18,7 +18,7 @@ defmodule MessngrWeb.TeamProfileController do
     prefix = conn.assigns.tenant_prefix
     account = conn.assigns.current_actor
 
-    case Teams.get_profile_for_account(prefix, account.id) do
+    case TeamManagement.get_profile_for_account(prefix, account.id) do
       nil ->
         {:error, :not_found}
 

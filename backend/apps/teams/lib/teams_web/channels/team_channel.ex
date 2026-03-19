@@ -9,7 +9,7 @@ defmodule TeamsWeb.TeamChannel do
   use TeamsWeb, :channel
   require Logger
 
-  alias Messngr.Teams
+  alias Teams.TeamManagement
   alias Teams.Channels
 
   @impl true
@@ -17,12 +17,12 @@ defmodule TeamsWeb.TeamChannel do
     account_id = socket.assigns[:uid]
     tenant = socket.assigns[:tenant]
 
-    case Teams.get_team_by_slug(slug) do
+    case TeamManagement.get_team_by_slug(slug) do
       nil ->
         {:error, %{reason: "team_not_found"}}
 
       team ->
-        if Teams.member?(team.id, account_id) do
+        if TeamManagement.member?(team.id, account_id) do
           socket =
             socket
             |> assign(:team_slug, slug)

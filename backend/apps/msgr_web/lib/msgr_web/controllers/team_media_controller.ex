@@ -1,7 +1,7 @@
 defmodule MessngrWeb.TeamMediaController do
   use MessngrWeb, :controller
 
-  alias Messngr.Teams
+  alias Teams.TeamManagement
   alias Teams.TenantModels.MediaUpload
 
   action_fallback MessngrWeb.FallbackController
@@ -14,7 +14,7 @@ defmodule MessngrWeb.TeamMediaController do
     account = conn.assigns.current_actor
     team = conn.assigns.current_team
 
-    profile = Teams.get_profile_for_account(prefix, account.id)
+    profile = TeamManagement.get_profile_for_account(prefix, account.id)
 
     unless profile do
       {:error, :forbidden}

@@ -2,7 +2,7 @@ defmodule MessngrWeb.TeamReactionController do
   use MessngrWeb, :controller
 
   alias Teams.Reactions
-  alias Messngr.Teams
+  alias Teams.TeamManagement
 
   action_fallback MessngrWeb.FallbackController
 
@@ -15,7 +15,7 @@ defmodule MessngrWeb.TeamReactionController do
     unless emoji do
       {:error, :bad_request}
     else
-      profile = Teams.get_profile_for_account(prefix, account.id)
+      profile = TeamManagement.get_profile_for_account(prefix, account.id)
 
       unless profile do
         {:error, :forbidden}

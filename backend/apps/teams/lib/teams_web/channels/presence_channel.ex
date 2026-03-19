@@ -12,7 +12,7 @@ defmodule TeamsWeb.PresenceChannel do
   require Logger
 
   alias TeamsWeb.TeamPresence
-  alias Messngr.Teams
+  alias Teams.TeamManagement
 
   @impl true
   def join("presence:" <> slug, _payload, socket) do
@@ -20,12 +20,12 @@ defmodule TeamsWeb.PresenceChannel do
     prefix = socket.assigns[:tenant]
     profile_id = socket.assigns[:profile_id]
 
-    case Teams.get_team_by_slug(slug) do
+    case TeamManagement.get_team_by_slug(slug) do
       nil ->
         {:error, %{reason: "team_not_found"}}
 
       team ->
-        if Teams.member?(team.id, account_id) do
+        if TeamManagement.member?(team.id, account_id) do
           socket =
             socket
             |> assign(:team_slug, slug)

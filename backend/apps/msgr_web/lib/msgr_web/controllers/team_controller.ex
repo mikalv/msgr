@@ -1,14 +1,14 @@
 defmodule MessngrWeb.TeamController do
   use MessngrWeb, :controller
 
-  alias Messngr.Teams
+  alias Teams.TeamManagement
 
   action_fallback MessngrWeb.FallbackController
 
   @doc "GET /api/teams — list teams for current account"
   def index(conn, _params) do
     account = conn.assigns.current_actor
-    teams = Teams.list_teams_for_account(account.id)
+    teams = TeamManagement.list_teams_for_account(account.id)
     json(conn, %{data: Enum.map(teams, &team_json/1)})
   end
 
@@ -22,7 +22,7 @@ defmodule MessngrWeb.TeamController do
       owner_account_id: account.id
     }
 
-    case Teams.create_team(attrs) do
+    case TeamManagement.create_team(attrs) do
       {:ok, team} ->
         conn
         |> put_status(:created)
@@ -37,12 +37,12 @@ defmodule MessngrWeb.TeamController do
   def join(conn, %{"slug" => slug}) do
     account = conn.assigns.current_actor
 
-    case Teams.get_team_by_slug(slug) do
+    case TeamManagement.get_team_by_slug(slug) do
       nil ->
         {:error, :not_found}
 
       team ->
-        case Teams.join_team(team, account.id, %{
+        case TeamManagement.join_team(team, account.id, %{
                display_name: account.handle || account.email
              }) do
           {:ok, result} ->
