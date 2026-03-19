@@ -36,6 +36,7 @@ defmodule Messngr.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:teams, in_umbrella: true},
       {:decibel, "~> 0.2.4"},
       {:uuid, "~> 1.1"},
       {:telemetry, "~> 1.3"},

@@ -3,23 +3,28 @@ defmodule Messngr.Reactions do
   Context module for tenant-scoped reaction operations.
   """
 
-  alias Teams.TenantModels.Reaction
+  import Ecto.Query
+  alias Messngr.Repo
 
   @doc """
   Toggles a reaction on a message.
-
-  If the reaction (message_id + profile_id + emoji) exists, removes it.
-  Otherwise, adds it. Returns `{:ok, reaction}` on add or `{:ok, :removed}` on remove.
+  If the reaction exists, removes it. Otherwise, adds it.
   """
   def toggle_reaction(prefix, message_id, profile_id, emoji) do
-    case Reaction.toggle(prefix, %{
-           message_id: message_id,
-           profile_id: profile_id,
-           emoji: emoji
-         }) do
-      {:ok, %Reaction{} = reaction} -> {:ok, reaction}
-      {:ok, _deleted} -> {:ok, :removed}
-      error -> error
+    query =
+      from(r in {"reactions", Teams.TenantModels.Reaction},
+        where: r.message_id == ^message_id and r.profile_id == ^profile_id and r.emoji == ^emoji
+      )
+
+    case Repo.one(query, prefix: prefix) do
+      nil ->
+        attrs = %{message_id: message_id, profile_id: profile_id, emoji: emoji}
+        {1, _} = Repo.insert_all("reactions", [attrs], prefix: prefix)
+        {:ok, attrs}
+
+      existing ->
+        Repo.delete(existing, prefix: prefix)
+        {:ok, :removed}
     end
   end
 
@@ -27,6 +32,10 @@ defmodule Messngr.Reactions do
   Lists all reactions for a message.
   """
   def list_reactions(prefix, message_id) do
-    Reaction.for_message(prefix, message_id)
+    from(r in {"reactions", Teams.TenantModels.Reaction},
+      where: r.message_id == ^message_id,
+      order_by: [asc: r.emoji]
+    )
+    |> Repo.all(prefix: prefix)
   end
 end

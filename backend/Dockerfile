@@ -125,6 +125,6 @@ USER nobody
 EXPOSE 4000 50052
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:4000/api/health || exit 1
+    CMD curl -f http://localhost:4000/health || exit 1
 
 CMD ["/app/bin/chatd", "start"]
