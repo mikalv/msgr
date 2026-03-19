@@ -71,7 +71,7 @@ defmodule Messngr.Application do
   defp maybe_noise_registry_child do
     opts = Application.get_env(:msgr, :noise_session_registry, [])
 
-    if Keyword.get(opts, :enabled, true) do
+    if Keyword.get(opts, :enabled, false) and Code.ensure_loaded?(Messngr.Transport.Noise.Registry) do
       registry_opts = Keyword.drop(opts, [:enabled])
       [{Messngr.Transport.Noise.Registry, registry_opts}]
     else
@@ -99,7 +99,7 @@ defmodule Messngr.Application do
     # Listens on port configured in :rust_gateway_server_port (default 50052)
     port = Application.get_env(:msgr, :rust_gateway_server_port, 50052)
 
-    if Application.get_env(:msgr, :rust_gateway_grpc_enabled, true) do
+    if Application.get_env(:msgr, :rust_gateway_grpc_enabled, false) do
       [
         {GRPC.Server.Supervisor,
          endpoint: Messngr.RustGateway.Endpoint, port: port, start_server: true}
