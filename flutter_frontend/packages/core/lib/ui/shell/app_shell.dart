@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:core/providers/channel_list_provider.dart';
+import 'package:core/providers/draft_provider.dart';
+import 'package:core/providers/models.dart';
+import 'package:core/providers/team_list_provider.dart';
+import 'package:core/providers/unread_provider.dart';
 
 import 'channel_sidebar.dart';
-import 'mock_data.dart';
 import 'shell_models.dart';
 import 'shell_theme.dart';
 import 'team_rail.dart';
@@ -14,23 +20,24 @@ import 'team_rail.dart';
 ///     the team rail.
 ///   - Mobile  (< 600 px): Only [child] is shown; team and channel selection
 ///     happens through full-screen navigation.
-class AppShell extends StatefulWidget {
+///
+/// State is driven by Riverpod providers:
+///   - [teamListProvider] / [selectedTeamProvider] for team selection
+///   - [channelListProvider] / [selectedChannelProvider] for channel selection
+///   - [unreadCountsProvider] for badges
+///   - [channelDraftsProvider] for draft indicators
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.child});
 
   /// The chat content area that fills the remaining space.
   final Widget child;
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
-  int _selectedTeamIndex = 0;
-  String? _selectedChannelId;
-  String? _selectedDmId;
+class _AppShellState extends ConsumerState<AppShell> {
   bool _sidebarCollapsed = false;
-
-  MockTeam get _activeTeam => mockTeams[_selectedTeamIndex];
 
   @override
   Widget build(BuildContext context) {
@@ -52,13 +59,83 @@ class _AppShellState extends State<AppShell> {
   }
 
   // ---------------------------------------------------------------------------
+  // Helpers to bridge new providers into the existing shell widgets
+  // ---------------------------------------------------------------------------
+
+  List<MockTeam> get _mockTeamsFromProviders {
+    final teams = ref.watch(teamsProvider);
+    final unreadCounts = ref.watch(unreadCountsProvider);
+    return teams.map((t) {
+      // Sum unread counts for all channels in this team.
+      final channels = ref.read(channelListProvider).channels;
+      var teamUnread = 0;
+      for (final ch in channels) {
+        if (ch.teamSlug == t.slug) {
+          teamUnread += unreadCounts[ch.id] ?? 0;
+        }
+      }
+      return MockTeam(
+        id: t.id,
+        name: t.name,
+        slug: t.slug,
+        iconEmoji: t.iconEmoji ?? '\u{1F4AC}',
+        unreadCount: teamUnread,
+      );
+    }).toList();
+  }
+
+  int get _selectedTeamIndex {
+    final selectedTeam = ref.watch(selectedTeamProvider);
+    final teams = ref.watch(teamsProvider);
+    if (selectedTeam == null || teams.isEmpty) return 0;
+    final idx = teams.indexWhere((t) => t.id == selectedTeam.id);
+    return idx >= 0 ? idx : 0;
+  }
+
+  SlackTeam? get _activeTeam => ref.watch(selectedTeamProvider);
+
+  List<MockChannel> get _mockChannelsFromProviders {
+    final channelState = ref.watch(channelListProvider);
+    final unreadCounts = ref.watch(unreadCountsProvider);
+    final drafts = ref.watch(channelDraftsProvider);
+    return channelState.publicChannels.map((c) {
+      return MockChannel(
+        id: c.id,
+        name: c.name,
+        slug: c.slug,
+        iconEmoji: c.icon ?? '#',
+        kind: ChannelKind.public,
+        unreadCount: unreadCounts[c.id] ?? 0,
+        hasDraft: drafts[c.id]?.isNotEmpty ?? false,
+      );
+    }).toList();
+  }
+
+  List<MockDmContact> get _mockDmsFromProviders {
+    final channelState = ref.watch(channelListProvider);
+    final unreadCounts = ref.watch(unreadCountsProvider);
+    return channelState.dmChannels.map((c) {
+      return MockDmContact(
+        id: c.id,
+        name: c.name,
+        isOnline: false, // TODO: wire up presence
+        unreadCount: unreadCounts[c.id] ?? 0,
+      );
+    }).toList();
+  }
+
+  String? get _selectedChannelId {
+    return ref.watch(selectedChannelProvider)?.id;
+  }
+
+  // ---------------------------------------------------------------------------
   // Desktop: TeamRail + ChannelSidebar + content
   // ---------------------------------------------------------------------------
   Widget _buildDesktop() {
     return Row(
       children: [
         TeamRail(
-          teams: mockTeams,
+          teams: _mockTeamsFromProviders,
           selectedIndex: _selectedTeamIndex,
           onTeamSelected: _onTeamSelected,
         ),
@@ -88,7 +165,7 @@ class _AppShellState extends State<AppShell> {
         child: Row(
           children: [
             TeamRail(
-              teams: mockTeams,
+              teams: _mockTeamsFromProviders,
               selectedIndex: _selectedTeamIndex,
               onTeamSelected: (index) {
                 _onTeamSelected(index);
@@ -112,6 +189,7 @@ class _AppShellState extends State<AppShell> {
   // Mobile: content only (team/channel via navigation)
   // ---------------------------------------------------------------------------
   Widget _buildMobile() {
+    final teamName = _activeTeam?.name ?? '';
     return Scaffold(
       backgroundColor: Colors.transparent,
       drawer: Drawer(
@@ -119,7 +197,7 @@ class _AppShellState extends State<AppShell> {
         child: Row(
           children: [
             TeamRail(
-              teams: mockTeams,
+              teams: _mockTeamsFromProviders,
               selectedIndex: _selectedTeamIndex,
               onTeamSelected: (index) {
                 _onTeamSelected(index);
@@ -131,7 +209,7 @@ class _AppShellState extends State<AppShell> {
       ),
       appBar: AppBar(
         title: Text(
-          _activeTeam.name,
+          teamName,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         backgroundColor: ShellTheme.sidebarBg,
@@ -152,23 +230,18 @@ class _AppShellState extends State<AppShell> {
   // Shared sidebar builder
   // ---------------------------------------------------------------------------
   Widget _buildSidebar() {
+    final teamName = _activeTeam?.name ?? '';
     return ChannelSidebar(
-      teamName: _activeTeam.name,
-      channels: mockChannels,
-      dmContacts: mockDmContacts,
+      teamName: teamName,
+      channels: _mockChannelsFromProviders,
+      dmContacts: _mockDmsFromProviders,
       selectedChannelId: _selectedChannelId,
-      selectedDmId: _selectedDmId,
+      selectedDmId: null, // DMs share the selectedChannelProvider
       onChannelSelected: (channel) {
-        setState(() {
-          _selectedChannelId = channel.id;
-          _selectedDmId = null;
-        });
+        _onChannelSelected(channel.id);
       },
       onDmSelected: (dm) {
-        setState(() {
-          _selectedDmId = dm.id;
-          _selectedChannelId = null;
-        });
+        _onDmSelected(dm.id);
       },
     );
   }
@@ -177,10 +250,24 @@ class _AppShellState extends State<AppShell> {
   // Callbacks
   // ---------------------------------------------------------------------------
   void _onTeamSelected(int index) {
-    setState(() {
-      _selectedTeamIndex = index;
-      _selectedChannelId = null;
-      _selectedDmId = null;
-    });
+    final teams = ref.read(teamsProvider);
+    if (index >= 0 && index < teams.length) {
+      ref.read(selectedTeamProvider.notifier).select(teams[index]);
+      // Clear channel selection when switching teams.
+      ref.read(selectedChannelProvider.notifier).clear();
+    }
+  }
+
+  void _onChannelSelected(String channelId) {
+    final channels = ref.read(channelListProvider).channels;
+    final channel = channels.where((c) => c.id == channelId).firstOrNull;
+    if (channel != null) {
+      ref.read(selectedChannelProvider.notifier).select(channel);
+      ref.read(unreadCountsProvider.notifier).markRead(channelId);
+    }
+  }
+
+  void _onDmSelected(String dmId) {
+    _onChannelSelected(dmId);
   }
 }
