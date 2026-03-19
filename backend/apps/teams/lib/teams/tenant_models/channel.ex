@@ -70,16 +70,9 @@ defmodule Teams.TenantModels.Channel do
   end
 
   def create(prefix, attrs) do
-    cs = changeset(%__MODULE__{}, attrs)
-
-    IO.puts("=== CHANNEL CREATE DEBUG ===")
-    IO.puts("attrs: #{inspect(attrs)}")
-    IO.puts("changeset valid: #{cs.valid?}")
-    IO.puts("changeset changes: #{inspect(cs.changes)}")
-    IO.puts("changeset errors: #{inspect(cs.errors)}")
-    IO.puts("=== END DEBUG ===")
-
-    Teams.Repo.insert(cs, prefix: prefix)
+    %__MODULE__{}
+    |> changeset(attrs)
+    |> Teams.Repo.insert(prefix: prefix)
   end
 
   def update(prefix, %__MODULE__{} = channel, attrs) do
