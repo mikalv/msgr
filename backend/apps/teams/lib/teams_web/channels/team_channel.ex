@@ -49,7 +49,7 @@ defmodule TeamsWeb.TeamChannel do
   Broadcasts that a new channel was created in the team.
   Call from channel creation logic:
 
-      TeamsWeb.Endpoint.broadcast("team:#{slug}", "new:channel", payload)
+      TeamsWeb.Endpoint.broadcast("team:\#{slug}", "new:channel", payload)
   """
   def broadcast_new_channel(slug, channel) do
     TeamsWeb.Endpoint.broadcast("team:#{slug}", "new:channel", %{
