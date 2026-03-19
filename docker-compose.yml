@@ -125,7 +125,7 @@ services:
       MSGR_FORCE_SSL_HSTS: ${MSGR_FORCE_SSL_HSTS:-false}
     working_dir: /app
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4001:4000"
       - "50052:50052"
       - "${MSGR_TLS_PORT:-4443}:${MSGR_TLS_PORT:-4443}"
       - "${NOISE_TRANSPORT_PORT:-5443}:${NOISE_TRANSPORT_PORT:-5443}"
