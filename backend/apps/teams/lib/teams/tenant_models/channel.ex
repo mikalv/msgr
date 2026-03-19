@@ -70,9 +70,12 @@ defmodule Teams.TenantModels.Channel do
   end
 
   def create(prefix, attrs) do
-    %__MODULE__{}
-    |> changeset(attrs)
-    |> Teams.Repo.insert(prefix: prefix)
+    cs = changeset(%__MODULE__{}, attrs)
+
+    require Logger
+    Logger.info("Channel.create changeset: valid=#{cs.valid?} changes=#{inspect(cs.changes)} errors=#{inspect(cs.errors)}")
+
+    Teams.Repo.insert(cs, prefix: prefix)
   end
 
   def update(prefix, %__MODULE__{} = channel, attrs) do
