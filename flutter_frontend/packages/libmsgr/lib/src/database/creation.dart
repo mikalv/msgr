@@ -105,4 +105,20 @@ Future<void> createDatabase(DatabaseConnection db) async {
   await db.execute(
     'CREATE INDEX outgoing_messages_team_idx ON $outgoingMessagesTable(team_name)',
   );
+
+  // Drafts — persisted composer text per channel
+  await db.execute(
+    '''
+    CREATE TABLE $draftsTable (
+      channel_id TEXT NOT NULL,
+      team_slug TEXT NOT NULL,
+      content TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (channel_id, team_slug)
+    )''',
+  );
+
+  await db.execute(
+    'CREATE INDEX drafts_team_idx ON $draftsTable(team_slug)',
+  );
 }

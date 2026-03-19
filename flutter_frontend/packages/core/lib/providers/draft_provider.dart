@@ -1,32 +1,62 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:libmsgr/libmsgr.dart';
+import 'package:libmsgr/src/database/daos/draft_dao.dart';
+
+import 'team_list_provider.dart';
 
 // ---------------------------------------------------------------------------
-// ChannelDrafts — draft text per channel, persisted to local DB
+// ChannelDrafts — draft text per channel, persisted to local SQLite DB
 // ---------------------------------------------------------------------------
 
 class ChannelDraftsNotifier extends StateNotifier<Map<String, String>> {
-  ChannelDraftsNotifier() : super({}) {
+  ChannelDraftsNotifier({
+    required DraftDao dao,
+    required String teamSlug,
+  })  : _dao = dao,
+        _teamSlug = teamSlug,
+        super({}) {
     _loadFromStorage();
   }
 
-  /// Load persisted drafts from local storage.
+  final DraftDao _dao;
+  final String _teamSlug;
+
+  /// Debounce timers per channel to avoid hammering the DB.
+  final Map<String, Timer> _debounceTimers = {};
+  static const _debounceDuration = Duration(milliseconds: 500);
+
+  /// Load all persisted drafts for this team from the local DB.
   Future<void> _loadFromStorage() async {
-    // TODO: Load from local DB (Hive/Sembast/libmsgr storage).
-    // Drafts are permanent until the user sends or deletes them.
+    try {
+      final drafts = await _dao.getAllDrafts(_teamSlug);
+      if (drafts.isNotEmpty && mounted) {
+        state = {...state, ...drafts};
+      }
+    } catch (_) {
+      // Silently ignore — drafts are best-effort.
+    }
   }
 
   /// Update the draft for a channel.
+  ///
+  /// Immediately updates in-memory state and debounces the DB write
+  /// by 500 ms to avoid excessive I/O while the user is typing.
   void updateDraft(String channelId, String text) {
     if (text.isEmpty) {
       clearDraft(channelId);
       return;
     }
     state = {...state, channelId: text};
-    _persistDraft(channelId, text);
+    _debouncePersist(channelId, text);
   }
 
   /// Clear the draft for a channel (e.g., after sending a message).
   void clearDraft(String channelId) {
+    _debounceTimers[channelId]?.cancel();
+    _debounceTimers.remove(channelId);
+
     final updated = Map<String, String>.from(state);
     updated.remove(channelId);
     state = updated;
@@ -42,21 +72,57 @@ class ChannelDraftsNotifier extends StateNotifier<Map<String, String>> {
     return draft != null && draft.isNotEmpty;
   }
 
-  void clear() => state = {};
+  void clear() {
+    for (final timer in _debounceTimers.values) {
+      timer.cancel();
+    }
+    _debounceTimers.clear();
+    state = {};
+  }
+
+  @override
+  void dispose() {
+    for (final timer in _debounceTimers.values) {
+      timer.cancel();
+    }
+    _debounceTimers.clear();
+    super.dispose();
+  }
+
+  void _debouncePersist(String channelId, String text) {
+    _debounceTimers[channelId]?.cancel();
+    _debounceTimers[channelId] = Timer(_debounceDuration, () {
+      _persistDraft(channelId, text);
+    });
+  }
 
   Future<void> _persistDraft(String channelId, String text) async {
-    // TODO: Save to local DB.
-    // Drafts survive app restart. Never auto-deleted.
+    try {
+      await _dao.saveDraft(channelId, _teamSlug, text);
+    } catch (_) {
+      // Best-effort persistence. Draft is still in memory.
+    }
   }
 
   Future<void> _removeDraft(String channelId) async {
-    // TODO: Remove from local DB.
+    try {
+      await _dao.deleteDraft(channelId, _teamSlug);
+    } catch (_) {
+      // Best-effort.
+    }
   }
 }
 
 final channelDraftsProvider =
     StateNotifierProvider<ChannelDraftsNotifier, Map<String, String>>((ref) {
-  return ChannelDraftsNotifier();
+  final team = ref.watch(selectedTeamProvider);
+  final teamSlug = team?.slug ?? 'default';
+
+  // Access the database through LibMsgr singleton.
+  final db = LibMsgr().databaseService.instance;
+  final dao = DraftDao(db);
+
+  return ChannelDraftsNotifier(dao: dao, teamSlug: teamSlug);
 });
 
 /// Draft text for a specific channel (null if no draft).

@@ -20,3 +20,4 @@ const notificationsTable = 'Notifications';
 const groupchatTable = 'Groupchat';
 const groupchatMembersTable = 'GroupchatMembers';
 const outgoingMessagesTable = 'OutgoingMessages';
+const draftsTable = 'Drafts';
