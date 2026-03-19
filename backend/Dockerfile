@@ -51,7 +51,7 @@ COPY rel rel
 #       fi; \
 #     done
 
-# Compile and build the release
+# Force rebuild: bust-cache-v2
 RUN mix compile
 
 # Runtime config does not require recompilation

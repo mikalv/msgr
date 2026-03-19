@@ -63,14 +63,16 @@ defmodule Teams.TeamManagement do
         })
 
       # 5. Seed #general channel
-      {:ok, general} =
-        Channel.create(schema_name, %{
-          name: "general",
-          slug: "general",
-          kind: "channel",
-          visibility: "public",
-          created_by: owner_profile.id
-        })
+      channel_attrs = %{
+        name: "general",
+        slug: "general",
+        kind: "channel",
+        visibility: "public",
+        created_by: owner_profile.id
+      }
+      IO.puts("=== TEAM_MGMT: Creating channel with attrs: #{inspect(channel_attrs)} ===")
+      {:ok, general} = Channel.create(schema_name, channel_attrs)
+      IO.puts("=== TEAM_MGMT: Channel created: #{inspect(general.id)} slug=#{inspect(general.slug)} ===")
 
       # 6. Add owner to #general
       ChannelMembership.join(schema_name, %{
