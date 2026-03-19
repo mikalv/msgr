@@ -1,110 +1,88 @@
 defmodule Teams.TenantModels.Message do
-  use Ecto.Schema
+  @moduledoc """
+  Tenant-scoped message. Supports threads via thread_parent_id,
+  rich content as JSONB map, and media_refs for attached files.
+  """
+
+  use Teams.Schema
   import Ecto.Changeset
   import Ecto.Query
-  alias Teams.TenantModels.{Conversation, Profile, Channel}
-  alias Teams.Repo
 
-  @derive {Jason.Encoder, only: [:msgid, :content, :is_system_msg, :channel_id, :profile_id, :conversation_id, :in_reply_to_id, :inserted_at, :updated_at, :metadata]}
   schema "messages" do
-    field :msgid, :string
-    belongs_to :profile, Profile, [foreign_key: :profile_id, type: :binary_id]
-    belongs_to :channel, Channel, [foreign_key: :channel_id, type: :binary_id]
-    belongs_to :conversation, Conversation, [foreign_key: :conversation_id, type: :binary_id]
-    field :content, :string
-    field :is_system_msg, :boolean
-    field :in_reply_to_id, :integer
-    field :metadata, :map
+    belongs_to :channel, Teams.TenantModels.Channel
+    belongs_to :sender_profile, Teams.TenantModels.Profile
+    belongs_to :thread_parent, __MODULE__
 
-    belongs_to(:parent, __MODULE__, foreign_key: :id, references: :message_parent, define_field: false)
-    has_many(:children, __MODULE__, foreign_key: :in_reply_to_id, references: :id)
+    field :content, :map, default: %{}
+    field :media_refs, {:array, :string}, default: []
+    field :edited_at, :utc_datetime
+
+    has_many :thread_replies, __MODULE__, foreign_key: :thread_parent_id
+    has_many :reactions, Teams.TenantModels.Reaction, foreign_key: :message_id
 
     timestamps(type: :utc_datetime)
   end
 
   @doc false
-  def changeset(model, attrs) do
-    model
-    |> cast(attrs, [:msgid, :profile_id, :channel_id, :conversation_id, :content, :is_system_msg, :in_reply_to_id, :metadata])
-    |> cast_assoc(:channel)
-    |> cast_assoc(:conversation)
-    |> cast_assoc(:profile)
-    |> cast_assoc(:parent)
-    |> cast_assoc(:children)
-    |> validate_required([:content])
+  def changeset(message, attrs) do
+    message
+    |> cast(attrs, [:channel_id, :sender_profile_id, :thread_parent_id, :content, :media_refs, :edited_at])
+    |> validate_required([:channel_id, :content])
+    |> foreign_key_constraint(:channel_id)
+    |> foreign_key_constraint(:sender_profile_id)
+    |> foreign_key_constraint(:thread_parent_id)
   end
 
-  def create_conversation_message(tenant, conversation_id, sender_id, message, metadata \\ %{}) do
-    next_id_seq = Ecto.Adapters.SQL.query!(
-      Teams.Repo,
-      "select pg_sequence_last_value('" <> Triplex.to_prefix(tenant) <> ".messages_id_seq') as nextID;", [])
-        |> Map.from_struct
-        |> Map.get(:rows)
-        |> List.first
-        |> List.first # Yes it's correct with two in a row. Value is stored like [[number]].
+  # Query helpers
+
+  def for_channel(prefix, channel_id, opts \\ []) do
+    limit = Keyword.get(opts, :limit, 50)
+
+    base =
+      from(m in __MODULE__,
+        where: m.channel_id == ^channel_id and is_nil(m.thread_parent_id),
+        order_by: [desc: m.inserted_at],
+        limit: ^limit,
+        preload: [:sender_profile]
+      )
+
+    base =
+      case Keyword.get(opts, :before) do
+        nil -> base
+        cursor -> from(m in base, where: m.inserted_at < ^cursor)
+      end
+
+    base =
+      case Keyword.get(opts, :after) do
+        nil -> base
+        cursor -> from(m in base, where: m.inserted_at > ^cursor)
+      end
+
+    Teams.Repo.all(base, prefix: prefix)
+  end
+
+  def thread_replies(prefix, parent_id) do
+    from(m in __MODULE__,
+      where: m.thread_parent_id == ^parent_id,
+      order_by: [asc: m.inserted_at],
+      preload: [:sender_profile]
+    )
+    |> Teams.Repo.all(prefix: prefix)
+  end
+
+  def create(prefix, attrs) do
     %__MODULE__{}
-    |> changeset(%{
-        msgid: Teams.SecureID.id!(next_id_seq, "M"),
-        conversation_id: conversation_id,
-        profile_id: sender_id,
-        content: message,
-        metadata: metadata
-      })
-    |> Repo.insert(prefix: Triplex.to_prefix(tenant))
-  end
-
-  def create_channel_message(tenant, channel_id, sender_id, message, metadata \\ %{}) do
-    next_id_seq = Ecto.Adapters.SQL.query!(
-      Teams.Repo,
-      "select pg_sequence_last_value('" <> Triplex.to_prefix(tenant) <> ".messages_id_seq') as nextID;", [])
-        |> Map.from_struct
-        |> Map.get(:rows)
-        |> List.first
-        |> List.first # Yes it's correct with two in a row. Value is stored like [[number]].
-    %__MODULE__{}
-    |> changeset(%{msgid: Teams.SecureID.id!(next_id_seq, "M"), channel_id: channel_id, profile_id: sender_id, content: message, metadata: metadata})
-    |> Repo.insert!(prefix: Triplex.to_prefix(tenant))
-    |> Repo.preload([:profile, :channel, :conversation])
-  end
-
-  def create_system_message(tenant, channel_id, message, metadata \\ %{}) do
-    next_id_seq = Ecto.Adapters.SQL.query!(
-      Teams.Repo,
-      "select pg_sequence_last_value('" <> Triplex.to_prefix(tenant) <> ".messages_id_seq') as nextID;", [])
-        |> Map.from_struct
-        |> Map.get(:rows)
-        |> List.first
-        |> List.first # Yes it's correct with two in a row. Value is stored like [[number]].
-    next_id_seq = if is_nil(next_id_seq), do: 1, else: next_id_seq
-    %__MODULE__{}
-    |> changeset(%{msgid: Teams.SecureID.id!(next_id_seq, "M"), channel_id: channel_id, content: message, is_system_msg: true, metadata: metadata})
-    |> Repo.insert(prefix: Triplex.to_prefix(tenant))
-  end
-
-  def get_for_channel(tenant, channel_id) do
-    from(m in __MODULE__, where: m.channel_id == ^channel_id) |> Repo.all(prefix: Triplex.to_prefix(tenant))
-  end
-
-  # Query functions
-
-  def list(tenant) do
-    Teams.Repo.all(__MODULE__, prefix: Triplex.to_prefix(tenant))
-  end
-
-  def create(tenant, attrs \\ %{}) do
-    %__MODULE__{}
-      |> changeset(attrs)
-      |> Teams.Repo.insert(prefix: Triplex.to_prefix(tenant))
-  end
-
-  def update(tenant, obj, attrs) do
-    obj
     |> changeset(attrs)
-    |> Teams.Repo.update(prefix: Triplex.to_prefix(tenant))
+    |> Teams.Repo.insert(prefix: prefix)
   end
 
-  def delete(tenant, obj) do
-    obj
-    |> Teams.Repo.delete(prefix: Triplex.to_prefix(tenant))
+  def update_content(prefix, %__MODULE__{} = message, content) do
+    message
+    |> changeset(%{content: content, edited_at: DateTime.utc_now()})
+    |> Teams.Repo.update(prefix: prefix)
+  end
+
+  def delete(prefix, %__MODULE__{} = message) do
+    Teams.Repo.delete(message, prefix: prefix)
   end
 end

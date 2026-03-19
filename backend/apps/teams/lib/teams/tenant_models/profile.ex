@@ -1,87 +1,63 @@
 defmodule Teams.TenantModels.Profile do
+  @moduledoc """
+  Tenant-scoped profile. Each account gets one profile per team.
+  The account_id references public.accounts (cross-schema).
+  """
+
   use Teams.Schema
   import Ecto.Changeset
   import Ecto.Query
-  alias Teams.Repo
 
   schema "profiles" do
-    field :uid, :string
-    field :username, :string
-    field :first_name, :string
-    field :last_name, :string
+    field :account_id, :binary_id
+    field :display_name, :string
     field :avatar_url, :string
-    field :status, :string
-    field :is_bot, :boolean
-    field :settings, :map
-    field :metadata, :map
-    many_to_many(
-      :roles,
-      Teams.TenantModels.Role,
-      join_through: Teams.TenantModels.ProfileRole,
-      on_replace: :delete
-    )
+    field :email, :string
+    field :phone, :string
+    field :role, :string, default: "member"
+
+    has_many :messages, Teams.TenantModels.Message, foreign_key: :sender_profile_id
+    has_many :channel_memberships, Teams.TenantModels.ChannelMembership, foreign_key: :profile_id
+
     timestamps(type: :utc_datetime)
   end
 
   @doc false
-  def changeset(model, attrs) do
-    model
-    |> cast(attrs, [:uid, :username, :first_name, :last_name, :avatar_url, :status, :settings, :metadata])
-    |> validate_required([:username])
-    |> unique_constraint(:uid)
-    |> unique_constraint(:username)
+  def changeset(profile, attrs) do
+    profile
+    |> cast(attrs, [:account_id, :display_name, :avatar_url, :email, :phone, :role])
+    |> validate_required([:account_id])
+    |> validate_inclusion(:role, ~w(owner admin member))
+    |> unique_constraint(:account_id)
   end
 
-  def changeset_update_roles(%__MODULE__{} = model, roles) do
-    model
-    |> cast(%{}, [:username])
-    |> put_assoc(:roles, roles)
+  # Query helpers
+
+  def get_by_id(prefix, id) do
+    Teams.Repo.get(__MODULE__, id, prefix: prefix)
   end
 
-  def quick_create_profile(tenant_team_name, uid, username, first_name \\ "", last_name \\ "") do
-    new = changeset(%__MODULE__{}, %{uid: uid, username: username, first_name: first_name, last_name: last_name})
-    Repo.insert!(new, prefix: Triplex.to_prefix(tenant_team_name))
+  def get_by_account_id(prefix, account_id) do
+    Teams.Repo.get_by(__MODULE__, [account_id: account_id], prefix: prefix)
   end
 
-  def load_roles(tenant, %__MODULE__{} = profile), do: Repo.preload(profile, [:roles], prefix: Triplex.to_prefix(tenant))
-
-  def can?(tenant, %__MODULE__{} = profile, what) do
-    whats =
-      Map.get(Map.from_struct(profile), :roles)
-        |> Enum.map(fn x -> x.permissions end)
-        |> List.flatten
-
-    (what in whats)
+  def list(prefix) do
+    Teams.Repo.all(__MODULE__, prefix: prefix)
   end
 
-  # Query functions
-
-  def count(tenant) do
-    query = from p in __MODULE__, select: count("id")
-    Repo.one(query, [prefix: Triplex.to_prefix(tenant)])
-  end
-
-  def get_by_id(tenant, id), do: Repo.get(__MODULE__, id, prefix: Triplex.to_prefix(tenant)) |> Repo.preload([:roles], prefix: Triplex.to_prefix(tenant))
-  def get_by_uid(tenant, uid), do: Repo.get_by(__MODULE__, [uid: uid], prefix: Triplex.to_prefix(tenant)) |> Repo.preload([:roles], prefix: Triplex.to_prefix(tenant))
-
-  def list(tenant) do
-    Teams.Repo.all(__MODULE__, prefix: Triplex.to_prefix(tenant)) |> Enum.map(fn x -> Repo.preload(x, [:roles], prefix: Triplex.to_prefix(tenant)) end)
-  end
-
-  def create(tenant, attrs \\ %{}) do
+  def create(prefix, attrs) do
     %__MODULE__{}
-      |> changeset(attrs)
-      |> Teams.Repo.insert(prefix: Triplex.to_prefix(tenant))
-  end
-
-  def update(tenant, obj, attrs) do
-    obj
     |> changeset(attrs)
-    |> Teams.Repo.update(prefix: Triplex.to_prefix(tenant))
+    |> Teams.Repo.insert(prefix: prefix)
   end
 
-  def delete(tenant, obj) do
-    obj
-    |> Teams.Repo.delete(prefix: Triplex.to_prefix(tenant))
+  def update(prefix, %__MODULE__{} = profile, attrs) do
+    profile
+    |> changeset(attrs)
+    |> Teams.Repo.update(prefix: prefix)
+  end
+
+  def delete(prefix, %__MODULE__{} = profile) do
+    Teams.Repo.delete(profile, prefix: prefix)
   end
 end
