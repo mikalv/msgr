@@ -12,3 +12,4 @@ backend/.envrc
 
 *.wat
 *.decomp
+.env
