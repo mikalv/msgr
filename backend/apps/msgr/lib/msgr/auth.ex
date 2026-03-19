@@ -48,10 +48,11 @@ defmodule Messngr.Auth do
              Accounts.verify_identity(identity, %{last_challenged_at: challenge.inserted_at}),
            {:ok, %{identity: identity, device: device}} <-
              Accounts.attach_device_for_identity(identity, device_attrs_from(challenge, attrs)),
-           :ok <- bind_noise_session_to_account(session_id, session_token, identity.account, identity.profile, device) do
+           :ok <- bind_noise_session_to_account(session_id, session_token, identity.account, Map.get(identity, :profile), device) do
         %{
           account: identity.account,
           identity: identity,
+          device: device,
           session_id: session_id
         }
       else
