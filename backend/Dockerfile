@@ -43,12 +43,13 @@ RUN mix deps.get --only $MIX_ENV && mix deps.compile
 COPY apps apps
 COPY rel rel
 
-# Compile assets for web apps (skip if no assets directory)
-RUN for app in msgr_web auth_provider teams; do \
-      if [ -d "apps/$app/assets" ]; then \
-        cd "/app/apps/$app" && mix assets.deploy && cd /app; \
-      fi; \
-    done
+# Asset compilation skipped — Flutter is the client, Phoenix serves API only.
+# Re-enable when Phoenix LiveView or server-rendered pages are needed:
+# RUN for app in msgr_web auth_provider teams; do \
+#       if [ -d "apps/$app/assets" ]; then \
+#         cd "/app/apps/$app" && mix assets.deploy && cd /app; \
+#       fi; \
+#     done
 
 # Compile and build the release
 RUN mix compile
