@@ -63,16 +63,20 @@ defmodule Teams.TeamManagement do
         })
 
       # 5. Seed #general channel
-      channel_attrs = %{
-        name: "general",
-        slug: "general",
-        kind: "channel",
-        visibility: "public",
-        created_by: owner_profile.id
-      }
-      IO.puts("=== TEAM_MGMT: Creating channel with attrs: #{inspect(channel_attrs)} ===")
-      {:ok, general} = Channel.create(schema_name, channel_attrs)
-      IO.puts("=== TEAM_MGMT: Channel created: #{inspect(general.id)} slug=#{inspect(general.slug)} ===")
+      general_cs =
+        %Channel{}
+        |> Ecto.Changeset.change(%{
+          name: "general",
+          slug: "general",
+          kind: "channel",
+          visibility: "public",
+          created_by: owner_profile.id
+        })
+
+      IO.puts("=== GENERAL CS: #{inspect(general_cs.changes)} valid=#{general_cs.valid?} ===")
+
+      {:ok, general} = Repo.insert(general_cs, prefix: schema_name)
+      IO.puts("=== GENERAL CREATED: id=#{general.id} slug=#{inspect(general.slug)} ===")
 
       # 6. Add owner to #general
       ChannelMembership.join(schema_name, %{
