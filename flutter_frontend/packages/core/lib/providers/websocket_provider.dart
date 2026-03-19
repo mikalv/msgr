@@ -90,11 +90,11 @@ class WebSocketNotifier extends StateNotifier<WebSocketState> {
     state = const WebSocketState();
   }
 
-  /// Send a message to a conversation or room
+  /// Send a message to a conversation or channel
   void sendMessage({
     required String content,
     String? conversationId,
-    String? roomId,
+    String? channelId,
   }) {
     if (_connection == null) {
       throw Exception('Not connected to WebSocket');
@@ -110,11 +110,11 @@ class WebSocketNotifier extends StateNotifier<WebSocketState> {
       content: content,
       fromProfileID: currentProfile.id,
       conversationID: conversationId,
-      roomID: roomId,
+      channelID: channelId,
     );
 
     // Send message via Phoenix channel
-    final destId = conversationId ?? roomId;
+    final destId = conversationId ?? channelId;
     if (destId != null) {
       _connection!.sendMessage(destId, message);
     }
@@ -125,7 +125,7 @@ class WebSocketNotifier extends StateNotifier<WebSocketState> {
   /// and may need to be implemented via channel events
   void sendTypingIndicator({
     String? conversationId,
-    String? roomId,
+    String? channelId,
   }) {
     if (_connection == null) {
       throw Exception('Not connected to WebSocket');

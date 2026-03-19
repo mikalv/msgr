@@ -31,7 +31,7 @@ defmodule TeamsWeb.ConversationChannel do
   end
 
   # It is also common to receive messages from the client and
-  # broadcast to everyone in the current topic (room:lobby).
+  # broadcast to everyone in the current topic (conversation:lobby).
   @impl true
   def handle_in("shout", payload, socket) do
     broadcast(socket, "shout", payload)
@@ -39,7 +39,7 @@ defmodule TeamsWeb.ConversationChannel do
   end
 
 
-  defp filter_msg_for_json(msg), do: Map.drop(Map.from_struct(msg), [:__meta__, :id, :metadata, :room, :conversation, :profile, :parent, :children])
+  defp filter_msg_for_json(msg), do: Map.drop(Map.from_struct(msg), [:__meta__, :id, :metadata, :channel, :conversation, :profile, :parent, :children])
 
 
   # Add authorization logic here as required.

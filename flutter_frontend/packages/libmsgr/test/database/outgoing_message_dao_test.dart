@@ -23,7 +23,7 @@ void main() {
         content: 'Hello world',
         fromProfileID: 'profile-1',
         conversationID: 'conversation-1',
-        roomID: null,
+        channelID: null,
         createdAt: DateTime.utc(2024, 1, 1),
         updatedAt: DateTime.utc(2024, 1, 1, 0, 1),
         isServerAck: false,

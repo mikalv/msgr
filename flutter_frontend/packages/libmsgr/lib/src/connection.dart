@@ -49,7 +49,7 @@ class MsgrConnection {
     _socket.errorStream.listen(_handleError);
     _socket.closeStream.listen(_handleDisconnect);
     _socket.openStream.listen(_handleConnect);
-    /*_socket.streamForTopic('room:lobby').listen((onData) {
+    /*_socket.streamForTopic('channel:lobby').listen((onData) {
       _log.info('ondata: $onData');
     });*/
   }
@@ -136,7 +136,7 @@ class MsgrConnection {
     _connected = true;
     _log.info('[+] Socket connected: ${event.toString()}');
     // TODO: This probably needs to be namespaced by team
-    joinChannel('room:lobby');
+    joinChannel('channel:lobby');
     userChannel = joinChannel('user:$userID');
     _presence = PhoenixPresence(channel: userChannel);
     _presence.onSync = presenceOnSync;
@@ -157,15 +157,15 @@ class MsgrConnection {
     await repos.messageRepository.processPendingQueue();
   }
 
-  List<Room> _handleRoomsPacket(
-      TeamRepositories repos, String team, dynamic rooms) {
-    final roomObjs = rooms.map<Room>((e) => Room.fromJson(e)).toList();
-    for (var room in roomObjs) {
-      dispatchFn(OnReceiveNewRoomAction(room));
-      joinChannel('room:$team.${room.id}');
+  List<Channel> _handleChannelsPacket(
+      TeamRepositories repos, String team, dynamic channels) {
+    final channelObjs = channels.map<Channel>((e) => Channel.fromJson(e)).toList();
+    for (var channel in channelObjs) {
+      dispatchFn(OnReceiveNewChannelAction(channel));
+      joinChannel('channel:$team.${channel.id}');
     }
-    repos.roomRepository.fillLocalCache(roomObjs);
-    return roomObjs;
+    repos.channelRepository.fillLocalCache(channelObjs);
+    return channelObjs;
   }
 
   List<Conversation> _handleConversationsPacket(
@@ -211,22 +211,22 @@ class MsgrConnection {
   }
 
   void _handleBootstrapPacket(event) {
-    final roomAndConvMap = event.payload['data'];
-    final String team = roomAndConvMap['team'];
+    final channelAndConvMap = event.payload['data'];
+    final String team = channelAndConvMap['team'];
     TeamRepositories repos = LibMsgr().repositoryFactory.getRepositories(team);
-    final List<dynamic> rooms = roomAndConvMap['rooms'];
-    final roomObjs = _handleRoomsPacket(repos, team, rooms);
-    final List<dynamic> conversations = roomAndConvMap['conversations'];
+    final List<dynamic> channels = channelAndConvMap['channels'];
+    final channelObjs = _handleChannelsPacket(repos, team, channels);
+    final List<dynamic> conversations = channelAndConvMap['conversations'];
     final conversationObjs =
         _handleConversationsPacket(repos, team, conversations);
-    final List<dynamic> profiles = roomAndConvMap['profiles'];
+    final List<dynamic> profiles = channelAndConvMap['profiles'];
     final profileObjs = _handleProfilesPacket(repos, team, profiles);
-    final List<dynamic> messages = roomAndConvMap['messages'];
+    final List<dynamic> messages = channelAndConvMap['messages'];
     final messageObjs = _handleMessagesPacket(repos, team, messages);
     dispatchFn(OnBootstrapAction(
         profiles: profileObjs,
         conversations: conversationObjs,
-        rooms: roomObjs,
+        channels: channelObjs,
         messages: messageObjs,
         teamName: team));
   }
@@ -239,8 +239,8 @@ class MsgrConnection {
       _handleBootstrapPacket(event);
     } else if (event.event == PhoenixChannelEvent.custom('new:msg')) {
       _handleNewMessagePacket(event);
-    } else if (event.event == PhoenixChannelEvent.custom("new:room")) {
-      _handleRoomsPacket(repos, team, event.payload['rooms']);
+    } else if (event.event == PhoenixChannelEvent.custom("new:channel")) {
+      _handleChannelsPacket(repos, team, event.payload['channels']);
     } else if (event.event == PhoenixChannelEvent.custom("new:conversation")) {
       _handleConversationsPacket(repos, team, event.payload['conversations']);
     } else {
@@ -255,11 +255,11 @@ class MsgrConnection {
   }
 
   Push? sendMessage(String destID, MMessage msg) {
-    final key = (msg.roomID != null) ? 'room:$destID' : 'conversation:$destID';
+    final key = (msg.channelID != null) ? 'channel:$destID' : 'conversation:$destID';
     if (!_connected) {
       _log.warning('Socket disconnected; queuing message ${msg.id} for retry');
       SocketTelemetry.instance.messageRetryScheduled(
-        conversationId: msg.conversationID ?? msg.roomID ?? destID,
+        conversationId: msg.conversationID ?? msg.channelID ?? destID,
         messageId: msg.id,
         metadata: {
           'topic': key,
@@ -272,7 +272,7 @@ class MsgrConnection {
     if (!_socket.channels.containsKey(key)) {
       _log.warning('Channel $key not found; queuing message ${msg.id} for retry');
       SocketTelemetry.instance.messageRetryScheduled(
-        conversationId: msg.conversationID ?? msg.roomID ?? destID,
+        conversationId: msg.conversationID ?? msg.channelID ?? destID,
         messageId: msg.id,
         metadata: {
           'topic': key,
@@ -284,7 +284,7 @@ class MsgrConnection {
 
     final chl = _socket.channels[key]!;
     SocketTelemetry.instance.messageSent(
-      conversationId: msg.conversationID ?? msg.roomID ?? destID,
+      conversationId: msg.conversationID ?? msg.channelID ?? destID,
       messageId: msg.id,
       metadata: {'topic': key},
     );
@@ -298,7 +298,7 @@ class MsgrConnection {
         isServerAck: true,
       );
       SocketTelemetry.instance.messageAcknowledged(
-        conversationId: msg.conversationID ?? msg.roomID ?? destID,
+        conversationId: msg.conversationID ?? msg.channelID ?? destID,
         messageId: msg.id,
         metadata: {
           'topic': key,
@@ -312,7 +312,7 @@ class MsgrConnection {
         MessageDeliveryStatus.failed,
       );
       SocketTelemetry.instance.messageAcknowledged(
-        conversationId: msg.conversationID ?? msg.roomID ?? destID,
+        conversationId: msg.conversationID ?? msg.channelID ?? destID,
         messageId: msg.id,
         metadata: {
           'topic': key,
@@ -325,15 +325,15 @@ class MsgrConnection {
     return push;
   }
 
-  Push? createRoom(String profileID, String roomName, String roomDescription,
+  Push? createChannel(String profileID, String channelName, String channelDescription,
       bool isSecret, List<String> members) {
-    final key = 'room:lobby';
+    final key = 'channel:lobby';
     if (_socket.channels.containsKey(key)) {
       final chl = _socket.channels[key]!;
-      return chl.push('create:room', {
+      return chl.push('create:channel', {
         'options': {
-          'room_name': roomName,
-          'room_description': roomDescription,
+          'channel_name': channelName,
+          'channel_description': channelDescription,
           'is_secret': isSecret
         },
         'team': tenant,

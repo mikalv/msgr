@@ -7,7 +7,7 @@ import 'package:messngr/ui/widgets/CategorySelector.dart';
 import 'package:messngr/features/chat/chat_page.dart';
 import 'package:messngr/ui/widgets/conversation/conversations_list_widget.dart';
 import 'package:messngr/ui/widgets/profile/profile_mode_switcher.dart';
-import 'package:messngr/ui/widgets/room/room_list_widget.dart';
+import 'package:messngr/ui/widgets/channel/channel_list_widget.dart';
 import 'package:go_router/go_router.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -591,7 +591,7 @@ class _HomeInboxPanel extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RoomListWidget(
+                    ChannelListWidget(
                       context: context,
                       modeFilter: modeFilter,
                     ),

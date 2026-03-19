@@ -104,22 +104,22 @@ class MessageRepository extends BaseRepository<MMessage> {
     unawaited(_dao.deleteMessages(teamName, [id]));
   }
 
-  List<MMessage> fetchRoomHistory(String roomID) {
-    log.info('Will get room messages for $roomID');
-    return items.cast<MMessage>().where((x) => x.roomID == roomID).toList();
+  List<MMessage> fetchChannelHistory(String channelID) {
+    log.info('Will get channel messages for $channelID');
+    return items.cast<MMessage>().where((x) => x.channelID == channelID).toList();
   }
 
-  int getUnreadMessagesCount(String roomID) {
+  int getUnreadMessagesCount(String channelID) {
     return items
         .cast<MMessage>()
-        .where((x) => x.roomID == roomID && !x.isMsgRead)
+        .where((x) => x.channelID == channelID && !x.isMsgRead)
         .length;
   }
 
-  MMessage? getLastRoomMessage(String roomID) {
+  MMessage? getLastChannelMessage(String channelID) {
     return items
         .cast<MMessage>()
-        .where((x) => x.roomID == roomID)
+        .where((x) => x.channelID == channelID)
         .toList()
         .lastOrNull;
   }
@@ -133,28 +133,28 @@ class MessageRepository extends BaseRepository<MMessage> {
     }).length;
   }
 
-  Stream<List<MMessage>> fetchRoomMessages(String roomID) {
+  Stream<List<MMessage>> fetchChannelMessages(String channelID) {
     late final StreamController<List<MMessage>> controller;
 
     void selfListener(List<MMessage> messages) {
       final allMessages =
-          items.cast<MMessage>().where((x) => x.roomID == roomID).toList();
+          items.cast<MMessage>().where((x) => x.channelID == channelID).toList();
       controller.add(allMessages);
     }
 
     void startStream() {
-      log.info('Starting stream for room $roomID');
+      log.info('Starting stream for channel $channelID');
       addListener(selfListener);
       final listen =
-          items.cast<MMessage>().where((x) => x.roomID == roomID).toList();
+          items.cast<MMessage>().where((x) => x.channelID == channelID).toList();
       /*listen.forEach((element) {
-        _log.info('Adding message to stream: ${element.roomID}');
+        _log.info('Adding message to stream: ${element.channelID}');
       });*/
       controller.add(listen);
     }
 
     void stopStream() {
-      log.info('Stopping stream for room $roomID');
+      log.info('Stopping stream for channel $channelID');
       removeListener(selfListener);
     }
 
@@ -209,13 +209,13 @@ class MessageRepository extends BaseRepository<MMessage> {
     return listen;
   }
 
-  Future<Push?> sendMessageToRoom(MMessage msg) {
+  Future<Push?> sendMessageToChannel(MMessage msg) {
     return _enqueueAndSend(
       msg.copyWith(
         isServerAck: false,
         deliveryStatus: MessageDeliveryStatus.pending,
       ),
-      '$teamName.${msg.roomID!}',
+      '$teamName.${msg.channelID!}',
     );
   }
 
@@ -261,7 +261,7 @@ class MessageRepository extends BaseRepository<MMessage> {
             MessageDeliveryStatus.failed,
           );
           SocketTelemetry.instance.messageRetryExhausted(
-            conversationId: entry.message.conversationID ?? entry.message.roomID,
+            conversationId: entry.message.conversationID ?? entry.message.channelID,
             messageId: entry.message.id,
             metadata: {
               'attempts': entry.attemptCount,
@@ -316,7 +316,7 @@ class MessageRepository extends BaseRepository<MMessage> {
     if (wsConn == null || !wsConn.isConnected()) {
       log.warning('No active websocket connection; will retry ${entry.message.id}');
       SocketTelemetry.instance.messageRetryScheduled(
-        conversationId: entry.message.conversationID ?? entry.message.roomID,
+        conversationId: entry.message.conversationID ?? entry.message.channelID,
         messageId: entry.message.id,
         metadata: {
           'attempts': entry.attemptCount,
@@ -349,7 +349,7 @@ class MessageRepository extends BaseRepository<MMessage> {
       log.severe('Error sending message: Push is null');
       updateDeliveryStatus(entry.message.id, MessageDeliveryStatus.pending);
       SocketTelemetry.instance.messageRetryScheduled(
-        conversationId: entry.message.conversationID ?? entry.message.roomID,
+        conversationId: entry.message.conversationID ?? entry.message.channelID,
         messageId: entry.message.id,
         metadata: {
           'attempts': updatedEntry.attemptCount,
@@ -364,7 +364,7 @@ class MessageRepository extends BaseRepository<MMessage> {
     push.future.then((value) async {
       if (updatedEntry.attemptCount > 1) {
         SocketTelemetry.instance.messageRetrySucceeded(
-          conversationId: updatedEntry.message.conversationID ?? updatedEntry.message.roomID,
+          conversationId: updatedEntry.message.conversationID ?? updatedEntry.message.channelID,
           messageId: updatedEntry.message.id,
           metadata: {
             'attempts': updatedEntry.attemptCount,
@@ -377,7 +377,7 @@ class MessageRepository extends BaseRepository<MMessage> {
       log.severe('Error sending message ${entry.message.id}: $e');
       updateDeliveryStatus(entry.message.id, MessageDeliveryStatus.pending);
       SocketTelemetry.instance.messageRetryScheduled(
-        conversationId: entry.message.conversationID ?? entry.message.roomID,
+        conversationId: entry.message.conversationID ?? entry.message.channelID,
         messageId: entry.message.id,
         metadata: {
           'attempts': updatedEntry.attemptCount,

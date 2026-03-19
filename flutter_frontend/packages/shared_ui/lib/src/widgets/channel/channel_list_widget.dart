@@ -4,19 +4,19 @@ import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/config/theme.dart';
 import 'package:messngr/redux/app_state.dart';
 import 'package:messngr/redux/navigation/navigation_actions.dart';
-import 'package:messngr/ui/widgets/room/room_list_item.dart';
+import 'package:messngr/ui/widgets/channel/channel_list_item.dart';
 import 'package:messngr/utils/flutter_redux.dart';
 
-class RoomListWidget extends StatelessWidget {
-  const RoomListWidget({
+class ChannelListWidget extends StatelessWidget {
+  const ChannelListWidget({
     super.key,
     required this.context,
-    required this.rooms,
+    required this.channels,
     required this.store,
   });
 
   final dynamic context;
-  final dynamic rooms;
+  final dynamic channels;
   final dynamic store;
 
   @override
@@ -24,11 +24,11 @@ class RoomListWidget extends StatelessWidget {
     final theList = ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: rooms.length,
+      itemCount: channels.length,
       itemBuilder: (BuildContext context, int index) {
-        final Room room = rooms[index];
-        return RoomListItem(
-            key: Key(room.id), store: store, room: room, index: index);
+        final Channel channel = channels[index];
+        return ChannelListItem(
+            key: Key(channel.id), store: store, channel: channel, index: index);
       },
     );
     return Column(
@@ -36,7 +36,7 @@ class RoomListWidget extends StatelessWidget {
         Row(
           children: [
             const SizedBox(width: 10.0),
-            Text('Rooms',
+            Text('Channels',
                 style: AppTheme.of(context)
                     .channelListViewTheme
                     .data
@@ -46,7 +46,7 @@ class RoomListWidget extends StatelessWidget {
               onPressed: () {
                 StoreProvider.of<AppState>(context).dispatch(
                     NavigateShellToNewRouteAction(
-                        route: AppNavigation.createRoomPath +
+                        route: AppNavigation.createChannelPath +
                             store.state.authState.currentTeamName!,
                         kUsePush: true));
               },

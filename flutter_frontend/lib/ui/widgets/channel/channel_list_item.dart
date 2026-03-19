@@ -8,19 +8,19 @@ import 'package:messngr/providers/auth_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-class RoomListItem extends ConsumerStatefulWidget {
-  final Room room;
+class ChannelListItem extends ConsumerStatefulWidget {
+  final Channel channel;
   final int index;
-  const RoomListItem(
+  const ChannelListItem(
       {super.key,
-      required this.room,
+      required this.channel,
       required this.index});
 
   @override
-  ConsumerState<RoomListItem> createState() => _RoomListItemState();
+  ConsumerState<ChannelListItem> createState() => _ChannelListItemState();
 }
 
-class _RoomListItemState extends ConsumerState<RoomListItem> {
+class _ChannelListItemState extends ConsumerState<ChannelListItem> {
   late final MessageRepository messageRepository;
   late final ProfileRepository profileRepository;
 
@@ -40,11 +40,11 @@ class _RoomListItemState extends ConsumerState<RoomListItem> {
   @override
   Widget build(BuildContext context) {
     final theme = AppTheme.of(context).channelListViewTheme;
-    final lastMessage = messageRepository.getLastRoomMessage(widget.room.id);
+    final lastMessage = messageRepository.getLastChannelMessage(widget.channel.id);
     final unreadCount =
-        messageRepository.getUnreadMessagesCount(widget.room.id);
+        messageRepository.getUnreadMessagesCount(widget.channel.id);
     var lastMsgString = '';
-    var lastMsgTimeString = timeago.format(widget.room.updatedAt);
+    var lastMsgTimeString = timeago.format(widget.channel.updatedAt);
     if (lastMessage == null) {
       lastMsgString = 'No messages yet';
     } else {
@@ -57,7 +57,7 @@ class _RoomListItemState extends ConsumerState<RoomListItem> {
       onTap: () {
         final currentTeam = ref.read(currentTeamProvider);
         if (currentTeam != null) {
-          context.go('${AppNavigation.roomsPath}/${widget.room.id}');
+          context.go('${AppNavigation.channelsPath}/${widget.channel.id}');
         }
       },
       child: Container(
@@ -77,7 +77,7 @@ class _RoomListItemState extends ConsumerState<RoomListItem> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          '#${widget.room.name}'.toLowerCase(),
+                          '#${widget.channel.name}'.toLowerCase(),
                           style: theme.data.titleStyle,
                         ),
                         const SizedBox(height: 5.0),

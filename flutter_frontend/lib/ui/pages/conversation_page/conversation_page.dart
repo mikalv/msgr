@@ -13,7 +13,7 @@ import 'package:messngr/ui/widgets/message_composer/message_composer.dart';
 
 class ConversationPage extends ConsumerStatefulWidget {
   final String title;
-  //final String roomID;
+  //final String channelID;
   late final Conversation conversation;
   final String conversationID;
   final String teamName;

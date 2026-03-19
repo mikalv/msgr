@@ -4,38 +4,38 @@ import 'package:libmsgr/libmsgr.dart';
 /// Team state class holding team-related data
 class TeamState {
   final List<Conversation> conversations;
-  final List<Room> rooms;
+  final List<Channel> channels;
   final List<Profile> profiles;
   final Conversation? currentConversation;
-  final Room? currentRoom;
+  final Channel? currentChannel;
   final bool isLoading;
   final Exception? error;
 
   const TeamState({
     this.conversations = const [],
-    this.rooms = const [],
+    this.channels = const [],
     this.profiles = const [],
     this.currentConversation,
-    this.currentRoom,
+    this.currentChannel,
     this.isLoading = false,
     this.error,
   });
 
   TeamState copyWith({
     List<Conversation>? conversations,
-    List<Room>? rooms,
+    List<Channel>? channels,
     List<Profile>? profiles,
     Conversation? currentConversation,
-    Room? currentRoom,
+    Channel? currentChannel,
     bool? isLoading,
     Exception? error,
   }) {
     return TeamState(
       conversations: conversations ?? this.conversations,
-      rooms: rooms ?? this.rooms,
+      channels: channels ?? this.channels,
       profiles: profiles ?? this.profiles,
       currentConversation: currentConversation ?? this.currentConversation,
-      currentRoom: currentRoom ?? this.currentRoom,
+      currentChannel: currentChannel ?? this.currentChannel,
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
     );
@@ -58,8 +58,8 @@ class TeamNotifier extends StateNotifier<TeamState> {
         state = state.copyWith(conversations: conversations);
       });
 
-      repositories.roomRepository.subscribe((rooms) {
-        state = state.copyWith(rooms: rooms);
+      repositories.channelRepository.subscribe((channels) {
+        state = state.copyWith(channels: channels);
       });
 
       repositories.profileRepository.subscribe((profiles) {
@@ -68,12 +68,12 @@ class TeamNotifier extends StateNotifier<TeamState> {
 
       // Load initial data from repositories
       final conversations = repositories.conversationRepository.items;
-      final rooms = repositories.roomRepository.items;
+      final channels = repositories.channelRepository.items;
       final profiles = repositories.profileRepository.items;
 
       state = state.copyWith(
         conversations: conversations,
-        rooms: rooms,
+        channels: channels,
         profiles: profiles,
         isLoading: false,
       );
@@ -91,9 +91,9 @@ class TeamNotifier extends StateNotifier<TeamState> {
     state = state.copyWith(currentConversation: conversation);
   }
 
-  /// Set current room
-  void setCurrentRoom(Room? room) {
-    state = state.copyWith(currentRoom: room);
+  /// Set current channel
+  void setCurrentChannel(Channel? channel) {
+    state = state.copyWith(currentChannel: channel);
   }
 
   /// Add or update conversation
@@ -108,16 +108,16 @@ class TeamNotifier extends StateNotifier<TeamState> {
     state = state.copyWith(conversations: conversations);
   }
 
-  /// Add or update room
-  void upsertRoom(Room room) {
-    final rooms = List<Room>.from(state.rooms);
-    final index = rooms.indexWhere((r) => r.id == room.id);
+  /// Add or update channel
+  void upsertChannel(Channel channel) {
+    final channels = List<Channel>.from(state.channels);
+    final index = channels.indexWhere((r) => r.id == channel.id);
     if (index != -1) {
-      rooms[index] = room;
+      channels[index] = channel;
     } else {
-      rooms.add(room);
+      channels.add(channel);
     }
-    state = state.copyWith(rooms: rooms);
+    state = state.copyWith(channels: channels);
   }
 
   /// Add or update profile
@@ -149,8 +149,8 @@ final conversationsProvider = Provider<List<Conversation>>((ref) {
   return ref.watch(teamProvider).conversations;
 });
 
-final roomsProvider = Provider<List<Room>>((ref) {
-  return ref.watch(teamProvider).rooms;
+final channelsProvider = Provider<List<Channel>>((ref) {
+  return ref.watch(teamProvider).channels;
 });
 
 final profilesProvider = Provider<List<Profile>>((ref) {
@@ -161,8 +161,8 @@ final currentConversationProvider = Provider<Conversation?>((ref) {
   return ref.watch(teamProvider).currentConversation;
 });
 
-final currentRoomProvider = Provider<Room?>((ref) {
-  return ref.watch(teamProvider).currentRoom;
+final currentChannelProvider = Provider<Channel?>((ref) {
+  return ref.watch(teamProvider).currentChannel;
 });
 
 /// Filtered conversations for personal app (based on profile mode)

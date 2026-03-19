@@ -46,12 +46,12 @@ defmodule TeamsWeb.SubdomainRouter do
 
   scope "/v1/api", TeamsWeb.Subdomain do
     pipe_through [:api, :authed_api, :authorized_api]
-    get "/rooms", RoomsController, :list
-    post "/rooms", RoomsController, :create
-    put "/rooms/:room_id", RoomsController, :update
-    get "/rooms/:room_id", RoomsController, :get
-    delete "/rooms/:room_id", RoomsController, :delete
-    get "/rooms/:room_id/history", RoomsController, :history
+    get "/channels", ChannelsController, :list
+    post "/channels", ChannelsController, :create
+    put "/channels/:channel_id", ChannelsController, :update
+    get "/channels/:channel_id", ChannelsController, :get
+    delete "/channels/:channel_id", ChannelsController, :delete
+    get "/channels/:channel_id/history", ChannelsController, :history
 
     get "/profiles", ProfileController, :list
     put "/profiles/:profile_id", ProfileController, :update

@@ -20,7 +20,7 @@ defmodule Teams.Application do
       # Start to serve requests, typically the last entry
       TeamsWeb.Endpoint,
       TeamsWeb.UserPresence,
-      {ChannelWatcher, :rooms}
+      {ChannelWatcher, :channels}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

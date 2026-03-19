@@ -11,6 +11,6 @@ class Events {
   /// Event sent when receiving a new message
   static const String messageNew = 'new:msg';
 
-  /// Event sent when receiving a new room
-  static const String roomNew = 'new:room';
+  /// Event sent when receiving a new channel
+  static const String channelNew = 'new:channel';
 }

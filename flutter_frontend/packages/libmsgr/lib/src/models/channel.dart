@@ -3,15 +3,15 @@ import 'package:libmsgr/libmsgr.dart';
 import 'package:libmsgr/src/models/base.dart';
 import 'package:meta/meta.dart';
 
-/// Represents a chat room in the messaging application.
+/// Represents a chat channel in the messaging application.
 ///
-/// A `Room` is a container for messages and participants. It extends the
+/// A `Channel` is a container for messages and participants. It extends the
 /// `BaseModel` class, inheriting common model properties and methods.
 ///
-/// This class is used to manage and store information about a chat room,
+/// This class is used to manage and store information about a chat channel,
 /// including its participants, messages, and metadata.
 @immutable
-class Room extends BaseModel {
+class Channel extends BaseModel {
   final String name;
   final String? topic;
   final String description;
@@ -25,7 +25,7 @@ class Room extends BaseModel {
 
   String get formattedName => '#$name'.toLowerCase();
 
-  Room.raw(
+  Channel.raw(
       {super.id,
       required this.name,
       required this.topic,
@@ -39,7 +39,7 @@ class Room extends BaseModel {
   @override
   bool operator ==(other) =>
       identical(this, other) ||
-      other is Room &&
+      other is Channel &&
           id == other.id &&
           name == other.name &&
           topic == other.topic &&
@@ -63,8 +63,8 @@ class Room extends BaseModel {
       updatedAt.hashCode ^
       metadata.hashCode;
 
-  factory Room({name, topic, description, members, kIsSecret, metadata}) {
-    return Room.raw(
+  factory Channel({name, topic, description, members, kIsSecret, metadata}) {
+    return Channel.raw(
         name: name,
         topic: topic,
         description: description,
@@ -75,32 +75,8 @@ class Room extends BaseModel {
         metadata: metadata);
   }
 
-  factory Room.fromJson(dynamic json) {
-    /*return switch (json) {
-      {
-        'id': String id,
-        'name': String name,
-        'topic': String topic,
-        'description': String description,
-        'is_secret': bool isSecret,
-        'inserted_at': String createdAt,
-        'updated_at': String updatedAt,
-        'members': List<dynamic> members,
-        'metadata': Map<String, dynamic> metadata
-      } =>
-        Room(
-            id: id,
-            topic: topic,
-            name: name,
-            description: description,
-            members: members,
-            createdAt: createdAt,
-            updatedAt: updatedAt,
-            kIsSecret: isSecret,
-            metadata: metadata),
-      _ => throw const FormatException('Failed to load room.'),
-    };*/
-    return Room.raw(
+  factory Channel.fromJson(dynamic json) {
+    return Channel.raw(
         id: json['id'],
         description: json['description'],
         kIsSecret: json['is_secret'] as bool,
@@ -112,8 +88,8 @@ class Room extends BaseModel {
         updatedAt: DateTime.parse(json['updated_at']));
   }
 
-  factory Room.fromMap(Map<String, dynamic> map) {
-    return Room.raw(
+  factory Channel.fromMap(Map<String, dynamic> map) {
+    return Channel.raw(
         id: map['id'],
         name: map['name'],
         topic: map['topic'],
@@ -153,12 +129,12 @@ class Room extends BaseModel {
 
   @override
   String toString() {
-    return 'Room{ID: $id, name: $name, topic: '
+    return 'Channel{ID: $id, name: $name, topic: '
         '$topic, description: $description, kIsSecret: '
         '$kIsSecret, members: ${members.toString()}}';
   }
 
-  Room copyWith({
+  Channel copyWith({
     String? id,
     String? name,
     String? topic,
@@ -169,7 +145,7 @@ class Room extends BaseModel {
     DateTime? updatedAt,
     Map<String, dynamic>? metadata,
   }) {
-    return Room.raw(
+    return Channel.raw(
       id: id ?? this.id,
       name: name ?? this.name,
       topic: topic ?? this.topic,

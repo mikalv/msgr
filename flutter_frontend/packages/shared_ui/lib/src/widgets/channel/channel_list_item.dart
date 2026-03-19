@@ -8,21 +8,21 @@ import 'package:messngr/redux/navigation/navigation_actions.dart';
 import 'package:redux/redux.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-class RoomListItem extends StatefulWidget {
+class ChannelListItem extends StatefulWidget {
   final Store<AppState> store;
-  final Room room;
+  final Channel channel;
   final int index;
-  const RoomListItem(
+  const ChannelListItem(
       {super.key,
       required this.store,
-      required this.room,
+      required this.channel,
       required this.index});
 
   @override
-  State<RoomListItem> createState() => _RoomListItemState();
+  State<ChannelListItem> createState() => _ChannelListItemState();
 }
 
-class _RoomListItemState extends State<RoomListItem> {
+class _ChannelListItemState extends State<ChannelListItem> {
   late final MessageRepository messageRepository;
   late final ProfileRepository profileRepository;
 
@@ -39,11 +39,11 @@ class _RoomListItemState extends State<RoomListItem> {
   @override
   Widget build(BuildContext context) {
     final theme = AppTheme.of(context).channelListViewTheme;
-    final lastMessage = messageRepository.getLastRoomMessage(widget.room.id);
+    final lastMessage = messageRepository.getLastChannelMessage(widget.channel.id);
     final unreadCount =
-        messageRepository.getUnreadMessagesCount(widget.room.id);
+        messageRepository.getUnreadMessagesCount(widget.channel.id);
     var lastMsgString = '';
-    var lastMsgTimeString = timeago.format(widget.room.updatedAt);
+    var lastMsgTimeString = timeago.format(widget.channel.updatedAt);
     if (lastMessage == null) {
       lastMsgString = 'No messages yet';
     } else {
@@ -54,7 +54,7 @@ class _RoomListItemState extends State<RoomListItem> {
     }
     return GestureDetector(
       onTap: () => widget.store.dispatch(NavigateShellToNewRouteAction(
-          route: '${AppNavigation.roomsPath}/${widget.room.id}',
+          route: '${AppNavigation.channelsPath}/${widget.channel.id}',
           context: context,
           kRouteArgs: {
             'teamName': widget.store.state.teamState!.selectedTeam!.name
@@ -77,7 +77,7 @@ class _RoomListItemState extends State<RoomListItem> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         Text(
-                          '#${widget.room.name}'.toLowerCase(),
+                          '#${widget.channel.name}'.toLowerCase(),
                           style: theme.data.titleStyle,
                         ),
                         const SizedBox(height: 5.0),

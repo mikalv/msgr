@@ -1,14 +1,14 @@
-defmodule TeamsWeb.RoomChannel do
+defmodule TeamsWeb.ChatChannel do
   use TeamsWeb, :channel
   alias TeamsWeb.UserPresence
   alias Teams.TenantModels.{Profile, Message}
-  alias TeamsWeb.MiddleLayers.RoomLayer
+  alias TeamsWeb.MiddleLayers.ChannelLayer
   require Logger
 
   intercept ["new_msg", "user_joined"]
 
   @impl true
-  def join("room:lobby", payload, socket) do
+  def join("channel:lobby", payload, socket) do
     if authorized?(payload) do
       #Logger.info "socket: #{inspect socket}"
       send(self(), :after_join)
@@ -25,15 +25,15 @@ defmodule TeamsWeb.RoomChannel do
     {:noreply, socket}
   end
 
-  def join("room:" <> destdata, _payload, socket) do
-    [team, room_id] = String.split(destdata, ".")
+  def join("channel:" <> destdata, _payload, socket) do
+    [team, channel_id] = String.split(destdata, ".")
     uid = socket.assigns[:uid]
-    Logger.info "Joining room: #{room_id} for user: #{uid} team #{team}"
-    :ok = ChannelWatcher.monitor(:rooms, self(), {__MODULE__, :leave, [room_id, uid]})
+    Logger.info "Joining channel: #{channel_id} for user: #{uid} team #{team}"
+    :ok = ChannelWatcher.monitor(:channels, self(), {__MODULE__, :leave, [channel_id, uid]})
     {:ok, socket}
   end
 
-  def join("room:" <> _private_room_id, _params, _socket) do
+  def join("channel:" <> _private_channel_id, _params, _socket) do
     {:error, %{reason: "unauthorized"}}
   end
 
@@ -58,38 +58,38 @@ defmodule TeamsWeb.RoomChannel do
     {:stop, :normal, socket}
   end
 
-  def handle_in("create:room", payload, socket) do
+  def handle_in("create:channel", payload, socket) do
     team = payload["team"]
     profile_id = payload["profile_id"]
     options = payload["options"]
     members = Map.get(payload, "members", [])
-    Logger.info "Got create:room: #{inspect payload}"
-    case RoomLayer.create_room(team, profile_id, options, members) do
-      {:ok, room} ->
-        Logger.info "Room created: #{inspect room}"
-        broadcast!(socket, "new:room", %{"team" => team, "rooms" => [filter_room_for_json(room)]})
-        {:reply, {:ok, %{"room" => filter_room_for_json(room)}}, socket}
+    Logger.info "Got create:channel: #{inspect payload}"
+    case ChannelLayer.create_channel(team, profile_id, options, members) do
+      {:ok, channel} ->
+        Logger.info "Channel created: #{inspect channel}"
+        broadcast!(socket, "new:channel", %{"team" => team, "channels" => [filter_channel_for_json(channel)]})
+        {:reply, {:ok, %{"channel" => filter_channel_for_json(channel)}}, socket}
 
       {:error, err} ->
-        Logger.error "Error while trying to create room: #{inspect err}"
-        {:reply, {:error, %{"status" => "error", "details" => "Error while trying to create room!"}}, socket}
+        Logger.error "Error while trying to create channel: #{inspect err}"
+        {:reply, {:error, %{"status" => "error", "details" => "Error while trying to create channel!"}}, socket}
 
       {:permission_error, err} ->
-        {:reply, {:error, %{"status" => "error", "details" => "You don't have the roles or permission to create a new room! (#{err})"}}, socket}
+        {:reply, {:error, %{"status" => "error", "details" => "You don't have the roles or permission to create a new channel! (#{err})"}}, socket}
     end
   end
 
-  def handle_in("create:msg", payload, %{topic: "room:" <> destdata} = socket) do
-    [team, room_id] = String.split(destdata, ".")
+  def handle_in("create:msg", payload, %{topic: "channel:" <> destdata} = socket) do
+    [team, channel_id] = String.split(destdata, ".")
     Logger.info "Got create:msg: #{inspect payload} socket: #{inspect socket}"
-    message = Message.create_room_message(team, room_id, payload["profile_id"], payload["content"])
+    message = Message.create_channel_message(team, channel_id, payload["profile_id"], payload["content"])
     Logger.info "Message created: #{inspect message}"
     broadcast!(socket, "new:msg", filter_msg_for_json(message))
     {:reply, {:ok, %{"message" => "ack"}}, socket}
   end
 
   # It is also common to receive messages from the client and
-  # broadcast to everyone in the current topic (room:lobby).
+  # broadcast to everyone in the current topic (channel:lobby).
   @impl true
   def handle_in("shout", payload, socket) do
     broadcast(socket, "shout", payload)
@@ -105,14 +105,14 @@ defmodule TeamsWeb.RoomChannel do
     push(socket, "new:msg", msg)
   end
 
-  def leave(room_id, uid) do
-    Logger.info "Leaving room: #{room_id} for user: #{uid}"
-    ChannelWatcher.unmonitor(:rooms, self())
+  def leave(channel_id, uid) do
+    Logger.info "Leaving channel: #{channel_id} for user: #{uid}"
+    ChannelWatcher.unmonitor(:channels, self())
   end
 
 
-  defp filter_room_for_json(room), do: Map.drop(Map.from_struct(room), [:__meta__])
-  defp filter_msg_for_json(msg), do: Map.drop(Map.from_struct(msg), [:__meta__, :id, :metadata, :room, :conversation, :profile, :parent, :children])
+  defp filter_channel_for_json(channel), do: Map.drop(Map.from_struct(channel), [:__meta__])
+  defp filter_msg_for_json(msg), do: Map.drop(Map.from_struct(msg), [:__meta__, :id, :metadata, :channel, :conversation, :profile, :parent, :children])
 
 
   # Add authorization logic here as required.

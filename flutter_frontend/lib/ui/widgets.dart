@@ -48,8 +48,8 @@ export 'widgets/misc/swipeable.dart';
 export 'widgets/navigationbar/BottomNavigationBarWidget.dart';
 export 'widgets/pinput_login_code.dart';
 
-export 'widgets/room/room_list_item.dart';
-export 'widgets/room/room_list_widget.dart';
+export 'widgets/channel/channel_list_item.dart';
+export 'widgets/channel/channel_list_widget.dart';
 
 export 'widgets/scaffolds/ScaffoldWithNavigationBar.dart';
 export 'widgets/scaffolds/ScaffoldWithNavigationRail.dart';

@@ -8,8 +8,8 @@ class FavoriteContacts extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final roomList = ref.watch(roomsProvider);
-    print('roomList: ${roomList}');
+    final channelList = ref.watch(channelsProvider);
+    print('channelList: ${channelList}');
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10.0),
       child: Column(
@@ -44,7 +44,7 @@ class FavoriteContacts extends ConsumerWidget {
             child: ListView.builder(
               padding: const EdgeInsets.only(left: 10.0),
               scrollDirection: Axis.horizontal,
-              itemCount: roomList.length,
+              itemCount: channelList.length,
               itemBuilder: (BuildContext context, int index) {
                 return GestureDetector(
                   onTap: () => {},
@@ -53,13 +53,13 @@ class FavoriteContacts extends ConsumerWidget {
                     child: Column(
                       children: <Widget>[
                         ProfilePicture(
-                          name: roomList[index].name ?? 'Unknown',
+                          name: channelList[index].name ?? 'Unknown',
                           radius: 35,
                           fontsize: 21,
                         ),
                         const SizedBox(height: 6.0),
                         Text(
-                          roomList[index].name ?? 'Unknown',
+                          channelList[index].name ?? 'Unknown',
                           style: const TextStyle(
                             color: Colors.blueGrey,
                             fontSize: 16.0,

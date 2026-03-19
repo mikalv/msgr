@@ -194,7 +194,7 @@ class _MessageListWidgetState extends State<MessageListWidget> {
       },
       noDataBuilder: (context) {
         return const Center(
-          child: Text('There are no messages in this room yet. Write one :)'),
+          child: Text('There are no messages in this channel yet. Write one :)'),
         );
       },
       comparator: const ListEquality().equals,

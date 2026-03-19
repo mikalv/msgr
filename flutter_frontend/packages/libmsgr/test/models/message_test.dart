@@ -19,7 +19,7 @@ void main() {
       expect(message.createdAt, now);
       expect(message.updatedAt, now);
       expect(message.conversationID, 'conv1');
-      expect(message.roomID, isNull);
+      expect(message.channelID, isNull);
       expect(message.kIsSystemMsg, isFalse);
       expect(message.isServerAck, isTrue);
       expect(message.isMsgRead, isFalse);
@@ -35,7 +35,7 @@ void main() {
       expect(message.fromProfileID, '123');
       expect(message.content, 'Hello, world!');
       expect(message.conversationID, 'conv1');
-      expect(message.roomID, isNull);
+      expect(message.channelID, isNull);
       expect(message.kIsSystemMsg, isFalse);
       expect(message.isServerAck, isTrue);
       expect(message.isMsgRead, isFalse);
@@ -111,7 +111,7 @@ void main() {
     });
 
     test(
-        'should throw ArgumentError if both conversationID and roomID are null',
+        'should throw ArgumentError if both conversationID and channelID are null',
         () {
       expect(
         () => MMessage.raw(

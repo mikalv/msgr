@@ -43,7 +43,7 @@ class AppThemeData {
   /// The color themes used in the widgets
   final AppColorTheme colorTheme;
 
-  /// Theme for listing of both Room and Conversation, together aka Channel
+  /// Theme for listing of both Channel and Conversation, together aka Channel
   final ChannelListViewTheme channelListViewTheme;
 
   /// Theme for the message widget

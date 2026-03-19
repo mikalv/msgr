@@ -36,7 +36,7 @@ void main() {
 
     final teamState = TeamState(
       selectedTeam: team,
-      rooms: const [],
+      channels: const [],
       conversations: const [],
     );
 

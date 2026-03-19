@@ -70,14 +70,14 @@ class MessageDao {
     return rows.map(_fromDbMap).toList(growable: false);
   }
 
-  Future<List<MMessage>> getMessagesForRoom(
+  Future<List<MMessage>> getMessagesForChannel(
     String teamName,
-    String roomId,
+    String channelId,
   ) async {
     final rows = await _db.query(
       messagesTable,
-      where: 'team_name = ? AND room_id = ?',
-      whereArgs: [teamName, roomId],
+      where: 'team_name = ? AND channel_id = ?',
+      whereArgs: [teamName, channelId],
       orderBy: 'inserted_at ASC',
     );
 
@@ -91,7 +91,7 @@ class MessageDao {
       'content': message.content,
       'profile_id': message.fromProfileID,
       'conversation_id': message.conversationID,
-      'room_id': message.roomID,
+      'channel_id': message.channelID,
       'inserted_at': message.createdAt.toIso8601String(),
       'updated_at': message.updatedAt.toIso8601String(),
       'is_system_msg': boolToInt(message.kIsSystemMsg),
@@ -108,7 +108,7 @@ class MessageDao {
       fromProfileID: map['profile_id']! as String,
       content: map['content']! as String,
       conversationID: map['conversation_id'] as String?,
-      roomID: map['room_id'] as String?,
+      channelID: map['channel_id'] as String?,
       createdAt: DateTime.parse(map['inserted_at']! as String),
       updatedAt: DateTime.parse(map['updated_at']! as String),
       kIsSystemMsg: intToBool(map['is_system_msg']! as int),

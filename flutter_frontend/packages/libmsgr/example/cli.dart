@@ -53,7 +53,7 @@ Future<void> whatToDo(logger) async {
   const updateTokenStr = 'Update token';
   const quitStr = 'Quit';
   const selectTeamStr = 'Select team';
-  const listRoomsStr = 'List rooms';
+  const listChannelsStr = 'List channels';
   const writeMessageStr = 'Write message';
   const saveConfigStr = 'Save Config to file';
   logger.stdout("What do you wanna do?");

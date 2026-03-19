@@ -11,7 +11,7 @@ export 'src/libmsgr_base.dart';
 export 'src/repositories/auth_repository.dart';
 export 'src/repositories/message_repository.dart';
 export 'src/repositories/profile_repository.dart';
-export 'src/repositories/room_repository.dart';
+export 'src/repositories/channel_repository.dart';
 export 'src/repositories/conversation_repository.dart';
 
 // Data models
@@ -19,7 +19,7 @@ export 'src/models/user.dart';
 export 'src/models/device.dart';
 export 'src/models/profile.dart';
 export 'src/models/team.dart';
-export 'src/models/room.dart';
+export 'src/models/channel.dart';
 export 'src/models/conversation.dart';
 export 'src/models/message.dart';
 export 'src/models/outgoing_message.dart';

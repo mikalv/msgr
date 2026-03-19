@@ -19,7 +19,7 @@ class MMessage extends BaseModel {
   final String fromProfileID;
   final String content;
   final String? conversationID;
-  final String? roomID;
+  final String? channelID;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool kIsSystemMsg;
@@ -36,24 +36,24 @@ class MMessage extends BaseModel {
       required this.createdAt,
       required this.updatedAt,
       this.conversationID,
-      this.roomID,
+      this.channelID,
       this.inReplyToMsgID,
       super.id = 'server-will-set-it',
       this.isServerAck = true,
       this.kIsSystemMsg = false,
       this.isMsgRead = false,
       this.deliveryStatus = MessageDeliveryStatus.delivered}) {
-    if (conversationID == null && roomID == null) {
-      throw ArgumentError('Either conversationID or roomID must be provided');
+    if (conversationID == null && channelID == null) {
+      throw ArgumentError('Either conversationID or channelID must be provided');
     }
   }
 
-  factory MMessage({content, fromProfileID, conversationID, roomID}) {
+  factory MMessage({content, fromProfileID, conversationID, channelID}) {
     return MMessage.raw(
         fromProfileID: fromProfileID,
         content: content,
         conversationID: conversationID,
-        roomID: roomID,
+        channelID: channelID,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         deliveryStatus: MessageDeliveryStatus.delivered);
@@ -67,7 +67,7 @@ class MMessage extends BaseModel {
           fromProfileID == other.fromProfileID &&
           content == other.content &&
           conversationID == other.conversationID &&
-          roomID == other.roomID &&
+          channelID == other.channelID &&
           createdAt == other.createdAt &&
           updatedAt == other.updatedAt &&
           kIsSystemMsg == other.kIsSystemMsg &&
@@ -82,7 +82,7 @@ class MMessage extends BaseModel {
       fromProfileID.hashCode ^
       content.hashCode ^
       conversationID.hashCode ^
-      roomID.hashCode ^
+      channelID.hashCode ^
       createdAt.hashCode ^
       updatedAt.hashCode ^
       kIsSystemMsg.hashCode ^
@@ -96,7 +96,7 @@ class MMessage extends BaseModel {
       content: map['content'],
       fromProfileID: map['profile_id'],
       conversationID: map['conversation_id'],
-      roomID: map['room_id'],
+      channelID: map['channel_id'],
       createdAt: map['inserted_at'].runtimeType == DateTime
           ? map['inserted_at']
           : DateTime.parse(map['inserted_at']),
@@ -127,7 +127,7 @@ class MMessage extends BaseModel {
       'content': content,
       'profile_id': fromProfileID,
       'conversation_id': conversationID,
-      'room_id': roomID,
+      'channel_id': channelID,
       'inserted_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
       'is_system_msg': kIsSystemMsg,
@@ -145,7 +145,7 @@ class MMessage extends BaseModel {
         'profile_id': String? fromProfileID,
         'content': String content,
         'conversation_id': String? conversationID,
-        'room_id': String? roomID,
+        'channel_id': String? channelID,
         'inserted_at': String createdAt,
         'updated_at': String updatedAt,
         'is_system_msg': bool? kIsSystemMsg,
@@ -157,7 +157,7 @@ class MMessage extends BaseModel {
             fromProfileID: fromProfileID ?? 'system',
             content: content,
             conversationID: conversationID,
-            roomID: roomID,
+            channelID: channelID,
             createdAt: DateTime.parse(createdAt),
             updatedAt: DateTime.parse(updatedAt),
             kIsSystemMsg: kIsSystemMsg ?? false,
@@ -172,7 +172,7 @@ class MMessage extends BaseModel {
         'profile_id': fromProfileID,
         'content': content,
         'conversation_id': conversationID,
-        'room_id': roomID,
+        'channel_id': channelID,
         'inserted_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
         'is_system_msg': kIsSystemMsg,
@@ -183,7 +183,7 @@ class MMessage extends BaseModel {
   @override
   String toString() {
     return 'Message{msgid: $id, isRead: $isMsgRead, fromProfileID: $fromProfileID '
-        'conversationID: $conversationID roomID: $roomID '
+        'conversationID: $conversationID channelID: $channelID '
         'content: $content, createdAt: $createdAt, '
         'updatedAt: $updatedAt, kIsSystemMsg: $kIsSystemMsg, '
         'inReplyToMsgID: $inReplyToMsgID}';
@@ -194,7 +194,7 @@ class MMessage extends BaseModel {
     String? fromProfileID,
     String? content,
     String? conversationID,
-    String? roomID,
+    String? channelID,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool? kIsSystemMsg,
@@ -208,7 +208,7 @@ class MMessage extends BaseModel {
       fromProfileID: fromProfileID ?? this.fromProfileID,
       content: content ?? this.content,
       conversationID: conversationID ?? this.conversationID,
-      roomID: roomID ?? this.roomID,
+      channelID: channelID ?? this.channelID,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       kIsSystemMsg: kIsSystemMsg ?? this.kIsSystemMsg,

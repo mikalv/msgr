@@ -8,21 +8,21 @@ import 'package:messngr/providers/auth_provider.dart';
 import 'package:messngr/ui/widgets/custom_switch.dart';
 import 'package:messngr/ui/widgets/dropdown_search/dropdown_search.dart';
 
-class CreateRoomPage extends ConsumerStatefulWidget {
+class CreateChannelPage extends ConsumerStatefulWidget {
   final String teamName;
-  const CreateRoomPage({super.key, required this.teamName});
+  const CreateChannelPage({super.key, required this.teamName});
 
   @override
-  ConsumerState<CreateRoomPage> createState() => _CreateRoomPageState();
+  ConsumerState<CreateChannelPage> createState() => _CreateChannelPageState();
 }
 
-class _CreateRoomPageState extends ConsumerState<CreateRoomPage> {
-  final TextEditingController _roomNameController = TextEditingController();
-  final TextEditingController _roomDescriptionController =
+class _CreateChannelPageState extends ConsumerState<CreateChannelPage> {
+  final TextEditingController _channelNameController = TextEditingController();
+  final TextEditingController _channelDescriptionController =
       TextEditingController();
   late TeamRepositories repos;
   late ProfileRepository profileRepository;
-  bool _shouldBePrivateRoom = false;
+  bool _shouldBePrivateChannel = false;
   final List<Profile> selectedMembers = [];
 
   @override
@@ -35,21 +35,21 @@ class _CreateRoomPageState extends ConsumerState<CreateRoomPage> {
 
   @override
   void dispose() {
-    _roomNameController.dispose();
-    _roomDescriptionController.dispose();
+    _channelNameController.dispose();
+    _channelDescriptionController.dispose();
     super.dispose();
   }
 
-  void _createRoom(context) {
-    final String roomName = _roomNameController.text;
-    final String roomDescription = _roomDescriptionController.text;
+  void _createChannel(context) {
+    final String channelName = _channelNameController.text;
+    final String channelDescription = _channelDescriptionController.text;
 
-    if (roomName.isNotEmpty &&
-        roomDescription.isNotEmpty &&
+    if (channelName.isNotEmpty &&
+        channelDescription.isNotEmpty &&
         selectedMembers.isNotEmpty) {
-      // Logic to create a new chat room
+      // Logic to create a new chat channel
       print(
-          'Room create request: $roomName, Description: $roomDescription, Members: $selectedMembers');
+          'Channel create request: $channelName, Description: $channelDescription, Members: $selectedMembers');
 
       final currentProfile = ref.read(currentProfileProvider);
       if (currentProfile == null) {
@@ -57,21 +57,21 @@ class _CreateRoomPageState extends ConsumerState<CreateRoomPage> {
         return;
       }
 
-      final RoomRepository roomRepository = repos.roomRepository;
-      final fpush = roomRepository.createRoom(
+      final ChannelRepository channelRepository = repos.channelRepository;
+      final fpush = channelRepository.createChannel(
           profileID: currentProfile.id,
-          roomName: roomName,
-          roomDescription: roomDescription,
+          channelName: channelName,
+          channelDescription: channelDescription,
           isSecret: false,
           members: selectedMembers.map((e) => e.id).toList());
       fpush?.future.then((msg) {
-        print('Room created successfully');
+        print('Channel created successfully');
         if (!mounted) return;
         context.go(AppNavigation.dashboardPath);
       }).onError((error, stackTrace) {
-        print('Error creating room: $error');
+        print('Error creating channel: $error');
       });
-      // Navigate back or to the new chat room
+      // Navigate back or to the new chat channel
     } else {
       // Show error message
       print('Please fill in all fields');
@@ -82,7 +82,7 @@ class _CreateRoomPageState extends ConsumerState<CreateRoomPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create New Chat Room'),
+        title: const Text('Create New Chat Channel'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => AppNavigation.router.pop(),
@@ -97,12 +97,12 @@ class _CreateRoomPageState extends ConsumerState<CreateRoomPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: <Widget>[
                   TextField(
-                    controller: _roomNameController,
+                    controller: _channelNameController,
                     style: formTextStyle,
                     autofocus: true,
                     decoration: InputDecoration(
-                        labelText: 'Room name',
-                        hintText: 'your-room-name',
+                        labelText: 'Channel name',
+                        hintText: 'your-channel-name',
                         hintTextDirection: TextDirection.ltr,
                         hintStyle: formHintTextStyle,
                         focusedBorder: borderStyle,
@@ -138,12 +138,12 @@ class _CreateRoomPageState extends ConsumerState<CreateRoomPage> {
                   ),
                   const SizedBox(height: 16.0),
                   TextField(
-                    controller: _roomDescriptionController,
+                    controller: _channelDescriptionController,
                     style: formTextStyle,
                     maxLines: 5,
                     decoration: InputDecoration(
-                        labelText: 'Room Description',
-                        hintText: 'My awesome room',
+                        labelText: 'Channel Description',
+                        hintText: 'My awesome channel',
                         hintTextDirection: TextDirection.ltr,
                         hintStyle: formHintTextStyle,
                         focusedBorder: borderStyle,
@@ -158,17 +158,17 @@ class _CreateRoomPageState extends ConsumerState<CreateRoomPage> {
                   ),
                   const SizedBox(height: 16.0),
                   CustomSwitch(
-                    activeText: 'Room is private',
+                    activeText: 'Channel is private',
                     activeTooltip:
-                        'The room will be private which means it\'s only visible to members',
-                    inactiveText: 'Room is public',
-                    inactiveTooltip: 'Anyone on the team can join this room',
-                    value: _shouldBePrivateRoom,
+                        'The channel will be private which means it\'s only visible to members',
+                    inactiveText: 'Channel is public',
+                    inactiveTooltip: 'Anyone on the team can join this channel',
+                    value: _shouldBePrivateChannel,
                     activeColor: Colors.red,
                     inactiveColor: Colors.green,
                     onChanged: (value) {
                       setState(() {
-                        _shouldBePrivateRoom = value;
+                        _shouldBePrivateChannel = value;
                       });
                     },
                   ),
@@ -176,8 +176,8 @@ class _CreateRoomPageState extends ConsumerState<CreateRoomPage> {
                     height: 16.0,
                   ),
                   ElevatedButton(
-                    onPressed: () => _createRoom(context),
-                    child: const Text('Create Room'),
+                    onPressed: () => _createChannel(context),
+                    child: const Text('Create Channel'),
                   ),
                 ],
               )),

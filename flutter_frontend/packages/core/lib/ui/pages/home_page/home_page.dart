@@ -7,7 +7,7 @@ import 'package:core/ui/widgets/CategorySelector.dart';
 import 'package:core/features/chat/chat_page.dart';
 import 'package:core/ui/widgets/conversation/conversations_list_widget.dart';
 import 'package:core/ui/widgets/profile/profile_mode_switcher.dart';
-import 'package:core/ui/widgets/room/room_list_widget.dart';
+import 'package:core/ui/widgets/channel/channel_list_widget.dart';
 import 'package:go_router/go_router.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -47,12 +47,12 @@ class HomePageState extends ConsumerState<HomePage> {
     context.go(AppNavigation.inviteMemberPath);
   }
 
-  void _createRoom() {
+  void _createChannel() {
     final currentTeam = ref.read(currentTeamProvider);
     if (currentTeam == null) {
       return;
     }
-    context.push(AppNavigation.createRoomPath + currentTeam.name);
+    context.push(AppNavigation.createChannelPath + currentTeam.name);
   }
 
   void _createConversation() {
@@ -87,7 +87,7 @@ class HomePageState extends ConsumerState<HomePage> {
             onCategorySelected: _handleCategoryChanged,
             onInvite: _openInvite,
             onSettings: _openSettings,
-            onCreateRoom: _createRoom,
+            onCreateChannel: _createChannel,
             onCreateConversation: _createConversation,
             onOpenDrawer: _openDrawer,
             modeFilter: _activeModeFilter,
@@ -102,7 +102,7 @@ class HomePageState extends ConsumerState<HomePage> {
             onCategorySelected: _handleCategoryChanged,
             onInvite: _openInvite,
             onSettings: _openSettings,
-            onCreateRoom: _createRoom,
+            onCreateChannel: _createChannel,
             onCreateConversation: _createConversation,
             onOpenDrawer: _openDrawer,
             modeFilter: _activeModeFilter,
@@ -116,7 +116,7 @@ class HomePageState extends ConsumerState<HomePage> {
           onCategorySelected: _handleCategoryChanged,
           onInvite: _openInvite,
           onSettings: _openSettings,
-          onCreateRoom: _createRoom,
+          onCreateChannel: _createChannel,
           onCreateConversation: _createConversation,
           onOpenDrawer: _openDrawer,
           modeFilter: _activeModeFilter,
@@ -134,7 +134,7 @@ class _HomeCompactLayout extends StatelessWidget {
     required this.onCategorySelected,
     required this.onInvite,
     required this.onSettings,
-    required this.onCreateRoom,
+    required this.onCreateChannel,
     required this.onCreateConversation,
     required this.onOpenDrawer,
     required this.modeFilter,
@@ -145,7 +145,7 @@ class _HomeCompactLayout extends StatelessWidget {
   final ValueChanged<int> onCategorySelected;
   final VoidCallback onInvite;
   final VoidCallback onSettings;
-  final VoidCallback onCreateRoom;
+  final VoidCallback onCreateChannel;
   final VoidCallback onCreateConversation;
   final VoidCallback onOpenDrawer;
   final ProfileMode? modeFilter;
@@ -172,7 +172,7 @@ class _HomeCompactLayout extends StatelessWidget {
                   _HomeActionStrip(
                     onSettings: onSettings,
                     onInvite: onInvite,
-                    onCreateRoom: onCreateRoom,
+                    onCreateChannel: onCreateChannel,
                     onCreateConversation: onCreateConversation,
                     onOpenDrawer: onOpenDrawer,
                   ),
@@ -202,7 +202,7 @@ class _HomeTabletLayout extends StatelessWidget {
     required this.onCategorySelected,
     required this.onInvite,
     required this.onSettings,
-    required this.onCreateRoom,
+    required this.onCreateChannel,
     required this.onCreateConversation,
     required this.onOpenDrawer,
     required this.modeFilter,
@@ -213,7 +213,7 @@ class _HomeTabletLayout extends StatelessWidget {
   final ValueChanged<int> onCategorySelected;
   final VoidCallback onInvite;
   final VoidCallback onSettings;
-  final VoidCallback onCreateRoom;
+  final VoidCallback onCreateChannel;
   final VoidCallback onCreateConversation;
   final VoidCallback onOpenDrawer;
   final ProfileMode? modeFilter;
@@ -241,7 +241,7 @@ class _HomeTabletLayout extends StatelessWidget {
                     selectedCategory: selectedCategory,
                     onCategorySelected: onCategorySelected,
                     onCreateConversation: onCreateConversation,
-                    onCreateRoom: onCreateRoom,
+                    onCreateChannel: onCreateChannel,
                     modeFilter: modeFilter,
                     onFilterChanged: onModeFilterChanged,
                   ),
@@ -254,7 +254,7 @@ class _HomeTabletLayout extends StatelessWidget {
                       _HomeActionStrip(
                         onSettings: onSettings,
                         onInvite: onInvite,
-                        onCreateRoom: onCreateRoom,
+                        onCreateChannel: onCreateChannel,
                         onCreateConversation: onCreateConversation,
                         onOpenDrawer: onOpenDrawer,
                       ),
@@ -279,7 +279,7 @@ class _HomeDesktopLayout extends StatelessWidget {
     required this.onCategorySelected,
     required this.onInvite,
     required this.onSettings,
-    required this.onCreateRoom,
+    required this.onCreateChannel,
     required this.onCreateConversation,
     required this.onOpenDrawer,
     required this.modeFilter,
@@ -290,7 +290,7 @@ class _HomeDesktopLayout extends StatelessWidget {
   final ValueChanged<int> onCategorySelected;
   final VoidCallback onInvite;
   final VoidCallback onSettings;
-  final VoidCallback onCreateRoom;
+  final VoidCallback onCreateChannel;
   final VoidCallback onCreateConversation;
   final VoidCallback onOpenDrawer;
   final ProfileMode? modeFilter;
@@ -324,7 +324,7 @@ class _HomeDesktopLayout extends StatelessWidget {
                   width: 360,
                   child: _HomeInboxPanel(
                     onCreateConversation: onCreateConversation,
-                    onCreateRoom: onCreateRoom,
+                    onCreateChannel: onCreateChannel,
                     modeFilter: modeFilter,
                     onFilterChanged: onModeFilterChanged,
                   ),
@@ -337,7 +337,7 @@ class _HomeDesktopLayout extends StatelessWidget {
                       _HomeActionStrip(
                         onSettings: onSettings,
                         onInvite: onInvite,
-                        onCreateRoom: onCreateRoom,
+                        onCreateChannel: onCreateChannel,
                         onCreateConversation: onCreateConversation,
                         dense: true,
                         onOpenDrawer: onOpenDrawer,
@@ -485,7 +485,7 @@ class _SidebarButton extends StatelessWidget {
 class _HomeInboxPanel extends ConsumerWidget {
   const _HomeInboxPanel({
     required this.onCreateConversation,
-    required this.onCreateRoom,
+    required this.onCreateChannel,
     this.categories,
     this.selectedCategory,
     this.onCategorySelected,
@@ -493,7 +493,7 @@ class _HomeInboxPanel extends ConsumerWidget {
     required this.onFilterChanged,
   });
   final VoidCallback onCreateConversation;
-  final VoidCallback onCreateRoom;
+  final VoidCallback onCreateChannel;
   final List<String>? categories;
   final int? selectedCategory;
   final ValueChanged<int>? onCategorySelected;
@@ -591,7 +591,7 @@ class _HomeInboxPanel extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RoomListWidget(
+                    ChannelListWidget(
                       context: context,
                       modeFilter: modeFilter,
                     ),
@@ -609,9 +609,9 @@ class _HomeInboxPanel extends ConsumerWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: onCreateRoom,
+              onPressed: onCreateChannel,
               icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Nytt rom'),
+              label: const Text('Ny kanal'),
               style: OutlinedButton.styleFrom(
                 padding:
                     const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
@@ -631,7 +631,7 @@ class _HomeActionStrip extends StatelessWidget {
   const _HomeActionStrip({
     required this.onSettings,
     required this.onInvite,
-    required this.onCreateRoom,
+    required this.onCreateChannel,
     required this.onCreateConversation,
     required this.onOpenDrawer,
     this.dense = false,
@@ -639,7 +639,7 @@ class _HomeActionStrip extends StatelessWidget {
 
   final VoidCallback onSettings;
   final VoidCallback onInvite;
-  final VoidCallback onCreateRoom;
+  final VoidCallback onCreateChannel;
   final VoidCallback onCreateConversation;
   final VoidCallback onOpenDrawer;
   final bool dense;
@@ -690,9 +690,9 @@ class _HomeActionStrip extends StatelessWidget {
             padding: buttonPadding,
           ),
           _ActionChip(
-            icon: Icons.meeting_room_outlined,
-            label: 'Nytt rom',
-            onPressed: onCreateRoom,
+            icon: Icons.tag,
+            label: 'Ny kanal',
+            onPressed: onCreateChannel,
             padding: buttonPadding,
           ),
           _ActionChip(

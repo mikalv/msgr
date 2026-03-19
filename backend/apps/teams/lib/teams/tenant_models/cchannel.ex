@@ -10,7 +10,7 @@ defmodule Teams.TenantModels.CChannel do
     field :description, :string
     field :members, {:array, :string}
     field :is_secret, :boolean
-    field :channel_type, :string # "room" or "conversation"
+    field :channel_type, :string # "channel" or "conversation"
     field :metadata, :map
 
     timestamps(type: :utc_datetime)

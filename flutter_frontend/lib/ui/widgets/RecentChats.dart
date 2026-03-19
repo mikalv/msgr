@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:messngr/ui/widgets/conversation/conversations_list_widget.dart';
-import 'package:messngr/ui/widgets/room/room_list_widget.dart';
+import 'package:messngr/ui/widgets/channel/channel_list_widget.dart';
 
 class RecentChats extends StatelessWidget {
   const RecentChats({Key? key}) : super(key: key);
@@ -15,7 +15,7 @@ class RecentChats extends StatelessWidget {
         height: MediaQuery.of(context).size.height,
         child: Column(
           children: [
-            RoomListWidget(context: context),
+            ChannelListWidget(context: context),
             ConversationsListWidget(context: context)
           ],
         ),

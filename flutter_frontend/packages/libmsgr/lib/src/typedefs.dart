@@ -11,11 +11,11 @@ typedef MessageList = List<MMessage>;
 typedef ProfileCacheType = Map<String, Profile>;
 typedef ProfileList = List<Profile>;
 
-typedef RoomCacheType = Map<String, Room>;
+typedef ChannelCacheType = Map<String, Channel>;
 
-typedef RoomList = List<Room>;
-typedef RoomEventCallback = void Function(List<Room>);
-typedef Rooms = Map<String, Room>;
+typedef ChannelList = List<Channel>;
+typedef ChannelEventCallback = void Function(List<Channel>);
+typedef Channels = Map<String, Channel>;
 
 typedef MessageHandler = void Function(MMessage event);
 

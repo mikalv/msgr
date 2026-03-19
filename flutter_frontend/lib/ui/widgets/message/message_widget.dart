@@ -100,7 +100,7 @@ class MessageWidget extends StatelessWidget {
     super.debugFillProperties(properties);
     properties
       ..add(DiagnosticsProperty<MMessage>('message', message))
-      ..add(DiagnosticsProperty('roomID', message.roomID))
+      ..add(DiagnosticsProperty('channelID', message.channelID))
       ..add(DiagnosticsProperty('conversationID', message.conversationID))
       ..add(DiagnosticsProperty('teamName', teamName))
       ..add(DiagnosticsProperty('createdAt', message.createdAt))

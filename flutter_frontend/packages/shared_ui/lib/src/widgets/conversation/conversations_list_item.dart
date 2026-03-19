@@ -10,7 +10,7 @@ import 'package:timeago/timeago.dart' as timeago;
 
 /// This is the conversations list item widget, used to display a single conversation in the conversations list.
 /// It is used by the [ConversationsListWidget] widget.
-/// It is similar to the [RoomListItem] widget.
+/// It is similar to the [ChannelListItem] widget.
 class ConversationsListItem extends StatefulWidget {
   final Store<AppState> store;
   final Conversation conversation;
@@ -43,7 +43,7 @@ class _ConversationsListItemState extends State<ConversationsListItem> {
   Widget build(BuildContext context) {
     final theme = AppTheme.of(context).channelListViewTheme;
     final lastMessage =
-        messageRepository.getLastRoomMessage(widget.conversation.id);
+        messageRepository.getLastChannelMessage(widget.conversation.id);
     final unreadCount =
         messageRepository.getUnreadMessagesCount(widget.conversation.id);
     var lastMsgString = '';

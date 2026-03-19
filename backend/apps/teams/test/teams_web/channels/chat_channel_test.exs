@@ -1,11 +1,11 @@
-defmodule TeamsWeb.RoomChannelTest do
+defmodule TeamsWeb.ChatChannelTest do
   use TeamsWeb.ChannelCase
 
   setup do
     {:ok, _, socket} =
       TeamsWeb.UserSocket
       |> socket("user_id", %{some: :assign})
-      |> subscribe_and_join(TeamsWeb.RoomChannel, "room:lobby")
+      |> subscribe_and_join(TeamsWeb.ChatChannel, "channel:lobby")
 
     %{socket: socket}
   end
@@ -15,7 +15,7 @@ defmodule TeamsWeb.RoomChannelTest do
     assert_reply ref, :ok, %{"hello" => "there"}
   end
 
-  test "shout broadcasts to room:lobby", %{socket: socket} do
+  test "shout broadcasts to channel:lobby", %{socket: socket} do
     push(socket, "shout", %{"hello" => "all"})
     assert_broadcast "shout", %{"hello" => "all"}
   end

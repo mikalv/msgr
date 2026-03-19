@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:libmsgr/src/models/room.dart';
-import 'package:libmsgr/src/repositories/room_repository.dart';
+import 'package:libmsgr/src/models/channel.dart';
+import 'package:libmsgr/src/repositories/channel_repository.dart';
 import 'package:libmsgr/src/utils/observable.dart';
 import 'package:logging/logging.dart';
 import 'package:mockito/mockito.dart';
@@ -15,13 +15,13 @@ class MockObserver extends Mock implements Observer {
 }
 
 void main() {
-  group('RoomRepository', () {
-    late RoomRepository roomRepository;
+  group('ChannelRepository', () {
+    late ChannelRepository channelRepository;
     late MockObserver mockObserver;
 
     setUp(() {
       mockObserver = MockObserver();
-      roomRepository = RoomRepository(teamName: '');
+      channelRepository = ChannelRepository(teamName: '');
     });
 
     test('should log info message on startup', () {
@@ -29,17 +29,17 @@ void main() {
       final logRecords = <LogRecord>[];
       log.onRecord.listen(logRecords.add);
 
-      RoomRepository(teamName: '');
+      ChannelRepository(teamName: '');
 
       expect(logRecords, isNotEmpty);
-      expect(logRecords.first.message, 'RoomRepository is starting up');
+      expect(logRecords.first.message, 'ChannelRepository is starting up');
     });
 
     test('fillLocalCache should notify observers', () {
-      final rooms = <Room>[];
-      roomRepository.fillLocalCache(rooms);
+      final channels = <Channel>[];
+      channelRepository.fillLocalCache(channels);
 
-      verify(mockObserver.update({'rooms': 'updated'})).called(1);
+      verify(mockObserver.update({'channels': 'updated'})).called(1);
     });
   });
 }

@@ -2,14 +2,14 @@ defmodule Teams.TenantModels.Message do
   use Ecto.Schema
   import Ecto.Changeset
   import Ecto.Query
-  alias Teams.TenantModels.{Conversation, Profile, Room}
+  alias Teams.TenantModels.{Conversation, Profile, Channel}
   alias Teams.Repo
 
-  @derive {Jason.Encoder, only: [:msgid, :content, :is_system_msg, :room_id, :profile_id, :conversation_id, :in_reply_to_id, :inserted_at, :updated_at, :metadata]}
+  @derive {Jason.Encoder, only: [:msgid, :content, :is_system_msg, :channel_id, :profile_id, :conversation_id, :in_reply_to_id, :inserted_at, :updated_at, :metadata]}
   schema "messages" do
     field :msgid, :string
     belongs_to :profile, Profile, [foreign_key: :profile_id, type: :binary_id]
-    belongs_to :room, Room, [foreign_key: :room_id, type: :binary_id]
+    belongs_to :channel, Channel, [foreign_key: :channel_id, type: :binary_id]
     belongs_to :conversation, Conversation, [foreign_key: :conversation_id, type: :binary_id]
     field :content, :string
     field :is_system_msg, :boolean
@@ -25,8 +25,8 @@ defmodule Teams.TenantModels.Message do
   @doc false
   def changeset(model, attrs) do
     model
-    |> cast(attrs, [:msgid, :profile_id, :room_id, :conversation_id, :content, :is_system_msg, :in_reply_to_id, :metadata])
-    |> cast_assoc(:room)
+    |> cast(attrs, [:msgid, :profile_id, :channel_id, :conversation_id, :content, :is_system_msg, :in_reply_to_id, :metadata])
+    |> cast_assoc(:channel)
     |> cast_assoc(:conversation)
     |> cast_assoc(:profile)
     |> cast_assoc(:parent)
@@ -53,7 +53,7 @@ defmodule Teams.TenantModels.Message do
     |> Repo.insert(prefix: Triplex.to_prefix(tenant))
   end
 
-  def create_room_message(tenant, room_id, sender_id, message, metadata \\ %{}) do
+  def create_channel_message(tenant, channel_id, sender_id, message, metadata \\ %{}) do
     next_id_seq = Ecto.Adapters.SQL.query!(
       Teams.Repo,
       "select pg_sequence_last_value('" <> Triplex.to_prefix(tenant) <> ".messages_id_seq') as nextID;", [])
@@ -62,12 +62,12 @@ defmodule Teams.TenantModels.Message do
         |> List.first
         |> List.first # Yes it's correct with two in a row. Value is stored like [[number]].
     %__MODULE__{}
-    |> changeset(%{msgid: Teams.SecureID.id!(next_id_seq, "M"), room_id: room_id, profile_id: sender_id, content: message, metadata: metadata})
+    |> changeset(%{msgid: Teams.SecureID.id!(next_id_seq, "M"), channel_id: channel_id, profile_id: sender_id, content: message, metadata: metadata})
     |> Repo.insert!(prefix: Triplex.to_prefix(tenant))
-    |> Repo.preload([:profile, :room, :conversation])
+    |> Repo.preload([:profile, :channel, :conversation])
   end
 
-  def create_system_message(tenant, room_id, message, metadata \\ %{}) do
+  def create_system_message(tenant, channel_id, message, metadata \\ %{}) do
     next_id_seq = Ecto.Adapters.SQL.query!(
       Teams.Repo,
       "select pg_sequence_last_value('" <> Triplex.to_prefix(tenant) <> ".messages_id_seq') as nextID;", [])
@@ -77,12 +77,12 @@ defmodule Teams.TenantModels.Message do
         |> List.first # Yes it's correct with two in a row. Value is stored like [[number]].
     next_id_seq = if is_nil(next_id_seq), do: 1, else: next_id_seq
     %__MODULE__{}
-    |> changeset(%{msgid: Teams.SecureID.id!(next_id_seq, "M"), room_id: room_id, content: message, is_system_msg: true, metadata: metadata})
+    |> changeset(%{msgid: Teams.SecureID.id!(next_id_seq, "M"), channel_id: channel_id, content: message, is_system_msg: true, metadata: metadata})
     |> Repo.insert(prefix: Triplex.to_prefix(tenant))
   end
 
-  def get_for_room(tenant, room_id) do
-    from(m in __MODULE__, where: m.room_id == ^room_id) |> Repo.all(prefix: Triplex.to_prefix(tenant))
+  def get_for_channel(tenant, channel_id) do
+    from(m in __MODULE__, where: m.channel_id == ^channel_id) |> Repo.all(prefix: Triplex.to_prefix(tenant))
   end
 
   # Query functions

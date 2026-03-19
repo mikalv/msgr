@@ -1,11 +1,11 @@
-defmodule TeamsWeb.Subdomain.RoomsController do
+defmodule TeamsWeb.Subdomain.ChannelsController do
   use TeamsWeb, :controller
   require Logger
   import Plug.Conn
-  alias Teams.TenantModels.{Profile, Room}
-  alias TeamsWeb.MiddleLayers.RoomLayer
+  alias Teams.TenantModels.{Profile, Channel}
+  alias TeamsWeb.MiddleLayers.ChannelLayer
 
-  def filter_room_for_json(room), do: Map.drop(Map.from_struct(room), [:__meta__, :updated_at, :inserted_at, :metadata])
+  def filter_channel_for_json(channel), do: Map.drop(Map.from_struct(channel), [:__meta__, :updated_at, :inserted_at, :metadata])
 
   defp get_authed_context(conn) do
     tenant = conn.private[:subdomain]
@@ -17,8 +17,8 @@ defmodule TeamsWeb.Subdomain.RoomsController do
 
   def list(conn, _params) do
     {tenant, profile} = get_authed_context(conn)
-    rooms = Room.list_with_me(tenant, profile) |> Enum.map(&filter_room_for_json/1)
-    conn |> send_resp(200, Jason.encode!(rooms))
+    channels = Channel.list_with_me(tenant, profile) |> Enum.map(&filter_channel_for_json/1)
+    conn |> send_resp(200, Jason.encode!(channels))
   end
 
   def create(conn, params) do
@@ -26,16 +26,16 @@ defmodule TeamsWeb.Subdomain.RoomsController do
     attrs = params["options"]
     members = Map.get(params, "members", [])
 
-    case RoomLayer.create_room(tenant, profile.id, attrs, members) do
-      {:ok, room} ->
-        conn |> send_resp(200, Jason.encode!(filter_room_for_json(room)))
+    case ChannelLayer.create_channel(tenant, profile.id, attrs, members) do
+      {:ok, channel} ->
+        conn |> send_resp(200, Jason.encode!(filter_channel_for_json(channel)))
 
       {:error, err} ->
-        Logger.error "Error while trying to create room: #{inspect err}"
+        Logger.error "Error while trying to create channel: #{inspect err}"
         conn |> send_resp(500, Jason.encode!(%{error: "Sorry! try again later"}))
 
       {:permission_error, err} ->
-        conn |> send_resp(401, Jason.encode!(%{error: "You don't have the roles or permission to create a new room! (#{err})"}))
+        conn |> send_resp(401, Jason.encode!(%{error: "You don't have the roles or permission to create a new channel! (#{err})"}))
     end
   end
 

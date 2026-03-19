@@ -7,7 +7,7 @@ defmodule TeamsWeb.UserSocket do
   # It's possible to control the websocket connection and
   # assign values that can be accessed by your channel topics.
 
-  channel "room:*", TeamsWeb.RoomChannel
+  channel "channel:*", TeamsWeb.ChatChannel
   channel "conv:*", TeamsWeb.ConversationChannel
   channel "private:*", TeamsWeb.PrivateChannel
   channel "device:*", TeamsWeb.DeviceChannel
@@ -18,7 +18,7 @@ defmodule TeamsWeb.UserSocket do
   #
   # To create a channel file, use the mix task:
   #
-  #     mix phx.gen.channel Room
+  #     mix phx.gen.channel Channel
   #
   # See the [`Channels guide`](https://hexdocs.pm/phoenix/channels.html)
   # for further details.

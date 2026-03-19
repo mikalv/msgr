@@ -9,8 +9,8 @@ import 'package:messngr/services/navigator_observer.dart';
 import 'package:messngr/ui/pages/conversation_page/create_conversation_page.dart';
 import 'package:messngr/ui/pages/home_page/home_page.dart';
 import 'package:messngr/ui/pages/invite_page/invite_page.dart';
-import 'package:messngr/ui/pages/room_page/create_room_page.dart';
-import 'package:messngr/ui/pages/room_page/room_page.dart';
+import 'package:messngr/ui/pages/channel_page/create_channel_page.dart';
+import 'package:messngr/ui/pages/channel_page/channel_page.dart';
 import 'package:messngr/ui/pages/settings_page/settings_page.dart';
 import 'package:messngr/ui/screens/create_profile_screen.dart';
 import 'package:messngr/ui/screens/main_screen/main_screen.dart';
@@ -114,9 +114,9 @@ class AppNavigation {
   static const String createConversationPathParam =
       '/new/conversations/:teamName';
   static const String channelsPath = '/channels';
-  static const String roomsPath = '/rooms';
-  static const String createRoomPath = '/new/rooms/';
-  static const String createRoomPathParam = '/new/rooms/:teamName';
+  static const String channelsPath = '/channels';
+  static const String createChannelPath = '/new/channels/';
+  static const String createChannelPathParam = '/new/channels/:teamName';
   static const String discoveryPath = '/discovery';
   static const String settingsPath = '/settings';
   static const String searchPath = '/search';
@@ -188,13 +188,13 @@ class AppNavigation {
               return redirectWhenNotLoggedIn(context, state);
             }),
         GoRoute(
-            path: createRoomPathParam,
+            path: createChannelPathParam,
             parentNavigatorKey: homeTabNavigatorKey,
             pageBuilder: (context, GoRouterState state) {
-              _log.finer('GoRouter changed to createRoomPath');
+              _log.finer('GoRouter changed to createChannelPath');
               return getPage(
-                child: CreateRoomPage(
-                    key: const Key('createRoomPage'),
+                child: CreateChannelPage(
+                    key: const Key('createChannelPage'),
                     teamName: state.pathParameters['teamName'] ?? ''),
                 state: state,
               );
@@ -235,15 +235,15 @@ class AppNavigation {
               return redirectWhenNotLoggedIn(context, state);
             }),
         GoRoute(
-            path: '$roomsPath/:roomID',
+            path: '$channelsPath/:channelID',
             parentNavigatorKey: searchTabNavigatorKey,
             pageBuilder: (context, state) {
-              _log.finer('GoRouter changed to roomsPath');
+              _log.finer('GoRouter changed to channelsPath');
               // state.uri.queryParameters['teamName']!,
-              var roomID = state.pathParameters['roomID'];
+              var channelID = state.pathParameters['channelID'];
               return getPage(
-                child: RoomPage(
-                  roomID: roomID!,
+                child: ChannelPage(
+                  channelID: channelID!,
                   teamName: state.uri.queryParameters['teamName'] ?? '',
                 ),
                 state: state,

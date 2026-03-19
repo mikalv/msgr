@@ -44,7 +44,7 @@ Future<void> upgradeFromV2ToV3(DatabaseMigrationData data) async {
       content TEXT NOT NULL,
       profile_id TEXT NOT NULL,
       conversation_id TEXT,
-      room_id TEXT,
+      channel_id TEXT,
       inserted_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       is_system_msg INTEGER NOT NULL,
@@ -60,7 +60,7 @@ Future<void> upgradeFromV2ToV3(DatabaseMigrationData data) async {
   );
 
   await db.execute(
-    'CREATE INDEX IF NOT EXISTS messages_room_idx ON $messagesTable(team_name, room_id)',
+    'CREATE INDEX IF NOT EXISTS messages_channel_idx ON $messagesTable(team_name, channel_id)',
   );
 
   await db.execute(

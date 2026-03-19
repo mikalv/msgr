@@ -31,7 +31,7 @@ void main() {
         content: 'Hello world',
         fromProfileID: 'profile-1',
         conversationID: 'conversation-1',
-        roomID: null,
+        channelID: null,
         createdAt: DateTime.utc(2024, 1, 1),
         updatedAt: DateTime.utc(2024, 1, 1, 0, 1),
       );
@@ -52,7 +52,7 @@ void main() {
         content: 'Hello world',
         fromProfileID: 'profile-1',
         conversationID: 'conversation-1',
-        roomID: null,
+        channelID: null,
         createdAt: DateTime.utc(2024, 1, 1),
         updatedAt: DateTime.utc(2024, 1, 1, 0, 1),
       );
@@ -74,7 +74,7 @@ void main() {
         content: 'Hello world',
         fromProfileID: 'profile-1',
         conversationID: 'conversation-1',
-        roomID: null,
+        channelID: null,
         createdAt: DateTime.utc(2024, 1, 1),
         updatedAt: DateTime.utc(2024, 1, 1, 0, 1),
       );
@@ -86,34 +86,34 @@ void main() {
       expect(stored, isEmpty);
     });
 
-    test('filters by conversation and room', () async {
+    test('filters by conversation and channel', () async {
       final conversationMessage = MMessage.raw(
         id: 'msg-1',
         content: 'Conversation message',
         fromProfileID: 'profile-1',
         conversationID: 'conversation-1',
-        roomID: null,
+        channelID: null,
         createdAt: DateTime.utc(2024, 1, 1),
         updatedAt: DateTime.utc(2024, 1, 1),
       );
-      final roomMessage = MMessage.raw(
+      final channelMessage = MMessage.raw(
         id: 'msg-2',
-        content: 'Room message',
+        content: 'Channel message',
         fromProfileID: 'profile-1',
         conversationID: null,
-        roomID: 'room-1',
+        channelID: 'channel-1',
         createdAt: DateTime.utc(2024, 1, 1),
         updatedAt: DateTime.utc(2024, 1, 1),
       );
 
-      await dao.upsertMessages('team-a', [conversationMessage, roomMessage]);
+      await dao.upsertMessages('team-a', [conversationMessage, channelMessage]);
 
       final convMessages =
           await dao.getMessagesForConversation('team-a', 'conversation-1');
-      final roomMessages = await dao.getMessagesForRoom('team-a', 'room-1');
+      final channelMessages = await dao.getMessagesForChannel('team-a', 'channel-1');
 
       expect(convMessages.map((m) => m.id), ['msg-1']);
-      expect(roomMessages.map((m) => m.id), ['msg-2']);
+      expect(channelMessages.map((m) => m.id), ['msg-2']);
     });
   });
 }

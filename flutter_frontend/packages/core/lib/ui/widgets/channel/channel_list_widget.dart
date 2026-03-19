@@ -5,11 +5,11 @@ import 'package:core/config/AppNavigation.dart';
 import 'package:core/config/theme.dart';
 import 'package:core/providers/auth_provider.dart';
 import 'package:core/providers/team_provider.dart';
-import 'package:core/ui/widgets/room/room_list_item.dart';
+import 'package:core/ui/widgets/channel/channel_list_item.dart';
 import 'package:go_router/go_router.dart';
 
-class RoomListWidget extends ConsumerWidget {
-  const RoomListWidget({
+class ChannelListWidget extends ConsumerWidget {
+  const ChannelListWidget({
     super.key,
     required this.context,
     this.modeFilter,
@@ -20,15 +20,15 @@ class RoomListWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final rooms = ref.watch(roomsProvider);
+    final channels = ref.watch(channelsProvider);
     final theList = ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: rooms.length,
+      itemCount: channels.length,
       itemBuilder: (BuildContext context, int index) {
-        final Room room = rooms[index];
-        return RoomListItem(
-            key: Key(room.id), room: room, index: index);
+        final Channel channel = channels[index];
+        return ChannelListItem(
+            key: Key(channel.id), channel: channel, index: index);
       },
     );
     return Column(
@@ -36,7 +36,7 @@ class RoomListWidget extends ConsumerWidget {
         Row(
           children: [
             const SizedBox(width: 10.0),
-            Text('Rooms',
+            Text('Channels',
                 style: AppTheme.of(context)
                     .channelListViewTheme
                     .data
@@ -46,7 +46,7 @@ class RoomListWidget extends ConsumerWidget {
               onPressed: () {
                 final currentTeam = ref.read(currentTeamProvider);
                 if (currentTeam != null) {
-                  context.push(AppNavigation.createRoomPath + currentTeam.name);
+                  context.push(AppNavigation.createChannelPath + currentTeam.name);
                 }
               },
             )

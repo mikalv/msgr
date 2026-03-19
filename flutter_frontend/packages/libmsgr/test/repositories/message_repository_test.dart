@@ -64,13 +64,13 @@ void main() {
     await telemetrySubscription.cancel();
   });
 
-  MMessage _sampleMessage({String id = 'msg-1', String? roomId, String? conversationId}) {
+  MMessage _sampleMessage({String id = 'msg-1', String? channelId, String? conversationId}) {
     return MMessage.raw(
       id: id,
       content: 'Hi',
       fromProfileID: 'profile-1',
       conversationID: conversationId,
-      roomID: roomId,
+      channelID: channelId,
       createdAt: DateTime.utc(2024, 1, 1),
       updatedAt: DateTime.utc(2024, 1, 1),
       isServerAck: false,
@@ -78,7 +78,7 @@ void main() {
   }
 
   test('writes queue entries before sending and clears on ack', () async {
-    final msg = _sampleMessage(roomId: 'room-1');
+    final msg = _sampleMessage(channelId: 'channel-1');
 
     await repository.sendMessageToRoom(msg);
 
@@ -95,14 +95,14 @@ void main() {
     expect(pending, isEmpty);
     final delivered = await messageDao.getMessagesForTeam('team-a');
     expect(delivered.single.deliveryStatus, MessageDeliveryStatus.delivered);
-    verify(connection.sendMessage('team-a.room-1', any)).called(1);
+    verify(connection.sendMessage('team-a.channel-1', any)).called(1);
   });
 
   test('emits telemetry for retry scheduling and success after reconnection',
       () async {
     connected = false;
     when(connection.sendMessage(any, any)).thenReturn(null);
-    final msg = _sampleMessage(roomId: 'room-telemetry');
+    final msg = _sampleMessage(channelId: 'channel-telemetry');
 
     await repository.sendMessageToRoom(msg);
 
@@ -142,7 +142,7 @@ void main() {
   test('retries pending messages when the connection comes back', () async {
     connected = false;
     when(connection.sendMessage(any, any)).thenReturn(null);
-    final msg = _sampleMessage(roomId: 'room-2', id: 'retry-msg');
+    final msg = _sampleMessage(channelId: 'channel-2', id: 'retry-msg');
 
     await repository.sendMessageToRoom(msg);
 
@@ -167,7 +167,7 @@ void main() {
   });
 
   test('marks message as failed on socket error', () async {
-    final msg = _sampleMessage(roomId: 'room-3', id: 'fail-msg');
+    final msg = _sampleMessage(channelId: 'channel-3', id: 'fail-msg');
 
     await repository.sendMessageToRoom(msg);
 
@@ -180,7 +180,7 @@ void main() {
 
   test('emits telemetry when retries are exhausted', () async {
     connected = true;
-    final msg = _sampleMessage(roomId: 'room-4', id: 'exhaust-msg');
+    final msg = _sampleMessage(channelId: 'channel-4', id: 'exhaust-msg');
 
     await repository.sendMessageToRoom(msg);
 

@@ -1,7 +1,7 @@
 defmodule Teams.TenantsHelper do
   alias Teams.TenantTeam
   alias Teams.Repo
-  alias Teams.TenantModels.{Conversation, Message, Profile, Role, Room}
+  alias Teams.TenantModels.{Conversation, Message, Profile, Role, Channel}
   require Logger
 
   def tenant_name_from_conn(%Plug.Conn{} = conn), do: conn.private[:subdomain]
@@ -39,22 +39,22 @@ defmodule Teams.TenantsHelper do
 
   def seed_tenant_space(tenant_team_name) do
     admin_permissions = [
-      "can_create_room",
-      "can_update_room",
-      "can_delete_room",
+      "can_create_channel",
+      "can_update_channel",
+      "can_delete_channel",
       "can_create_secret_conversation",
       "can_invite_user",
       "can_kick_user",
       "can_update_other_profile",
       "can_delete_other_message",
     ]
-    default_permissions = ["can_create_room"]
-    general_room = Room.changeset(%Room{}, %{name: "General", description: "The default chat room", members: ["all"]})
+    default_permissions = ["can_create_channel"]
+    general_channel = Channel.changeset(%Channel{}, %{name: "General", description: "The default chat channel", members: ["all"]})
     admin_role = Role.changeset(%Role{}, %{name: "Owner", permissions: admin_permissions})
     default_role = Role.changeset(%Role{}, %{name: "User", permissions: default_permissions, is_default: true})
 
 
-    changesets = [general_room, admin_role, default_role]
+    changesets = [general_channel, admin_role, default_role]
     results = Enum.map(changesets, fn x -> insert_to_db(tenant_team_name, x) end)
 
     {:ok, _msg} = Teams.TenantModels.Message.create_system_message(tenant_team_name, Map.get(List.first(results), :id), "Hello and welcome!")

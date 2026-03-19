@@ -1,11 +1,11 @@
-defmodule Teams.TenantModels.Room do
+defmodule Teams.TenantModels.Channel do
   use Teams.Schema
   import Ecto.Changeset
   import Ecto.Query
   alias Teams.TenantModels.Profile
   require Logger
 
-  schema "rooms" do
+  schema "channels" do
     field :name, :string
     field :topic, :string
     field :description, :string
@@ -24,7 +24,7 @@ defmodule Teams.TenantModels.Room do
     |> unique_constraint(:name)
   end
 
-  def create_room(tenant,
+  def create_channel(tenant,
       %Profile{} = profile,
       %{"name" => _n, "description" => _d, "is_secret" => _i} = params,
       other_member_ids \\ []) do

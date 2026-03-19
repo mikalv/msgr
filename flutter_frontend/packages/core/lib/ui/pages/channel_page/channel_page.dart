@@ -10,23 +10,23 @@ import 'package:core/providers/websocket_provider.dart';
 import 'package:core/ui/widgets/message/message_list_widget.dart';
 import 'package:core/ui/widgets/message_composer/message_composer.dart';
 
-class RoomPage extends ConsumerStatefulWidget {
-  final String roomID;
-  //final String roomID;
-  late final Room room;
+class ChannelPage extends ConsumerStatefulWidget {
+  final String channelID;
+  //final String channelID;
+  late final Channel channel;
   final String teamName;
   late final TeamRepositories repos;
 
-  RoomPage({super.key, required this.roomID, required this.teamName}) {
+  ChannelPage({super.key, required this.channelID, required this.teamName}) {
     repos = LibMsgr().repositoryFactory.getRepositories(teamName);
-    room = repos.roomRepository.fetchByID(roomID);
+    channel = repos.channelRepository.fetchByID(channelID);
   }
 
   @override
-  ConsumerState<RoomPage> createState() => RoomPageState();
+  ConsumerState<ChannelPage> createState() => ChannelPageState();
 }
 
-class RoomPageState extends ConsumerState<RoomPage> with WidgetsBindingObserver {
+class ChannelPageState extends ConsumerState<ChannelPage> with WidgetsBindingObserver {
   final TextEditingController _newMessageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode composerFocusNode = FocusNode();
@@ -37,7 +37,7 @@ class RoomPageState extends ConsumerState<RoomPage> with WidgetsBindingObserver 
   @override
   void initState() {
     super.initState();
-    print('Fetching room history for ${widget.room.id}');
+    print('Fetching channel history for ${widget.channel.id}');
     repos = LibMsgr().repositoryFactory.getRepositories(widget.teamName);
     messageRepository = repos.messageRepository;
     WidgetsBinding.instance.addObserver(this);
@@ -78,10 +78,10 @@ class RoomPageState extends ConsumerState<RoomPage> with WidgetsBindingObserver 
       );
 
   @override
-  void didUpdateWidget(RoomPage oldWidget) {
+  void didUpdateWidget(ChannelPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.roomID != widget.roomID) {
-      // Clear messages when roomID changes
+    if (oldWidget.channelID != widget.channelID) {
+      // Clear messages when channelID changes
       setState(() {});
       WidgetsBinding.instance
           .addPostFrameCallback((_) => scrollToLastMessage());
@@ -110,7 +110,7 @@ class RoomPageState extends ConsumerState<RoomPage> with WidgetsBindingObserver 
         onChanged: (p0) {
           // Send typing indicator to server
           ref.read(webSocketProvider.notifier).sendTypingIndicator(
-                roomId: widget.room.id,
+                channelId: widget.channel.id,
               );
         },
         onSubmitted: (String msg) {
@@ -123,7 +123,7 @@ class RoomPageState extends ConsumerState<RoomPage> with WidgetsBindingObserver 
           try {
             ref.read(webSocketProvider.notifier).sendMessage(
                   content: _newMessageController.text,
-                  roomId: widget.room.id,
+                  channelId: widget.channel.id,
                 );
             _newMessageController.clear();
           } catch (error) {
@@ -144,7 +144,7 @@ class RoomPageState extends ConsumerState<RoomPage> with WidgetsBindingObserver 
           color: Colors.black, //change your color here
         ),
         title: Text(
-            widget.room.formattedName), //widget.user.username ?? 'Unknown'),
+            widget.channel.formattedName), //widget.user.username ?? 'Unknown'),
         centerTitle: true,
         elevation: 0.00,
         backgroundColor: Colors.greenAccent[400],
@@ -152,7 +152,7 @@ class RoomPageState extends ConsumerState<RoomPage> with WidgetsBindingObserver 
         bottom: PreferredSize(
             preferredSize: Size.zero,
             child: GestureDetector(
-              child: Text(widget.room.topic ?? 'The room has no topic yet!'),
+              child: Text(widget.channel.topic ?? 'The channel has no topic yet!'),
               onTap: () {
                 print('tapped subtitle');
               },
@@ -178,7 +178,7 @@ class RoomPageState extends ConsumerState<RoomPage> with WidgetsBindingObserver 
                   ),
                   child: MessageListWidget(
                       stream:
-                          messageRepository.fetchRoomMessages(widget.roomID),
+                          messageRepository.fetchChannelMessages(widget.channelID),
                       scrollController: _scrollController,
                       padding: const EdgeInsets.only(top: 15.0),
                       teamName: widget.teamName),
