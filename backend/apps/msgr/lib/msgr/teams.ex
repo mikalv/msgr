@@ -1,0 +1,173 @@
+defmodule Messngr.Teams do
+  @moduledoc """
+  Context module for team management.
+
+  Handles team creation (with tenant schema provisioning),
+  membership, and team listing.
+  """
+
+  alias Messngr.Repo
+  alias Messngr.Teams.{Team, TeamMembership}
+  alias Messngr.Tenancy
+  alias Teams.TenantModels.{Profile, Channel, ChannelMembership}
+
+  import Ecto.Query
+
+  # ── Team CRUD ──────────────────────────────────────────────
+
+  @doc """
+  Creates a new team, provisions a tenant schema, and seeds a #general channel.
+
+  The `attrs` map should include:
+    * `:name` — team display name
+    * `:slug` — URL-safe slug
+    * `:owner_account_id` — account id of the creator
+
+  Returns `{:ok, team}` or `{:error, changeset}`.
+  """
+  def create_team(attrs) do
+    Repo.transaction(fn ->
+      # 1. Insert the team record in public schema
+      team_id = Ecto.UUID.generate()
+      schema_name = Tenancy.prefix(team_id)
+
+      team_attrs =
+        attrs
+        |> Map.put(:id, team_id)
+        |> Map.put(:schema_name, schema_name)
+
+      team =
+        %Team{}
+        |> Team.changeset(team_attrs)
+        |> Repo.insert!()
+
+      # 2. Create tenant schema + run migrations
+      Tenancy.create_tenant(team.id)
+
+      # 3. Create owner membership
+      %TeamMembership{}
+      |> TeamMembership.changeset(%{
+        account_id: team.owner_account_id,
+        team_id: team.id,
+        role: "owner",
+        joined_at: DateTime.utc_now()
+      })
+      |> Repo.insert!()
+
+      # 4. Create owner profile in tenant
+      {:ok, owner_profile} =
+        Profile.create(schema_name, %{
+          account_id: team.owner_account_id,
+          role: "owner"
+        })
+
+      # 5. Seed #general channel
+      {:ok, general} =
+        Channel.create(schema_name, %{
+          name: "general",
+          slug: "general",
+          kind: "channel",
+          visibility: "public",
+          created_by: owner_profile.id
+        })
+
+      # 6. Add owner to #general
+      ChannelMembership.join(schema_name, %{
+        channel_id: general.id,
+        profile_id: owner_profile.id,
+        role: "admin"
+      })
+
+      team
+    end)
+  end
+
+  @doc """
+  Gets a team by slug. Raises Ecto.NoResultsError if not found.
+  """
+  def get_team_by_slug!(slug) do
+    Repo.get_by!(Team, slug: slug)
+  end
+
+  @doc """
+  Gets a team by slug. Returns nil if not found.
+  """
+  def get_team_by_slug(slug) do
+    Repo.get_by(Team, slug: slug)
+  end
+
+  # ── Membership ─────────────────────────────────────────────
+
+  @doc """
+  Joins an account to a team.
+  Creates a TeamMembership in the public schema and a Profile in the tenant schema.
+  Adds the new member to the #general channel.
+  """
+  def join_team(team, account_id, attrs \\ %{}) do
+    Repo.transaction(fn ->
+      # 1. Create public membership
+      membership =
+        %TeamMembership{}
+        |> TeamMembership.changeset(%{
+          account_id: account_id,
+          team_id: team.id,
+          role: Map.get(attrs, :role, "member"),
+          joined_at: DateTime.utc_now()
+        })
+        |> Repo.insert!()
+
+      prefix = team.schema_name
+
+      # 2. Create tenant profile
+      {:ok, profile} =
+        Profile.create(prefix, %{
+          account_id: account_id,
+          display_name: Map.get(attrs, :display_name),
+          role: "member"
+        })
+
+      # 3. Add to #general channel
+      case Channel.get_by_slug(prefix, "general") do
+        nil -> :ok
+        general ->
+          ChannelMembership.join(prefix, %{
+            channel_id: general.id,
+            profile_id: profile.id
+          })
+      end
+
+      %{membership: membership, profile: profile}
+    end)
+  end
+
+  @doc """
+  Lists all teams an account belongs to.
+  """
+  def list_teams_for_account(account_id) do
+    from(tm in TeamMembership,
+      where: tm.account_id == ^account_id,
+      join: t in Team,
+      on: t.id == tm.team_id,
+      select: t,
+      order_by: [desc: tm.joined_at]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Checks if an account is a member of a team.
+  """
+  def member?(team_id, account_id) do
+    from(tm in TeamMembership,
+      where: tm.team_id == ^team_id and tm.account_id == ^account_id
+    )
+    |> Repo.exists?()
+  end
+
+  @doc """
+  Gets the profile for an account within a team's tenant schema.
+  """
+  def get_profile_for_account(prefix, account_id) do
+    Profile.get_by_account_id(prefix, account_id)
+  end
+end

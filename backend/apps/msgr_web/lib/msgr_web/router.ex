@@ -78,6 +78,35 @@ defmodule MessngrWeb.Router do
     post "/profiles/:id/switch", ProfileController, :switch
   end
 
+  # ── Team API (multi-tenant Slack-like) ──────────────────────
+
+  # Endpoints scoped to a team via :slug → tenant resolution
+  scope "/api/teams/:slug", MessngrWeb do
+    pipe_through [:api, :actor]
+    plug MessngrWeb.Plugs.TenantFromSlug
+
+    get "/channels", TeamChannelController, :index
+    post "/channels", TeamChannelController, :create
+    get "/channels/:channel_id/messages", TeamMessageController, :index
+    post "/channels/:channel_id/messages", TeamMessageController, :create
+    post "/channels/:channel_id/messages/:message_id/reactions", TeamReactionController, :toggle
+    get "/channels/:channel_id/threads/:message_id", TeamMessageController, :thread
+    put "/channels/:channel_id/read_cursor", TeamReadCursorController, :update
+    get "/profiles", TeamProfileController, :index
+    put "/profiles/me", TeamProfileController, :update
+    post "/media/presign", TeamMediaController, :presign
+    post "/dms", TeamDmController, :create
+  end
+
+  # Team-level endpoints (no tenant resolution needed)
+  scope "/api/teams", MessngrWeb do
+    pipe_through [:api, :actor]
+
+    get "/", TeamController, :index
+    post "/", TeamController, :create
+    post "/:slug/join", TeamController, :join
+  end
+
   scope "/auth/bridge", MessngrWeb do
     pipe_through :browser
 
