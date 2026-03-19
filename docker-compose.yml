@@ -17,11 +17,46 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  msgr_redis:
+    image: redis:7-alpine
+    container_name: msgr_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  msgr_minio:
+    image: minio/minio
+    container_name: msgr_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   rust_gateway:
     build:
       context: ./rust-gateway
       dockerfile: Dockerfile
+      target: prod
     container_name: msgr_rust_gateway
     environment:
       HTTP_PORT: 8443
@@ -42,11 +77,13 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
 
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
+      target: prod
     container_name: msgr_backend
     env_file:
       - .env
@@ -55,8 +92,10 @@ services:
         condition: service_healthy
       stonemq:
         condition: service_started
+      msgr_redis:
+        condition: service_healthy
     environment:
-      MIX_ENV: dev
+      MIX_ENV: prod
       PHX_SERVER: "true"
       PHX_LISTEN_IP: 0.0.0.0
       PHX_HOST: 0.0.0.0
@@ -67,6 +106,7 @@ services:
       RUST_GATEWAY_HOST: rust_gateway
       RUST_GATEWAY_GRPC_PORT: 50051
       RUST_GATEWAY_SERVER_PORT: 50052
+      REDIS_URL: redis://msgr_redis:6379
       MSGR_WEB_LEGACY_ACTOR_HEADERS: ${MSGR_WEB_LEGACY_ACTOR_HEADERS:-false}
       SECRET_KEY_BASE: 3X6X5EiV0HEhNAZCFKuGcZNl14Q8U5hZ4qQlR9VuQ07oVcTyVwW7BrPPW5zSOdaT
       NOISE_TRANSPORT_ENABLED: ${NOISE_TRANSPORT_ENABLED:-false}
@@ -84,20 +124,18 @@ services:
       MSGR_FORCE_SSL: ${MSGR_FORCE_SSL:-false}
       MSGR_FORCE_SSL_HSTS: ${MSGR_FORCE_SSL_HSTS:-false}
     working_dir: /app
-    command: ["sh", "-c", "mix setup && mix phx.server"]
-    volumes:
-      - ./backend:/app
-      - elixir_deps:/app/deps
-      - elixir_build:/app/_build
-      - tailwind_cache:/root/.cache
-      - node_modules:/app/apps/msgr_web/assets/node_modules
     ports:
       - "4000:4000"
       - "50052:50052"
       - "${MSGR_TLS_PORT:-4443}:${MSGR_TLS_PORT:-4443}"
       - "${NOISE_TRANSPORT_PORT:-5443}:${NOISE_TRANSPORT_PORT:-5443}"
-    tty: true
-    stdin_open: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus:v2.53.0
@@ -110,6 +148,12 @@ services:
     depends_on:
       backend:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:11.0.0
@@ -126,6 +170,12 @@ services:
     depends_on:
       prometheus:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
 
   openobserve:
     image: public.ecr.aws/zinclabs/openobserve:latest
@@ -139,6 +189,11 @@ services:
       - openobserve_data:/data
     ports:
       - "5088:5080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
   stonemq:
@@ -169,8 +224,25 @@ services:
       - "49152-49999:49152-49999/udp"
     restart: unless-stopped
 
+  # -------------------------------------------------------------------------
+  # Prism (API mock server) — uncomment to enable
+  # See: https://stoplight.io/open-source/prism
+  # Usage: docker compose up prism
+  # -------------------------------------------------------------------------
+  # prism:
+  #   image: stoplight/prism:4
+  #   container_name: msgr_prism
+  #   command: mock -h 0.0.0.0 /api/openapi.yml
+  #   volumes:
+  #     - ./docs/openapi.yml:/api/openapi.yml:ro
+  #   ports:
+  #     - "4010:4010"
+  #   restart: unless-stopped
+
 volumes:
   postgres_data:
+  redis_data:
+  minio_data:
   elixir_deps:
   elixir_build:
   tailwind_cache:

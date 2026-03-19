@@ -1,51 +1,74 @@
-# Build stage
-FROM rustlang/rust:nightly as builder
+# ==============================================================================
+# Multi-stage Dockerfile for the Noise Protocol Gateway
+# Stages: build, dev, prod
+# ==============================================================================
+
+# ==============================================================================
+# Stage: build — compile the release binary
+# ==============================================================================
+FROM rustlang/rust:nightly AS build
 
 WORKDIR /usr/src/app
 
-# Install build dependencies
 RUN apt-get update && \
     apt-get install -y protobuf-compiler && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy manifests
+# Copy manifests first for layer caching
 COPY Cargo.toml Cargo.lock ./
 COPY build.rs ./
 COPY proto ./proto
 
-# Copy source
+# Copy source and build
 COPY src ./src
 
-# Build release binary
 RUN cargo build --release
 
-# Runtime stage
-FROM debian:bookworm-slim
+# ==============================================================================
+# Stage: dev — development image with full toolchain
+# ==============================================================================
+FROM rustlang/rust:nightly AS dev
 
-# Install runtime dependencies
+WORKDIR /usr/src/app
+
 RUN apt-get update && \
-    apt-get install -y ca-certificates curl protobuf-compiler && \
+    apt-get install -y protobuf-compiler ca-certificates curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Create app user
+# Install cargo-watch for hot-reload during development
+RUN cargo install cargo-watch
+
+COPY Cargo.toml Cargo.lock ./
+COPY build.rs ./
+COPY proto ./proto
+COPY src ./src
+
+EXPOSE 8443 50051
+
+CMD ["cargo", "watch", "-x", "run"]
+
+# ==============================================================================
+# Stage: prod — minimal runtime image
+# ==============================================================================
+FROM debian:bookworm-slim AS prod
+
+RUN apt-get update && \
+    apt-get install -y ca-certificates curl && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN useradd -m -u 1000 noise && \
     mkdir -p /var/run/noise-gateway && \
     chown noise:noise /var/run/noise-gateway
 
 WORKDIR /app
 
-# Copy binary from builder
-COPY --from=builder /usr/src/app/target/release/noise-gateway /app/noise-gateway
+COPY --from=build /usr/src/app/target/release/noise-gateway /app/noise-gateway
 
-# Switch to app user
 USER noise
 
-# Expose ports
 EXPOSE 8443 50051
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8443/gateway/health || exit 1
 
-# Run
 CMD ["/app/noise-gateway"]

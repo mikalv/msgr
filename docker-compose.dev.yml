@@ -1,0 +1,43 @@
+# Development overrides — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# This overrides production targets with dev stages, mounts source code
+# for hot-reload, and adjusts environment for local development.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: dev
+    environment:
+      MIX_ENV: dev
+    command: ["sh", "-c", "mix setup && mix phx.server"]
+    volumes:
+      - ./backend:/app
+      - elixir_deps:/app/deps
+      - elixir_build:/app/_build
+      - tailwind_cache:/root/.cache
+      - node_modules:/app/apps/msgr_web/assets/node_modules
+    tty: true
+    stdin_open: true
+    # Remove healthcheck in dev (mix takes longer to start)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  rust_gateway:
+    build:
+      context: ./rust-gateway
+      dockerfile: Dockerfile
+      target: dev
+    volumes:
+      - ./rust-gateway/src:/usr/src/app/src
+      - ./rust-gateway/proto:/usr/src/app/proto
+      - rust_target:/usr/src/app/target
+
+volumes:
+  rust_target:

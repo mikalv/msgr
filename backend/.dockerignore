@@ -1,0 +1,40 @@
+# Build artifacts
+_build/
+deps/
+
+# Version control
+.git/
+.gitignore
+
+# Environment and secrets
+.env
+.env.*
+.envrc
+.envrc.example
+
+# Documentation
+*.md
+LICENSE
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test
+test/
+cover/
+
+# Docker files (no need to include themselves)
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Misc
+.formatter.exs
+.credo.exs
+tmp/
+log/
+pc.log

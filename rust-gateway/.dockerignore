@@ -1,0 +1,29 @@
+# Build artifacts
+target/
+
+# Version control
+.git/
+.gitignore
+
+# Environment and secrets
+.env
+.env.*
+
+# Documentation
+*.md
+LICENSE
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker files
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Misc
+tmp/
