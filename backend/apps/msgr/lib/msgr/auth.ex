@@ -3,6 +3,8 @@ defmodule Messngr.Auth do
   Handles passwordless OTP and federated sign-in flows for Messngr clients.
   """
 
+  require Logger
+
   alias Messngr.Accounts
   alias Messngr.Accounts.Identity
   alias Messngr.Auth.Challenge
