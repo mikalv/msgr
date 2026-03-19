@@ -17,7 +17,7 @@ defmodule MessngrWeb.Plugs.TenantFromSlug do
   def call(conn, _opts) do
     slug = conn.path_params["slug"] || conn.params["slug"]
 
-    case Messngr.Repo.get_by(Messngr.Teams.Team, slug: slug) do
+    case Teams.Repo.get_by(Teams.Schemas.Team, slug: slug) do
       nil ->
         conn
         |> put_resp_content_type("application/json")

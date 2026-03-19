@@ -14,7 +14,7 @@ defmodule TeamsWeb.ChatChannel do
   use TeamsWeb, :channel
   require Logger
 
-  alias Messngr.{Messages, Channels, Reactions}
+  alias Teams.{Messages, Channels, Reactions}
   alias Teams.TenantModels.{Channel, ChannelMembership, ReadCursor}
 
   @impl true

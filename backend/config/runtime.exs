@@ -44,13 +44,17 @@ default_db =
     _ -> "msgr_dev"
   end
 
-config :msgr, Messngr.Repo,
+shared_repo_config = [
   username: System.get_env("POSTGRES_USERNAME", "postgres"),
   password: System.get_env("POSTGRES_PASSWORD", "postgres"),
   hostname: System.get_env("POSTGRES_HOST", "localhost"),
   database: System.get_env("POSTGRES_DB", default_db),
   port: String.to_integer(System.get_env("POSTGRES_PORT", "5432")),
   ssl: String.downcase(System.get_env("POSTGRES_SSL", "false")) == "true"
+]
+
+config :msgr, Messngr.Repo, shared_repo_config
+config :teams, Teams.Repo, shared_repo_config
 
 secret_key =
   case System.get_env("SECRET_KEY_BASE") do

@@ -7,8 +7,8 @@ defmodule Teams.TeamManagement do
   """
 
   alias Teams.Repo
-  alias Messngr.Teams.{Team, TeamMembership}
-  alias Messngr.Tenancy
+  alias Teams.Schemas.{Team, TeamMembership}
+  alias Teams.Tenancy
   alias Teams.TenantModels.{Profile, Channel, ChannelMembership}
 
   import Ecto.Query
