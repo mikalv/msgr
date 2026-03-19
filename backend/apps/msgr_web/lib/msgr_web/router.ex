@@ -80,10 +80,13 @@ defmodule MessngrWeb.Router do
 
   # ── Team API (multi-tenant Slack-like) ──────────────────────
 
+  pipeline :tenant do
+    plug MessngrWeb.Plugs.TenantFromSlug
+  end
+
   # Endpoints scoped to a team via :slug → tenant resolution
   scope "/api/teams/:slug", MessngrWeb do
-    pipe_through [:api, :actor]
-    plug MessngrWeb.Plugs.TenantFromSlug
+    pipe_through [:api, :actor, :tenant]
 
     get "/channels", TeamChannelController, :index
     post "/channels", TeamChannelController, :create
