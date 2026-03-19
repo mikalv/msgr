@@ -269,3 +269,12 @@ config :guardian, Guardian.DB,
   repo: Messngr.Repo,
   schema_name: guardian_schema,
   sweep_interval: :timer.minutes(guardian_interval_minutes)
+
+# Dev server: expose OTP codes in API response and use local mailer
+expose_otp = bool_env.(System.get_env("EXPOSE_OTP_CODES"), false)
+config :msgr_web, :expose_otp_codes, expose_otp
+
+if bool_env.(System.get_env("SWOOSH_LOCAL_ADAPTER"), false) do
+  config :msgr, Messngr.Mailer, adapter: Swoosh.Adapters.Local
+  config :swoosh, :api_client, false
+end
