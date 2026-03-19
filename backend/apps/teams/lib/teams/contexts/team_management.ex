@@ -1,4 +1,4 @@
-defmodule Messngr.Teams do
+defmodule Teams.TeamManagement do
   @moduledoc """
   Context module for team management.
 
@@ -6,7 +6,7 @@ defmodule Messngr.Teams do
   membership, and team listing.
   """
 
-  alias Messngr.Repo
+  alias Teams.Repo
   alias Messngr.Teams.{Team, TeamMembership}
   alias Messngr.Tenancy
   alias Teams.TenantModels.{Profile, Channel, ChannelMembership}

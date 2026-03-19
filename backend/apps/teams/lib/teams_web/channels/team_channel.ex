@@ -10,7 +10,7 @@ defmodule TeamsWeb.TeamChannel do
   require Logger
 
   alias Messngr.Teams
-  alias Messngr.Channels
+  alias Teams.Channels
 
   @impl true
   def join("team:" <> slug, _payload, socket) do

@@ -1,9 +1,9 @@
 defmodule MessngrWeb.TeamMessageController do
   use MessngrWeb, :controller
 
-  alias Messngr.Messages
+  alias Teams.Messages
   alias Messngr.Teams
-  alias Messngr.Pagination
+  alias Teams.Pagination
 
   action_fallback MessngrWeb.FallbackController
 

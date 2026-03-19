@@ -1,4 +1,4 @@
-defmodule Messngr.Channels do
+defmodule Teams.Channels do
   @moduledoc """
   Context module for tenant-scoped channel operations.
 

@@ -1,7 +1,7 @@
 defmodule MessngrWeb.TeamReactionController do
   use MessngrWeb, :controller
 
-  alias Messngr.Reactions
+  alias Teams.Reactions
   alias Messngr.Teams
 
   action_fallback MessngrWeb.FallbackController

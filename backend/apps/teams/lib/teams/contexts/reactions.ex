@@ -1,10 +1,10 @@
-defmodule Messngr.Reactions do
+defmodule Teams.Reactions do
   @moduledoc """
   Context module for tenant-scoped reaction operations.
   """
 
   import Ecto.Query
-  alias Messngr.Repo
+  alias Teams.Repo
 
   @doc """
   Toggles a reaction on a message.

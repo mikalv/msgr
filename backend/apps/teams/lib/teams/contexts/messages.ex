@@ -1,12 +1,12 @@
-defmodule Messngr.Messages do
+defmodule Teams.Messages do
   @moduledoc """
   Context module for tenant-scoped message operations.
 
-  Uses cursor-based pagination via `Messngr.Pagination`.
+  Uses cursor-based pagination via `Teams.Pagination`.
   """
 
   alias Teams.TenantModels.Message
-  alias Messngr.Pagination
+  alias Teams.Pagination
 
   import Ecto.Query
 

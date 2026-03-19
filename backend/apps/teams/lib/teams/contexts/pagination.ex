@@ -1,4 +1,4 @@
-defmodule Messngr.Pagination do
+defmodule Teams.Pagination do
   @moduledoc """
   Cursor-based pagination helper for chat messages.
 

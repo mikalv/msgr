@@ -1,7 +1,7 @@
 defmodule MessngrWeb.TeamDmController do
   use MessngrWeb, :controller
 
-  alias Messngr.Channels
+  alias Teams.Channels
   alias Messngr.Teams
 
   action_fallback MessngrWeb.FallbackController
