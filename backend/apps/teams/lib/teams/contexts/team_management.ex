@@ -26,11 +26,15 @@ defmodule Teams.TeamManagement do
   Returns `{:ok, team}` or `{:error, changeset}`.
   """
   def create_team(attrs) do
-    Repo.transaction(fn ->
-      # 1. Insert the team record in public schema
-      team_id = Ecto.UUID.generate()
-      schema_name = Tenancy.prefix(team_id)
+    team_id = Ecto.UUID.generate()
+    schema_name = Tenancy.prefix(team_id)
 
+    # 1. Create tenant schema + run migrations OUTSIDE transaction
+    #    (CREATE SCHEMA and migrations need their own connections)
+    Tenancy.create_tenant(team_id)
+
+    # 2. Insert team record and seed data inside a transaction
+    Repo.transaction(fn ->
       team_attrs =
         attrs
         |> Map.put(:id, team_id)
@@ -40,9 +44,6 @@ defmodule Teams.TeamManagement do
         %Team{}
         |> Team.changeset(team_attrs)
         |> Repo.insert!()
-
-      # 2. Create tenant schema + run migrations
-      Tenancy.create_tenant(team.id)
 
       # 3. Create owner membership
       %TeamMembership{}
