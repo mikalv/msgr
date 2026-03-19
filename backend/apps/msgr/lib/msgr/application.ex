@@ -43,17 +43,13 @@ defmodule Messngr.Application do
       ]
     Logger.info("✅ Base children list built with #{length(children)} items")
 
-    Logger.info("📦 Adding maybe_noise_registry_child...")
-    children = children |> Kernel.++(maybe_noise_registry_child())
-    Logger.info("✅ After noise registry: #{length(children)} children")
+    # TODO: Re-enable when Messngr.Transport.Noise.Registry module is implemented
+    # children = children |> Kernel.++(maybe_noise_registry_child())
 
-    Logger.info("📦 Adding maybe_bridge_health_child...")
     children = children |> Kernel.++(maybe_bridge_health_child())
-    Logger.info("✅ After bridge health: #{length(children)} children")
 
-    Logger.info("📦 Adding maybe_rust_gateway_grpc_server...")
-    children = children |> Kernel.++(maybe_rust_gateway_grpc_server())
-    Logger.info("✅ After gRPC server: #{length(children)} children")
+    # TODO: Re-enable when gRPC proto/endpoint modules are compiled
+    # children = children |> Kernel.++(maybe_rust_gateway_grpc_server())
 
     Logger.info("🔧 Starting supervisor with #{length(children)} children...")
     Logger.info("Children to start: #{inspect(Enum.map(children, &child_name/1))}")
