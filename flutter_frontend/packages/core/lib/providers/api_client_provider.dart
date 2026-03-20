@@ -1,25 +1,26 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
-import 'auth_provider.dart';
+import 'auth_state_provider.dart';
 
 /// Lightweight HTTP client for the team-scoped REST API.
 ///
-/// All requests are authenticated using the team access token from [authProvider].
+/// All requests are authenticated using X-Account-Id and X-Profile-Id headers.
 /// The base URL points to the dev gateway by default and can be overridden.
 class ApiClient {
   ApiClient({
     required this.baseUrl,
-    this.tokenProvider,
+    this.accountIdProvider,
+    this.profileIdProvider,
     http.Client? httpClient,
   }) : _http = httpClient ?? http.Client();
 
   final String baseUrl;
-  final String? Function()? tokenProvider;
+  final String? Function()? accountIdProvider;
+  final String? Function()? profileIdProvider;
   final http.Client _http;
 
   Map<String, String> _headers() {
@@ -27,9 +28,13 @@ class ApiClient {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
-    final token = tokenProvider?.call();
-    if (token != null) {
-      headers['Authorization'] = 'Bearer $token';
+    final accountId = accountIdProvider?.call();
+    final profileId = profileIdProvider?.call();
+    if (accountId != null) {
+      headers['X-Account-Id'] = accountId;
+    }
+    if (profileId != null) {
+      headers['X-Profile-Id'] = profileId;
     }
     return headers;
   }
@@ -38,11 +43,21 @@ class ApiClient {
     return Uri.parse('$baseUrl$path').replace(queryParameters: query);
   }
 
+  Future<dynamic> getRaw(
+    String path, {
+    Map<String, String>? query,
+  }) async {
+    final response =
+        await _http.get(_uri(path, query: query), headers: _headers());
+    return _handleResponseRaw(response);
+  }
+
   Future<Map<String, dynamic>> get(
     String path, {
     Map<String, String>? query,
   }) async {
-    final response = await _http.get(_uri(path, query: query), headers: _headers());
+    final response =
+        await _http.get(_uri(path, query: query), headers: _headers());
     return _handleResponse(response);
   }
 
@@ -75,6 +90,116 @@ class ApiClient {
     return _handleResponse(response);
   }
 
+  // -----------------------------------------------------------------------
+  // High-level API methods
+  // -----------------------------------------------------------------------
+
+  /// GET /api/teams
+  Future<List<Map<String, dynamic>>> getTeams() async {
+    final raw = await getRaw('/api/teams');
+    if (raw is List) {
+      return raw.cast<Map<String, dynamic>>();
+    }
+    if (raw is Map<String, dynamic>) {
+      final data = raw['data'];
+      if (data is List) return data.cast<Map<String, dynamic>>();
+      return [raw];
+    }
+    return [];
+  }
+
+  /// POST /api/teams
+  Future<Map<String, dynamic>> createTeam({
+    required String name,
+    required String slug,
+    String? description,
+  }) async {
+    return post('/api/teams', body: {
+      'name': name,
+      'slug': slug,
+      if (description != null) 'description': description,
+    });
+  }
+
+  /// POST /api/teams/:slug/join
+  Future<Map<String, dynamic>> joinTeam(String slug) async {
+    return post('/api/teams/$slug/join');
+  }
+
+  /// GET /api/teams/:slug/channels
+  Future<List<Map<String, dynamic>>> getChannels(String slug) async {
+    final raw = await getRaw('/api/teams/$slug/channels');
+    if (raw is List) {
+      return raw.cast<Map<String, dynamic>>();
+    }
+    if (raw is Map<String, dynamic>) {
+      final data = raw['data'];
+      if (data is List) return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  /// GET /api/teams/:slug/channels/:id/messages
+  Future<List<Map<String, dynamic>>> getMessages(
+    String slug,
+    String channelId, {
+    int limit = 50,
+    String? before,
+  }) async {
+    final query = <String, String>{'limit': '$limit'};
+    if (before != null) query['before'] = before;
+    final raw =
+        await getRaw('/api/teams/$slug/channels/$channelId/messages', query: query);
+    if (raw is List) {
+      return raw.cast<Map<String, dynamic>>();
+    }
+    if (raw is Map<String, dynamic>) {
+      final data = raw['data'];
+      if (data is List) return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  /// POST /api/teams/:slug/channels/:id/messages
+  Future<Map<String, dynamic>> sendMessage(
+    String slug,
+    String channelId,
+    String content,
+  ) async {
+    return post('/api/teams/$slug/channels/$channelId/messages', body: {
+      'content': content,
+    });
+  }
+
+  /// POST /api/teams/:slug/dms
+  Future<Map<String, dynamic>> createDm(
+    String slug,
+    List<String> profileIds,
+  ) async {
+    return post('/api/teams/$slug/dms', body: {
+      'profile_ids': profileIds,
+    });
+  }
+
+  // -----------------------------------------------------------------------
+  // Response handling
+  // -----------------------------------------------------------------------
+
+  dynamic _handleResponseRaw(http.Response response) {
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.body.isEmpty) return <String, dynamic>{};
+      try {
+        return jsonDecode(response.body);
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }
+    throw ApiClientException(
+      statusCode: response.statusCode,
+      message: response.body,
+    );
+  }
+
   Map<String, dynamic> _handleResponse(http.Response response) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (response.body.isEmpty) return <String, dynamic>{};
@@ -103,11 +228,12 @@ class ApiClientException implements Exception {
   String toString() => 'ApiClientException($statusCode): $message';
 }
 
-/// Global API client provider wired to the current auth token.
+/// Global API client provider wired to the current auth state (header-based).
 final apiClientProvider = Provider<ApiClient>((ref) {
-  final authState = ref.watch(authProvider);
+  final simpleAuth = ref.watch(simpleAuthProvider);
   return ApiClient(
     baseUrl: 'https://dev.msgr.no',
-    tokenProvider: () => authState.teamAccessToken,
+    accountIdProvider: () => simpleAuth.accountId,
+    profileIdProvider: () => simpleAuth.profileId,
   );
 });

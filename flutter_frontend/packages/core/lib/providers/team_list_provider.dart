@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api_client_provider.dart';
-import 'mock_api_data.dart';
+import 'auth_state_provider.dart';
 import 'models.dart';
 
 // ---------------------------------------------------------------------------
-// TeamList — all teams the current user belongs to
+// TeamList -- all teams the current user belongs to
 // ---------------------------------------------------------------------------
 
 class TeamListState {
@@ -42,16 +42,23 @@ class TeamListNotifier extends StateNotifier<TeamListState> {
   final Ref _ref;
 
   Future<void> _load() async {
+    final auth = _ref.read(simpleAuthProvider);
+    if (!auth.isLoggedIn) return;
+
     state = state.copyWith(isLoading: true, error: null);
     try {
-      // TODO: Replace with real API call: GET /api/teams
-      // final client = _ref.read(apiClientProvider);
-      // final response = await client.get('/api/teams');
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      state = state.copyWith(
-        teams: mockSlackTeams,
-        isLoading: false,
-      );
+      final client = _ref.read(apiClientProvider);
+      final data = await client.getTeams();
+      final teams = data.map((t) {
+        return SlackTeam(
+          id: t['id']?.toString() ?? '',
+          name: t['name']?.toString() ?? '',
+          slug: t['slug']?.toString() ?? '',
+          iconEmoji: t['icon_emoji'] as String?,
+          domain: t['domain'] as String?,
+        );
+      }).toList();
+      state = state.copyWith(teams: teams, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e);
     }
@@ -61,11 +68,12 @@ class TeamListNotifier extends StateNotifier<TeamListState> {
 
   Future<void> createTeam(String name, String slug) async {
     try {
-      // TODO: POST /api/teams
+      final client = _ref.read(apiClientProvider);
+      final data = await client.createTeam(name: name, slug: slug);
       final team = SlackTeam(
-        id: 'team-${DateTime.now().millisecondsSinceEpoch}',
-        name: name,
-        slug: slug,
+        id: data['id']?.toString() ?? 'team-${DateTime.now().millisecondsSinceEpoch}',
+        name: data['name']?.toString() ?? name,
+        slug: data['slug']?.toString() ?? slug,
       );
       state = state.copyWith(teams: [...state.teams, team]);
     } catch (e) {
@@ -75,11 +83,12 @@ class TeamListNotifier extends StateNotifier<TeamListState> {
 
   Future<void> joinTeam(String slug) async {
     try {
-      // TODO: POST /api/teams/:slug/join
+      final client = _ref.read(apiClientProvider);
+      final data = await client.joinTeam(slug);
       final team = SlackTeam(
-        id: 'team-${DateTime.now().millisecondsSinceEpoch}',
-        name: slug,
-        slug: slug,
+        id: data['id']?.toString() ?? 'team-${DateTime.now().millisecondsSinceEpoch}',
+        name: data['name']?.toString() ?? slug,
+        slug: data['slug']?.toString() ?? slug,
       );
       state = state.copyWith(teams: [...state.teams, team]);
     } catch (e) {
@@ -90,6 +99,8 @@ class TeamListNotifier extends StateNotifier<TeamListState> {
 
 final teamListProvider =
     StateNotifierProvider<TeamListNotifier, TeamListState>((ref) {
+  // Re-create when auth state changes
+  ref.watch(simpleAuthProvider);
   return TeamListNotifier(ref);
 });
 
@@ -99,7 +110,7 @@ final teamsProvider = Provider<List<SlackTeam>>((ref) {
 });
 
 // ---------------------------------------------------------------------------
-// SelectedTeam — the team currently being viewed
+// SelectedTeam -- the team currently being viewed
 // ---------------------------------------------------------------------------
 
 class SelectedTeamNotifier extends StateNotifier<SlackTeam?> {

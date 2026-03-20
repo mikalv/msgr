@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api_client_provider.dart';
+import 'auth_state_provider.dart';
 import 'channel_list_provider.dart';
-import 'mock_api_data.dart';
 import 'models.dart';
 import 'team_list_provider.dart';
 
 // ---------------------------------------------------------------------------
-// ChannelMessages — messages for the currently selected channel
+// ChannelMessages -- messages for the currently selected channel
 // ---------------------------------------------------------------------------
 
 class ChannelMessagesState {
@@ -60,15 +60,36 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
   Future<void> loadMessages(String channelId) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      // TODO: GET /api/teams/:slug/channels/:id/messages?limit=50
-      // final team = _ref.read(selectedTeamProvider);
-      // final client = _ref.read(apiClientProvider);
-      // final response = await client.get(
-      //   '/api/teams/${team?.slug}/channels/$channelId/messages',
-      //   query: {'limit': '$_pageSize'},
-      // );
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      final messages = mockSlackMessages[channelId] ?? [];
+      final team = _ref.read(selectedTeamProvider);
+      if (team == null) {
+        state = state.copyWith(isLoading: false);
+        return;
+      }
+
+      final client = _ref.read(apiClientProvider);
+      final data = await client.getMessages(team.slug, channelId, limit: _pageSize);
+      final messages = data.map((m) {
+        final sender = m['sender'] as Map<String, dynamic>? ?? {};
+        return SlackMessage(
+          id: m['id']?.toString() ?? '',
+          channelId: channelId,
+          senderProfileId: m['profile_id']?.toString() ?? sender['id']?.toString() ?? '',
+          senderName: m['sender_name']?.toString() ??
+              sender['display_name']?.toString() ??
+              sender['name']?.toString() ??
+              'Ukjent',
+          content: m['content']?.toString() ?? '',
+          insertedAt: DateTime.tryParse(m['inserted_at']?.toString() ?? '') ??
+              DateTime.now(),
+          threadParentId: m['thread_parent_id'] as String?,
+          mediaRefs: (m['media_refs'] as List?)
+                  ?.map((r) => r.toString())
+                  .toList() ??
+              [],
+          status: MessageStatus.sent,
+        );
+      }).toList();
+
       state = state.copyWith(
         messages: messages,
         isLoading: false,
@@ -85,10 +106,47 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
     if (state.isLoadingMore || !state.hasMore) return;
     state = state.copyWith(isLoadingMore: true);
     try {
-      // TODO: GET /api/teams/:slug/channels/:id/messages?before=cursor&limit=50
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      // Mock: no more messages
-      state = state.copyWith(isLoadingMore: false, hasMore: false);
+      final team = _ref.read(selectedTeamProvider);
+      if (team == null) {
+        state = state.copyWith(isLoadingMore: false);
+        return;
+      }
+
+      final client = _ref.read(apiClientProvider);
+      final data = await client.getMessages(
+        team.slug,
+        channelId,
+        limit: _pageSize,
+        before: state.cursor,
+      );
+
+      if (data.isEmpty) {
+        state = state.copyWith(isLoadingMore: false, hasMore: false);
+        return;
+      }
+
+      final messages = data.map((m) {
+        final sender = m['sender'] as Map<String, dynamic>? ?? {};
+        return SlackMessage(
+          id: m['id']?.toString() ?? '',
+          channelId: channelId,
+          senderProfileId: m['profile_id']?.toString() ?? sender['id']?.toString() ?? '',
+          senderName: m['sender_name']?.toString() ??
+              sender['display_name']?.toString() ??
+              'Ukjent',
+          content: m['content']?.toString() ?? '',
+          insertedAt: DateTime.tryParse(m['inserted_at']?.toString() ?? '') ??
+              DateTime.now(),
+          status: MessageStatus.sent,
+        );
+      }).toList();
+
+      state = state.copyWith(
+        messages: [...messages, ...state.messages],
+        isLoadingMore: false,
+        hasMore: messages.length >= _pageSize,
+        cursor: messages.isNotEmpty ? messages.first.id : state.cursor,
+      );
     } catch (e) {
       state = state.copyWith(isLoadingMore: false, error: e);
     }
@@ -100,12 +158,14 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
     String content, {
     List<String>? mediaRefs,
   }) async {
+    final auth = _ref.read(simpleAuthProvider);
+
     // Optimistic insert
     final tempId = 'local-${DateTime.now().microsecondsSinceEpoch}';
     final optimistic = SlackMessage(
       id: tempId,
       channelId: channelId,
-      senderProfileId: 'me',
+      senderProfileId: auth.profileId ?? 'me',
       senderName: 'Deg',
       content: content,
       insertedAt: DateTime.now(),
@@ -116,22 +176,25 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
     state = state.copyWith(messages: [...state.messages, optimistic]);
 
     try {
-      // TODO: POST /api/teams/:slug/channels/:id/messages
-      await Future<void>.delayed(const Duration(milliseconds: 200));
+      final team = _ref.read(selectedTeamProvider);
+      if (team == null) throw Exception('No team selected');
 
-      // Replace optimistic message with "sent" version.
+      final client = _ref.read(apiClientProvider);
+      final data = await client.sendMessage(team.slug, channelId, content);
+
+      // Replace optimistic message with server response.
       final sent = optimistic.copyWith(
-        id: 'msg-${DateTime.now().microsecondsSinceEpoch}',
+        id: data['id']?.toString() ?? 'msg-${DateTime.now().microsecondsSinceEpoch}',
         status: MessageStatus.sent,
       );
-      final updated = state.messages
-          .map((m) => m.id == tempId ? sent : m)
-          .toList();
+      final updated =
+          state.messages.map((m) => m.id == tempId ? sent : m).toList();
       state = state.copyWith(messages: updated);
     } catch (e) {
       // Mark as failed
       final updated = state.messages
-          .map((m) => m.id == tempId ? m.copyWith(status: MessageStatus.failed) : m)
+          .map(
+              (m) => m.id == tempId ? m.copyWith(status: MessageStatus.failed) : m)
           .toList();
       state = state.copyWith(messages: updated, error: e);
     }

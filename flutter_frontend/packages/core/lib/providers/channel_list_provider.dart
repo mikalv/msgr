@@ -3,12 +3,11 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'api_client_provider.dart';
-import 'mock_api_data.dart';
 import 'models.dart';
 import 'team_list_provider.dart';
 
 // ---------------------------------------------------------------------------
-// ChannelList — channels (+ DMs) for the currently selected team
+// ChannelList -- channels (+ DMs) for the currently selected team
 // ---------------------------------------------------------------------------
 
 class ChannelListState {
@@ -28,7 +27,10 @@ class ChannelListState {
 
   /// Only DM channels.
   List<SlackChannel> get dmChannels =>
-      channels.where((c) => c.kind == ChannelKind.dm || c.kind == ChannelKind.groupDm).toList();
+      channels
+          .where(
+              (c) => c.kind == ChannelKind.dm || c.kind == ChannelKind.groupDm)
+          .toList();
 
   ChannelListState copyWith({
     List<SlackChannel>? channels,
@@ -43,6 +45,17 @@ class ChannelListState {
   }
 }
 
+ChannelKind _parseChannelKind(String? kind) {
+  switch (kind) {
+    case 'dm':
+      return ChannelKind.dm;
+    case 'group_dm':
+      return ChannelKind.groupDm;
+    default:
+      return ChannelKind.channel;
+  }
+}
+
 class ChannelListNotifier extends StateNotifier<ChannelListState> {
   ChannelListNotifier(this._ref) : super(const ChannelListState());
 
@@ -52,11 +65,19 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
   Future<void> loadForTeam(String teamSlug) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      // TODO: GET /api/teams/:slug/channels
-      // final client = _ref.read(apiClientProvider);
-      // final response = await client.get('/api/teams/$teamSlug/channels');
-      await Future<void>.delayed(const Duration(milliseconds: 150));
-      final channels = mockSlackChannels[teamSlug] ?? [];
+      final client = _ref.read(apiClientProvider);
+      final data = await client.getChannels(teamSlug);
+      final channels = data.map((c) {
+        return SlackChannel(
+          id: c['id']?.toString() ?? '',
+          name: c['name']?.toString() ?? '',
+          slug: c['slug']?.toString() ?? c['name']?.toString() ?? '',
+          icon: c['icon'] as String?,
+          kind: _parseChannelKind(c['kind'] as String?),
+          teamSlug: teamSlug,
+          topic: c['topic'] as String?,
+        );
+      }).toList();
       state = state.copyWith(channels: channels, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e);
@@ -69,11 +90,18 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
     String? icon,
   }) async {
     try {
-      // TODO: POST /api/teams/:slug/channels
-      final slug = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
+      final client = _ref.read(apiClientProvider);
+      final data = await client.post('/api/teams/$teamSlug/channels', body: {
+        'name': name,
+        if (icon != null) 'icon': icon,
+      });
+      final slug =
+          data['slug']?.toString() ??
+          name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
       final channel = SlackChannel(
-        id: 'ch-${DateTime.now().millisecondsSinceEpoch}',
-        name: name,
+        id: data['id']?.toString() ??
+            'ch-${DateTime.now().millisecondsSinceEpoch}',
+        name: data['name']?.toString() ?? name,
         slug: slug,
         icon: icon,
         teamSlug: teamSlug,
@@ -112,7 +140,7 @@ final dmChannelsProvider = Provider<List<SlackChannel>>((ref) {
 });
 
 // ---------------------------------------------------------------------------
-// SelectedChannel — the channel currently being viewed
+// SelectedChannel -- the channel currently being viewed
 // ---------------------------------------------------------------------------
 
 class SelectedChannelNotifier extends StateNotifier<SlackChannel?> {

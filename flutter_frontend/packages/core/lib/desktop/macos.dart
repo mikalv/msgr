@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:core/config/app_constants.dart';
 import 'package:core/config/theme.dart';
+import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/services/app_localizations.dart';
 import 'package:core/services/localization/translator.dart';
-import 'package:core/config/AppNavigation.dart';
-import 'package:core/ui/screens/error_screen/error_screen.dart';
+import 'package:core/ui/auth/simple_login_screen.dart';
+import 'package:core/ui/shell/app_shell.dart';
+import 'package:core/ui/shell/simple_chat_content.dart';
 import 'package:core/ui/widgets/desktop/TitlebarSafeArea.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -69,27 +71,21 @@ class _MacOSAppState extends State<MacOSApp>
 
   @override
   void onWindowEvent(String eventName) {
-    // Window events can be handled here if needed
-    // For now, just log the event
     print('[WindowManager] onWindowEvent: $eventName');
   }
 
   @override
   void onWindowFocus() {
-    // Make sure to call once.
     setState(() {
       hasFocus = true;
     });
-    // do something
   }
 
   @override
   void onWindowBlur() {
-    // Make sure to call once.
     setState(() {
       hasFocus = false;
     });
-    // do something
   }
 
   @override
@@ -106,14 +102,11 @@ class _MacOSAppState extends State<MacOSApp>
 
   Widget loadingScreen() {
     var progCtrl = AnimationController(
-      /// [AnimationController]s can be created with `vsync: this` because of
-      /// [TickerProviderStateMixin].
       vsync: this,
       duration: const Duration(seconds: 5),
     )..addListener(() {
         setState(() {});
       });
-    //progCtrl.repeat(reverse: true);
     final appThemeData = AppThemeData(brightness: _brightness);
     return AppTheme(
       data: appThemeData,
@@ -159,10 +152,16 @@ class _MacOSAppState extends State<MacOSApp>
       child: TitlebarSafeArea(
         child: AppTheme(
           data: appThemeData,
-          child: CupertinoApp.router(
+          child: MaterialApp(
             title: appTitle,
             debugShowCheckedModeBanner: false,
-            theme: appThemeData.getCupertinoThemeData(_brightness),
+            theme: ThemeData.dark().copyWith(
+              colorScheme: ColorScheme.dark(
+                primary: const Color(0xFF02ac88),
+                secondary: const Color(0xFF02ac88),
+              ),
+              scaffoldBackgroundColor: const Color(0xFF1E1E1E),
+            ),
             localizationsDelegates: const [
               AppLocalizations.delegate,
               DefaultMaterialLocalizations.delegate,
@@ -179,7 +178,7 @@ class _MacOSAppState extends State<MacOSApp>
               }
               return null;
             },
-            routerConfig: AppNavigation.router,
+            home: const _AuthGate(),
           ),
         ),
       ),
@@ -214,5 +213,22 @@ class _MacOSAppState extends State<MacOSApp>
         },
       );
     }
+  }
+}
+
+/// Gates the app on simple auth state.
+/// Shows login screen if not authenticated, app shell + chat if authenticated.
+class _AuthGate extends ConsumerWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isLoggedIn = ref.watch(isSimpleAuthLoggedInProvider);
+
+    if (!isLoggedIn) {
+      return const SimpleLoginScreen();
+    }
+
+    return const AppShell(child: SimpleChatContent());
   }
 }

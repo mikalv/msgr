@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:core/providers/channel_list_provider.dart';
 import 'package:core/providers/draft_provider.dart';
-import 'package:core/providers/models.dart';
+import 'package:core/providers/models.dart' hide ChannelKind;
 import 'package:core/providers/team_list_provider.dart';
 import 'package:core/providers/unread_provider.dart';
 

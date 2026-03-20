@@ -114,7 +114,6 @@ class AppNavigation {
   static const String createConversationPathParam =
       '/new/conversations/:teamName';
   static const String channelsPath = '/channels';
-  static const String channelsPath = '/channels';
   static const String createChannelPath = '/new/channels/';
   static const String createChannelPathParam = '/new/channels/:teamName';
   static const String discoveryPath = '/discovery';
