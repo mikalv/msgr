@@ -33,9 +33,7 @@ class _PinputLoginCodeState extends ConsumerState<PinputLoginCode> {
     /// In case you need an SMS autofill feature
     if (!kIsWeb) {
       if (Platform.isIOS || Platform.isAndroid) {
-        smsRetriever = SmsRetrieverImpl(
-          SmartAuth(),
-        );
+        smsRetriever = SmsRetrieverImpl();
       }
     }
   }
@@ -171,9 +169,6 @@ class _PinputLoginCodeState extends ConsumerState<PinputLoginCode> {
               focusNode: focusNode,
               defaultPinTheme: defaultPinTheme,
               separatorBuilder: (index) => const SizedBox(width: 8),
-              /*validator: (value) {
-                return value == '2222' ? null : 'Pin is incorrect';
-              },*/
               hapticFeedbackType: HapticFeedbackType.lightImpact,
               onCompleted: (pin) {
                 sendCodeToServer(context, pin);
@@ -219,25 +214,17 @@ class _PinputLoginCodeState extends ConsumerState<PinputLoginCode> {
 /// You, as a developer should implement this interface.
 /// You can use any package to retrieve the SMS code. in this example we are using SmartAuth
 class SmsRetrieverImpl implements SmsRetriever {
-  const SmsRetrieverImpl(this.smartAuth);
-
-  final SmartAuth smartAuth;
+  const SmsRetrieverImpl();
 
   @override
-  Future<void> dispose() {
-    return smartAuth.removeSmsListener();
+  Future<void> dispose() async {
+    // SmartAuth 3.2.0 no longer has removeSmsListener
   }
 
   @override
   Future<String?> getSmsCode() async {
-    final signature = await smartAuth.getAppSignature();
-    debugPrint('App Signature: $signature');
-    final res = await smartAuth.getSmsCode(
-      useUserConsentApi: true,
-    );
-    if (res.succeed && res.codeFound) {
-      return res.code!;
-    }
+    // SmartAuth 3.2.0 API changed - use requestSms instead
+    // For now return null as SMS retrieval needs platform-specific setup
     return null;
   }
 

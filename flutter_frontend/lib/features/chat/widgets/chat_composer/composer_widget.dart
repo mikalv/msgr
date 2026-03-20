@@ -6,7 +6,7 @@ const _linkUrlFieldKey = ValueKey('composerLinkUrlField');
 enum _FormattingAction { bold, italic, strike, code, link, bullet, quote }
 
 class ChatComposer extends StatefulWidget {
-  const ChatComposer({
+  ChatComposer({
     super.key,
     required this.controller,
     required this.onSubmit,
@@ -25,7 +25,7 @@ class ChatComposer extends StatefulWidget {
   final List<SlashCommand> availableCommands;
   final List<ComposerMention> availableMentions;
   final ChatVoiceRecorder voiceRecorder;
-  final FilePickerPlatform? filePicker;
+  final dynamic filePicker;
 
   @override
   State<ChatComposer> createState() => _ChatComposerState();
@@ -374,6 +374,7 @@ class _ChatComposerState extends State<ChatComposer>
                 ),
               ),
             ),
+            ),
           ],
         ),
       ),
@@ -503,7 +504,9 @@ class _ChatComposerState extends State<ChatComposer>
   void _handleVoiceState(ChatVoiceState state) {
     setState(() {});
     if (!state.isRecording) {
-      widget.controller.setVoiceNote(widget.controller.value.voiceNote);
+      if (widget.controller.value.voiceNote != null) {
+        widget.controller.setVoiceNote(widget.controller.value.voiceNote!);
+      }
     }
   }
 

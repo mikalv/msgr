@@ -1,27 +1,26 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/authentication/auth_actions.dart';
-import 'package:messngr/redux/navigation/navigation_actions.dart';
+import 'package:messngr/providers/auth_provider.dart';
 import 'package:messngr/ui/widgets/MobileInputWithOutline.dart';
 import 'package:messngr/ui/widgets/PhoneField/phone_number.dart';
 import 'package:messngr/ui/widgets/PhoneField/countries.dart';
 import 'package:messngr/ui/widgets/auth/auth_input_decoration.dart';
 import 'package:messngr/ui/widgets/auth/auth_shell.dart';
-import 'package:messngr/utils/flutter_redux.dart';
+import 'package:go_router/go_router.dart';
 
-class RegisterUserScreen extends StatefulWidget {
+class RegisterUserScreen extends ConsumerStatefulWidget {
   const RegisterUserScreen({super.key});
 
   @override
-  State<RegisterUserScreen> createState() => _RegisterUserScreenState();
+  ConsumerState<RegisterUserScreen> createState() => _RegisterUserScreenState();
 }
 
-class _RegisterUserScreenState extends State<RegisterUserScreen> {
+class _RegisterUserScreenState extends ConsumerState<RegisterUserScreen> {
   final Logger _log = Logger('_RegisterUserScreenState');
   final _msisdnFieldCtrl = TextEditingController();
   final _emailFieldCtrl = TextEditingController();
@@ -130,34 +129,29 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
       return;
     }
 
-    final completer = Completer();
     final displayName = _displayNameController.text.trim().isEmpty
         ? null
         : _displayNameController.text.trim();
 
-    if (useMsisdnForAuth) {
-      final phoneNumber = _phone!.completeNumber;
-      _log.info('Requesting login for number $phoneNumber');
-      StoreProvider.of<AppState>(context).dispatch(RequestCodeMsisdnAction(
-        msisdn: phoneNumber,
-        displayName: displayName,
-        completer: completer,
-      ));
-    } else {
-      final email = _emailFieldCtrl.text.trim();
-      _log.info('Requesting login for email $email');
-      StoreProvider.of<AppState>(context).dispatch(RequestCodeEmailAction(
-        email: email,
-        displayName: displayName,
-        completer: completer,
-      ));
-    }
-
     try {
-      await completer.future;
+      if (useMsisdnForAuth) {
+        final phoneNumber = _phone!.completeNumber;
+        _log.info('Requesting login for number $phoneNumber');
+        await ref.read(authProvider.notifier).loginWithEmailOrPhone(
+              phoneNumber,
+              displayName: displayName,
+            );
+      } else {
+        final email = _emailFieldCtrl.text.trim();
+        _log.info('Requesting login for email $email');
+        await ref.read(authProvider.notifier).loginWithEmailOrPhone(
+              email,
+              displayName: displayName,
+            );
+      }
+
       if (!mounted) return;
-      StoreProvider.of<AppState>(context).dispatch(
-          NavigateToNewRouteAction(route: AppNavigation.registerCodePath));
+      context.go(AppNavigation.registerCodePath);
     } catch (error, stackTrace) {
       _log.severe(error, stackTrace);
       if (!mounted) return;
@@ -188,7 +182,7 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
       icon: Icons.person_add_alt_rounded,
       title: 'Lag din msgr-konto',
       subtitle:
-          'Velg hvordan du vil motta engangskoden din og bli med i samtalene på sekunder.',
+          'Velg hvordan du vil motta engangskoden din og bli med i samtalene pa sekunder.',
       illustrationAsset: 'assets/images/welcome/route_path.png',
       bulletPoints: const [
         'Tilpass innloggingen til din arbeidsflyt.',
@@ -280,7 +274,7 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Vi sender deg en kode som bekrefter identiteten din. Den er gyldig i noen få minutter.',
+              'Vi sender deg en kode som bekrefter identiteten din. Den er gyldig i noen fa minutter.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white54, height: 1.4),
             ),
@@ -289,7 +283,7 @@ class _RegisterUserScreenState extends State<RegisterUserScreen> {
       ),
       footer: const [
         Text(
-          'Har du allerede en konto? Gå tilbake og logg inn.',
+          'Har du allerede en konto? Ga tilbake og logg inn.',
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white38),
         ),

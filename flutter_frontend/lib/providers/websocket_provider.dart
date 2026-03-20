@@ -29,15 +29,15 @@ class WebSocketState {
 }
 
 /// WebSocket notifier class
-class WebSocketNotifier extends StateNotifier<WebSocketState> {
-  WebSocketNotifier(this._ref) : super(const WebSocketState());
-
-  final Ref _ref;
+class WebSocketNotifier extends Notifier<WebSocketState> {
   MsgrConnection? _connection;
+
+  @override
+  WebSocketState build() => const WebSocketState();
 
   /// Connect to WebSocket when team is selected
   Future<void> connect() async {
-    final authState = _ref.read(authProvider);
+    final authState = ref.read(authProvider);
     final currentTeam = authState.currentTeam;
     final teamAccessToken = authState.teamAccessToken;
     final currentUser = authState.currentUser;
@@ -66,7 +66,7 @@ class WebSocketNotifier extends StateNotifier<WebSocketState> {
         _connection = LibMsgr().getWebsocketConnection();
 
         // Load team data into team_provider
-        await _ref.read(teamProvider.notifier).loadTeamData(currentTeam.name);
+        await ref.read(teamProvider.notifier).loadTeamData(currentTeam.name);
 
         state = state.copyWith(
           isConnected: true,
@@ -100,18 +100,15 @@ class WebSocketNotifier extends StateNotifier<WebSocketState> {
       throw Exception('Not connected to WebSocket');
     }
 
-    final currentProfile = _ref.read(currentProfileProvider);
+    final currentProfile = ref.read(currentProfileProvider);
     if (currentProfile == null) {
       throw Exception('No current profile');
     }
 
     // Create message object
     final message = MMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
       content: content,
-      createdAt: DateTime.now().toUtc(),
-      updatedAt: DateTime.now().toUtc(),
-      senderID: currentProfile.id,
+      fromProfileID: currentProfile.id,
       conversationID: conversationId,
       channelID: channelId,
     );
@@ -149,8 +146,8 @@ class WebSocketNotifier extends StateNotifier<WebSocketState> {
 
 /// WebSocket state provider
 final webSocketProvider =
-    StateNotifierProvider<WebSocketNotifier, WebSocketState>((ref) {
-  return WebSocketNotifier(ref);
+    NotifierProvider<WebSocketNotifier, WebSocketState>(() {
+  return WebSocketNotifier();
 });
 
 /// Convenience provider for connection status

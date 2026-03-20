@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:messngr/config/app_constants.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/profile/profile_actions.dart';
-import 'package:messngr/utils/flutter_redux.dart';
 
-class CreateProfileScreen extends StatefulWidget {
+class CreateProfileScreen extends ConsumerStatefulWidget {
   const CreateProfileScreen({super.key});
 
   @override
-  State<CreateProfileScreen> createState() => _CreateProfileScreenState();
+  ConsumerState<CreateProfileScreen> createState() => _CreateProfileScreenState();
 }
 
-class _CreateProfileScreenState extends State<CreateProfileScreen> {
+class _CreateProfileScreenState extends ConsumerState<CreateProfileScreen> {
   final _userNameCtrl = TextEditingController();
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
@@ -122,12 +120,8 @@ class _CreateProfileScreenState extends State<CreateProfileScreen> {
                     border: borderStyle)),
             ElevatedButton(
               child: const Text('Create profile and start chat'),
-              onPressed: () => {
-                StoreProvider.of<AppState>(context).dispatch(
-                    CreateProfileAction(
-                        username: _userNameCtrl.text,
-                        firstName: _firstNameCtrl.text,
-                        lastName: _lastNameCtrl.text))
+              onPressed: () {
+                // TODO: Implement profile creation via Riverpod provider
               },
             )
           ],

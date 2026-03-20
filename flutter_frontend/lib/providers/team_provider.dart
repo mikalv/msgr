@@ -43,8 +43,9 @@ class TeamState {
 }
 
 /// Team notifier class
-class TeamNotifier extends StateNotifier<TeamState> {
-  TeamNotifier() : super(const TeamState());
+class TeamNotifier extends Notifier<TeamState> {
+  @override
+  TeamState build() => const TeamState();
 
   /// Load team data (bootstrap)
   Future<void> loadTeamData(String teamName) async {
@@ -52,19 +53,6 @@ class TeamNotifier extends StateNotifier<TeamState> {
     try {
       // Get repositories from LibMsgr for this team
       final repositories = LibMsgr().repositoryFactory.getRepositories(teamName);
-
-      // Subscribe to repository changes
-      repositories.conversationRepository.subscribe((conversations) {
-        state = state.copyWith(conversations: conversations);
-      });
-
-      repositories.channelRepository.subscribe((channels) {
-        state = state.copyWith(channels: channels);
-      });
-
-      repositories.profileRepository.subscribe((profiles) {
-        state = state.copyWith(profiles: profiles);
-      });
 
       // Load initial data from repositories
       final conversations = repositories.conversationRepository.items;
@@ -139,7 +127,7 @@ class TeamNotifier extends StateNotifier<TeamState> {
 }
 
 /// Team state provider
-final teamProvider = StateNotifierProvider<TeamNotifier, TeamState>((ref) {
+final teamProvider = NotifierProvider<TeamNotifier, TeamState>(() {
   return TeamNotifier();
 });
 

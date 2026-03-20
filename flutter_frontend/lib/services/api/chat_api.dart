@@ -6,7 +6,7 @@ import 'package:messngr/features/chat/models/chat_message.dart';
 import 'package:messngr/features/chat/models/chat_thread.dart';
 
 class ApiException implements Exception {
-  ApiException(this.statusCode, this.body);
+  const ApiException(this.statusCode, this.body);
 
   final int statusCode;
   final String body;
@@ -52,7 +52,7 @@ class ThumbnailUploadInfo {
     return ThumbnailUploadInfo(
       method: json['method'] as String? ?? 'PUT',
       url: Uri.parse(json['url'] as String? ?? ''),
-      headers: _stringMap(json['headers'] as Map<String, dynamic>? ?? const {}),
+      headers: ChatApi._stringMap(json['headers'] as Map<String, dynamic>? ?? const {}),
       bucket: json['bucket'] as String? ?? '',
       objectKey:
           json['object_key'] as String? ?? json['objectKey'] as String? ?? '',
@@ -110,7 +110,7 @@ class PresignedUploadInfo {
     return PresignedUploadInfo(
       method: json['method'] as String? ?? 'PUT',
       url: Uri.parse(json['url'] as String? ?? ''),
-      headers: _stringMap(json['headers'] as Map<String, dynamic>? ?? const {}),
+      headers: ChatApi._stringMap(json['headers'] as Map<String, dynamic>? ?? const {}),
       bucket: json['bucket'] as String? ?? '',
       objectKey:
           json['object_key'] as String? ?? json['objectKey'] as String? ?? '',

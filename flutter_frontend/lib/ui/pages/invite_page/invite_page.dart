@@ -1,23 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/config/app_constants.dart';
 import 'package:messngr/config/themedata.dart';
-import 'package:messngr/redux/app_state.dart';
-import 'package:messngr/redux/invitation/invitation_actions.dart';
-import 'package:messngr/redux/navigation/navigation_actions.dart';
 import 'package:messngr/ui/widgets/MobileInputWithOutline.dart';
 import 'package:messngr/ui/widgets/custom_switch.dart';
-import 'package:messngr/utils/flutter_redux.dart';
+import 'package:go_router/go_router.dart';
 
-class InvitePage extends StatefulWidget {
+class InvitePage extends ConsumerStatefulWidget {
   const InvitePage({super.key});
 
   @override
-  State<InvitePage> createState() => _InvitePageState();
+  ConsumerState<InvitePage> createState() => _InvitePageState();
 }
 
-class _InvitePageState extends State<InvitePage> {
+class _InvitePageState extends ConsumerState<InvitePage> {
   final Logger _log = Logger('_InvitePageState');
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final _msisdnFieldCtrl = TextEditingController();
@@ -32,20 +30,11 @@ class _InvitePageState extends State<InvitePage> {
     super.dispose();
   }
 
-  _inviteTeammate(context) {
+  _inviteTeammate(BuildContext context) {
     return () {
-      final store = StoreProvider.of<AppState>(context);
-      if (useMsisdnForInvitation) {
-        store.dispatch(InviteUserToTeamAction(
-            identifier: phoneNumber!,
-            teamName: store.state.teamState!.selectedTeam!.name));
-      } else {
-        store.dispatch(InviteUserToTeamAction(
-            identifier: _emailFieldCtrl.text,
-            teamName: store.state.teamState!.selectedTeam!.name));
-      }
-      store.dispatch(NavigateShellToNewRouteAction(
-          route: AppNavigation.homePath, kRouteDoPopInstead: true));
+      // TODO: Implement invitation via Riverpod provider
+      _log.info('Invite teammate - not yet implemented with Riverpod');
+      context.go(AppNavigation.homePath);
     };
   }
 
@@ -115,13 +104,11 @@ class _InvitePageState extends State<InvitePage> {
 
   @override
   Widget build(BuildContext context) {
-    final store = StoreProvider.of<AppState>(context);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => store.dispatch(NavigateShellToNewRouteAction(
-              route: AppNavigation.dashboardPath)),
+          onPressed: () => context.go(AppNavigation.dashboardPath),
         ),
         title: const Text('Invite Teammates'),
       ),

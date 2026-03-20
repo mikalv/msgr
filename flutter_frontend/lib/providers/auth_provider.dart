@@ -88,12 +88,12 @@ class AuthState {
 }
 
 /// Auth notifier class
-class AuthNotifier extends StateNotifier<AuthState> {
-  AuthNotifier(this._ref) : super(const AuthState()) {
+class AuthNotifier extends Notifier<AuthState> {
+  @override
+  AuthState build() {
     _loadPersistedSession();
+    return const AuthState();
   }
-
-  final Ref _ref;
 
   // Storage keys for session persistence
   static const String _keyCurrentUser = 'auth_current_user';
@@ -394,7 +394,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true);
     try {
-      final api = _ref.read(profileApiProvider);
+      final api = ref.read(profileApiProvider);
       final result = await api.switchProfile(
         identity: identity,
         profileId: profileId,
@@ -420,7 +420,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<List<Profile>> listProfiles({
     required AccountIdentity identity,
   }) async {
-    final api = _ref.read(profileApiProvider);
+    final api = ref.read(profileApiProvider);
     return await api.listProfiles(identity: identity);
   }
 
@@ -430,7 +430,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String profileId,
     required Map<String, dynamic> changes,
   }) async {
-    final api = _ref.read(profileApiProvider);
+    final api = ref.read(profileApiProvider);
     final updated = await api.updateProfile(
       identity: identity,
       profileId: profileId,
@@ -451,7 +451,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required AccountIdentity identity,
     required String profileId,
   }) async {
-    final api = _ref.read(profileApiProvider);
+    final api = ref.read(profileApiProvider);
     await api.deleteProfile(
       identity: identity,
       profileId: profileId,
@@ -491,8 +491,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 }
 
 /// Auth state provider
-final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier(ref);
+final authProvider = NotifierProvider<AuthNotifier, AuthState>(() {
+  return AuthNotifier();
 });
 
 /// Convenience providers for specific auth state
