@@ -46,13 +46,13 @@ class AuthService {
   final http.Client _client;
 
   /// POST /api/v1/auth/challenge
-  Future<ChallengeResult> requestChallenge(String email) async {
+  Future<ChallengeResult> requestChallenge(String identifier, {String channel = 'email'}) async {
     final response = await _client.post(
       Uri.parse('$baseUrl/api/v1/auth/challenge'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'channel': 'email',
-        'identifier': email,
+        'channel': channel,
+        'identifier': identifier,
       }),
     );
 

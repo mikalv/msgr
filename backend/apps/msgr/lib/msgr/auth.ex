@@ -220,14 +220,37 @@ defmodule Messngr.Auth do
   end
 
   defp upsert_identity_from_challenge(challenge, attrs) do
+    display_name =
+      Map.get(attrs, "display_name") || derive_display_name(challenge)
+
     Accounts.ensure_identity(%{
       kind: challenge.channel,
       value: challenge.target,
-      display_name: Map.get(attrs, "display_name"),
+      display_name: display_name,
       email: channel_email(challenge),
       phone_number: channel_phone(challenge)
     })
   end
+
+  defp derive_display_name(%Challenge{channel: :email, target: target}) do
+    target
+    |> String.split("@")
+    |> List.first()
+    |> String.replace(~r/[._-]/, " ")
+    |> String.split()
+    |> Enum.map(&String.capitalize/1)
+    |> Enum.join(" ")
+    |> case do
+      name when byte_size(name) < 2 -> name <> " "
+      name -> name
+    end
+  end
+
+  defp derive_display_name(%Challenge{channel: :phone, target: target}) do
+    "User #{String.slice(target, -4, 4)}"
+  end
+
+  defp derive_display_name(_), do: "User"
 
   defp channel_email(%Challenge{channel: :email, target: target}), do: target
   defp channel_email(_), do: nil

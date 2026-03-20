@@ -148,8 +148,7 @@ class _MacOSAppState extends State<MacOSApp>
   @override
   Widget build(BuildContext context) {
     return ProviderScope(
-      child: TitlebarSafeArea(
-        child: MaterialApp(
+      child: MaterialApp(
           title: appTitle,
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
@@ -170,7 +169,6 @@ class _MacOSAppState extends State<MacOSApp>
           ],
           supportedLocales: kSupportedLocales,
           home: const _AuthGate(),
-        ),
       ),
     );
   }

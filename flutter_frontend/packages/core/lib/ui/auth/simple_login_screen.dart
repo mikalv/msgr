@@ -4,16 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/services/auth_service.dart';
 
-/// Simple login screen for the header-based auth flow (dev.msgr.no).
-///
-/// Two-step OTP flow:
-///   1. Enter email -> "Send kode"
-///   2. Enter code -> "Logg inn"
 class SimpleLoginScreen extends ConsumerStatefulWidget {
   const SimpleLoginScreen({super.key, this.onLoginSuccess});
-
-  /// Called after successful login. If null, the provider change will
-  /// trigger navigation via the router redirect.
   final VoidCallback? onLoginSuccess;
 
   @override
@@ -21,7 +13,7 @@ class SimpleLoginScreen extends ConsumerStatefulWidget {
 }
 
 class _SimpleLoginScreenState extends ConsumerState<SimpleLoginScreen> {
-  final _emailController = TextEditingController();
+  final _identifierController = TextEditingController();
   final _codeController = TextEditingController();
   final _authService = AuthService();
 
@@ -29,74 +21,84 @@ class _SimpleLoginScreenState extends ConsumerState<SimpleLoginScreen> {
   String? _error;
   ChallengeResult? _challenge;
   String? _debugCode;
+  bool _usePhone = false; // toggle between email and phone
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _identifierController.dispose();
     _codeController.dispose();
     super.dispose();
   }
 
+  String get _channel => _usePhone ? 'phone' : 'email';
+
   Future<void> _requestChallenge() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      setState(() => _error = 'Skriv inn e-postadresse');
+    final identifier = _identifierController.text.trim();
+    if (identifier.isEmpty) {
+      setState(() => _error = _usePhone ? 'Skriv inn telefonnummer' : 'Skriv inn e-postadresse');
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    setState(() { _isLoading = true; _error = null; });
 
     try {
-      final challenge = await _authService.requestChallenge(email);
+      final challenge = await _authService.requestChallenge(identifier, channel: _channel);
       setState(() {
         _challenge = challenge;
         _debugCode = challenge.debugCode;
         _isLoading = false;
-        // Auto-fill debug code in dev mode
         if (challenge.debugCode != null) {
           _codeController.text = challenge.debugCode!;
         }
       });
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      setState(() { _error = e.toString(); _isLoading = false; });
     }
   }
 
   Future<void> _verifyCode() async {
     final code = _codeController.text.trim();
-    if (code.isEmpty || _challenge == null) {
-      setState(() => _error = 'Skriv inn koden');
+    if (code.isEmpty) {
+      setState(() => _error = 'Skriv inn kode');
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    setState(() { _isLoading = true; _error = null; });
 
     try {
       final session = await _authService.verifyCode(_challenge!.id, code);
 
-      // Store auth state
       ref.read(simpleAuthProvider.notifier).login(
-            accountId: session.accountId,
-            profileId: session.profileId,
-            email: _emailController.text.trim(),
-          );
+        accountId: session.accountId,
+        profileId: session.profileId,
+        email: session.email,
+      );
 
       widget.onLoginSuccess?.call();
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      setState(() { _error = e.toString(); _isLoading = false; });
     }
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.white54),
+      enabledBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: Colors.white24),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: Color(0xFF02ac88)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      disabledBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: Colors.white12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      filled: true,
+      fillColor: Colors.white.withValues(alpha: 0.05),
+    );
   }
 
   @override
@@ -114,94 +116,76 @@ class _SimpleLoginScreenState extends ConsumerState<SimpleLoginScreen> {
               children: [
                 const Text(
                   'Messngr',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   _challenge == null
-                      ? 'Logg inn med e-post'
-                      : 'Skriv inn koden sendt til ${_emailController.text}',
+                      ? (_usePhone ? 'Logg inn med telefonnummer' : 'Logg inn med e-post')
+                      : 'Skriv inn koden sendt til ${_challenge!.targetHint ?? _identifierController.text}',
                   style: const TextStyle(color: Colors.white70, fontSize: 14),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
 
-                // Email field
+                // Identifier field (email or phone)
                 TextField(
-                  controller: _emailController,
+                  controller: _identifierController,
                   enabled: _challenge == null && !_isLoading,
-                  keyboardType: TextInputType.emailAddress,
+                  autofocus: true,
+                  keyboardType: _usePhone ? TextInputType.phone : TextInputType.emailAddress,
                   style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'E-post',
-                    labelStyle: const TextStyle(color: Colors.white54),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white24),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Color(0xFF02ac88)),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    disabledBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
-                  ),
+                  decoration: _inputDecoration(_usePhone ? 'Telefonnummer' : 'E-post'),
+                  onSubmitted: _challenge == null ? (_) => _requestChallenge() : null,
                 ),
 
-                // Code field (shown after challenge)
+                // Toggle email/phone
+                if (_challenge == null)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _isLoading ? null : () {
+                        setState(() {
+                          _usePhone = !_usePhone;
+                          _identifierController.clear();
+                          _error = null;
+                        });
+                      },
+                      child: Text(
+                        _usePhone ? 'Bruk e-post i stedet' : 'Bruk telefonnummer i stedet',
+                        style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                    ),
+                  ),
+
+                // Code field
                 if (_challenge != null) ...[
                   const SizedBox(height: 16),
                   TextField(
                     controller: _codeController,
                     enabled: !_isLoading,
+                    autofocus: true,
                     keyboardType: TextInputType.number,
                     style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Kode',
-                      labelStyle: const TextStyle(color: Colors.white54),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(color: Colors.white24),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(color: Color(0xFF02ac88)),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
-                    ),
+                    decoration: _inputDecoration('Kode'),
+                    onSubmitted: (_) => _verifyCode(),
                   ),
                   if (_debugCode != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        'Debug-kode: $_debugCode',
-                        style: const TextStyle(
-                          color: Colors.amber,
-                          fontSize: 12,
-                        ),
-                      ),
+                      child: Text('Debug-kode: $_debugCode',
+                        style: const TextStyle(color: Colors.amber, fontSize: 12)),
                     ),
                 ],
 
-                // Error message
+                // Error
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
-                    child: Text(
-                      _error!,
+                    child: Text(_error!,
                       style: const TextStyle(color: Colors.redAccent, fontSize: 13),
-                      textAlign: TextAlign.center,
-                    ),
+                      textAlign: TextAlign.center),
                   ),
 
                 const SizedBox(height: 24),
@@ -210,53 +194,29 @@ class _SimpleLoginScreenState extends ConsumerState<SimpleLoginScreen> {
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: _isLoading
-                        ? null
-                        : (_challenge == null ? _requestChallenge : _verifyCode),
+                    onPressed: _isLoading ? null : (_challenge == null ? _requestChallenge : _verifyCode),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF02ac88),
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       disabledBackgroundColor: Colors.grey.shade700,
                     ),
                     child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(
-                            _challenge == null ? 'Send kode' : 'Logg inn',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                        ? const SizedBox(height: 20, width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : Text(_challenge == null ? 'Send kode' : 'Logg inn',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   ),
                 ),
 
-                // Reset link
+                // Reset
                 if (_challenge != null)
                   TextButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () {
-                            setState(() {
-                              _challenge = null;
-                              _debugCode = null;
-                              _codeController.clear();
-                              _error = null;
-                            });
-                          },
-                    child: const Text(
-                      'Bruk annen e-post',
-                      style: TextStyle(color: Colors.white54),
-                    ),
+                    onPressed: _isLoading ? null : () {
+                      setState(() { _challenge = null; _debugCode = null; _codeController.clear(); _error = null; });
+                    },
+                    child: Text('Bruk ${_usePhone ? "annet nummer" : "annen e-post"}',
+                      style: const TextStyle(color: Colors.white54)),
                   ),
               ],
             ),
