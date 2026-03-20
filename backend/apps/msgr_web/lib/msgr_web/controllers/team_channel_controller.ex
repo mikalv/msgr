@@ -23,8 +23,10 @@ defmodule MessngrWeb.TeamChannelController do
     unless profile do
       {:error, :forbidden}
     else
+      slug = params["slug"] || params["name"] |> to_string() |> String.downcase() |> String.replace(~r/[^a-z0-9]+/, "-") |> String.trim("-")
       attrs = %{
         name: params["name"],
+        slug: slug,
         icon: params["icon"],
         visibility: params["visibility"] || "public",
         topic: params["topic"],
