@@ -51,24 +51,28 @@ defmodule MessngrWeb.UserSocket do
     )
 
     with {:ok, account_id} <- validate_uuid(account_id, "account_id"),
-         {:ok, profile_id} <- validate_uuid(profile_id, "profile_id"),
-         account when not is_nil(account) <- load_account(account_id),
-         profile when not is_nil(profile) <- load_profile(profile_id, account) do
+         account when not is_nil(account) <- load_account(account_id) do
+
+      # Profile is optional at connect time — team profile is resolved per-channel join
+      profile = case validate_uuid(profile_id, "profile_id") do
+        {:ok, pid} -> load_profile(pid, account)
+        _ -> nil
+      end
+
       socket =
         socket
         |> assign(:current_account, account)
         |> assign(:current_profile, profile)
+        |> assign(:uid, account_id)
         |> assign(:account_id, account_id)
         |> assign(:profile_id, profile_id)
         |> assign(:session_id, session_id)
+        |> assign(:tenant, nil)
+        |> assign(:team_id, nil)
 
       socket = if device_id, do: maybe_assign_device(socket, device_id, account), else: socket
 
-      Logger.debug("WebSocket authenticated",
-        account_id: account_id,
-        profile_id: profile_id
-      )
-
+      Logger.info("WebSocket authenticated: account=#{account_id}")
       {:ok, socket}
     else
       error ->
@@ -80,6 +84,11 @@ defmodule MessngrWeb.UserSocket do
   channel "msgr:device", MessngrWeb.DeviceChannel
   channel "conversation:*", MessngrWeb.ConversationChannel
   channel "rtc:*", MessngrWeb.RTCChannel
+
+  # Team channels (from TeamsWeb, routed here since MessngrWeb.Endpoint serves /socket)
+  channel "channel:*", TeamsWeb.ChatChannel
+  channel "team:*", TeamsWeb.TeamChannel
+  channel "presence:*", TeamsWeb.PresenceChannel
 
   # Socket IDs are topics that allow you to identify all sockets for a given user:
   #
