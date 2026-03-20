@@ -1,0 +1,11 @@
+name: llm_agent
+description: LLM integration for Msgr — bots, summaries, and AI features
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  http: ^1.2.1
+  args: ^2.4.0
