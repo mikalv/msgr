@@ -278,6 +278,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
               Expanded(
                 child: TextField(
                   controller: _textController,
+                  autofocus: true,
                   onChanged: _onTextChanged,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(

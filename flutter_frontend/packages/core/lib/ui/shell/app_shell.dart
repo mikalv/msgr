@@ -5,6 +5,7 @@ import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/providers/channel_list_provider.dart';
 import 'package:core/providers/draft_provider.dart';
 import 'package:core/providers/models.dart' hide ChannelKind;
+import 'package:core/providers/msgr_client_provider.dart';
 import 'package:core/providers/team_list_provider.dart';
 import 'package:core/providers/unread_provider.dart';
 
@@ -62,22 +63,20 @@ class _AppShellState extends ConsumerState<AppShell> {
       );
     }
 
-    return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isDesktop = constraints.maxWidth > 1024;
-          final isTablet =
-              constraints.maxWidth >= 600 && constraints.maxWidth <= 1024;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth > 1024;
+        final isTablet =
+            constraints.maxWidth >= 600 && constraints.maxWidth <= 1024;
 
-          if (isDesktop) {
-            return _buildDesktop();
-          } else if (isTablet) {
-            return _buildTablet();
-          } else {
-            return _buildMobile();
-          }
-        },
-      ),
+        if (isDesktop) {
+          return _buildDesktop();
+        } else if (isTablet) {
+          return _buildTablet();
+        } else {
+          return _buildMobile();
+        }
+      },
     );
   }
 
@@ -155,26 +154,29 @@ class _AppShellState extends ConsumerState<AppShell> {
   // Desktop: TeamRail + ChannelSidebar + content
   // ---------------------------------------------------------------------------
   Widget _buildDesktop() {
-    return Row(
-      children: [
-        TeamRail(
-          teams: _mockTeamsFromProviders,
-          selectedIndex: _selectedTeamIndex,
-          onTeamSelected: _onTeamSelected,
-          onAddTeam: _showCreateTeamDialog,
-        ),
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: _sidebarCollapsed ? 0 : ShellTheme.sidebarWidth,
-          curve: Curves.easeInOut,
-          clipBehavior: Clip.hardEdge,
-          decoration: const BoxDecoration(),
-          child: _sidebarCollapsed
-              ? const SizedBox.shrink()
-              : _buildSidebar(),
-        ),
-        Expanded(child: widget.child),
-      ],
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Row(
+        children: [
+          TeamRail(
+            teams: _mockTeamsFromProviders,
+            selectedIndex: _selectedTeamIndex,
+            onTeamSelected: _onTeamSelected,
+            onAddTeam: _showCreateTeamDialog,
+          ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: _sidebarCollapsed ? 0 : ShellTheme.sidebarWidth,
+            curve: Curves.easeInOut,
+            clipBehavior: Clip.hardEdge,
+            decoration: const BoxDecoration(),
+            child: _sidebarCollapsed
+                ? const SizedBox.shrink()
+                : _buildSidebar(),
+          ),
+          Expanded(child: widget.child),
+        ],
+      ),
     );
   }
 
@@ -395,6 +397,10 @@ class _AppShellState extends ConsumerState<AppShell> {
       final slug = slugController.text.trim();
       if (name.isNotEmpty && slug.isNotEmpty) {
         await ref.read(teamListProvider.notifier).createTeam(name, slug);
+        // Show profile setup dialog before entering the team
+        if (mounted) {
+          await _showProfileSetupDialog(slug);
+        }
         // Auto-select the newly created team via microtask to avoid
         // _dependents.isEmpty assertion.
         Future.microtask(() {
@@ -469,6 +475,10 @@ class _AppShellState extends ConsumerState<AppShell> {
       final slug = slugController.text.trim();
       if (slug.isNotEmpty) {
         await ref.read(teamListProvider.notifier).joinTeam(slug);
+        // Show profile setup dialog before entering the team
+        if (mounted) {
+          await _showProfileSetupDialog(slug);
+        }
         // Auto-select the joined team via microtask to avoid
         // _dependents.isEmpty assertion.
         Future.microtask(() {
@@ -487,6 +497,133 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
 
     slugController.dispose();
+  }
+
+  Future<void> _showProfileSetupDialog(String teamSlug) async {
+    final auth = ref.read(simpleAuthProvider);
+    final nameController = TextEditingController(text: auth.displayName ?? '');
+    final emailController = TextEditingController(text: auth.email ?? '');
+    final phoneController = TextEditingController();
+    bool isSaving = false;
+
+    final saved = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF2A2A3E),
+              title: const Text(
+                'Sett opp profilen din',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: SizedBox(
+                width: 360,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      autofocus: true,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Visningsnavn',
+                        labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.05),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: emailController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'E-post (valgfri)',
+                        labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.05),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: phoneController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Telefon (valgfri)',
+                        labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.05),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      keyboardType: TextInputType.phone,
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF02ac88),
+                  ),
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          setDialogState(() => isSaving = true);
+                          try {
+                            final client = ref.read(msgrApiProvider);
+                            final displayName = nameController.text.trim();
+                            final email = emailController.text.trim();
+                            final phone = phoneController.text.trim();
+                            await client.updateMyProfile(
+                              teamSlug,
+                              displayName: displayName.isNotEmpty ? displayName : null,
+                              email: email.isNotEmpty ? email : null,
+                              phone: phone.isNotEmpty ? phone : null,
+                            );
+                            if (context.mounted) {
+                              Navigator.of(context).pop(true);
+                            }
+                          } catch (e) {
+                            // Profile update failed -- still allow entry
+                            if (context.mounted) {
+                              Navigator.of(context).pop(false);
+                            }
+                          }
+                        },
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Lagre profil'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
   }
 
   Future<void> _showCreateChannelDialog() async {

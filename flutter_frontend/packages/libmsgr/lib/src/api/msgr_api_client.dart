@@ -328,6 +328,20 @@ class MsgrApiClient {
     return [];
   }
 
+  /// PUT /api/teams/:slug/profiles/me
+  Future<Map<String, dynamic>> updateMyProfile(
+    String teamSlug, {
+    String? displayName,
+    String? email,
+    String? phone,
+  }) async {
+    final body = <String, dynamic>{};
+    if (displayName != null) body['display_name'] = displayName;
+    if (email != null) body['email'] = email;
+    if (phone != null) body['phone'] = phone;
+    return put('/api/teams/$teamSlug/profiles/me', body: body);
+  }
+
   // ---------------------------------------------------------------------------
   // DMs
   // ---------------------------------------------------------------------------
