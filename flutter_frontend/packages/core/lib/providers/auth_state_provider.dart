@@ -12,12 +12,14 @@ class SimpleAuthState {
     this.accountId,
     this.profileId,
     this.email,
+    this.displayName,
     this.isLoading = false,
   });
 
   final String? accountId;
   final String? profileId;
   final String? email;
+  final String? displayName;
   final bool isLoading;
 
   bool get isLoggedIn => accountId != null && profileId != null;
@@ -26,12 +28,14 @@ class SimpleAuthState {
     String? accountId,
     String? profileId,
     String? email,
+    String? displayName,
     bool? isLoading,
   }) {
     return SimpleAuthState(
       accountId: accountId ?? this.accountId,
       profileId: profileId ?? this.profileId,
       email: email ?? this.email,
+      displayName: displayName ?? this.displayName,
       isLoading: isLoading ?? this.isLoading,
     );
   }
@@ -47,11 +51,13 @@ class SimpleAuthNotifier extends StateNotifier<SimpleAuthState> {
     final accountId = prefs.getString('auth_account_id');
     final profileId = prefs.getString('auth_profile_id');
     final email = prefs.getString('auth_email');
+    final displayName = prefs.getString('auth_display_name');
     if (accountId != null && profileId != null) {
       state = SimpleAuthState(
         accountId: accountId,
         profileId: profileId,
         email: email,
+        displayName: displayName,
         isLoading: false,
       );
     } else {
@@ -63,18 +69,19 @@ class SimpleAuthNotifier extends StateNotifier<SimpleAuthState> {
     required String accountId,
     required String profileId,
     String? email,
+    String? displayName,
   }) async {
     state = SimpleAuthState(
       accountId: accountId,
       profileId: profileId,
       email: email,
+      displayName: displayName,
     );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('auth_account_id', accountId);
     await prefs.setString('auth_profile_id', profileId);
-    if (email != null) {
-      await prefs.setString('auth_email', email);
-    }
+    if (email != null) await prefs.setString('auth_email', email);
+    if (displayName != null) await prefs.setString('auth_display_name', displayName);
   }
 
   Future<void> logout() async {
@@ -83,6 +90,7 @@ class SimpleAuthNotifier extends StateNotifier<SimpleAuthState> {
     await prefs.remove('auth_account_id');
     await prefs.remove('auth_profile_id');
     await prefs.remove('auth_email');
+    await prefs.remove('auth_display_name');
     await prefs.remove('last_team_slug');
     await prefs.remove('last_channel_id');
   }

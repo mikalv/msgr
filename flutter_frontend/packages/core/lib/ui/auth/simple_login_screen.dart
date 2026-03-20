@@ -74,6 +74,7 @@ class _SimpleLoginScreenState extends ConsumerState<SimpleLoginScreen> {
         accountId: session.accountId,
         profileId: session.profileId,
         email: session.email,
+        displayName: session.displayName,
       );
 
       widget.onLoginSuccess?.call();

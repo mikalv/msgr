@@ -204,7 +204,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
       id: tempId,
       channelId: channelId,
       senderProfileId: auth.profileId ?? 'me',
-      senderName: 'Deg',
+      senderName: auth.displayName ?? auth.email ?? 'Deg',
       content: content,
       insertedAt: DateTime.now(),
       mediaRefs: mediaRefs ?? [],
