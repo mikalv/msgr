@@ -41,6 +41,26 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    final teamState = ref.watch(teamListProvider);
+
+    // Show loading while teams are being fetched
+    if (teamState.isLoading && teamState.teams.isEmpty) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF1A1A2E),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Show welcome screen when user has no teams
+    if (teamState.teams.isEmpty) {
+      return _WelcomeScreen(
+        error: teamState.error,
+        onCreateTeam: () => _showCreateTeamDialog(),
+        onJoinTeam: () => _showJoinTeamDialog(),
+        onRetry: () => ref.read(teamListProvider.notifier).refresh(),
+      );
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth > 1024;
@@ -138,6 +158,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           teams: _mockTeamsFromProviders,
           selectedIndex: _selectedTeamIndex,
           onTeamSelected: _onTeamSelected,
+          onAddTeam: _showCreateTeamDialog,
         ),
         AnimatedContainer(
           duration: const Duration(milliseconds: 200),
@@ -171,6 +192,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                 _onTeamSelected(index);
                 Navigator.of(context).pop(); // close drawer
               },
+              onAddTeam: _showCreateTeamDialog,
             ),
             Expanded(child: _buildSidebar()),
           ],
@@ -202,6 +224,7 @@ class _AppShellState extends ConsumerState<AppShell> {
               onTeamSelected: (index) {
                 _onTeamSelected(index);
               },
+              onAddTeam: _showCreateTeamDialog,
             ),
             Expanded(child: _buildSidebar()),
           ],
@@ -243,6 +266,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       onDmSelected: (dm) {
         _onDmSelected(dm.id);
       },
+      onCreateChannel: _showCreateChannelDialog,
     );
   }
 
@@ -269,5 +293,416 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   void _onDmSelected(String dmId) {
     _onChannelSelected(dmId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dialogs
+  // ---------------------------------------------------------------------------
+
+  Future<void> _showCreateTeamDialog() async {
+    final nameController = TextEditingController();
+    final slugController = TextEditingController();
+    bool autoSlug = true;
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF2A2A3E),
+              title: const Text(
+                'Opprett team',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: SizedBox(
+                width: 360,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: nameController,
+                      autofocus: true,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Teamnavn',
+                        labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                        hintText: 'F.eks. Min bedrift',
+                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.05),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        if (autoSlug) {
+                          slugController.text = _nameToSlug(value);
+                          setDialogState(() {});
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: slugController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Slug (URL-vennlig)',
+                        labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                        hintText: 'min-bedrift',
+                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.05),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (_) {
+                        autoSlug = false;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Avbryt', style: TextStyle(color: Colors.white54)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF02ac88),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Opprett'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == true && mounted) {
+      final name = nameController.text.trim();
+      final slug = slugController.text.trim();
+      if (name.isNotEmpty && slug.isNotEmpty) {
+        await ref.read(teamListProvider.notifier).createTeam(name, slug);
+        // Auto-select the newly created team
+        final teams = ref.read(teamsProvider);
+        if (teams.isNotEmpty) {
+          final newTeam = teams.lastWhere(
+            (t) => t.slug == slug,
+            orElse: () => teams.last,
+          );
+          ref.read(selectedTeamProvider.notifier).select(newTeam);
+        }
+      }
+    }
+
+    nameController.dispose();
+    slugController.dispose();
+  }
+
+  Future<void> _showJoinTeamDialog() async {
+    final slugController = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF2A2A3E),
+          title: const Text(
+            'Bli med i team',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: SizedBox(
+            width: 360,
+            child: TextField(
+              controller: slugController,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                labelText: 'Team-slug',
+                labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                hintText: 'F.eks. min-bedrift',
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Avbryt', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF02ac88),
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Bli med'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true && mounted) {
+      final slug = slugController.text.trim();
+      if (slug.isNotEmpty) {
+        await ref.read(teamListProvider.notifier).joinTeam(slug);
+        // Auto-select the joined team
+        final teams = ref.read(teamsProvider);
+        if (teams.isNotEmpty) {
+          final joinedTeam = teams.lastWhere(
+            (t) => t.slug == slug,
+            orElse: () => teams.last,
+          );
+          ref.read(selectedTeamProvider.notifier).select(joinedTeam);
+        }
+      }
+    }
+
+    slugController.dispose();
+  }
+
+  Future<void> _showCreateChannelDialog() async {
+    final team = ref.read(selectedTeamProvider);
+    if (team == null) return;
+
+    final nameController = TextEditingController();
+    final iconController = TextEditingController();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF2A2A3E),
+          title: const Text(
+            'Opprett kanal',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Kanalnavn',
+                    labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                    hintText: 'F.eks. general',
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.05),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: iconController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Ikon (emoji, valgfritt)',
+                    labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                    hintText: '#',
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withOpacity(0.05),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Avbryt', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF02ac88),
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Opprett'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true && mounted) {
+      final name = nameController.text.trim();
+      if (name.isNotEmpty) {
+        final icon = iconController.text.trim();
+        await ref.read(channelListProvider.notifier).createChannel(
+              teamSlug: team.slug,
+              name: name,
+              icon: icon.isNotEmpty ? icon : null,
+            );
+        // Auto-select newly created channel
+        final channels = ref.read(channelListProvider).channels;
+        if (channels.isNotEmpty) {
+          final newChannel = channels.last;
+          ref.read(selectedChannelProvider.notifier).select(newChannel);
+        }
+      }
+    }
+
+    nameController.dispose();
+    iconController.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Utilities
+  // ---------------------------------------------------------------------------
+
+  static String _nameToSlug(String name) {
+    return name
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9\s-]'), '')
+        .replaceAll(RegExp(r'\s+'), '-')
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-|-$'), '');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Welcome screen (no teams)
+// ---------------------------------------------------------------------------
+
+class _WelcomeScreen extends StatelessWidget {
+  const _WelcomeScreen({
+    this.error,
+    required this.onCreateTeam,
+    required this.onJoinTeam,
+    required this.onRetry,
+  });
+
+  final Object? error;
+  final VoidCallback onCreateTeam;
+  final VoidCallback onJoinTeam;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF1A1A2E),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.chat_bubble_outline,
+                size: 64,
+                color: Color(0xFF02ac88),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Velkommen til Messngr!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Opprett et nytt team eller bli med i et eksisterende.',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 15,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (error != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.redAccent, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          error.toString(),
+                          style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: onCreateTeam,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Opprett team'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF02ac88),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onJoinTeam,
+                  icon: const Icon(Icons.group_add),
+                  label: const Text('Bli med i team'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white70,
+                    side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: onRetry,
+                child: const Text(
+                  'Last inn paa nytt',
+                  style: TextStyle(color: Colors.white38, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

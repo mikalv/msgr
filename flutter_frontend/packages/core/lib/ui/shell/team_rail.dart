@@ -14,11 +14,13 @@ class TeamRail extends StatelessWidget {
     required this.teams,
     required this.selectedIndex,
     required this.onTeamSelected,
+    this.onAddTeam,
   });
 
   final List<MockTeam> teams;
   final int selectedIndex;
   final ValueChanged<int> onTeamSelected;
+  final VoidCallback? onAddTeam;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +43,7 @@ class TeamRail extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Divider(color: ShellTheme.sidebarText, thickness: 0.5),
           ),
-          _AddTeamButton(onTap: () {}),
+          _AddTeamButton(onTap: () => onAddTeam?.call()),
           const Spacer(),
         ],
       ),

@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
-import 'mock_api_data.dart';
 import 'team_list_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -16,8 +15,8 @@ class UnreadCountsNotifier extends StateNotifier<Map<String, int>> {
   /// Load initial unread counts for a team.
   void loadForTeam(String teamSlug) {
     // TODO: Receive unread counts from Phoenix channel or initial API response.
-    // For now, use mock data.
-    state = Map<String, int>.from(mockUnreadCounts);
+    // Start with empty counts; real-time updates will populate them.
+    state = {};
   }
 
   /// Mark a channel as read (set count to 0).

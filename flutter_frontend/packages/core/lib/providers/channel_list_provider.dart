@@ -92,10 +92,14 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
   }) async {
     try {
       final client = _ref.read(apiClientProvider);
-      final data = await client.post('/api/teams/$teamSlug/channels', body: {
+      final raw = await client.post('/api/teams/$teamSlug/channels', body: {
         'name': name,
         if (icon != null) 'icon': icon,
       });
+      // Handle both {data: {...}} and flat response
+      final data = raw.containsKey('data') && raw['data'] is Map
+          ? raw['data'] as Map<String, dynamic>
+          : raw;
       final slug =
           data['slug']?.toString() ??
           name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
@@ -105,7 +109,9 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
         name: data['name']?.toString() ?? name,
         slug: slug,
         icon: icon,
+        kind: _parseChannelKind(data['kind'] as String?),
         teamSlug: teamSlug,
+        topic: data['topic'] as String?,
       );
       state = state.copyWith(channels: [...state.channels, channel]);
     } catch (e) {

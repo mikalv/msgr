@@ -17,6 +17,7 @@ class ChannelSidebar extends StatefulWidget {
     this.selectedDmId,
     this.onChannelSelected,
     this.onDmSelected,
+    this.onCreateChannel,
   });
 
   final String teamName;
@@ -26,6 +27,7 @@ class ChannelSidebar extends StatefulWidget {
   final String? selectedDmId;
   final ValueChanged<MockChannel>? onChannelSelected;
   final ValueChanged<MockDmContact>? onDmSelected;
+  final VoidCallback? onCreateChannel;
 
   @override
   State<ChannelSidebar> createState() => _ChannelSidebarState();
@@ -153,7 +155,7 @@ class _ChannelSidebarState extends State<ChannelSidebar> {
                   Padding(
                     padding: const EdgeInsets.only(left: 12, top: 4),
                     child: TextButton.icon(
-                      onPressed: () {},
+                      onPressed: () => widget.onCreateChannel?.call(),
                       icon: const Icon(Icons.add, size: 14, color: ShellTheme.sidebarText),
                       label: const Text(
                         'Opprett kanal',

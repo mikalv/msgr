@@ -181,7 +181,11 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
       if (team == null) throw Exception('No team selected');
 
       final client = _ref.read(apiClientProvider);
-      final data = await client.sendMessage(team.slug, channelId, content);
+      final raw = await client.sendMessage(team.slug, channelId, content);
+      // Handle both {data: {...}} and flat response
+      final data = raw.containsKey('data') && raw['data'] is Map
+          ? raw['data'] as Map<String, dynamic>
+          : raw;
 
       // Replace optimistic message with server response.
       final sent = optimistic.copyWith(

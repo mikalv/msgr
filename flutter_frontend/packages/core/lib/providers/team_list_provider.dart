@@ -70,11 +70,16 @@ class TeamListNotifier extends StateNotifier<TeamListState> {
   Future<void> createTeam(String name, String slug) async {
     try {
       final client = _ref.read(apiClientProvider);
-      final data = await client.createTeam(name: name, slug: slug);
+      final raw = await client.createTeam(name: name, slug: slug);
+      // Handle both {data: {...}} and flat response
+      final data = raw.containsKey('data') && raw['data'] is Map
+          ? raw['data'] as Map<String, dynamic>
+          : raw;
       final team = SlackTeam(
         id: data['id']?.toString() ?? 'team-${DateTime.now().millisecondsSinceEpoch}',
         name: data['name']?.toString() ?? name,
         slug: data['slug']?.toString() ?? slug,
+        iconEmoji: data['icon_emoji'] as String?,
       );
       state = state.copyWith(teams: [...state.teams, team]);
     } catch (e) {
@@ -85,11 +90,15 @@ class TeamListNotifier extends StateNotifier<TeamListState> {
   Future<void> joinTeam(String slug) async {
     try {
       final client = _ref.read(apiClientProvider);
-      final data = await client.joinTeam(slug);
+      final raw = await client.joinTeam(slug);
+      final data = raw.containsKey('data') && raw['data'] is Map
+          ? raw['data'] as Map<String, dynamic>
+          : raw;
       final team = SlackTeam(
         id: data['id']?.toString() ?? 'team-${DateTime.now().millisecondsSinceEpoch}',
         name: data['name']?.toString() ?? slug,
         slug: data['slug']?.toString() ?? slug,
+        iconEmoji: data['icon_emoji'] as String?,
       );
       state = state.copyWith(teams: [...state.teams, team]);
     } catch (e) {
