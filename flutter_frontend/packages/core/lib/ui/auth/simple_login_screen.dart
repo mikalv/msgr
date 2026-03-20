@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:core/providers/auth_state_provider.dart';
-import 'package:core/services/auth_service.dart';
+import 'package:core/providers/msgr_client_provider.dart';
+import 'package:libmsgr/api.dart';
 
 class SimpleLoginScreen extends ConsumerStatefulWidget {
   const SimpleLoginScreen({super.key, this.onLoginSuccess});
@@ -15,7 +16,6 @@ class SimpleLoginScreen extends ConsumerStatefulWidget {
 class _SimpleLoginScreenState extends ConsumerState<SimpleLoginScreen> {
   final _identifierController = TextEditingController();
   final _codeController = TextEditingController();
-  final _authService = AuthService();
 
   bool _isLoading = false;
   String? _error;
@@ -42,7 +42,8 @@ class _SimpleLoginScreenState extends ConsumerState<SimpleLoginScreen> {
     setState(() { _isLoading = true; _error = null; });
 
     try {
-      final challenge = await _authService.requestChallenge(identifier, channel: _channel);
+      final api = ref.read(msgrApiProvider);
+      final challenge = await api.requestChallenge(identifier, channel: _channel);
       setState(() {
         _challenge = challenge;
         _debugCode = challenge.debugCode;
@@ -66,7 +67,8 @@ class _SimpleLoginScreenState extends ConsumerState<SimpleLoginScreen> {
     setState(() { _isLoading = true; _error = null; });
 
     try {
-      final session = await _authService.verifyCode(_challenge!.id, code);
+      final api = ref.read(msgrApiProvider);
+      final session = await api.verifyCode(_challenge!.id, code);
 
       ref.read(simpleAuthProvider.notifier).login(
         accountId: session.accountId,

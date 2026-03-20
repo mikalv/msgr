@@ -43,6 +43,12 @@ export 'src/repositories/repository_factory.dart';
 
 export 'src/redux.dart';
 
+// API + Realtime client (pure Dart, zero Flutter deps)
+export 'src/api/models.dart';
+export 'src/api/msgr_api_client.dart';
+export 'src/api/msgr_client.dart';
+export 'src/realtime/channel_client.dart';
+
 export 'src/platform_support/none.dart'
     if (dart.library.io) 'src/platform_support/io_platform.dart'
     if (dart.library.js_interop) 'src/platform_support/web_platform.dart';

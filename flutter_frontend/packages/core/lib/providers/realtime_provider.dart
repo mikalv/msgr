@@ -97,6 +97,16 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
       };
 
       state = state.copyWith(isConnected: true, isConnecting: false);
+
+      // Auto-join current team/channel after successful connect
+      final selectedTeam = _ref.read(selectedTeamProvider);
+      if (selectedTeam != null) {
+        await joinTeam(selectedTeam.slug);
+      }
+      final selectedChannel = _ref.read(selectedChannelProvider);
+      if (selectedChannel != null) {
+        await joinChannel(selectedChannel.id);
+      }
     } catch (e) {
       _log.warning('WebSocket connect failed: $e');
       state = state.copyWith(isConnecting: false, error: e);
@@ -122,6 +132,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   /// Join team topics when the selected team changes.
   Future<void> joinTeam(String teamSlug) async {
     final client = _ref.read(msgrClientProvider);
+    _log.info('joinTeam($teamSlug) called, isRealtimeConnected=${client.isRealtimeConnected}');
     if (!client.isRealtimeConnected) return;
 
     // Leave previous team topics
@@ -146,6 +157,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   /// Join a channel topic. Leaves the previous channel topic automatically.
   Future<void> joinChannel(String channelId) async {
     final client = _ref.read(msgrClientProvider);
+    _log.info('joinChannel($channelId) called, isRealtimeConnected=${client.isRealtimeConnected}');
     if (!client.isRealtimeConnected) return;
 
     // Leave previous channel topic
@@ -394,22 +406,33 @@ final realtimeProvider =
     StateNotifierProvider<RealtimeNotifier, RealtimeState>((ref) {
   final notifier = RealtimeNotifier(ref);
 
-  // Auto-connect when auth state becomes logged in
+  // Auto-connect when auth state becomes logged in.
+  // connect() will auto-join the current team/channel after success.
   final auth = ref.watch(simpleAuthProvider);
   if (auth.isLoggedIn && !auth.isLoading) {
     Future.microtask(() => notifier.connect());
   }
 
-  // Auto-join team topic when selected team changes
+  // Auto-join team topic when selected team changes AFTER already connected.
   final selectedTeam = ref.watch(selectedTeamProvider);
   if (selectedTeam != null) {
-    Future.microtask(() => notifier.joinTeam(selectedTeam.slug));
+    Future.microtask(() {
+      final client = ref.read(msgrClientProvider);
+      if (client.isRealtimeConnected) {
+        notifier.joinTeam(selectedTeam.slug);
+      }
+    });
   }
 
-  // Auto-join channel topic when selected channel changes
+  // Auto-join channel topic when selected channel changes AFTER already connected.
   final selectedChannel = ref.watch(selectedChannelProvider);
   if (selectedChannel != null) {
-    Future.microtask(() => notifier.joinChannel(selectedChannel.id));
+    Future.microtask(() {
+      final client = ref.read(msgrClientProvider);
+      if (client.isRealtimeConnected) {
+        notifier.joinChannel(selectedChannel.id);
+      }
+    });
   }
 
   ref.onDispose(() => notifier.disconnect());

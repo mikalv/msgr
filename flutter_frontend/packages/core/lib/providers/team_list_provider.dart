@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'api_client_provider.dart';
 import 'auth_state_provider.dart';
 import 'models.dart';
+import 'msgr_client_provider.dart';
 
 // ---------------------------------------------------------------------------
 // TeamList -- all teams the current user belongs to
@@ -49,7 +49,7 @@ class TeamListNotifier extends StateNotifier<TeamListState> {
 
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final client = _ref.read(apiClientProvider);
+      final client = _ref.read(msgrApiProvider);
       final data = await client.getTeams();
       final teams = data.map((t) {
         return SlackTeam(
@@ -70,8 +70,8 @@ class TeamListNotifier extends StateNotifier<TeamListState> {
 
   Future<void> createTeam(String name, String slug) async {
     try {
-      final client = _ref.read(apiClientProvider);
-      final raw = await client.createTeam(name: name, slug: slug);
+      final client = _ref.read(msgrApiProvider);
+      final raw = await client.createTeam(name, slug);
       // Handle both {data: {...}} and flat response
       final data = raw.containsKey('data') && raw['data'] is Map
           ? raw['data'] as Map<String, dynamic>
@@ -90,7 +90,7 @@ class TeamListNotifier extends StateNotifier<TeamListState> {
 
   Future<void> joinTeam(String slug) async {
     try {
-      final client = _ref.read(apiClientProvider);
+      final client = _ref.read(msgrApiProvider);
       final raw = await client.joinTeam(slug);
       final data = raw.containsKey('data') && raw['data'] is Map
           ? raw['data'] as Map<String, dynamic>

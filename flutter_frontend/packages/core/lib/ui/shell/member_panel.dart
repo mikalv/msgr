@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:core/providers/api_client_provider.dart';
+import 'package:core/providers/msgr_client_provider.dart';
 import 'package:core/providers/models.dart';
 import 'package:core/providers/team_list_provider.dart';
 
@@ -11,7 +11,7 @@ final teamMembersProvider =
   final team = ref.watch(selectedTeamProvider);
   if (team == null) return [];
 
-  final client = ref.read(apiClientProvider);
+  final client = ref.read(msgrApiProvider);
   final raw = await client.getRaw('/api/teams/${team.slug}/profiles');
 
   List<Map<String, dynamic>> items;

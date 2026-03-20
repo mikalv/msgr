@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'api_client_provider.dart';
 import 'models.dart';
+import 'msgr_client_provider.dart';
 import 'team_list_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -67,7 +67,7 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
   Future<void> loadForTeam(String teamSlug) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final client = _ref.read(apiClientProvider);
+      final client = _ref.read(msgrApiProvider);
       final data = await client.getChannels(teamSlug);
       final channels = data.map((c) {
         return SlackChannel(
@@ -100,13 +100,9 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
     String? icon,
   }) async {
     try {
-      final client = _ref.read(apiClientProvider);
+      final client = _ref.read(msgrApiProvider);
       final slug = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-|-$'), '');
-      final raw = await client.post('/api/teams/$teamSlug/channels', body: {
-        'name': name,
-        'slug': slug,
-        if (icon != null) 'icon': icon,
-      });
+      final raw = await client.createChannel(teamSlug, name: name, slug: slug, icon: icon);
       // Handle both {data: {...}} and flat response
       final data = raw.containsKey('data') && raw['data'] is Map
           ? raw['data'] as Map<String, dynamic>

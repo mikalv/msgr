@@ -1,125 +1,72 @@
 /// A headless bot client that:
 /// 1. Registers via OTP (auto-verifies using debug_code)
 /// 2. Joins a team
-/// 3. Listens for messages on all channels
+/// 3. Listens for messages on all channels via Phoenix WebSocket
 /// 4. Responds with an echo or greeting
 ///
 /// Usage: dart run test_client:bot_client --email bot@msgr.no --team test-team
 library;
 
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/args.dart';
-import 'package:http/http.dart' as http;
+import 'package:libmsgr/api.dart';
 
 const _baseUrl = 'https://dev.msgr.no';
-
-class BotSession {
-  String? accountId;
-  String? profileId;
-  String? email;
-
-  Map<String, String> get headers => {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        if (accountId != null) 'X-Account-Id': accountId!,
-        if (profileId != null) 'X-Profile-Id': profileId!,
-      };
-
-  bool get isLoggedIn => accountId != null && profileId != null;
-}
 
 class BotClient {
   BotClient({
     required this.email,
     required this.teamSlug,
-    http.Client? client,
-  }) : _client = client ?? http.Client();
+  });
 
   final String email;
   final String teamSlug;
-  final http.Client _client;
-  final BotSession _session = BotSession();
+  late final MsgrClient _client;
+
+  /// Channel IDs we are monitoring.
+  final List<Map<String, dynamic>> _channels = [];
 
   /// Track message IDs we have already seen so we do not echo them again.
   final Set<String> _seenMessageIds = {};
 
-  /// Track channel IDs for the team.
-  final List<Map<String, dynamic>> _channels = [];
-
   // -----------------------------------------------------------------------
-  // Auth
+  // Auth -- uses libmsgr MsgrApiClient
   // -----------------------------------------------------------------------
 
   Future<void> authenticate() async {
     _log('Requesting OTP challenge for $email ...');
 
-    // 1. Request challenge
-    final challengeRes = await _client.post(
-      Uri.parse('$_baseUrl/api/v1/auth/challenge'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'channel': 'email', 'identifier': email}),
-    );
-    _assertOk(challengeRes, 'challenge');
+    _client = MsgrClient(baseUrl: _baseUrl);
 
-    final challengeData = jsonDecode(challengeRes.body) as Map<String, dynamic>;
-    final challengeId = challengeData['id'] as String;
-    final debugCode = challengeData['debug_code'] as String?;
+    // 1. Request challenge
+    final challenge =
+        await _client.api.requestChallenge(email, channel: 'email');
+    final debugCode = challenge.debugCode;
 
     if (debugCode == null) {
       _log('ERROR: No debug_code returned. Is the backend in dev mode?');
       exit(1);
     }
 
-    _log('Got challenge $challengeId, debug_code=$debugCode');
+    _log('Got challenge ${challenge.id}, debug_code=$debugCode');
 
     // 2. Verify
-    final verifyRes = await _client.post(
-      Uri.parse('$_baseUrl/api/v1/auth/verify'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'challenge_id': challengeId, 'code': debugCode}),
-    );
-    _assertOk(verifyRes, 'verify');
+    final session = await _client.api.verifyCode(challenge.id, debugCode);
+    _client.setSession(session);
 
-    final verifyData = jsonDecode(verifyRes.body) as Map<String, dynamic>;
-    final account = verifyData['account'] as Map<String, dynamic>? ?? {};
-    _session.accountId = account['id']?.toString();
-
-    // Get profile ID
-    final profileId = verifyData['profile_id']?.toString();
-    if (profileId != null && profileId.isNotEmpty) {
-      _session.profileId = profileId;
-    } else {
-      final profiles = account['profiles'] as List? ?? [];
-      if (profiles.isNotEmpty) {
-        _session.profileId =
-            (profiles.first as Map<String, dynamic>)['id']?.toString();
-      }
-    }
-    _session.email = email;
-
-    _log('Authenticated: account=${_session.accountId}, profile=${_session.profileId}');
+    _log('Authenticated: account=${session.accountId}, profile=${session.profileId}');
   }
 
   // -----------------------------------------------------------------------
-  // Team operations
+  // Team operations -- uses libmsgr MsgrApiClient
   // -----------------------------------------------------------------------
 
   Future<void> joinTeam() async {
     _log('Joining team "$teamSlug" ...');
     try {
-      final res = await _client.post(
-        Uri.parse('$_baseUrl/api/teams/$teamSlug/join'),
-        headers: _session.headers,
-      );
-      if (res.statusCode >= 200 && res.statusCode < 300) {
-        _log('Joined team $teamSlug');
-      } else if (res.statusCode == 409 || res.statusCode == 422) {
-        _log('Already a member of $teamSlug (${res.statusCode})');
-      } else {
-        _log('Join returned ${res.statusCode}: ${res.body}');
-      }
+      await _client.api.joinTeam(teamSlug);
+      _log('Joined team $teamSlug');
     } catch (e) {
       _log('Join error (may already be member): $e');
     }
@@ -127,31 +74,80 @@ class BotClient {
 
   Future<void> fetchChannels() async {
     _log('Fetching channels for $teamSlug ...');
-    final res = await _client.get(
-      Uri.parse('$_baseUrl/api/teams/$teamSlug/channels'),
-      headers: _session.headers,
-    );
-    _assertOk(res, 'getChannels');
-
-    final decoded = jsonDecode(res.body);
-    List<dynamic> channels;
-    if (decoded is List) {
-      channels = decoded;
-    } else if (decoded is Map && decoded['data'] is List) {
-      channels = decoded['data'] as List;
-    } else {
-      channels = [];
-    }
-
+    final channels = await _client.api.getChannels(teamSlug);
     _channels.clear();
-    for (final ch in channels) {
-      _channels.add(ch as Map<String, dynamic>);
-    }
+    _channels.addAll(channels);
     _log('Found ${_channels.length} channels: ${_channels.map((c) => c['name']).join(', ')}');
   }
 
   // -----------------------------------------------------------------------
-  // Message polling loop
+  // Real-time: connect Phoenix WebSocket and listen for messages
+  // -----------------------------------------------------------------------
+
+  Future<void> connectRealtime() async {
+    _log('Connecting WebSocket ...');
+    await _client.connectRealtime();
+
+    // Wire up event handler
+    _client.realtime.onEvent = _handleRealtimeEvent;
+    _client.realtime.onDisconnect = () => _log('WebSocket disconnected');
+    _client.realtime.onReconnect = () => _log('WebSocket reconnected');
+
+    // Join all channel topics
+    for (final ch in _channels) {
+      final channelId = ch['id'].toString();
+      final topic = 'channel:$teamSlug.$channelId';
+      await _client.realtime.join(topic);
+      _log('Joined topic: $topic');
+    }
+
+    // Also join the lobby
+    await _client.realtime.join('channel:lobby');
+    _log('WebSocket connected and channels joined');
+  }
+
+  void _handleRealtimeEvent(
+      String topic, String event, Map<String, dynamic> payload) {
+    if (event == 'new:msg' || event == 'create:msg') {
+      final msgId = payload['id']?.toString() ?? '';
+      if (_seenMessageIds.contains(msgId)) return;
+      _seenMessageIds.add(msgId);
+
+      final content = payload['content']?.toString() ?? '';
+      final senderProfileId = payload['profile_id']?.toString() ??
+          (payload['sender'] as Map<String, dynamic>?)?['id']?.toString() ??
+          '';
+      final senderName =
+          (payload['sender'] as Map<String, dynamic>?)?['display_name']
+                  ?.toString() ??
+              payload['sender_name']?.toString() ??
+              'unknown';
+
+      _log('[$topic] $senderName: $content');
+
+      // Do not echo our own messages
+      if (senderProfileId == _client.profileId) return;
+
+      // Extract channel info from topic and echo
+      final parts = topic.split(':');
+      if (parts.length >= 2) {
+        final channelRef = parts[1]; // "teamSlug.channelId"
+        final channelParts = channelRef.split('.');
+        if (channelParts.length >= 2) {
+          final channelId = channelParts[1];
+          final reply = 'Echo: $content';
+          _client.api.sendMessage(teamSlug, channelId, reply).then((_) {
+            _log('[$topic] BOT: $reply');
+          }).catchError((e) {
+            _log('Send error: $e');
+          });
+        }
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Fallback poll loop (if WebSocket is not available)
   // -----------------------------------------------------------------------
 
   Future<void> pollLoop() async {
@@ -160,7 +156,8 @@ class BotClient {
     // First pass: record existing messages as "seen" without echoing
     for (final ch in _channels) {
       final channelId = ch['id'].toString();
-      final messages = await _fetchMessages(channelId);
+      final messages =
+          await _client.api.getMessages(teamSlug, channelId, limit: 20);
       for (final msg in messages) {
         _seenMessageIds.add(msg['id'].toString());
       }
@@ -172,7 +169,8 @@ class BotClient {
         for (final ch in _channels) {
           final channelId = ch['id'].toString();
           final channelName = ch['name']?.toString() ?? channelId;
-          final messages = await _fetchMessages(channelId);
+          final messages =
+              await _client.api.getMessages(teamSlug, channelId, limit: 20);
 
           for (final msg in messages) {
             final msgId = msg['id'].toString();
@@ -180,7 +178,8 @@ class BotClient {
             _seenMessageIds.add(msgId);
 
             final content = msg['content']?.toString() ?? '';
-            final sender = msg['sender'] as Map<String, dynamic>? ?? {};
+            final sender =
+                msg['sender'] as Map<String, dynamic>? ?? {};
             final senderName = sender['display_name']?.toString() ??
                 sender['name']?.toString() ??
                 msg['sender_name']?.toString() ??
@@ -192,11 +191,11 @@ class BotClient {
             _log('[#$channelName] $senderName: $content');
 
             // Do not echo our own messages
-            if (senderProfileId == _session.profileId) continue;
+            if (senderProfileId == _client.profileId) continue;
 
             // Echo the message
             final reply = 'Echo: $content';
-            await _sendMessage(channelId, reply);
+            await _client.api.sendMessage(teamSlug, channelId, reply);
             _log('[#$channelName] BOT: $reply');
           }
         }
@@ -205,36 +204,6 @@ class BotClient {
       }
 
       await Future<void>.delayed(const Duration(seconds: 2));
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> _fetchMessages(String channelId) async {
-    final res = await _client.get(
-      Uri.parse('$_baseUrl/api/teams/$teamSlug/channels/$channelId/messages?limit=20'),
-      headers: _session.headers,
-    );
-    if (res.statusCode < 200 || res.statusCode >= 300) return [];
-
-    final decoded = jsonDecode(res.body);
-    List<dynamic> msgs;
-    if (decoded is List) {
-      msgs = decoded;
-    } else if (decoded is Map && decoded['data'] is List) {
-      msgs = decoded['data'] as List;
-    } else {
-      msgs = [];
-    }
-    return msgs.cast<Map<String, dynamic>>();
-  }
-
-  Future<void> _sendMessage(String channelId, String content) async {
-    final res = await _client.post(
-      Uri.parse('$_baseUrl/api/teams/$teamSlug/channels/$channelId/messages'),
-      headers: _session.headers,
-      body: jsonEncode({'content': content}),
-    );
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      _log('Send failed (${res.statusCode}): ${res.body}');
     }
   }
 
@@ -248,13 +217,6 @@ class BotClient {
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
     print('[$ts] $message');
   }
-
-  void _assertOk(http.Response res, String label) {
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      _log('$label failed with ${res.statusCode}: ${res.body}');
-      exit(1);
-    }
-  }
 }
 
 Future<void> main(List<String> args) async {
@@ -263,6 +225,10 @@ Future<void> main(List<String> args) async {
         abbr: 'e', help: 'Bot email address', defaultsTo: 'bot@msgr.no')
     ..addOption('team',
         abbr: 't', help: 'Team slug to join', defaultsTo: 'test-team')
+    ..addFlag('poll',
+        abbr: 'p',
+        help: 'Use polling instead of WebSocket',
+        negatable: false)
     ..addFlag('help', abbr: 'h', negatable: false);
 
   final results = parser.parse(args);
@@ -274,10 +240,12 @@ Future<void> main(List<String> args) async {
 
   final email = results['email'] as String;
   final team = results['team'] as String;
+  final usePoll = results['poll'] as bool;
 
   print('=== Msgr Bot Client ===');
   print('Email: $email');
   print('Team:  $team');
+  print('Mode:  ${usePoll ? "polling" : "WebSocket"}');
   print('');
 
   final bot = BotClient(email: email, teamSlug: team);
@@ -285,5 +253,12 @@ Future<void> main(List<String> args) async {
   await bot.authenticate();
   await bot.joinTeam();
   await bot.fetchChannels();
-  await bot.pollLoop();
+
+  if (usePoll) {
+    await bot.pollLoop();
+  } else {
+    await bot.connectRealtime();
+    // Keep the process alive while WebSocket is running.
+    await Future<void>.delayed(const Duration(days: 365));
+  }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:core/providers/auth_provider.dart';
 import 'package:core/providers/team_provider.dart';
+import 'package:core/providers/msgr_client_provider.dart';
 
 /// WebSocket connection state
 class WebSocketState {
@@ -29,33 +30,41 @@ class WebSocketState {
   }
 }
 
-/// WebSocket notifier class
+/// WebSocket notifier class -- now uses MsgrClient.realtime from libmsgr.
 class WebSocketNotifier extends StateNotifier<WebSocketState> {
   WebSocketNotifier(this._ref) : super(const WebSocketState());
 
   final Ref _ref;
-  MsgrConnection? _connection;
 
-  /// Connect to WebSocket when team is selected
+  /// Connect to WebSocket when team is selected.
+  ///
+  /// This method supports two paths:
+  /// 1. Legacy path (via LibMsgr singleton + MsgrConnection for bootstrapped apps)
+  /// 2. New path (via MsgrClient.realtime for header-auth apps)
   Future<void> connect() async {
     final authState = _ref.read(authProvider);
     final currentTeam = authState.currentTeam;
     final teamAccessToken = authState.teamAccessToken;
     final currentUser = authState.currentUser;
 
-    if (currentTeam == null || teamAccessToken == null || currentUser == null) {
-      throw Exception('Missing team, token, or user for WebSocket connection');
+    // Try legacy path first (for apps using full LibMsgr bootstrap).
+    if (currentTeam != null && teamAccessToken != null && currentUser != null) {
+      await _connectLegacy(currentTeam, teamAccessToken, currentUser);
+      return;
     }
 
-    state = state.copyWith(isConnecting: true);
+    // New path: use MsgrClient from libmsgr.
+    await _connectNew();
+  }
 
+  Future<void> _connectLegacy(
+      Team currentTeam, String teamAccessToken, User currentUser) async {
+    state = state.copyWith(isConnecting: true);
     try {
-      // Ensure LibMsgr is bootstrapped
       if (!LibMsgr().hasBootstrapped) {
         await LibMsgr().bootstrapLibrary();
       }
 
-      // Connect to WebSocket
       final connected = await LibMsgr().connectWebsocket(
         currentUser.id,
         currentTeam.name,
@@ -64,30 +73,52 @@ class WebSocketNotifier extends StateNotifier<WebSocketState> {
       );
 
       if (connected) {
-        _connection = LibMsgr().getWebsocketConnection();
-
-        // Load team data into team_provider
         await _ref.read(teamProvider.notifier).loadTeamData(currentTeam.name);
-
-        state = state.copyWith(
-          isConnected: true,
-          isConnecting: false,
-        );
+        state = state.copyWith(isConnected: true, isConnecting: false);
       } else {
         throw Exception('Failed to connect to WebSocket');
       }
     } catch (e) {
-      state = state.copyWith(
-        isConnecting: false,
-        error: e as Exception,
-      );
+      state = state.copyWith(isConnecting: false, error: e as Exception);
+      rethrow;
+    }
+  }
+
+  Future<void> _connectNew() async {
+    state = state.copyWith(isConnecting: true);
+    try {
+      final client = _ref.read(msgrClientProvider);
+      if (client.accountId == null || client.profileId == null) {
+        throw Exception('Not authenticated -- cannot connect WebSocket');
+      }
+
+      await client.connectRealtime();
+
+      client.realtime.onDisconnect = () {
+        if (mounted) {
+          state = state.copyWith(isConnected: false);
+        }
+      };
+
+      client.realtime.onReconnect = () {
+        if (mounted) {
+          state = state.copyWith(isConnected: true);
+        }
+      };
+
+      state = state.copyWith(isConnected: true, isConnecting: false);
+    } catch (e) {
+      state = state.copyWith(isConnecting: false, error: e as Exception);
       rethrow;
     }
   }
 
   /// Disconnect from WebSocket
   Future<void> disconnect() async {
-    _connection = null;
+    try {
+      final client = _ref.read(msgrClientProvider);
+      client.disconnectRealtime();
+    } catch (_) {}
     state = const WebSocketState();
   }
 
@@ -97,7 +128,28 @@ class WebSocketNotifier extends StateNotifier<WebSocketState> {
     String? conversationId,
     String? channelId,
   }) {
-    if (_connection == null) {
+    // Try the new MsgrClient path first.
+    final client = _ref.read(msgrClientProvider);
+    if (client.isRealtimeConnected) {
+      final destTopic = conversationId != null
+          ? 'conversation:$conversationId'
+          : 'channel:$channelId';
+      client.realtime
+          .push(destTopic, 'create:msg', {'content': content}).catchError(
+              (e) {
+        // Fallback: try legacy MsgrConnection
+        _sendViaLegacy(content, conversationId, channelId);
+      });
+      return;
+    }
+
+    _sendViaLegacy(content, conversationId, channelId);
+  }
+
+  void _sendViaLegacy(
+      String content, String? conversationId, String? channelId) {
+    final connection = LibMsgr().getWebsocketConnection();
+    if (connection == null) {
       throw Exception('Not connected to WebSocket');
     }
 
@@ -106,7 +158,6 @@ class WebSocketNotifier extends StateNotifier<WebSocketState> {
       throw Exception('No current profile');
     }
 
-    // Create message object
     final message = MMessage(
       content: content,
       fromProfileID: currentProfile.id,
@@ -114,34 +165,23 @@ class WebSocketNotifier extends StateNotifier<WebSocketState> {
       channelID: channelId,
     );
 
-    // Send message via Phoenix channel
     final destId = conversationId ?? channelId;
     if (destId != null) {
-      _connection!.sendMessage(destId, message);
+      connection.sendMessage(destId, message);
     }
   }
 
   /// Send typing indicator
-  /// Note: Typing indicators are typically handled by Phoenix presence
-  /// and may need to be implemented via channel events
   void sendTypingIndicator({
     String? conversationId,
     String? channelId,
   }) {
-    if (_connection == null) {
-      throw Exception('Not connected to WebSocket');
-    }
-
-    // TODO: Implement typing indicator via Phoenix channel push
-    // This will likely need to be a custom event like 'typing:start'
-    // For now, this is a placeholder
+    // TODO: Implement via Phoenix channel push
   }
 
-  /// Handle WebSocket events (Redux dispatch callback)
+  /// Handle WebSocket events (Redux dispatch callback -- legacy path)
   void _handleWebSocketEvent(dynamic event) {
-    // This callback is used by LibMsgr to dispatch Redux actions
-    // For now, we can leave it empty since repositories handle updates
-    // In the future, this could be used to emit Riverpod events
+    // Left empty: repositories handle updates via Redux actions.
   }
 }
 
