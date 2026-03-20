@@ -573,6 +573,10 @@ class _AppShellState extends ConsumerState<AppShell> {
               name: name,
               icon: icon.isNotEmpty ? icon : null,
             );
+        // Refresh from server to ensure sidebar is in sync (the local
+        // optimistic add may lack fields like kind, which causes the
+        // channel to be filtered out of publicChannels).
+        await ref.read(channelListProvider.notifier).refresh();
         // Auto-select newly created channel after microtask to avoid
         // _dependents.isEmpty assertion from modifying state during build.
         Future.microtask(() {

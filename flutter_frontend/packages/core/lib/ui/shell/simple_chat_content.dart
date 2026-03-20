@@ -6,6 +6,7 @@ import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/providers/channel_list_provider.dart';
 import 'package:core/providers/messages_provider.dart';
 import 'package:core/providers/models.dart';
+import 'package:core/ui/shell/member_panel.dart';
 
 /// Simple chat content area for the AppShell.
 ///
@@ -22,6 +23,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   Timer? _pollTimer;
+  bool _showMembers = false;
 
   @override
   void initState() {
@@ -73,8 +75,12 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
 
     return Material(
       color: const Color(0xFF1E1E1E),
-      child: Column(
+      child: Row(
       children: [
+        // Main chat area
+        Expanded(
+          child: Column(
+          children: [
         // Channel header
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -108,12 +114,16 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                 ),
               ],
               const Spacer(),
-              // Members panel toggle (placeholder)
+              // Members panel toggle
               IconButton(
-                icon: const Icon(Icons.people_outline, color: Colors.white54, size: 20),
+                icon: Icon(
+                  _showMembers ? Icons.people : Icons.people_outline,
+                  color: _showMembers ? const Color(0xFF02ac88) : Colors.white54,
+                  size: 20,
+                ),
                 tooltip: 'Medlemmer',
                 onPressed: () {
-                  // TODO: toggle member sidebar panel
+                  setState(() => _showMembers = !_showMembers);
                 },
               ),
             ],
@@ -220,6 +230,15 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
             ],
           ),
         ),
+      ],
+          ),
+        ),
+
+        // Member panel (conditionally shown)
+        if (_showMembers)
+          MemberPanel(
+            onClose: () => setState(() => _showMembers = false),
+          ),
       ],
     ),
     );
