@@ -29,7 +29,7 @@ Future<void> runDesktopApp() async {
       : defaultDesktopWindowSize;
 
   WindowOptions windowOptions = WindowOptions(
-    size: size,
+    size: hasSavedBounds ? size : defaultDesktopWindowSize,
     center: !hasSavedBounds,
     backgroundColor: Colors.transparent,
     skipTaskbar: false,
@@ -38,8 +38,12 @@ Future<void> runDesktopApp() async {
   );
 
   windowManager.waitUntilReadyToShow(windowOptions, () async {
-    if (hasSavedBounds && savedX != null && savedY != null) {
-      await windowManager.setPosition(Offset(savedX, savedY));
+    // Restore saved bounds AFTER the window is ready — avoids framework reset
+    if (hasSavedBounds) {
+      await windowManager.setSize(size);
+      if (savedX != null && savedY != null) {
+        await windowManager.setPosition(Offset(savedX, savedY));
+      }
     }
     await windowManager.show();
     await windowManager.focus();
