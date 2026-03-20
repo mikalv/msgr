@@ -23,10 +23,18 @@ defmodule MessngrWeb.TeamChannelController do
     unless profile do
       {:error, :forbidden}
     else
-      slug = params["slug"] || params["name"] |> to_string() |> String.downcase() |> String.replace(~r/[^a-z0-9]+/, "-") |> String.trim("-")
+      channel_slug = case params["channel_slug"] do
+        s when is_binary(s) and s != "" -> s
+        _ ->
+          params["name"]
+          |> to_string()
+          |> String.downcase()
+          |> String.replace(~r/[^a-z0-9]+/, "-")
+          |> String.trim("-")
+      end
       attrs = %{
         name: params["name"],
-        slug: slug,
+        slug: channel_slug,
         icon: params["icon"],
         visibility: params["visibility"] || "public",
         topic: params["topic"],
