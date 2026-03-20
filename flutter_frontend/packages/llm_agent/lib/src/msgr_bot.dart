@@ -98,9 +98,37 @@ class MsgrBot {
       teamProfileId = joinData['profile_id'] as String?;
       print('[Bot] Joined team "$teamSlug", teamProfile=$teamProfileId');
     } else {
-      // May already be a member — try to get profile from channels endpoint
-      print('[Bot] Join returned ${joinRes.statusCode}, may already be member');
+      print('[Bot] Join returned ${joinRes.statusCode}, fetching profile from team members...');
     }
+
+    // Always try to find our team profile from the profiles list
+    if (teamProfileId == null) {
+      await _resolveTeamProfile();
+    }
+  }
+
+  Future<void> _resolveTeamProfile() async {
+    final res = await _client.get(
+      Uri.parse('$msgrBaseUrl/api/teams/$teamSlug/profiles'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) return;
+
+    final data = jsonDecode(res.body);
+    final profiles = (data is Map && data.containsKey('data'))
+        ? data['data'] as List
+        : data is List ? data : [];
+
+    // Find our profile by matching account_id
+    for (final p in profiles) {
+      final pAccountId = p['account_id']?.toString();
+      if (pAccountId == accountId) {
+        teamProfileId = p['id']?.toString();
+        print('[Bot] Resolved team profile: $teamProfileId');
+        return;
+      }
+    }
+    print('[Bot] Warning: could not find own team profile');
   }
 
   Future<void> _discoverChannels() async {
@@ -177,8 +205,9 @@ class MsgrBot {
           if (id.isEmpty || _seenMessageIds.contains(id)) continue;
           _seenMessageIds.add(id);
 
-          // Extract sender info
-          final sender = m['sender'] as Map<String, dynamic>? ?? {};
+          // Extract sender info (backend uses 'sender_profile' key)
+          final sender = m['sender_profile'] as Map<String, dynamic>? ??
+              m['sender'] as Map<String, dynamic>? ?? {};
           final senderProfileId = m['sender_profile_id']?.toString() ??
               sender['id']?.toString() ?? '';
           final senderName = sender['display_name']?.toString() ??

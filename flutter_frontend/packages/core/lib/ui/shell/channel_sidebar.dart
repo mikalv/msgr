@@ -72,10 +72,11 @@ class _ChannelSidebarState extends State<ChannelSidebar> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: ShellTheme.sidebarWidth,
+    return Material(
       color: ShellTheme.sidebarBg,
-      child: Column(
+      child: SizedBox(
+        width: ShellTheme.sidebarWidth,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Team name header
@@ -205,6 +206,7 @@ class _ChannelSidebarState extends State<ChannelSidebar> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

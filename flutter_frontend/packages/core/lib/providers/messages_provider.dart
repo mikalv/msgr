@@ -70,7 +70,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
       final client = _ref.read(apiClientProvider);
       final data = await client.getMessages(team.slug, channelId, limit: _pageSize);
       final messages = data.map((m) {
-        final sender = m['sender'] as Map<String, dynamic>? ?? {};
+        final sender = m['sender_profile'] as Map<String, dynamic>? ?? m['sender'] as Map<String, dynamic>? ?? {};
         return SlackMessage(
           id: m['id']?.toString() ?? '',
           channelId: channelId,
@@ -111,7 +111,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
       final client = _ref.read(apiClientProvider);
       final data = await client.getMessages(team.slug, channelId, limit: _pageSize);
       final fresh = data.map((m) {
-        final sender = m['sender'] as Map<String, dynamic>? ?? {};
+        final sender = m['sender_profile'] as Map<String, dynamic>? ?? m['sender'] as Map<String, dynamic>? ?? {};
         return SlackMessage(
           id: m['id']?.toString() ?? '',
           channelId: channelId,
@@ -163,7 +163,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
       }
 
       final messages = data.map((m) {
-        final sender = m['sender'] as Map<String, dynamic>? ?? {};
+        final sender = m['sender_profile'] as Map<String, dynamic>? ?? m['sender'] as Map<String, dynamic>? ?? {};
         return SlackMessage(
           id: m['id']?.toString() ?? '',
           channelId: channelId,
