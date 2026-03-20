@@ -10,14 +10,19 @@ class Bootstrapper {
   const Bootstrapper();
 
   Future<void> initialize() async {
-    bootstrapLogging();
-    AppNavigation.instance;
-
-    await bootstrapLibMsgr();
-    final deviceContextBootstrapper = DeviceContextBootstrapper.create();
-    await deviceContextBootstrapper.initialize();
-
     final binding = WidgetsFlutterBinding.ensureInitialized();
     binding.renderView.automaticSystemUiAdjustment = false;
+
+    bootstrapLogging();
+
+    // LibMsgr bootstrap is optional — app works with simple API client if it fails
+    try {
+      await bootstrapLibMsgr();
+      final deviceContextBootstrapper = DeviceContextBootstrapper.create();
+      await deviceContextBootstrapper.initialize();
+    } catch (e) {
+      // LibMsgr not configured yet — using simple HTTP API client
+      print('LibMsgr bootstrap skipped: $e');
+    }
   }
 }

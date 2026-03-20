@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:core/providers/api_providers.dart';
 import 'package:core/services/api/chat_api.dart';

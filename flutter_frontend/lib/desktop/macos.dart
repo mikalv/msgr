@@ -1,13 +1,16 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:messngr/config/AppNavigation.dart';
 import 'package:messngr/config/app_constants.dart';
 import 'package:messngr/config/theme.dart';
 import 'package:messngr/services/app_localizations.dart';
 import 'package:messngr/services/localization/translator.dart';
 import 'package:messngr/ui/widgets/desktop/TitlebarSafeArea.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:core/providers/auth_state_provider.dart';
+import 'package:core/ui/auth/simple_login_screen.dart';
+import 'package:core/ui/shell/app_shell.dart';
+import 'package:core/ui/shell/simple_chat_content.dart';
 
 class MacOSApp extends StatefulWidget {
   const MacOSApp({super.key});
@@ -144,33 +147,29 @@ class _MacOSAppState extends State<MacOSApp>
 
   @override
   Widget build(BuildContext context) {
-    final appThemeData = AppThemeData(brightness: _brightness);
     return ProviderScope(
       child: TitlebarSafeArea(
-        child: AppTheme(
-          data: appThemeData,
-          child: CupertinoApp.router(
-            title: appTitle,
-            debugShowCheckedModeBanner: false,
-            theme: appThemeData.getCupertinoThemeData(_brightness),
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              DefaultMaterialLocalizations.delegate,
-              DefaultCupertinoLocalizations.delegate,
-              DefaultWidgetsLocalizations.delegate,
-            ],
-            supportedLocales: kSupportedLocales,
-            localeResolutionCallback: (locale, supportedLocales) {
-              for (var supportedLocale in supportedLocales) {
-                if (supportedLocale.languageCode == locale!.languageCode &&
-                    supportedLocale.countryCode == locale.countryCode) {
-                  return supportedLocale;
-                }
-              }
-              return null;
-            },
-            routerConfig: AppNavigation.router,
+        child: MaterialApp(
+          title: appTitle,
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            colorSchemeSeed: const Color(0xFF02AC88),
+            brightness: _brightness ?? Brightness.light,
+            useMaterial3: true,
           ),
+          darkTheme: ThemeData(
+            colorSchemeSeed: const Color(0xFF02AC88),
+            brightness: Brightness.dark,
+            useMaterial3: true,
+          ),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            DefaultMaterialLocalizations.delegate,
+            DefaultCupertinoLocalizations.delegate,
+            DefaultWidgetsLocalizations.delegate,
+          ],
+          supportedLocales: kSupportedLocales,
+          home: const _AuthGate(),
         ),
       ),
     );
@@ -204,5 +203,18 @@ class _MacOSAppState extends State<MacOSApp>
         },
       );
     }
+  }
+}
+
+class _AuthGate extends ConsumerWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(simpleAuthProvider);
+    if (auth.isLoggedIn) {
+      return AppShell(child: const SimpleChatContent());
+    }
+    return const SimpleLoginScreen();
   }
 }

@@ -15,10 +15,6 @@ PODS:
     - FlutterMacOS
     - WebRTC-SDK (= 125.6422.04)
   - FlutterMacOS (1.0.0)
-  - FMDB/Core (2.7.12)
-  - FMDB/SQLCipher (2.7.12):
-    - FMDB/Core
-    - SQLCipher (~> 4.6)
   - irondash_engine_context (0.0.1):
     - FlutterMacOS
   - package_info_plus (0.0.1):
@@ -38,40 +34,6 @@ PODS:
   - sqflite_darwin (0.0.4):
     - Flutter
     - FlutterMacOS
-  - sqflite_sqlcipher (0.0.1):
-    - FlutterMacOS
-    - FMDB/SQLCipher (~> 2.7.5)
-    - SQLCipher (= 4.10.0)
-  - SQLCipher (4.10.0):
-    - SQLCipher/standard (= 4.10.0)
-  - SQLCipher/common (4.10.0)
-  - SQLCipher/standard (4.10.0):
-    - SQLCipher/common
-  - sqlite3 (3.51.1):
-    - sqlite3/common (= 3.51.1)
-  - sqlite3/common (3.51.1)
-  - sqlite3/dbstatvtab (3.51.1):
-    - sqlite3/common
-  - sqlite3/fts5 (3.51.1):
-    - sqlite3/common
-  - sqlite3/math (3.51.1):
-    - sqlite3/common
-  - sqlite3/perf-threadsafe (3.51.1):
-    - sqlite3/common
-  - sqlite3/rtree (3.51.1):
-    - sqlite3/common
-  - sqlite3/session (3.51.1):
-    - sqlite3/common
-  - sqlite3_flutter_libs (0.0.1):
-    - Flutter
-    - FlutterMacOS
-    - sqlite3 (~> 3.51.1)
-    - sqlite3/dbstatvtab
-    - sqlite3/fts5
-    - sqlite3/math
-    - sqlite3/perf-threadsafe
-    - sqlite3/rtree
-    - sqlite3/session
   - super_native_extensions (0.0.1):
     - FlutterMacOS
   - url_launcher_macos (0.0.1):
@@ -103,8 +65,6 @@ DEPENDENCIES:
   - shared_preferences_foundation (from `Flutter/ephemeral/.symlinks/plugins/shared_preferences_foundation/darwin`)
   - smart_auth (from `Flutter/ephemeral/.symlinks/plugins/smart_auth/macos`)
   - sqflite_darwin (from `Flutter/ephemeral/.symlinks/plugins/sqflite_darwin/darwin`)
-  - sqflite_sqlcipher (from `Flutter/ephemeral/.symlinks/plugins/sqflite_sqlcipher/macos`)
-  - sqlite3_flutter_libs (from `Flutter/ephemeral/.symlinks/plugins/sqlite3_flutter_libs/darwin`)
   - super_native_extensions (from `Flutter/ephemeral/.symlinks/plugins/super_native_extensions/macos`)
   - url_launcher_macos (from `Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos`)
   - video_player_avfoundation (from `Flutter/ephemeral/.symlinks/plugins/video_player_avfoundation/darwin`)
@@ -113,9 +73,6 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
-    - FMDB
-    - SQLCipher
-    - sqlite3
     - WebRTC-SDK
 
 EXTERNAL SOURCES:
@@ -151,10 +108,6 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/smart_auth/macos
   sqflite_darwin:
     :path: Flutter/ephemeral/.symlinks/plugins/sqflite_darwin/darwin
-  sqflite_sqlcipher:
-    :path: Flutter/ephemeral/.symlinks/plugins/sqflite_sqlcipher/macos
-  sqlite3_flutter_libs:
-    :path: Flutter/ephemeral/.symlinks/plugins/sqlite3_flutter_libs/darwin
   super_native_extensions:
     :path: Flutter/ephemeral/.symlinks/plugins/super_native_extensions/macos
   url_launcher_macos:
@@ -175,7 +128,6 @@ SPEC CHECKSUMS:
   flutter_secure_storage_macos: 7f45e30f838cf2659862a4e4e3ee1c347c2b3b54
   flutter_webrtc: f68f019e758ba8ea97d3a2aa5d85b3b25bce4015
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
-  FMDB: 728731dd336af3936ce00f91d9d8495f5718a0e6
   irondash_engine_context: 893c7d96d20ce361d7e996f39d360c4c2f9869ba
   package_info_plus: f0052d280d17aa382b932f399edf32507174e870
   path_provider_foundation: bb55f6dbba17d0dccd6737fe6f7f34fbd0376880
@@ -184,10 +136,6 @@ SPEC CHECKSUMS:
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
   smart_auth: e10f1d22af5d9e1a51964fb1826cb177f993a7e1
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
-  sqflite_sqlcipher: a4c2f17db76d2f86dfe044937d3a851d8880cbb9
-  SQLCipher: eb79c64049cb002b4e9fcb30edb7979bf4706dfc
-  sqlite3: 8d708bc63e9f4ce48f0ad9d6269e478c5ced1d9b
-  sqlite3_flutter_libs: d13b8b3003f18f596e542bcb9482d105577eff41
   super_native_extensions: c2795d6d9aedf4a79fae25cb6160b71b50549189
   url_launcher_macos: f87a979182d112f911de6820aefddaf56ee9fbfd
   video_player_avfoundation: dd410b52df6d2466a42d28550e33e4146928280a

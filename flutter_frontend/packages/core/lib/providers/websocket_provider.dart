@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:libmsgr/libmsgr.dart';
 import 'package:core/providers/auth_provider.dart';
 import 'package:core/providers/team_provider.dart';

@@ -17,7 +17,7 @@ dependencies:
   path_provider: ^2.1.4
   provider: ^6.1.2
   overlay_support: ^2.1.0
-  fluttertoast: ^8.2.8
+  fluttertoast: ^9.0.0
   http: ^1.2.1
   phoenix_socket:
     path: ../phoenix_socket
@@ -34,28 +34,28 @@ dependencies:
 
   flutter_profile_picture: ^2.0.0
   cupertino_icons: ^1.0.8
-  google_fonts: ^6.2.1
+  google_fonts: ^8.0.2
 
   # Will be used for pincode / lockscreen / SMS registration
-  pinput: ^5.0.0
-  smart_auth: ^2.0.0
-  permission_handler: ^11.3.1
-  flutter_contacts: ^1.1.7
-  device_info_plus: ^10.1.2
-  package_info_plus: ^8.0.0
+  pinput: ^6.0.2
+  smart_auth: ^3.2.0
+  permission_handler: ^12.0.1
+  flutter_contacts: ^2.0.0
+  device_info_plus: ^11.5.0
+  package_info_plus: ^9.0.0
   visibility_detector: ^0.4.0+2
 
   # For deciding on traffic usage
-  connectivity_plus: ^6.0.5
-  share_plus: ^10.0.2
-  file_picker: ^8.1.2
-  desktop_drop: ^0.4.4
+  connectivity_plus: ^7.0.0
+  share_plus: ^12.0.1
+  file_picker: ^10.3.10
+  desktop_drop: ^0.7.0
 
   # Media
   video_player: ^2.2.0
-  video_thumbnail: ^0.4.3
+  video_thumbnail: ^0.5.6
   media_kit: ^1.1.11
-  media_info: ^0.8.0
+  media_info: ^0.12.0+2
   image_picker: ^1.1.2
   image_picker_for_web: ^3.0.6
   cached_network_image: ^3.3.1
@@ -70,7 +70,7 @@ dependencies:
   webview_flutter: ^4.8.0
 
   # State Management
-  flutter_riverpod: ^2.6.1
+  flutter_riverpod: ^3.3.1
 
   # Misc
   meta: ^1.15.0
@@ -80,12 +80,12 @@ dependencies:
 
   # UI
   liquid_pull_to_refresh: ^3.0.1
-  window_manager: ^0.4.2
-  go_router: ^14.2.7
+  window_manager: ^0.5.1
+  go_router: ^17.1.0
   flutter_screen_lock: ^9.1.0
-  introduction_screen: ^3.1.14
-  flutter_sticky_header: ^0.6.5
-  super_clipboard: ^0.8.24
+  introduction_screen: ^4.0.0
+  flutter_sticky_header: ^0.8.0
+  super_clipboard: ^0.9.1
   flutter_portal: ^1.1.4
   intl: ^0.20.2
   timeago: ^3.7.0
@@ -97,19 +97,19 @@ dependencies:
   path: ^1.9.0
 
   # Secure storage
-  flutter_secure_storage: ^9.2.2
+  flutter_secure_storage: ^10.0.0
   url_launcher: ^6.3.0
   flutter_native_image: ^0.0.6+1
-  flutter_webrtc: ^0.11.7
+  flutter_webrtc: ^1.4.0
   collection: ^1.18.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+  flutter_lints: ^6.0.0
   drift_dev: ^2.20.0
   mockito: ^5.4.4
-  go_router_builder: ^2.7.1
+  go_router_builder: ^4.2.0
   build_runner: ^2.4.12
   build_verify: ^3.1.0
 
