@@ -392,15 +392,20 @@ class _AppShellState extends ConsumerState<AppShell> {
       final slug = slugController.text.trim();
       if (name.isNotEmpty && slug.isNotEmpty) {
         await ref.read(teamListProvider.notifier).createTeam(name, slug);
-        // Auto-select the newly created team
-        final teams = ref.read(teamsProvider);
-        if (teams.isNotEmpty) {
-          final newTeam = teams.lastWhere(
-            (t) => t.slug == slug,
-            orElse: () => teams.last,
-          );
-          ref.read(selectedTeamProvider.notifier).select(newTeam);
-        }
+        // Auto-select the newly created team via microtask to avoid
+        // _dependents.isEmpty assertion.
+        Future.microtask(() {
+          if (!mounted) return;
+          final teams = ref.read(teamsProvider);
+          if (teams.isNotEmpty) {
+            final newTeam = teams.lastWhere(
+              (t) => t.slug == slug,
+              orElse: () => teams.last,
+            );
+            ref.read(selectedTeamProvider.notifier).select(newTeam);
+            ref.read(selectedChannelProvider.notifier).clear();
+          }
+        });
       }
     }
 
@@ -461,15 +466,20 @@ class _AppShellState extends ConsumerState<AppShell> {
       final slug = slugController.text.trim();
       if (slug.isNotEmpty) {
         await ref.read(teamListProvider.notifier).joinTeam(slug);
-        // Auto-select the joined team
-        final teams = ref.read(teamsProvider);
-        if (teams.isNotEmpty) {
-          final joinedTeam = teams.lastWhere(
-            (t) => t.slug == slug,
-            orElse: () => teams.last,
-          );
-          ref.read(selectedTeamProvider.notifier).select(joinedTeam);
-        }
+        // Auto-select the joined team via microtask to avoid
+        // _dependents.isEmpty assertion.
+        Future.microtask(() {
+          if (!mounted) return;
+          final teams = ref.read(teamsProvider);
+          if (teams.isNotEmpty) {
+            final joinedTeam = teams.lastWhere(
+              (t) => t.slug == slug,
+              orElse: () => teams.last,
+            );
+            ref.read(selectedTeamProvider.notifier).select(joinedTeam);
+            ref.read(selectedChannelProvider.notifier).clear();
+          }
+        });
       }
     }
 
@@ -560,12 +570,16 @@ class _AppShellState extends ConsumerState<AppShell> {
               name: name,
               icon: icon.isNotEmpty ? icon : null,
             );
-        // Auto-select newly created channel
-        final channels = ref.read(channelListProvider).channels;
-        if (channels.isNotEmpty) {
-          final newChannel = channels.last;
-          ref.read(selectedChannelProvider.notifier).select(newChannel);
-        }
+        // Auto-select newly created channel after microtask to avoid
+        // _dependents.isEmpty assertion from modifying state during build.
+        Future.microtask(() {
+          if (!mounted) return;
+          final channels = ref.read(channelListProvider).channels;
+          if (channels.isNotEmpty) {
+            final newChannel = channels.last;
+            ref.read(selectedChannelProvider.notifier).select(newChannel);
+          }
+        });
       }
     }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client_provider.dart';
 import 'auth_state_provider.dart';
@@ -126,18 +127,36 @@ final teamsProvider = Provider<List<SlackTeam>>((ref) {
 class SelectedTeamNotifier extends StateNotifier<SlackTeam?> {
   SelectedTeamNotifier() : super(null);
 
-  void select(SlackTeam team) => state = team;
+  void select(SlackTeam team) {
+    state = team;
+    // Persist last selected team
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('last_team_slug', team.slug);
+    });
+  }
 
   void clear() => state = null;
 }
 
 final selectedTeamProvider =
     StateNotifierProvider<SelectedTeamNotifier, SlackTeam?>((ref) {
-  // Auto-select first team when team list loads, if nothing is selected yet.
   final teams = ref.watch(teamListProvider).teams;
   final notifier = SelectedTeamNotifier();
   if (teams.isNotEmpty) {
-    notifier.select(teams.first);
+    // Try to restore last selected team from prefs
+    Future.microtask(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final lastSlug = prefs.getString('last_team_slug');
+      if (lastSlug != null) {
+        final savedTeam = teams.where((t) => t.slug == lastSlug).firstOrNull;
+        if (savedTeam != null) {
+          notifier.select(savedTeam);
+          return;
+        }
+      }
+      // Fall back to first team
+      notifier.select(teams.first);
+    });
   }
   return notifier;
 });

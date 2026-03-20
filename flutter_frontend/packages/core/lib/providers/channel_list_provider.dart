@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client_provider.dart';
 import 'models.dart';
@@ -85,6 +86,14 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
     }
   }
 
+  /// Reload channels for the current team.
+  Future<void> refresh() async {
+    final selectedTeam = _ref.read(selectedTeamProvider);
+    if (selectedTeam != null) {
+      await loadForTeam(selectedTeam.slug);
+    }
+  }
+
   Future<void> createChannel({
     required String teamSlug,
     required String name,
@@ -153,11 +162,40 @@ final dmChannelsProvider = Provider<List<SlackChannel>>((ref) {
 class SelectedChannelNotifier extends StateNotifier<SlackChannel?> {
   SelectedChannelNotifier() : super(null);
 
-  void select(SlackChannel channel) => state = channel;
+  void select(SlackChannel channel) {
+    state = channel;
+    // Persist last selected channel
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('last_channel_id', channel.id);
+    });
+  }
+
   void clear() => state = null;
 }
 
 final selectedChannelProvider =
     StateNotifierProvider<SelectedChannelNotifier, SlackChannel?>((ref) {
-  return SelectedChannelNotifier();
+  final notifier = SelectedChannelNotifier();
+
+  // Auto-select saved channel when channel list loads
+  final channelState = ref.watch(channelListProvider);
+  if (channelState.channels.isNotEmpty && !channelState.isLoading) {
+    Future.microtask(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final lastId = prefs.getString('last_channel_id');
+      if (lastId != null) {
+        final saved = channelState.channels
+            .where((c) => c.id == lastId)
+            .firstOrNull;
+        if (saved != null) {
+          notifier.select(saved);
+          return;
+        }
+      }
+      // Fall back to first channel
+      notifier.select(channelState.channels.first);
+    });
+  }
+
+  return notifier;
 });

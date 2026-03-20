@@ -218,14 +218,23 @@ class _MacOSAppState extends State<MacOSApp>
 
 /// Gates the app on simple auth state.
 /// Shows login screen if not authenticated, app shell + chat if authenticated.
+/// Shows a loading spinner while checking saved session on startup.
 class _AuthGate extends ConsumerWidget {
   const _AuthGate();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isLoggedIn = ref.watch(isSimpleAuthLoggedInProvider);
+    final authState = ref.watch(simpleAuthProvider);
 
-    if (!isLoggedIn) {
+    // Show loading spinner while checking saved session
+    if (authState.isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF1E1E1E),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (!authState.isLoggedIn) {
       return const SimpleLoginScreen();
     }
 
