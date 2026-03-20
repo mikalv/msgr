@@ -45,6 +45,7 @@ class LlmClient {
     });
 
     final uri = Uri.parse('$baseUrl/v1/chat/completions');
+    print('[LLM] POST $uri model=$model messages=${allMessages.length}');
     final response = await http.post(
       uri,
       headers: {
@@ -54,6 +55,7 @@ class LlmClient {
       body: body,
     );
 
+    print('[LLM] Response: ${response.statusCode} (${response.body.length} bytes)');
     if (response.statusCode != 200) {
       throw LlmException(
         'LLM request failed (${response.statusCode}): ${response.body}',
@@ -61,13 +63,23 @@ class LlmClient {
     }
 
     final json = jsonDecode(response.body) as Map<String, dynamic>;
-    final choices = json['choices'] as List<dynamic>;
+    final choices = json['choices'] as List<dynamic>? ?? [];
     if (choices.isEmpty) {
-      throw LlmException('LLM returned empty choices');
+      throw LlmException('LLM returned empty choices: ${response.body}');
     }
 
-    final message = choices[0]['message'] as Map<String, dynamic>;
-    return message['content'] as String;
+    final message = choices[0]['message'] as Map<String, dynamic>? ?? {};
+    final content = message['content']?.toString() ?? '';
+
+    // Strip <think>...</think> tags from reasoning models
+    final stripped = content.replaceAll(RegExp(r'<think>[\s\S]*?</think>'), '').trim();
+    print('[LLM] Reply (${stripped.length} chars): ${stripped.substring(0, stripped.length.clamp(0, 80))}...');
+
+    if (stripped.isEmpty) {
+      throw LlmException('LLM returned empty content after stripping think tags');
+    }
+
+    return stripped;
   }
 }
 

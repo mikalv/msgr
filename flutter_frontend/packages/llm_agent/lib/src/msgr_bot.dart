@@ -241,8 +241,9 @@ class MsgrBot {
             await sendMessage(channelId, reply);
           }
         }
-      } catch (e) {
-        // Silently continue on errors
+      } catch (e, stack) {
+        print('[Bot] Poll error: $e');
+        print('[Bot] Stack: $stack');
       }
     }
   }
