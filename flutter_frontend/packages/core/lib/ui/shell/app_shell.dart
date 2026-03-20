@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/providers/channel_list_provider.dart';
 import 'package:core/providers/draft_provider.dart';
 import 'package:core/providers/models.dart' hide ChannelKind;
@@ -269,6 +270,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         _onDmSelected(dm.id);
       },
       onCreateChannel: _showCreateChannelDialog,
+      userEmail: ref.watch(simpleAuthProvider).email,
+      onLogout: () => ref.read(simpleAuthProvider.notifier).logout(),
     );
   }
 

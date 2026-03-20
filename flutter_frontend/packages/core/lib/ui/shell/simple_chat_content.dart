@@ -108,12 +108,12 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                 ),
               ],
               const Spacer(),
-              // Logout button
+              // Members panel toggle (placeholder)
               IconButton(
-                icon: const Icon(Icons.logout, color: Colors.white54, size: 20),
-                tooltip: 'Logg ut',
+                icon: const Icon(Icons.people_outline, color: Colors.white54, size: 20),
+                tooltip: 'Medlemmer',
                 onPressed: () {
-                  ref.read(simpleAuthProvider.notifier).logout();
+                  // TODO: toggle member sidebar panel
                 },
               ),
             ],

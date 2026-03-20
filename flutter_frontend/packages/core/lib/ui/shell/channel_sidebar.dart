@@ -18,6 +18,8 @@ class ChannelSidebar extends StatefulWidget {
     this.onChannelSelected,
     this.onDmSelected,
     this.onCreateChannel,
+    this.onLogout,
+    this.userEmail,
   });
 
   final String teamName;
@@ -28,6 +30,8 @@ class ChannelSidebar extends StatefulWidget {
   final ValueChanged<MockChannel>? onChannelSelected;
   final ValueChanged<MockDmContact>? onDmSelected;
   final VoidCallback? onCreateChannel;
+  final VoidCallback? onLogout;
+  final String? userEmail;
 
   @override
   State<ChannelSidebar> createState() => _ChannelSidebarState();
@@ -205,6 +209,38 @@ class _ChannelSidebarState extends State<ChannelSidebar> {
               ],
             ),
           ),
+
+          // User section at bottom
+          if (widget.onLogout != null || widget.userEmail != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.account_circle, color: ShellTheme.sidebarText, size: 28),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      widget.userEmail ?? '',
+                      style: const TextStyle(color: ShellTheme.sidebarText, fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (widget.onLogout != null)
+                    IconButton(
+                      icon: const Icon(Icons.logout, color: ShellTheme.sidebarText, size: 16),
+                      tooltip: 'Logg ut',
+                      onPressed: widget.onLogout,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    ),
+                ],
+              ),
+            ),
         ],
       ),
       ),
