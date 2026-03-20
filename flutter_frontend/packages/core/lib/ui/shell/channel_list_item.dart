@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import 'shell_models.dart';
 import 'shell_theme.dart';
 
-/// A single channel row inside the sidebar.
+/// A single channel row in Slack-style flat list.
 ///
-/// Shows an optional emoji icon, a `#name` label, an unread badge when
-/// [channel.unreadCount] > 0, and an italic "Draft" hint when
-/// [channel.hasDraft] is true.
+/// Private channels show a lock icon, public channels show `#`.
+/// Unread badge appears as a pill on the right side.
 class ChannelListItem extends StatelessWidget {
   const ChannelListItem({
     super.key,
@@ -25,25 +24,35 @@ class ChannelListItem extends StatelessWidget {
     final hasUnread = channel.unreadCount > 0;
     final textColor =
         hasUnread ? ShellTheme.sidebarTextBright : ShellTheme.sidebarText;
-    final fontWeight = hasUnread ? FontWeight.w700 : FontWeight.w400;
+    final fontWeight = hasUnread ? FontWeight.w600 : FontWeight.w400;
+    final isPrivate = channel.kind == ChannelKind.private;
 
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      hoverColor: ShellTheme.sidebarHoverItem,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
           color: isSelected ? ShellTheme.sidebarActiveItem : null,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
           children: [
-            if (channel.iconEmoji.isNotEmpty) ...[
-              Text(channel.iconEmoji, style: const TextStyle(fontSize: 14)),
-              const SizedBox(width: 6),
-            ],
+            // Channel prefix: lock for private, # for public
+            Text(
+              isPrivate ? '\u{1F512}' : '#',
+              style: TextStyle(
+                color: ShellTheme.sidebarText,
+                fontSize: isPrivate ? 12 : 14,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            const SizedBox(width: 6),
             Expanded(
               child: Text(
-                '#${channel.name}',
+                channel.name,
                 style: TextStyle(
                   color: textColor,
                   fontWeight: fontWeight,
@@ -52,23 +61,11 @@ class ChannelListItem extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (channel.hasDraft && !hasUnread)
-              const Padding(
-                padding: EdgeInsets.only(left: 4),
-                child: Text(
-                  'Draft',
-                  style: TextStyle(
-                    color: ShellTheme.sidebarText,
-                    fontStyle: FontStyle.italic,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
             if (hasUnread)
               Container(
                 margin: const EdgeInsets.only(left: 6),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
                   color: ShellTheme.unreadBadge,
                   borderRadius: BorderRadius.circular(10),

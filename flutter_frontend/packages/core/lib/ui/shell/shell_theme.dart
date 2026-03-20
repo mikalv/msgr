@@ -10,7 +10,7 @@ class ShellTheme {
   static const sidebarBg = Color(0xFF1A1D21);
   static const sidebarText = Color(0xFFD1D2D3);
   static const sidebarTextBright = Color(0xFFFFFFFF);
-  static const sidebarActiveItem = Color(0xFF1164A3);
+  static const sidebarActiveItem = Color(0xFF27242C);
   static const sidebarHoverItem = Color(0xFF27242C);
   static const accentColor = Color(0xFF02AC88);
   static const unreadBadge = Color(0xFFE01E5A);

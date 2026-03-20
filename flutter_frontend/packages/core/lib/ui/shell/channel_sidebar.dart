@@ -5,9 +5,11 @@ import 'dm_list_item.dart';
 import 'shell_models.dart';
 import 'shell_theme.dart';
 
-/// Channel sidebar (240 px wide) showing the active team name, a search field,
-/// collapsible channel and DM sections, and "create" buttons.
-class ChannelSidebar extends StatefulWidget {
+/// Slack-style channel sidebar (240 px wide) with flat list layout.
+///
+/// Shows team name header with settings/compose buttons, then flat sections
+/// for channels and DMs separated by thin dividers.
+class ChannelSidebar extends StatelessWidget {
   const ChannelSidebar({
     super.key,
     required this.teamName,
@@ -33,22 +35,11 @@ class ChannelSidebar extends StatefulWidget {
   final VoidCallback? onLogout;
   final String? userEmail;
 
-  @override
-  State<ChannelSidebar> createState() => _ChannelSidebarState();
-}
-
-class _ChannelSidebarState extends State<ChannelSidebar> {
-  bool _channelsExpanded = true;
-  bool _dmsExpanded = true;
-  final _searchController = TextEditingController();
-
   List<MockChannel> get _sortedChannels {
-    final sorted = List<MockChannel>.from(widget.channels);
+    final sorted = List<MockChannel>.from(channels);
     sorted.sort((a, b) {
-      // Unread first
       if (a.unreadCount > 0 && b.unreadCount == 0) return -1;
       if (a.unreadCount == 0 && b.unreadCount > 0) return 1;
-      // Then by last activity
       final aTime = a.lastActivityAt ?? DateTime(2000);
       final bTime = b.lastActivityAt ?? DateTime(2000);
       return bTime.compareTo(aTime);
@@ -57,7 +48,7 @@ class _ChannelSidebarState extends State<ChannelSidebar> {
   }
 
   List<MockDmContact> get _sortedDms {
-    final sorted = List<MockDmContact>.from(widget.dmContacts);
+    final sorted = List<MockDmContact>.from(dmContacts);
     sorted.sort((a, b) {
       if (a.unreadCount > 0 && b.unreadCount == 0) return -1;
       if (a.unreadCount == 0 && b.unreadCount > 0) return 1;
@@ -66,12 +57,6 @@ class _ChannelSidebarState extends State<ChannelSidebar> {
       return bTime.compareTo(aTime);
     });
     return sorted;
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   @override
@@ -81,207 +66,223 @@ class _ChannelSidebarState extends State<ChannelSidebar> {
       child: SizedBox(
         width: ShellTheme.sidebarWidth,
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Team name header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 8, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.teamName,
-                    style: const TextStyle(
-                      color: ShellTheme.sidebarTextBright,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.tune, color: ShellTheme.sidebarText, size: 18),
-                  onPressed: () {},
-                  tooltip: 'Innstillinger',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                ),
-              ],
-            ),
-          ),
-
-          // Search field
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: SizedBox(
-              height: 32,
-              child: TextField(
-                controller: _searchController,
-                style: const TextStyle(color: ShellTheme.sidebarText, fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: 'Sok...',
-                  hintStyle: TextStyle(color: ShellTheme.sidebarText.withAlpha(128)),
-                  prefixIcon: const Icon(Icons.search, color: ShellTheme.sidebarText, size: 16),
-                  prefixIconConstraints: const BoxConstraints(minWidth: 32),
-                  filled: true,
-                  fillColor: ShellTheme.sidebarHoverItem,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 4),
-
-          // Scrollable content
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              children: [
-                // Channels section
-                _SectionHeader(
-                  title: 'Kanaler',
-                  isExpanded: _channelsExpanded,
-                  onToggle: () =>
-                      setState(() => _channelsExpanded = !_channelsExpanded),
-                ),
-                if (_channelsExpanded) ...[
-                  for (final channel in _sortedChannels)
-                    ChannelListItem(
-                      channel: channel,
-                      isSelected: channel.id == widget.selectedChannelId,
-                      onTap: () => widget.onChannelSelected?.call(channel),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 12, top: 4),
-                    child: TextButton.icon(
-                      onPressed: () => widget.onCreateChannel?.call(),
-                      icon: const Icon(Icons.add, size: 14, color: ShellTheme.sidebarText),
-                      label: const Text(
-                        'Opprett kanal',
-                        style: TextStyle(color: ShellTheme.sidebarText, fontSize: 13),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        minimumSize: const Size(0, 28),
-                      ),
-                    ),
-                  ),
-                ],
-
-                const SizedBox(height: 8),
-
-                // DMs section
-                _SectionHeader(
-                  title: 'Direktemeldinger',
-                  isExpanded: _dmsExpanded,
-                  onToggle: () =>
-                      setState(() => _dmsExpanded = !_dmsExpanded),
-                ),
-                if (_dmsExpanded) ...[
-                  for (final dm in _sortedDms)
-                    DmListItem(
-                      contact: dm,
-                      isSelected: dm.id == widget.selectedDmId,
-                      onTap: () => widget.onDmSelected?.call(dm),
-                    ),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 12, top: 4),
-                    child: TextButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.add, size: 14, color: ShellTheme.sidebarText),
-                      label: const Text(
-                        'Ny melding',
-                        style: TextStyle(color: ShellTheme.sidebarText, fontSize: 13),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        minimumSize: const Size(0, 28),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          // User section at bottom
-          if (widget.onLogout != null || widget.userEmail != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
-                ),
-              ),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Team name header with settings and compose buttons
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
               child: Row(
                 children: [
-                  const Icon(Icons.account_circle, color: ShellTheme.sidebarText, size: 28),
-                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      widget.userEmail ?? '',
-                      style: const TextStyle(color: ShellTheme.sidebarText, fontSize: 12),
+                      teamName,
+                      style: const TextStyle(
+                        color: ShellTheme.sidebarTextBright,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (widget.onLogout != null)
-                    IconButton(
-                      icon: const Icon(Icons.logout, color: ShellTheme.sidebarText, size: 16),
-                      tooltip: 'Logg ut',
-                      onPressed: widget.onLogout,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                    ),
+                  IconButton(
+                    icon: const Icon(Icons.tune, color: ShellTheme.sidebarText, size: 18),
+                    onPressed: () {},
+                    tooltip: 'Innstillinger',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_square, color: ShellTheme.sidebarText, size: 18),
+                    onPressed: () {},
+                    tooltip: 'Ny melding',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  ),
                 ],
               ),
             ),
-        ],
+
+            _buildDivider(),
+
+            // Scrollable content
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                children: [
+                  // --- Channels section ---
+                  _SectionHeader(
+                    icon: Icons.grid_view_rounded,
+                    title: 'Kanaler',
+                  ),
+                  const SizedBox(height: 2),
+                  for (final channel in _sortedChannels)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: ChannelListItem(
+                        channel: channel,
+                        isSelected: channel.id == selectedChannelId,
+                        onTap: () => onChannelSelected?.call(channel),
+                      ),
+                    ),
+                  // + Legg til kanaler
+                  _AddButton(
+                    label: 'Legg til kanaler',
+                    onTap: () => onCreateChannel?.call(),
+                  ),
+
+                  const SizedBox(height: 4),
+                  _buildDivider(),
+                  const SizedBox(height: 4),
+
+                  // --- Direct messages section ---
+                  _SectionHeader(
+                    icon: Icons.chat_bubble_outline,
+                    title: 'Direktemeldinger',
+                  ),
+                  const SizedBox(height: 2),
+                  for (final dm in _sortedDms)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: DmListItem(
+                        contact: dm,
+                        isSelected: dm.id == selectedDmId,
+                        onTap: () => onDmSelected?.call(dm),
+                      ),
+                    ),
+                  // + Inviter folk
+                  _AddButton(
+                    label: 'Inviter folk',
+                    onTap: () {},
+                  ),
+                ],
+              ),
+            ),
+
+            // User section at bottom
+            if (onLogout != null || userEmail != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 9,
+                      height: 9,
+                      decoration: const BoxDecoration(
+                        color: ShellTheme.onlineDot,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        userEmail ?? '',
+                        style: const TextStyle(
+                          color: ShellTheme.sidebarText,
+                          fontSize: 12,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (onLogout != null)
+                      IconButton(
+                        icon: const Icon(Icons.logout, color: ShellTheme.sidebarText, size: 16),
+                        tooltip: 'Logg ut',
+                        onPressed: onLogout,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
+    );
+  }
+
+  static Widget _buildDivider() {
+    return Container(
+      height: 1,
+      color: Colors.white.withValues(alpha: 0.08),
+    );
+  }
+}
+
+/// Non-collapsible section header: icon + bold text.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.title,
+  });
+
+  final IconData icon;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, color: ShellTheme.sidebarText, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            title,
+            style: const TextStyle(
+              color: ShellTheme.sidebarText,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.isExpanded,
-    required this.onToggle,
+/// Subtle "+ Add" inline link matching item indentation.
+class _AddButton extends StatelessWidget {
+  const _AddButton({
+    required this.label,
+    required this.onTap,
   });
 
-  final String title;
-  final bool isExpanded;
-  final VoidCallback onToggle;
+  final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: onToggle,
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      hoverColor: ShellTheme.sidebarHoverItem,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
         child: Row(
           children: [
-            Icon(
-              isExpanded ? Icons.expand_more : Icons.chevron_right,
-              color: ShellTheme.sidebarText,
-              size: 16,
-            ),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: ShellTheme.sidebarText,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
+            Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: ShellTheme.sidebarText.withAlpha(128),
+                  width: 1,
                 ),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Icon(Icons.add, size: 12, color: ShellTheme.sidebarText),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: ShellTheme.sidebarText.withAlpha(180),
+                fontSize: 13,
               ),
             ),
           ],

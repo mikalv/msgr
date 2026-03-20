@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'shell_models.dart';
 import 'shell_theme.dart';
 
-/// A single DM contact row inside the sidebar.
+/// A single DM contact row in Slack-style flat list.
 ///
-/// Renders a small [CircleAvatar] with a green online dot overlay, the
-/// contact name, and an unread badge when applicable.
+/// Shows an inline presence dot (green = online, gray = offline) followed
+/// by the contact name, and an unread badge pill on the right.
 class DmListItem extends StatelessWidget {
   const DmListItem({
     super.key,
@@ -24,51 +24,37 @@ class DmListItem extends StatelessWidget {
     final hasUnread = contact.unreadCount > 0;
     final textColor =
         hasUnread ? ShellTheme.sidebarTextBright : ShellTheme.sidebarText;
-    final fontWeight = hasUnread ? FontWeight.w700 : FontWeight.w400;
+    final fontWeight = hasUnread ? FontWeight.w600 : FontWeight.w400;
 
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      hoverColor: ShellTheme.sidebarHoverItem,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
           color: isSelected ? ShellTheme.sidebarActiveItem : null,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
           children: [
-            // Avatar with online dot
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 12,
-                  backgroundColor: ShellTheme.sidebarHoverItem,
-                  child: Text(
-                    contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      color: ShellTheme.sidebarTextBright,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+            // Inline presence dot
+            Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                color: contact.isOnline
+                    ? ShellTheme.onlineDot
+                    : Colors.transparent,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: contact.isOnline
+                      ? ShellTheme.onlineDot
+                      : ShellTheme.sidebarText.withAlpha(128),
+                  width: 1.5,
                 ),
-                if (contact.isOnline)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: ShellTheme.onlineDot,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: ShellTheme.sidebarBg,
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -86,7 +72,7 @@ class DmListItem extends StatelessWidget {
               Container(
                 margin: const EdgeInsets.only(left: 6),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
                   color: ShellTheme.unreadBadge,
                   borderRadius: BorderRadius.circular(10),
