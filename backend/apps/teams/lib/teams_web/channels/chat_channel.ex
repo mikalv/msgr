@@ -46,11 +46,19 @@ defmodule TeamsWeb.ChatChannel do
           {:error, %{reason: "channel_not_found"}}
 
         channel ->
-          if has_access?(prefix, channel, profile_id) do
+          # Resolve the tenant profile for this account
+          account_id = socket.assigns[:uid] || socket.assigns[:account_id]
+          tenant_profile = if account_id do
+            TeamManagement.get_profile_for_account(prefix, account_id)
+          end
+          tenant_profile_id = if tenant_profile, do: tenant_profile.id, else: profile_id
+
+          if has_access?(prefix, channel, tenant_profile_id) do
             socket =
               socket
               |> assign(:channel_id, channel_id)
               |> assign(:prefix, prefix)
+              |> assign(:profile_id, tenant_profile_id)
 
             send(self(), :after_join)
             {:ok, socket}

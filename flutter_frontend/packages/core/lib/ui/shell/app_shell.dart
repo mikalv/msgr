@@ -272,7 +272,12 @@ class _AppShellState extends ConsumerState<AppShell> {
         _onDmSelected(dm.id);
       },
       onCreateChannel: _showCreateChannelDialog,
+      userDisplayName: ref.watch(simpleAuthProvider).displayName,
       userEmail: ref.watch(simpleAuthProvider).email,
+      onEditProfile: () {
+        final team = ref.read(selectedTeamProvider);
+        if (team != null) _showProfileSetupDialog(team.slug);
+      },
       onLogout: () => ref.read(simpleAuthProvider.notifier).logout(),
     );
   }
@@ -284,7 +289,6 @@ class _AppShellState extends ConsumerState<AppShell> {
     final teams = ref.read(teamsProvider);
     if (index >= 0 && index < teams.length) {
       ref.read(selectedTeamProvider.notifier).select(teams[index]);
-      // Clear channel selection when switching teams.
       ref.read(selectedChannelProvider.notifier).clear();
     }
   }

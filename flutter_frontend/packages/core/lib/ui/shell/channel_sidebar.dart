@@ -21,7 +21,9 @@ class ChannelSidebar extends StatelessWidget {
     this.onDmSelected,
     this.onCreateChannel,
     this.onLogout,
+    this.onEditProfile,
     this.userEmail,
+    this.userDisplayName,
   });
 
   final String teamName;
@@ -33,7 +35,9 @@ class ChannelSidebar extends StatelessWidget {
   final ValueChanged<MockDmContact>? onDmSelected;
   final VoidCallback? onCreateChannel;
   final VoidCallback? onLogout;
+  final VoidCallback? onEditProfile;
   final String? userEmail;
+  final String? userDisplayName;
 
   List<MockChannel> get _sortedChannels {
     final sorted = List<MockChannel>.from(channels);
@@ -179,13 +183,32 @@ class ChannelSidebar extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        userEmail ?? '',
-                        style: const TextStyle(
-                          color: ShellTheme.sidebarText,
-                          fontSize: 12,
+                      child: InkWell(
+                        onTap: onEditProfile,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              userDisplayName ?? userEmail ?? '',
+                              style: const TextStyle(
+                                color: ShellTheme.sidebarTextBright,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (userDisplayName != null && userEmail != null)
+                              Text(
+                                userEmail!,
+                                style: TextStyle(
+                                  color: ShellTheme.sidebarText.withAlpha(150),
+                                  fontSize: 10,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (onLogout != null)

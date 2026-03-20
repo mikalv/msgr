@@ -203,7 +203,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
         'channel:$channelId',
         'new:message',
         {
-          'content': content,
+          'content': {'text': content},
           if (mediaRefs != null && mediaRefs.isNotEmpty)
             'media_refs': mediaRefs,
         },
