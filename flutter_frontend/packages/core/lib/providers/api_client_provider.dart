@@ -167,7 +167,7 @@ class ApiClient {
     String content,
   ) async {
     return post('/api/teams/$slug/channels/$channelId/messages', body: {
-      'content': content,
+      'content': {'text': content},
     });
   }
 

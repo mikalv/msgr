@@ -79,7 +79,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
               sender['display_name']?.toString() ??
               sender['name']?.toString() ??
               'Ukjent',
-          content: m['content']?.toString() ?? '',
+          content: _extractContent(m['content']),
           insertedAt: DateTime.tryParse(m['inserted_at']?.toString() ?? '') ??
               DateTime.now(),
           threadParentId: m['thread_parent_id'] as String?,
@@ -135,7 +135,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
           senderName: m['sender_name']?.toString() ??
               sender['display_name']?.toString() ??
               'Ukjent',
-          content: m['content']?.toString() ?? '',
+          content: _extractContent(m['content']),
           insertedAt: DateTime.tryParse(m['inserted_at']?.toString() ?? '') ??
               DateTime.now(),
           status: MessageStatus.sent,
@@ -237,3 +237,10 @@ final channelMessagesProvider =
 final messagesListProvider = Provider<List<SlackMessage>>((ref) {
   return ref.watch(channelMessagesProvider).messages;
 });
+
+/// Extract text from content field — handles both String and Map (JSONB).
+String _extractContent(dynamic content) {
+  if (content is String) return content;
+  if (content is Map) return content['text']?.toString() ?? content.toString();
+  return content?.toString() ?? '';
+}
