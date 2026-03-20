@@ -3,10 +3,11 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
-import 'api_client_provider.dart';
 import 'auth_state_provider.dart';
 import 'channel_list_provider.dart';
 import 'models.dart';
+import 'msgr_client_provider.dart';
+import 'realtime_provider.dart';
 import 'team_list_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -67,7 +68,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
         return;
       }
 
-      final client = _ref.read(apiClientProvider);
+      final client = _ref.read(msgrApiProvider);
       final data = await client.getMessages(team.slug, channelId, limit: _pageSize);
       final messages = data.map((m) {
         final sender = m['sender_profile'] as Map<String, dynamic>? ?? m['sender'] as Map<String, dynamic>? ?? {};
@@ -108,7 +109,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
       final team = _ref.read(selectedTeamProvider);
       if (team == null) return;
 
-      final client = _ref.read(apiClientProvider);
+      final client = _ref.read(msgrApiProvider);
       final data = await client.getMessages(team.slug, channelId, limit: _pageSize);
       final fresh = data.map((m) {
         final sender = m['sender_profile'] as Map<String, dynamic>? ?? m['sender'] as Map<String, dynamic>? ?? {};
@@ -149,7 +150,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
         return;
       }
 
-      final client = _ref.read(apiClientProvider);
+      final client = _ref.read(msgrApiProvider);
       final data = await client.getMessages(
         team.slug,
         channelId,
@@ -216,16 +217,30 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
       final team = _ref.read(selectedTeamProvider);
       if (team == null) throw Exception('No team selected');
 
-      final client = _ref.read(apiClientProvider);
-      final raw = await client.sendMessage(team.slug, channelId, content);
-      // Handle both {data: {...}} and flat response
-      final data = raw.containsKey('data') && raw['data'] is Map
-          ? raw['data'] as Map<String, dynamic>
-          : raw;
+      // Try Phoenix Channel push first, fall back to REST.
+      final realtime = _ref.read(realtimeProvider.notifier);
+      final pushed = await realtime.sendMessageViaChannel(
+        channelId,
+        content,
+        mediaRefs: mediaRefs,
+      );
 
-      // Replace optimistic message with server response.
+      String? serverId;
+      if (!pushed) {
+        // REST fallback
+        final client = _ref.read(msgrApiProvider);
+        final raw = await client.sendMessage(team.slug, channelId, content);
+        final data = raw.containsKey('data') && raw['data'] is Map
+            ? raw['data'] as Map<String, dynamic>
+            : raw;
+        serverId = data['id']?.toString();
+      }
+
+      // Replace optimistic message with confirmed status.
+      // For channel push, the broadcast will arrive with the real ID;
+      // for REST, we have the ID from the response.
       final sent = optimistic.copyWith(
-        id: data['id']?.toString() ?? 'msg-${DateTime.now().microsecondsSinceEpoch}',
+        id: serverId ?? 'msg-${DateTime.now().microsecondsSinceEpoch}',
         status: MessageStatus.sent,
       );
       final updated =

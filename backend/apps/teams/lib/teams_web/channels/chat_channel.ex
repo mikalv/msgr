@@ -14,30 +14,50 @@ defmodule TeamsWeb.ChatChannel do
   use TeamsWeb, :channel
   require Logger
 
-  alias Teams.{Messages, Channels, Reactions}
+  alias Teams.{Messages, Channels, Reactions, TeamManagement}
   alias Teams.TenantModels.{Channel, ChannelMembership, ReadCursor}
 
   @impl true
-  def join("channel:" <> channel_id, _payload, socket) do
-    prefix = socket.assigns[:tenant]
+  def join("channel:" <> channel_id, payload, socket) do
     profile_id = socket.assigns[:profile_id]
 
-    case Channels.get_channel(prefix, channel_id) do
-      nil ->
-        {:error, %{reason: "channel_not_found"}}
+    # Resolve tenant prefix: prefer socket assign (from JWT), fall back to
+    # team_slug in join payload (header-based auth from Flutter).
+    prefix =
+      case socket.assigns[:tenant] do
+        nil ->
+          team_slug = Map.get(payload || %{}, "team_slug")
+          if team_slug do
+            case TeamManagement.get_team_by_slug(team_slug) do
+              nil -> nil
+              team -> team.schema_name
+            end
+          else
+            nil
+          end
+        t -> t
+      end
 
-      channel ->
-        if has_access?(prefix, channel, profile_id) do
-          socket =
-            socket
-            |> assign(:channel_id, channel_id)
-            |> assign(:prefix, prefix)
+    if is_nil(prefix) do
+      {:error, %{reason: "tenant_not_resolved"}}
+    else
+      case Channels.get_channel(prefix, channel_id) do
+        nil ->
+          {:error, %{reason: "channel_not_found"}}
 
-          send(self(), :after_join)
-          {:ok, socket}
-        else
-          {:error, %{reason: "unauthorized"}}
-        end
+        channel ->
+          if has_access?(prefix, channel, profile_id) do
+            socket =
+              socket
+              |> assign(:channel_id, channel_id)
+              |> assign(:prefix, prefix)
+
+            send(self(), :after_join)
+            {:ok, socket}
+          else
+            {:error, %{reason: "unauthorized"}}
+          end
+      end
     end
   end
 

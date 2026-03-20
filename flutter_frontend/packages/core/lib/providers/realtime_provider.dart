@@ -1,0 +1,433 @@
+import 'dart:async';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
+import 'package:logging/logging.dart';
+
+import 'auth_state_provider.dart';
+import 'channel_list_provider.dart';
+import 'messages_provider.dart';
+import 'models.dart';
+import 'msgr_client_provider.dart';
+import 'team_list_provider.dart';
+import 'typing_provider.dart';
+
+// ---------------------------------------------------------------------------
+// RealtimeState
+// ---------------------------------------------------------------------------
+
+class RealtimeState {
+  const RealtimeState({
+    this.isConnected = false,
+    this.isConnecting = false,
+    this.error,
+  });
+
+  final bool isConnected;
+  final bool isConnecting;
+  final Object? error;
+
+  RealtimeState copyWith({
+    bool? isConnected,
+    bool? isConnecting,
+    Object? error,
+  }) {
+    return RealtimeState(
+      isConnected: isConnected ?? this.isConnected,
+      isConnecting: isConnecting ?? this.isConnecting,
+      error: error,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// RealtimeNotifier
+// ---------------------------------------------------------------------------
+
+/// Manages Phoenix WebSocket lifecycle and routes incoming events to the
+/// appropriate Riverpod providers.
+///
+/// Connects on login, disconnects on logout. Subscribes to team and channel
+/// topics automatically when the selected team/channel changes.
+class RealtimeNotifier extends StateNotifier<RealtimeState> {
+  RealtimeNotifier(this._ref) : super(const RealtimeState());
+
+  final Ref _ref;
+  final _log = Logger('RealtimeNotifier');
+
+  String? _currentTeamSlug;
+  String? _currentChannelId;
+  Timer? _reconnectTimer;
+
+  /// Connect the WebSocket using credentials from the MsgrClient.
+  Future<void> connect() async {
+    final client = _ref.read(msgrClientProvider);
+    if (client.accountId == null || client.profileId == null) {
+      _log.warning('Cannot connect realtime: not authenticated');
+      return;
+    }
+
+    if (client.isRealtimeConnected) {
+      state = state.copyWith(isConnected: true, isConnecting: false);
+      return;
+    }
+
+    state = state.copyWith(isConnecting: true, error: null);
+    try {
+      await client.connectRealtime();
+
+      client.realtime.onEvent = _handleEvent;
+
+      client.realtime.onDisconnect = () {
+        if (mounted) {
+          _log.info('WebSocket disconnected');
+          state = state.copyWith(isConnected: false);
+          _scheduleReconnect();
+        }
+      };
+
+      client.realtime.onReconnect = () {
+        if (mounted) {
+          _log.info('WebSocket reconnected');
+          _reconnectTimer?.cancel();
+          _reconnectTimer = null;
+          state = state.copyWith(isConnected: true);
+          _rejoinTopics();
+        }
+      };
+
+      state = state.copyWith(isConnected: true, isConnecting: false);
+    } catch (e) {
+      _log.warning('WebSocket connect failed: $e');
+      state = state.copyWith(isConnecting: false, error: e);
+      _scheduleReconnect();
+    }
+  }
+
+  /// Disconnect and clean up.
+  void disconnect() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+
+    try {
+      final client = _ref.read(msgrClientProvider);
+      client.disconnectRealtime();
+    } catch (_) {}
+
+    _currentTeamSlug = null;
+    _currentChannelId = null;
+    state = const RealtimeState();
+  }
+
+  /// Join team topics when the selected team changes.
+  Future<void> joinTeam(String teamSlug) async {
+    final client = _ref.read(msgrClientProvider);
+    if (!client.isRealtimeConnected) return;
+
+    // Leave previous team topics
+    if (_currentTeamSlug != null && _currentTeamSlug != teamSlug) {
+      try {
+        await client.realtime.leave('team:$_currentTeamSlug');
+        await client.realtime.leave('presence:$_currentTeamSlug');
+      } catch (_) {}
+    }
+
+    _currentTeamSlug = teamSlug;
+
+    try {
+      await client.realtime.join('team:$teamSlug');
+      await client.realtime.join('presence:$teamSlug');
+      _log.info('Joined team topics: team:$teamSlug, presence:$teamSlug');
+    } catch (e) {
+      _log.warning('Failed to join team topics: $e');
+    }
+  }
+
+  /// Join a channel topic. Leaves the previous channel topic automatically.
+  Future<void> joinChannel(String channelId) async {
+    final client = _ref.read(msgrClientProvider);
+    if (!client.isRealtimeConnected) return;
+
+    // Leave previous channel topic
+    if (_currentChannelId != null && _currentChannelId != channelId) {
+      try {
+        await client.realtime.leave('channel:$_currentChannelId');
+      } catch (_) {}
+    }
+
+    _currentChannelId = channelId;
+
+    try {
+      // Pass team_slug so the backend can resolve the tenant prefix
+      // when connected without a JWT token.
+      await client.realtime.join(
+        'channel:$channelId',
+        payload: {
+          if (_currentTeamSlug != null) 'team_slug': _currentTeamSlug,
+        },
+      );
+      _log.info('Joined channel topic: channel:$channelId');
+    } catch (e) {
+      _log.warning('Failed to join channel topic: $e');
+    }
+  }
+
+  /// Send a message via Phoenix Channel push with REST fallback.
+  ///
+  /// Returns true if push succeeded, false if fell back to REST.
+  Future<bool> sendMessageViaChannel(
+    String channelId,
+    String content, {
+    List<String>? mediaRefs,
+  }) async {
+    final client = _ref.read(msgrClientProvider);
+    if (!client.isRealtimeConnected ||
+        client.realtime.getChannel('channel:$channelId') == null) {
+      return false; // Caller should use REST fallback
+    }
+
+    try {
+      final reply = await client.realtime.push(
+        'channel:$channelId',
+        'new:message',
+        {
+          'content': content,
+          if (mediaRefs != null && mediaRefs.isNotEmpty)
+            'media_refs': mediaRefs,
+        },
+      );
+      _log.fine('Message sent via channel push: $reply');
+      return true;
+    } catch (e) {
+      _log.warning('Channel push failed, caller should use REST: $e');
+      return false;
+    }
+  }
+
+  /// Send typing indicator via channel push.
+  void sendTypingStart(String channelId) {
+    final client = _ref.read(msgrClientProvider);
+    if (!client.isRealtimeConnected) return;
+
+    try {
+      client.realtime.push('channel:$channelId', 'typing:start', {});
+    } catch (_) {}
+  }
+
+  void sendTypingStop(String channelId) {
+    final client = _ref.read(msgrClientProvider);
+    if (!client.isRealtimeConnected) return;
+
+    try {
+      client.realtime.push('channel:$channelId', 'typing:stop', {});
+    } catch (_) {}
+  }
+
+  // ── Event routing ──────────────────────────────────────────────
+
+  void _handleEvent(
+      String topic, String event, Map<String, dynamic> payload) {
+    _log.fine('Event: $topic / $event');
+
+    if (topic.startsWith('channel:')) {
+      _handleChannelEvent(topic, event, payload);
+    } else if (topic.startsWith('team:')) {
+      _handleTeamEvent(topic, event, payload);
+    } else if (topic.startsWith('presence:')) {
+      _handlePresenceEvent(topic, event, payload);
+    }
+  }
+
+  void _handleChannelEvent(
+      String topic, String event, Map<String, dynamic> payload) {
+    final channelId = topic.replaceFirst('channel:', '');
+
+    switch (event) {
+      case 'new:message':
+        _onNewMessage(channelId, payload);
+      case 'new:thread_reply':
+        final msgData = payload['message'] as Map<String, dynamic>?;
+        if (msgData != null) {
+          _onNewMessage(channelId, msgData);
+        }
+      case 'typing:update':
+        _onTypingUpdate(channelId, payload);
+      case 'reaction:updated':
+        // Could route to a reactions provider in the future
+        _log.fine('Reaction updated on message ${payload['message_id']}');
+      case 'read_cursor:updated':
+        _log.fine('Read cursor updated for ${payload['profile_id']}');
+      case 'phx_reply' || 'phx_error' || 'phx_close':
+        break; // Phoenix internal events
+      default:
+        _log.fine('Unhandled channel event: $event');
+    }
+  }
+
+  void _handleTeamEvent(
+      String topic, String event, Map<String, dynamic> payload) {
+    switch (event) {
+      case 'new:channel':
+        _onNewChannel(payload);
+      case 'channel:updated':
+        _log.fine('Channel updated: ${payload['id']}');
+        // Refresh channel list
+        _ref.read(channelListProvider.notifier).refresh();
+      case 'member:joined':
+        _log.fine('Member joined: ${payload['profile_id']}');
+      case 'member:left':
+        _log.fine('Member left: ${payload['profile_id']}');
+      case 'phx_reply' || 'phx_error' || 'phx_close':
+        break;
+      default:
+        _log.fine('Unhandled team event: $event');
+    }
+  }
+
+  void _handlePresenceEvent(
+      String topic, String event, Map<String, dynamic> payload) {
+    // Presence events are handled by phoenix_socket's Presence module
+    // and delivered via the onPresence callback. For now just log.
+    _log.fine('Presence event: $event');
+  }
+
+  void _onNewMessage(String channelId, Map<String, dynamic> data) {
+    final auth = _ref.read(simpleAuthProvider);
+    final senderProfileId = data['sender_profile_id']?.toString() ?? '';
+
+    // Skip messages we sent ourselves (already handled by optimistic insert)
+    if (senderProfileId == auth.profileId) return;
+
+    final senderProfile =
+        data['sender_profile'] as Map<String, dynamic>? ?? {};
+
+    final message = SlackMessage(
+      id: data['id']?.toString() ?? '',
+      channelId: channelId,
+      senderProfileId: senderProfileId,
+      senderName: senderProfile['display_name']?.toString() ??
+          data['sender_name']?.toString() ??
+          'Ukjent',
+      content: _extractContent(data['content']),
+      insertedAt:
+          DateTime.tryParse(data['inserted_at']?.toString() ?? '') ??
+              DateTime.now(),
+      threadParentId: data['thread_parent_id'] as String?,
+      mediaRefs: (data['media_refs'] as List?)
+              ?.map((r) => r.toString())
+              .toList() ??
+          [],
+      status: MessageStatus.sent,
+    );
+
+    // Only merge if this is the currently viewed channel
+    final selectedChannel = _ref.read(selectedChannelProvider);
+    if (selectedChannel != null && selectedChannel.id == channelId) {
+      _ref.read(channelMessagesProvider.notifier).mergeIncoming(message);
+    }
+  }
+
+  void _onNewChannel(Map<String, dynamic> data) {
+    // Refresh the channel list from the server to get the full channel data
+    _ref.read(channelListProvider.notifier).refresh();
+  }
+
+  void _onTypingUpdate(String channelId, Map<String, dynamic> data) {
+    final profileId = data['profile_id']?.toString() ?? '';
+    final isTyping = data['is_typing'] as bool? ?? false;
+    final auth = _ref.read(simpleAuthProvider);
+
+    // Don't show our own typing indicator
+    if (profileId == auth.profileId) return;
+
+    final typingNotifier = _ref.read(typingIndicatorsProvider.notifier);
+    if (isTyping) {
+      // Use profileId as display name for now -- could look up from members
+      typingNotifier.setTyping(channelId, profileId);
+    } else {
+      typingNotifier.stopTyping(channelId, profileId);
+    }
+  }
+
+  // ── Reconnection ───────────────────────────────────────────────
+
+  void _scheduleReconnect() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && !state.isConnected && !state.isConnecting) {
+        _log.info('Attempting reconnect...');
+        connect();
+      }
+    });
+  }
+
+  void _rejoinTopics() {
+    // Re-join all active topics after reconnect
+    if (_currentTeamSlug != null) {
+      joinTeam(_currentTeamSlug!);
+    }
+    if (_currentChannelId != null) {
+      joinChannel(_currentChannelId!);
+    }
+
+    // Refresh current channel messages to catch anything missed
+    final selectedChannel = _ref.read(selectedChannelProvider);
+    if (selectedChannel != null) {
+      _ref
+          .read(channelMessagesProvider.notifier)
+          .refresh(selectedChannel.id);
+    }
+  }
+
+  @override
+  void dispose() {
+    _reconnectTimer?.cancel();
+    super.dispose();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Providers
+// ---------------------------------------------------------------------------
+
+final realtimeProvider =
+    StateNotifierProvider<RealtimeNotifier, RealtimeState>((ref) {
+  final notifier = RealtimeNotifier(ref);
+
+  // Auto-connect when auth state becomes logged in
+  final auth = ref.watch(simpleAuthProvider);
+  if (auth.isLoggedIn && !auth.isLoading) {
+    Future.microtask(() => notifier.connect());
+  }
+
+  // Auto-join team topic when selected team changes
+  final selectedTeam = ref.watch(selectedTeamProvider);
+  if (selectedTeam != null) {
+    Future.microtask(() => notifier.joinTeam(selectedTeam.slug));
+  }
+
+  // Auto-join channel topic when selected channel changes
+  final selectedChannel = ref.watch(selectedChannelProvider);
+  if (selectedChannel != null) {
+    Future.microtask(() => notifier.joinChannel(selectedChannel.id));
+  }
+
+  ref.onDispose(() => notifier.disconnect());
+  return notifier;
+});
+
+/// Whether the realtime WebSocket is connected.
+final isRealtimeConnectedProvider = Provider<bool>((ref) {
+  return ref.watch(realtimeProvider).isConnected;
+});
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Extract text from content field -- handles both String and Map (JSONB).
+String _extractContent(dynamic content) {
+  if (content is String) return content;
+  if (content is Map) return content['text']?.toString() ?? content.toString();
+  return content?.toString() ?? '';
+}

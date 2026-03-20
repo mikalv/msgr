@@ -59,6 +59,19 @@ defmodule TeamsWeb.UserSocket do
     end
   end
 
+  # Header-based auth fallback: accepts account_id + profile_id directly.
+  # Used by Flutter app which authenticates via X-Account-Id / X-Profile-Id headers.
+  # The tenant is resolved per-channel join (TeamChannel, ChatChannel, PresenceChannel).
+  def connect(%{"account_id" => account_id, "profile_id" => profile_id} = _params, socket, _connect_info) do
+    Logger.info "Socket connection via account_id/profile_id: account=#{account_id} profile=#{profile_id}"
+    socket = socket
+      |> assign(:uid, account_id)
+      |> assign(:profile_id, profile_id)
+      |> assign(:tenant, nil)
+      |> assign(:team_id, nil)
+    {:ok, socket}
+  end
+
   def disconnect_user(uid) do
     TeamsWeb.Endpoint.broadcast("user_socket:#{uid}", "disconnect", %{"reason" => "testing"})
   end

@@ -6,6 +6,8 @@ import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/providers/channel_list_provider.dart';
 import 'package:core/providers/messages_provider.dart';
 import 'package:core/providers/models.dart';
+import 'package:core/providers/realtime_provider.dart';
+import 'package:core/providers/typing_provider.dart';
 import 'package:core/ui/shell/member_panel.dart';
 
 /// Simple chat content area for the AppShell.
@@ -22,27 +24,60 @@ class SimpleChatContent extends ConsumerStatefulWidget {
 class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
-  Timer? _pollTimer;
+  Timer? _fallbackPollTimer;
+  Timer? _typingDebounce;
   bool _showMembers = false;
 
   @override
   void initState() {
     super.initState();
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _refreshMessages());
+    // Fallback polling is started/stopped based on WS connection state
+    // in the build method via _syncFallbackPolling.
   }
 
   @override
   void dispose() {
-    _pollTimer?.cancel();
+    _fallbackPollTimer?.cancel();
+    _typingDebounce?.cancel();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Start or stop fallback polling based on WebSocket connection state.
+  void _syncFallbackPolling(bool isRealtimeConnected) {
+    if (!isRealtimeConnected) {
+      // WS is down -- fall back to polling
+      _fallbackPollTimer ??=
+          Timer.periodic(const Duration(seconds: 5), (_) => _refreshMessages());
+    } else {
+      // WS is up -- stop polling
+      _fallbackPollTimer?.cancel();
+      _fallbackPollTimer = null;
+    }
   }
 
   void _refreshMessages() {
     final channel = ref.read(selectedChannelProvider);
     if (channel == null) return;
     ref.read(channelMessagesProvider.notifier).refresh(channel.id);
+  }
+
+  void _onTextChanged(String text) {
+    final channel = ref.read(selectedChannelProvider);
+    if (channel == null) return;
+    final realtime = ref.read(realtimeProvider.notifier);
+
+    if (text.isNotEmpty) {
+      _typingDebounce?.cancel();
+      realtime.sendTypingStart(channel.id);
+      _typingDebounce = Timer(const Duration(seconds: 3), () {
+        realtime.sendTypingStop(channel.id);
+      });
+    } else {
+      _typingDebounce?.cancel();
+      realtime.sendTypingStop(channel.id);
+    }
   }
 
   void _sendMessage() {
@@ -54,6 +89,8 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
 
     ref.read(channelMessagesProvider.notifier).sendMessage(channel.id, text);
     _textController.clear();
+    _typingDebounce?.cancel();
+    ref.read(realtimeProvider.notifier).sendTypingStop(channel.id);
 
     // With reverse: true, new messages appear at position 0 (bottom) automatically.
     // Just scroll to 0 to ensure we're at the latest.
@@ -69,6 +106,15 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     final messagesState = ref.watch(channelMessagesProvider);
     final auth = ref.watch(simpleAuthProvider);
 
+    // Activate the realtime provider (auto-connects on login)
+    final realtimeState = ref.watch(realtimeProvider);
+    _syncFallbackPolling(realtimeState.isConnected);
+
+    // Typing indicators for the current channel
+    final typing = selectedChannel != null
+        ? ref.watch(channelTypingProvider(selectedChannel.id))
+        : <String>[];
+
     if (selectedChannel == null) {
       return const _NoChannelSelected();
     }
@@ -81,6 +127,18 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
         Expanded(
           child: Column(
           children: [
+        // Reconnecting banner
+        if (!realtimeState.isConnected && auth.isLoggedIn)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            color: Colors.orange.shade800,
+            child: const Text(
+              'Kobler til igjen...',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
         // Channel header
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -192,6 +250,20 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                         ),
         ),
 
+        // Typing indicator
+        if (typing.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+            child: Text(
+              '${typing.join(', ')} skriver...',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5),
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+
         // Composer
         Container(
           padding: const EdgeInsets.all(12),
@@ -206,6 +278,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
               Expanded(
                 child: TextField(
                   controller: _textController,
+                  onChanged: _onTextChanged,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'Skriv en melding...',

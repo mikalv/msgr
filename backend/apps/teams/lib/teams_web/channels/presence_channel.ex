@@ -17,7 +17,6 @@ defmodule TeamsWeb.PresenceChannel do
   @impl true
   def join("presence:" <> slug, _payload, socket) do
     account_id = socket.assigns[:uid]
-    prefix = socket.assigns[:tenant]
     profile_id = socket.assigns[:profile_id]
 
     case TeamManagement.get_team_by_slug(slug) do
@@ -26,6 +25,9 @@ defmodule TeamsWeb.PresenceChannel do
 
       team ->
         if TeamManagement.member?(team.id, account_id) do
+          # Resolve prefix: prefer socket assign (JWT), fall back to team schema
+          prefix = socket.assigns[:tenant] || team.schema_name
+
           socket =
             socket
             |> assign(:team_slug, slug)
