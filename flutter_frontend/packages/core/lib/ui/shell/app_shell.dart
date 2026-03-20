@@ -61,20 +61,22 @@ class _AppShellState extends ConsumerState<AppShell> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth > 1024;
-        final isTablet =
-            constraints.maxWidth >= 600 && constraints.maxWidth <= 1024;
+    return Scaffold(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isDesktop = constraints.maxWidth > 1024;
+          final isTablet =
+              constraints.maxWidth >= 600 && constraints.maxWidth <= 1024;
 
-        if (isDesktop) {
-          return _buildDesktop();
-        } else if (isTablet) {
-          return _buildTablet();
-        } else {
-          return _buildMobile();
-        }
-      },
+          if (isDesktop) {
+            return _buildDesktop();
+          } else if (isTablet) {
+            return _buildTablet();
+          } else {
+            return _buildMobile();
+          }
+        },
+      ),
     );
   }
 

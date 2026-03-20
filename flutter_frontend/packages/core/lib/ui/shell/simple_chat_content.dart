@@ -75,7 +75,9 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
       return const _NoChannelSelected();
     }
 
-    return Column(
+    return Material(
+      color: const Color(0xFF1E1E1E),
+      child: Column(
       children: [
         // Channel header
         Container(
@@ -220,6 +222,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
           ),
         ),
       ],
+    ),
     );
   }
 }
