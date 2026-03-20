@@ -55,10 +55,13 @@ defmodule Teams.TeamManagement do
       })
       |> Repo.insert!()
 
-      # 4. Create owner profile in tenant
+      # 4. Create owner profile in tenant (with display_name from account)
+      owner_display_name = resolve_account_display_name(team.owner_account_id)
+
       {:ok, owner_profile} =
         Profile.create(schema_name, %{
           account_id: team.owner_account_id,
+          display_name: owner_display_name,
           role: "owner"
         })
 
@@ -119,11 +122,18 @@ defmodule Teams.TeamManagement do
 
       prefix = team.schema_name
 
-      # 2. Create tenant profile
+      # 2. Create tenant profile (fallback to account display_name if not provided)
+      display_name =
+        case Map.get(attrs, :display_name) do
+          nil -> resolve_account_display_name(account_id)
+          "" -> resolve_account_display_name(account_id)
+          name -> name
+        end
+
       {:ok, profile} =
         Profile.create(prefix, %{
           account_id: account_id,
-          display_name: Map.get(attrs, :display_name),
+          display_name: display_name,
           role: "member"
         })
 
@@ -170,5 +180,16 @@ defmodule Teams.TeamManagement do
   """
   def get_profile_for_account(prefix, account_id) do
     Profile.get_by_account_id(prefix, account_id)
+  end
+
+  # Resolves a display_name from the global account record.
+  # Falls back through display_name -> handle -> email -> "Ukjent".
+  defp resolve_account_display_name(account_id) do
+    try do
+      account = Messngr.Accounts.get_account!(account_id)
+      account.display_name || account.handle || account.email || "Ukjent"
+    rescue
+      Ecto.NoResultsError -> "Ukjent"
+    end
   end
 end

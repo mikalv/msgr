@@ -55,6 +55,7 @@ shared_repo_config = [
 
 config :msgr, Messngr.Repo, shared_repo_config
 config :teams, Teams.Repo, shared_repo_config
+config :auth_provider, AuthProvider.Repo, shared_repo_config
 
 secret_key =
   case System.get_env("SECRET_KEY_BASE") do
