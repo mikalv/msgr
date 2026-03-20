@@ -7,6 +7,7 @@ import 'package:messngr/services/app_localizations.dart';
 import 'package:messngr/services/localization/translator.dart';
 import 'package:messngr/ui/widgets/desktop/TitlebarSafeArea.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:messngr/main_desktop.dart' show saveWindowBounds;
 import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/ui/auth/simple_login_screen.dart';
 import 'package:core/ui/shell/app_shell.dart';
@@ -70,9 +71,13 @@ class _MacOSAppState extends State<MacOSApp>
   }
 
   @override
-  void onWindowEvent(String eventName) {
-    print('[WindowManager] onWindowEvent: $eventName');
-  }
+  void onWindowEvent(String eventName) {}
+
+  @override
+  void onWindowMoved() => saveWindowBounds();
+
+  @override
+  void onWindowResized() => saveWindowBounds();
 
   @override
   void onWindowFocus() {
