@@ -53,16 +53,12 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     ref.read(channelMessagesProvider.notifier).sendMessage(channel.id, text);
     _textController.clear();
 
-    // Scroll to bottom after a short delay
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    // With reverse: true, new messages appear at position 0 (bottom) automatically.
+    // Just scroll to 0 to ensure we're at the latest.
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(0,
+          duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
+    }
   }
 
   @override
@@ -168,11 +164,14 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                         )
                       : ListView.builder(
                           controller: _scrollController,
+                          reverse: true,
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 8),
                           itemCount: messagesState.messages.length,
                           itemBuilder: (context, index) {
-                            final msg = messagesState.messages[index];
+                            // reverse: true flips the list — index 0 = newest
+                            final msg = messagesState.messages[
+                                messagesState.messages.length - 1 - index];
                             final isOwn =
                                 msg.senderProfileId == auth.profileId;
                             return _MessageBubble(
