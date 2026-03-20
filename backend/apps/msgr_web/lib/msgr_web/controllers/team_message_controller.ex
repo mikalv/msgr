@@ -42,6 +42,13 @@ defmodule MessngrWeb.TeamMessageController do
         {:ok, message} ->
           message = Messages.get_message(prefix, message.id)
 
+          # Broadcast to Phoenix Channel so all connected clients get the message
+          MessngrWeb.Endpoint.broadcast(
+            "channel:#{channel_id}",
+            "new:message",
+            message_json(message)
+          )
+
           conn
           |> put_status(:created)
           |> json(%{data: message_json(message)})
