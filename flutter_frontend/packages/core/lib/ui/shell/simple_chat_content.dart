@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,7 +10,7 @@ import 'package:core/providers/models.dart';
 /// Simple chat content area for the AppShell.
 ///
 /// Displays messages for the currently selected channel and a composer
-/// to send new messages. Uses real API via Riverpod providers.
+/// to send new messages. Polls for new messages every 3 seconds.
 class SimpleChatContent extends ConsumerStatefulWidget {
   const SimpleChatContent({super.key});
 
@@ -20,12 +21,26 @@ class SimpleChatContent extends ConsumerStatefulWidget {
 class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
+  Timer? _pollTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) => _refreshMessages());
+  }
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _refreshMessages() {
+    final channel = ref.read(selectedChannelProvider);
+    if (channel == null) return;
+    ref.read(channelMessagesProvider.notifier).refresh(channel.id);
   }
 
   void _sendMessage() {

@@ -102,6 +102,42 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
     }
   }
 
+  /// Refresh messages silently (for polling). Merges new messages without loading state.
+  Future<void> refresh(String channelId) async {
+    try {
+      final team = _ref.read(selectedTeamProvider);
+      if (team == null) return;
+
+      final client = _ref.read(apiClientProvider);
+      final data = await client.getMessages(team.slug, channelId, limit: _pageSize);
+      final fresh = data.map((m) {
+        final sender = m['sender'] as Map<String, dynamic>? ?? {};
+        return SlackMessage(
+          id: m['id']?.toString() ?? '',
+          channelId: channelId,
+          senderProfileId: m['profile_id']?.toString() ?? sender['id']?.toString() ?? '',
+          senderName: m['sender_name']?.toString() ??
+              sender['display_name']?.toString() ??
+              sender['name']?.toString() ?? 'Ukjent',
+          content: _extractContent(m['content']),
+          insertedAt: DateTime.tryParse(m['inserted_at']?.toString() ?? '') ?? DateTime.now(),
+          threadParentId: m['thread_parent_id'] as String?,
+          mediaRefs: (m['media_refs'] as List?)?.map((r) => r.toString()).toList() ?? [],
+          status: MessageStatus.sent,
+        );
+      }).toList();
+
+      // Only update if there are new messages
+      final existingIds = state.messages.map((m) => m.id).toSet();
+      final hasNew = fresh.any((m) => !existingIds.contains(m.id));
+      if (hasNew) {
+        state = state.copyWith(messages: fresh);
+      }
+    } catch (_) {
+      // Silent refresh — don't show errors
+    }
+  }
+
   /// Load older messages (cursor pagination).
   Future<void> loadMore(String channelId) async {
     if (state.isLoadingMore || !state.hasMore) return;
