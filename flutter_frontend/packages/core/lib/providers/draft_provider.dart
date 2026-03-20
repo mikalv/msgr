@@ -13,15 +13,15 @@ import 'team_list_provider.dart';
 
 class ChannelDraftsNotifier extends StateNotifier<Map<String, String>> {
   ChannelDraftsNotifier({
-    required DraftDao dao,
+    DraftDao? dao,
     required String teamSlug,
   })  : _dao = dao,
         _teamSlug = teamSlug,
         super({}) {
-    _loadFromStorage();
+    if (_dao != null) _loadFromStorage();
   }
 
-  final DraftDao _dao;
+  final DraftDao? _dao;
   final String _teamSlug;
 
   /// Debounce timers per channel to avoid hammering the DB.
@@ -31,7 +31,7 @@ class ChannelDraftsNotifier extends StateNotifier<Map<String, String>> {
   /// Load all persisted drafts for this team from the local DB.
   Future<void> _loadFromStorage() async {
     try {
-      final drafts = await _dao.getAllDrafts(_teamSlug);
+      final drafts = await _dao!.getAllDrafts(_teamSlug);
       if (drafts.isNotEmpty && mounted) {
         state = {...state, ...drafts};
       }
@@ -99,7 +99,7 @@ class ChannelDraftsNotifier extends StateNotifier<Map<String, String>> {
 
   Future<void> _persistDraft(String channelId, String text) async {
     try {
-      await _dao.saveDraft(channelId, _teamSlug, text);
+      await _dao?.saveDraft(channelId, _teamSlug, text);
     } catch (_) {
       // Best-effort persistence. Draft is still in memory.
     }
@@ -107,7 +107,7 @@ class ChannelDraftsNotifier extends StateNotifier<Map<String, String>> {
 
   Future<void> _removeDraft(String channelId) async {
     try {
-      await _dao.deleteDraft(channelId, _teamSlug);
+      await _dao?.deleteDraft(channelId, _teamSlug);
     } catch (_) {
       // Best-effort.
     }
@@ -119,9 +119,14 @@ final channelDraftsProvider =
   final team = ref.watch(selectedTeamProvider);
   final teamSlug = team?.slug ?? 'default';
 
-  // Access the database through LibMsgr singleton.
-  final db = LibMsgr().databaseService.instance;
-  final dao = DraftDao(db);
+  // Try to use libmsgr database for persistent drafts, fall back to in-memory
+  DraftDao? dao;
+  try {
+    final db = LibMsgr().databaseService.instance;
+    dao = DraftDao(db);
+  } catch (_) {
+    // LibMsgr not bootstrapped yet — drafts will be in-memory only
+  }
 
   return ChannelDraftsNotifier(dao: dao, teamSlug: teamSlug);
 });
