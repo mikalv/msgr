@@ -386,7 +386,11 @@ class _MessageBubble extends StatelessWidget {
                 Text(
                   message.content,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.85),
+                    color: message.status == MessageStatus.sending
+                        ? Colors.white.withOpacity(0.4)
+                        : message.status == MessageStatus.failed
+                            ? Colors.redAccent.withOpacity(0.6)
+                            : Colors.white.withOpacity(0.85),
                     fontSize: 14,
                   ),
                 ),

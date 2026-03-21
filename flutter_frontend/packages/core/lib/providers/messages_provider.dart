@@ -258,14 +258,28 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
 
   /// Merge an incoming realtime message.
   void mergeIncoming(SlackMessage message) {
+    // Check for exact ID match first
     final existing = state.messages.indexWhere((m) => m.id == message.id);
     if (existing >= 0) {
       final updated = [...state.messages];
       updated[existing] = message;
       state = state.copyWith(messages: updated);
-    } else {
-      state = state.copyWith(messages: [...state.messages, message]);
+      return;
     }
+
+    // Check if this replaces an optimistic (local-*) message with matching content
+    final optimisticIdx = state.messages.indexWhere((m) =>
+        m.id.startsWith('local-') &&
+        m.content == message.content &&
+        m.channelId == message.channelId);
+    if (optimisticIdx >= 0) {
+      final updated = [...state.messages];
+      updated[optimisticIdx] = message;
+      state = state.copyWith(messages: updated);
+      return;
+    }
+
+    state = state.copyWith(messages: [...state.messages, message]);
   }
 
   void clear() => state = const ChannelMessagesState();
