@@ -580,11 +580,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                     loading: () => SlashCommand.defaults,
                     error: (_, __) => SlashCommand.defaults,
                   ),
-                  availableMentions: mentionCandidates.when(
-                    data: (mentions) => mentions,
-                    loading: () => ComposerMention.defaults,
-                    error: (_, __) => ComposerMention.defaults,
-                  ),
+                  availableMentions: mentionCandidates,
                 ),
               ],
             ),

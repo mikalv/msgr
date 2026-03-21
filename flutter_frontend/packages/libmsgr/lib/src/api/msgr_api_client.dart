@@ -289,6 +289,19 @@ class MsgrApiClient {
         ?.map((p) => p as Map<String, dynamic>)
         .toList();
 
+    // Extract display name: try account level first, then first profile, then
+    // top-level response (some backend versions put it there).
+    String? displayNameValue = account['display_name'] as String?;
+    if ((displayNameValue == null || displayNameValue.isEmpty) &&
+        profiles != null &&
+        profiles.isNotEmpty) {
+      displayNameValue = profiles.first['display_name'] as String? ??
+          profiles.first['name'] as String?;
+    }
+    if (displayNameValue == null || displayNameValue.isEmpty) {
+      displayNameValue = data['display_name'] as String?;
+    }
+
     // Extract JWT tokens if present
     final accessTokenValue = data['access_token'] as String?;
     final refreshTokenValue = data['refresh_token'] as String?;
@@ -303,7 +316,7 @@ class MsgrApiClient {
       accountId: accountIdValue,
       profileId: profileIdValue,
       email: account['email'] as String?,
-      displayName: account['display_name'] as String?,
+      displayName: displayNameValue,
       profiles: profiles,
       accessToken: accessTokenValue,
       refreshToken: refreshTokenValue,

@@ -21,16 +21,25 @@ class MsgrBot {
   String? accountId;
   String? profileId;
   String? teamProfileId;
+  String? _accessToken;
+  String? _refreshToken;
   final Map<String, String> channelNames = {};
   final Set<String> _seenMessageIds = {};
   final _client = http.Client();
 
-  Map<String, String> get _headers => {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-    if (accountId != null) 'X-Account-Id': accountId!,
-    if (profileId != null) 'X-Profile-Id': profileId!,
-  };
+  Map<String, String> get _headers {
+    final h = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (_accessToken != null) {
+      h['Authorization'] = 'Bearer $_accessToken';
+    } else {
+      if (accountId != null) h['X-Account-Id'] = accountId!;
+      if (profileId != null) h['X-Profile-Id'] = profileId!;
+    }
+    return h;
+  }
 
   /// Authenticate, join team, discover channels, start polling.
   Future<void> start() async {
@@ -78,11 +87,15 @@ class MsgrBot {
     accountId = account['id'] as String?;
     profileId = verifyData['profile_id'] as String?;
 
+    // Extract JWT tokens for Bearer auth (backend now requires JWT).
+    _accessToken = verifyData['access_token'] as String?;
+    _refreshToken = verifyData['refresh_token'] as String?;
+
     if (accountId == null || profileId == null) {
       throw MsgrBotException('No account/profile in verify response');
     }
 
-    print('[Bot] Authenticated: account=$accountId, profile=$profileId');
+    print('[Bot] Authenticated: account=$accountId, profile=$profileId, jwt=${_accessToken != null ? "yes" : "no"}');
   }
 
   Future<void> _joinTeam() async {

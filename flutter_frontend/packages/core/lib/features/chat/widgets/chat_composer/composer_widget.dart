@@ -46,6 +46,7 @@ class _ChatComposerState extends State<ChatComposer>
   static const double _lineDragSensitivity = 28;
 
   bool _isDropHover = false;
+  final LayerLink _paletteLink = LayerLink();
 
   bool _showEmoji = false;
   int _commandSelection = 0;
@@ -106,6 +107,7 @@ class _ChatComposerState extends State<ChatComposer>
 
   @override
   void dispose() {
+    _hidePaletteOverlay();
     _voiceSubscription?.cancel();
     widget.controller.removeListener(_handleControllerChanged);
     _textController.dispose();
@@ -153,7 +155,9 @@ class _ChatComposerState extends State<ChatComposer>
           : baseDecoration.border,
     );
 
-    return DropTarget(
+    return CompositedTransformTarget(
+      link: _paletteLink,
+      child: DropTarget(
       onDragEntered: (_) => setState(() => _isDropHover = true),
       onDragExited: (_) => setState(() => _isDropHover = false),
       onDragDone: _handleDrop,
@@ -162,36 +166,6 @@ class _ChatComposerState extends State<ChatComposer>
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // Mention/command palette positioned ABOVE the composer
-            if (_shouldShowMentionPalette)
-              Positioned(
-                left: 8,
-                right: 8,
-                bottom: 0,
-                child: Transform.translate(
-                  offset: const Offset(0, -4),
-                  child: _MentionPalette(
-                    mentions: _mentionCandidates,
-                    highlightedIndex: _mentionSelection,
-                    query: _mentionQuery,
-                    onSelect: _applyMention,
-                  ),
-                ),
-              ),
-            if (_shouldShowCommandPalette)
-              Positioned(
-                left: 8,
-                right: 8,
-                bottom: 0,
-                child: Transform.translate(
-                  offset: const Offset(0, -4),
-                  child: _CommandPalette(
-                    commands: _matchedCommands,
-                    highlightedIndex: _commandSelection,
-                    onSelect: _applyCommand,
-                  ),
-                ),
-              ),
             // The actual composer
             Column(
               mainAxisSize: MainAxisSize.min,
@@ -216,8 +190,7 @@ class _ChatComposerState extends State<ChatComposer>
                 onRemoveAttachment: _removeAttachment,
                 onRemoveVoiceNote: _clearVoiceNote,
               ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
+            Container(
               decoration: decoration,
               padding: EdgeInsets.symmetric(
                 horizontal: isCompact ? 12 : 16,
@@ -274,8 +247,8 @@ class _ChatComposerState extends State<ChatComposer>
                                 placeholder: isCompact
                                     ? 'Melding'
                                     : 'Del en oppdatering eller skriv / for kommandoer',
-                                minLines: _lineSpan,
-                                maxLines: _lineSpan,
+                                minLines: 1,
+                                maxLines: _maxResizableLines,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -381,7 +354,7 @@ class _ChatComposerState extends State<ChatComposer>
                             onReset: _resetLineSpan,
                           ),
                         ),
-                      // Mention and command palettes are now in the Stack above
+                      // Palettes rendered via Overlay (see _showPaletteOverlay / _hidePaletteOverlay)
                       SizeTransition(
                         sizeFactor: CurvedAnimation(
                           parent: _expanderController,
@@ -401,6 +374,7 @@ class _ChatComposerState extends State<ChatComposer>
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -591,6 +565,7 @@ class _ChatComposerState extends State<ChatComposer>
           _mentionCandidates = matches;
           _mentionSelection = 0;
         });
+        WidgetsBinding.instance.addPostFrameCallback((_) => _updatePaletteOverlay());
         found = true;
         break;
       }
@@ -605,11 +580,67 @@ class _ChatComposerState extends State<ChatComposer>
     }
   }
 
+  OverlayEntry? _paletteOverlay;
+
   void _clearMentionPalette() {
     _mentionTriggerIndex = null;
     _mentionQuery = '';
     _mentionCandidates = const <ComposerMention>[];
     _mentionSelection = 0;
+    _hidePaletteOverlay();
+  }
+
+  void _updatePaletteOverlay() {
+    if (_shouldShowMentionPalette || _shouldShowCommandPalette) {
+      _showPaletteOverlay();
+    } else {
+      _hidePaletteOverlay();
+    }
+  }
+
+  void _showPaletteOverlay() {
+    _hidePaletteOverlay();
+    _paletteOverlay = OverlayEntry(
+      builder: (context) => Positioned(
+        width: MediaQuery.of(context).size.width * 0.5,
+        child: CompositedTransformFollower(
+          link: _paletteLink,
+          targetAnchor: Alignment.topLeft,
+          followerAnchor: Alignment.bottomLeft,
+          offset: const Offset(8, -4),
+          child: TextFieldTapRegion(
+            child: Material(
+              elevation: 8,
+              color: Colors.transparent,
+              child: _shouldShowMentionPalette
+                  ? _MentionPalette(
+                      mentions: _mentionCandidates,
+                      highlightedIndex: _mentionSelection,
+                      query: _mentionQuery,
+                      onSelect: (m) {
+                        _applyMention(m);
+                        _hidePaletteOverlay();
+                      },
+                    )
+                  : _CommandPalette(
+                      commands: _matchedCommands,
+                      highlightedIndex: _commandSelection,
+                      onSelect: (c) {
+                        _applyCommand(c);
+                        _hidePaletteOverlay();
+                      },
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+    Overlay.of(context).insert(_paletteOverlay!);
+  }
+
+  void _hidePaletteOverlay() {
+    _paletteOverlay?.remove();
+    _paletteOverlay = null;
   }
 
   void _toggleEmoji() {
