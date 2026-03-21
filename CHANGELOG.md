@@ -1,6 +1,50 @@
 # Changelog
 
-## Unreleased
+## [0.2.0] — 2026-03-21
+
+### Added — Backend
+- Multi-tenant PostgreSQL with tenant schemas per team
+- JWT tokens (access 15min + refresh 30 days) via AuthProvider.Guardian
+- REST API: teams, channels, messages, reactions, threads, profiles, media, DMs
+- Phoenix Channels WebSocket: real-time messages, typing, presence
+- Cursor-based pagination (before/after/around)
+- App Platform Phase 1-3: executor framework, /poll /remind /topic, LLM executor with GitHub tools
+- Channel member invites, presigned media URLs, thread reply count
+- Room → Channel atomic rename (81 files)
+
+### Added — Flutter (macOS)
+- Slack/Discord hybrid 3-column layout
+- Rich composer: markdown, emoji, voice, attachments, @mentions, slash commands
+- Message rendering: grouping, markdown, timestamps, hover, reactions, threads
+- Quick switcher (Cmd+K), native macOS menus, keyboard shortcuts, dock badge
+- Profile cards, member panel, context menus, desktop notifications
+- File sharing: upload, inline images, file cards
+- JWT auth with auto-refresh, persistent login, sticky view, window persistence
+- WebSocket real-time with polling fallback, delivery states, reconnection banner
+
+### Added — Bot / LLM
+- Kåre: LLM-powered hippie chatbot (qwen3.5-abliterated-35b)
+- llm_agent package (pure Dart, headless)
+
+### Added — Architecture
+- libmsgr: pure Dart client library (zero Flutter deps)
+- Identity URI: msgr://user@domain/resource, æ.me vanity URL
+- App Platform design (7 phases), Rust NOISE gateway (future E2EE)
+
+### Added — Infrastructure
+- Docker Compose stack, multi-stage Dockerfiles
+- Live on dev.msgr.no with wildcard TLS via proxyengine
+
+### Fixed
+- Circular deps between umbrella apps
+- WebSocket tenant profile resolution
+- Message content JSONB, deduplication, display name fallback
+- @mention overlay positioning and click handling
+- JWT enforcement, Docker port conflicts
+
+---
+
+## Unreleased (pre-0.2.0 history)
 
 ### Architecture checklist
 
