@@ -47,7 +47,8 @@ Viktig:
 
     for (final msg in contextMessages) {
       // Messages from the bot itself are "assistant", everything else is "user"
-      final isOwnMessage = msg.senderName.toLowerCase() == 'kåre';
+      final nameLower = msg.senderName.toLowerCase();
+      final isOwnMessage = nameLower == 'kåre' || nameLower == 'kaare';
       messages.add(ChatMessage(
         role: isOwnMessage ? 'assistant' : 'user',
         content: isOwnMessage

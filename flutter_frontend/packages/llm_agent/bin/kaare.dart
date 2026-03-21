@@ -100,6 +100,18 @@ void main(List<String> args) async {
 
       try {
         final reply = await llmClient.chat(messages);
+
+        // Add own reply to history so future context includes it
+        channelHistory[message.channelId]!.add(BotMessage(
+          channelId: message.channelId,
+          channelName: message.channelName,
+          senderName: 'kaare',
+          senderProfileId: bot.teamProfileId ?? '',
+          content: reply,
+          messageId: 'self-${DateTime.now().microsecondsSinceEpoch}',
+          timestamp: DateTime.now(),
+        ));
+
         return reply;
       } catch (e) {
         print('[Kåre] LLM-feil: $e');

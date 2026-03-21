@@ -40,7 +40,7 @@ class _ChatComposerState extends State<ChatComposer>
   StreamSubscription<ChatVoiceState>? _voiceSubscription;
   final ImagePicker _imagePicker = ImagePicker();
 
-  static const int _defaultLineSpan = 3;
+  static const int _defaultLineSpan = 1;
   static const int _minResizableLines = 1;
   static const int _maxResizableLines = 12;
   static const double _lineDragSensitivity = 28;
@@ -123,8 +123,7 @@ class _ChatComposerState extends State<ChatComposer>
 
     final attachments = _value.attachments;
     final voiceNote = _value.voiceNote;
-    final showFormatting =
-        _focusNode.hasFocus || _textController.text.trim().isNotEmpty;
+    const showFormatting = true; // Always show toolbar
 
     final sendState = _value.sendState;
     final autosaveStatus = _value.autosaveStatus;
@@ -331,7 +330,7 @@ class _ChatComposerState extends State<ChatComposer>
                             ),
                           ),
                         ),
-                      if (showFormatting)
+                      if (false) // Resize handle hidden — auto-expand is enough
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: _ComposerResizeHandle(

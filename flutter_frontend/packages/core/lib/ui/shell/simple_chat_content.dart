@@ -12,6 +12,7 @@ import 'package:core/providers/models.dart';
 import 'package:core/providers/realtime_provider.dart';
 import 'package:core/providers/thread_provider.dart';
 import 'package:core/providers/typing_provider.dart';
+import 'package:core/features/chat/widgets/chat_composer.dart';
 import 'package:core/ui/shell/member_panel.dart';
 import 'package:core/ui/shell/thread_panel.dart';
 
@@ -122,12 +123,14 @@ class SimpleChatContent extends ConsumerStatefulWidget {
 class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
+  final _composerController = ChatComposerController();
   Timer? _fallbackPollTimer;
   Timer? _typingDebounce;
   bool _showMembers = false;
   bool _showThread = false;
   bool _showNewMessagesBanner = false;
   int _previousMessageCount = 0;
+  bool _isSending = false;
 
   @override
   void initState() {
@@ -140,6 +143,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     _fallbackPollTimer?.cancel();
     _typingDebounce?.cancel();
     _textController.dispose();
+    _composerController.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -186,6 +190,18 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
       _typingDebounce?.cancel();
       realtime.sendTypingStop(channel.id);
     }
+  }
+
+  void _onComposerSubmit(ChatComposerResult result) {
+    if (result.text.trim().isEmpty) return;
+    final channel = ref.read(selectedChannelProvider);
+    if (channel == null) return;
+
+    setState(() => _isSending = true);
+    ref.read(channelMessagesProvider.notifier).sendMessage(channel.id, result.text.trim());
+    _composerController.clear();
+    setState(() => _isSending = false);
+    _scrollToBottom();
   }
 
   void _sendMessage() {
@@ -401,47 +417,11 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                     ),
                   ),
 
-                // Composer
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A2A2A),
-                    border: Border(
-                      top: BorderSide(color: Colors.white.withOpacity(0.1)),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _textController,
-                          autofocus: true,
-                          onChanged: _onTextChanged,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: InputDecoration(
-                            hintText: 'Skriv en melding...',
-                            hintStyle: TextStyle(
-                                color: Colors.white.withOpacity(0.3)),
-                            filled: true,
-                            fillColor: Colors.white.withOpacity(0.05),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                          ),
-                          onSubmitted: (_) => _sendMessage(),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: _sendMessage,
-                        icon:
-                            const Icon(Icons.send, color: Color(0xFF02ac88)),
-                      ),
-                    ],
-                  ),
+                // Rich composer
+                ChatComposer(
+                  controller: _composerController,
+                  isSending: _isSending,
+                  onSubmit: _onComposerSubmit,
                 ),
               ],
             ),
@@ -691,9 +671,12 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                     status: msg.status,
                   ),
 
-                  // Reaction bar
-                  if (msg.reactions.isNotEmpty || _hovered)
-                    _ReactionBar(
+                  // Reaction bar — always reserve space to prevent layout jumps.
+                  // Hidden when empty + not hovered via opacity.
+                  AnimatedOpacity(
+                    opacity: msg.reactions.isNotEmpty || _hovered ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: _ReactionBar(
                       reactions: msg.reactions,
                       onToggle: (emoji) {
                         ref
@@ -701,6 +684,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                             .toggleReaction(msg.id, emoji);
                       },
                     ),
+                  ),
 
                   // Thread indicator
                   if (msg.hasThreadReplies)
