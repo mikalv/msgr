@@ -37,15 +37,13 @@ defmodule Messngr.Media.Storage do
 
     {:ok, url} =
       ExAws.S3.presigned_url(
-        ex_aws_config(),
+        presign_config(),
         :put,
         bucket,
         object_key,
         expires_in: ttl,
         query_params: [{"Content-Type", content_type}]
       )
-
-    url = maybe_replace_host(url)
 
     headers =
       encryption_headers()
@@ -69,14 +67,12 @@ defmodule Messngr.Media.Storage do
 
     {:ok, url} =
       ExAws.S3.presigned_url(
-        ex_aws_config(),
+        presign_config(),
         :get,
         bucket,
         object_key,
         expires_in: ttl
       )
-
-    url = maybe_replace_host(url)
 
     %{
       method: "GET",
@@ -123,22 +119,23 @@ defmodule Messngr.Media.Storage do
     Application.get_env(:msgr, __MODULE__, [])
   end
 
+  # Config for internal operations (bucket creation, delete, etc.)
   defp ex_aws_config do
     ExAws.Config.new(:s3)
   end
 
-  @doc false
-  # Replace the internal MinIO hostname (e.g. msgr_minio:9000 inside Docker)
-  # with the public-facing endpoint so clients can actually reach the URL.
-  defp maybe_replace_host(url) do
-    internal = config() |> Keyword.get(:internal_endpoint)
-    public = config() |> Keyword.get(:public_endpoint)
+  # Config for presigned URLs — uses PUBLIC host so signatures match
+  # what the client sends. This is the correct way to handle reverse proxies.
+  defp presign_config do
+    public = config() |> Keyword.get(:public_endpoint, "http://localhost:9000")
+    uri = URI.parse(public)
 
-    cond do
-      is_nil(internal) or is_nil(public) -> url
-      internal == public -> url
-      true -> String.replace(url, internal, public)
-    end
+    ExAws.Config.new(:s3, %{
+      scheme: "#{uri.scheme}://",
+      host: uri.host,
+      port: uri.port || (if uri.scheme == "https", do: 443, else: 80),
+      force_path_style: true
+    })
   end
 
   defp encryption_headers do
