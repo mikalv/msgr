@@ -30,6 +30,7 @@ defmodule MessngrWeb.Router do
     post "/v1/auth/challenge", AuthController, :challenge
     post "/v1/auth/verify", AuthController, :verify
     post "/v1/auth/oidc", AuthController, :oidc
+    post "/v1/auth/refresh", AuthController, :refresh
     # Noise handshake is now handled by Rust Gateway
     resources "/users", AccountController, only: [:index, :create, :update]
   end
@@ -111,6 +112,7 @@ defmodule MessngrWeb.Router do
     post "/dms", TeamDmController, :create
 
     # ── App Platform (team-scoped) ─────────────────────────────
+    get "/commands", CommandController, :index
     post "/channels/:channel_id/commands", CommandController, :execute
     get "/apps", AppController, :team_index
     post "/apps/:app_slug/install", AppController, :install

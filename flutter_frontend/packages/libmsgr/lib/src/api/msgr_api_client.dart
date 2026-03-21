@@ -534,6 +534,45 @@ class MsgrApiClient {
   }
 
   // ---------------------------------------------------------------------------
+  // Apps & Commands
+  // ---------------------------------------------------------------------------
+
+  /// GET /api/teams/:slug/apps — list installed apps for a team.
+  Future<List<Map<String, dynamic>>> getInstalledApps(String teamSlug) async {
+    final raw = await getRaw('/api/teams/$teamSlug/apps');
+    if (raw is Map<String, dynamic>) {
+      final data = raw['data'];
+      if (data is List) return data.cast<Map<String, dynamic>>();
+    }
+    if (raw is List) return raw.cast<Map<String, dynamic>>();
+    return [];
+  }
+
+  /// GET /api/teams/:slug/commands — list available slash commands for a team.
+  Future<List<Map<String, dynamic>>> getCommands(String teamSlug) async {
+    final raw = await getRaw('/api/teams/$teamSlug/commands');
+    if (raw is Map<String, dynamic>) {
+      final data = raw['data'];
+      if (data is List) return data.cast<Map<String, dynamic>>();
+    }
+    if (raw is List) return raw.cast<Map<String, dynamic>>();
+    return [];
+  }
+
+  /// POST /api/teams/:slug/channels/:channelId/commands — execute a command.
+  Future<Map<String, dynamic>> executeCommand(
+    String teamSlug,
+    String channelId,
+    String command,
+    String? args,
+  ) async {
+    return post('/api/teams/$teamSlug/channels/$channelId/commands', body: {
+      'command': command,
+      if (args != null) 'args': args,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Media / File uploads
   // ---------------------------------------------------------------------------
 

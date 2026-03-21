@@ -133,6 +133,19 @@ defmodule Teams.Channels do
   end
 
   @doc """
+  Updates the topic of a channel.
+  """
+  def update_topic(prefix, channel_id, topic) when is_binary(topic) do
+    case get_channel(prefix, channel_id) do
+      nil ->
+        {:error, :not_found}
+
+      channel ->
+        Channel.update(prefix, channel, %{topic: topic})
+    end
+  end
+
+  @doc """
   Lists members of a channel.
   """
   def list_members(prefix, channel_id) do

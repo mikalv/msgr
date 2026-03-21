@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/providers/channel_list_provider.dart';
+import 'package:core/providers/command_provider.dart';
 import 'package:core/providers/mention_provider.dart';
 import 'package:core/providers/messages_provider.dart';
 import 'package:core/providers/models.dart';
@@ -208,6 +209,12 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     final team = ref.read(selectedTeamProvider);
     if (team == null) return;
 
+    // Check if this is a slash command submission
+    if (result.hasCommand || result.text.trim().startsWith('/')) {
+      await _executeSlashCommand(team, channel, result);
+      return;
+    }
+
     // Validate attachment sizes (50 MB limit).
     for (final att in result.attachments) {
       if (att.size > MsgrApiClient.maxFileSize) {
@@ -288,6 +295,65 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     _scrollToBottom();
   }
 
+  /// Execute a slash command via the server API.
+  Future<void> _executeSlashCommand(
+    SlackTeam team,
+    SlackChannel channel,
+    ChatComposerResult result,
+  ) async {
+    final text = result.text.trim();
+
+    // Parse command name and args from the text
+    String commandName;
+    String? args;
+    if (result.hasCommand) {
+      // Command was selected from the palette
+      commandName = result.command!.name.replaceFirst('/', '');
+      // Everything after the command name in text is the args
+      final cmdPrefix = '/${commandName}';
+      if (text.startsWith(cmdPrefix)) {
+        args = text.substring(cmdPrefix.length).trim();
+      } else {
+        args = text;
+      }
+    } else {
+      // User typed /command manually
+      final parts = text.split(RegExp(r'\s+'));
+      commandName = parts.first.replaceFirst('/', '');
+      args = parts.length > 1 ? parts.sublist(1).join(' ') : null;
+    }
+
+    if (commandName.isEmpty) return;
+
+    setState(() => _isSending = true);
+    _composerController.clear();
+
+    try {
+      final client = ref.read(msgrApiProvider);
+      await client.executeCommand(
+        team.slug,
+        channel.id,
+        commandName,
+        args?.isNotEmpty == true ? args : null,
+      );
+      // The server posts a system message to the channel via realtime,
+      // so we just need to refresh messages to pick it up.
+      _refreshMessages();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Kommando feilet: $e'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
+    _scrollToBottom();
+  }
+
   void _sendMessage() {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
@@ -332,6 +398,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     final messagesState = ref.watch(channelMessagesProvider);
     final auth = ref.watch(simpleAuthProvider);
     final mentionCandidates = ref.watch(mentionCandidatesProvider);
+    final slashCommands = ref.watch(slashCommandsProvider);
 
     final realtimeState = ref.watch(realtimeProvider);
     _syncFallbackPolling(realtimeState.isConnected);
@@ -507,6 +574,11 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                   controller: _composerController,
                   isSending: _isSending,
                   onSubmit: _onComposerSubmit,
+                  availableCommands: slashCommands.when(
+                    data: (commands) => commands,
+                    loading: () => SlashCommand.defaults,
+                    error: (_, __) => SlashCommand.defaults,
+                  ),
                   availableMentions: mentionCandidates.when(
                     data: (mentions) => mentions,
                     loading: () => ComposerMention.defaults,

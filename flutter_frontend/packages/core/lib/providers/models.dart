@@ -132,6 +132,7 @@ class SlackMessage {
     this.status = MessageStatus.sent,
     this.reactions = const [],
     this.mentions = const [],
+    this.isSystem = false,
   });
 
   final String id;
@@ -147,6 +148,7 @@ class SlackMessage {
   final MessageStatus status;
   final List<MessageReaction> reactions;
   final List<MentionData> mentions;
+  final bool isSystem;
 
   bool get isThreadReply => threadParentId != null;
   bool get hasThreadReplies => threadReplyCount > 0;
@@ -166,6 +168,7 @@ class SlackMessage {
     MessageStatus? status,
     List<MessageReaction>? reactions,
     List<MentionData>? mentions,
+    bool? isSystem,
   }) {
     return SlackMessage(
       id: id ?? this.id,
@@ -181,6 +184,7 @@ class SlackMessage {
       status: status ?? this.status,
       reactions: reactions ?? this.reactions,
       mentions: mentions ?? this.mentions,
+      isSystem: isSystem ?? this.isSystem,
     );
   }
 

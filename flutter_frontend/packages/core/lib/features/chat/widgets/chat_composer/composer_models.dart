@@ -217,13 +217,9 @@ class SlashCommand {
   final String name;
   final String description;
 
-  static const defaults = <SlashCommand>[
-    SlashCommand('/giphy', 'Del en GIF'),
-    SlashCommand('/standup', 'Start daglig standup'),
-    SlashCommand('/remind', 'Opprett en påminnelse'),
-    SlashCommand('/meeting', 'Planlegg et møte'),
-    SlashCommand('/poll', 'Start en avstemning'),
-  ];
+  /// Default commands are now loaded from the server API via [slashCommandsProvider].
+  /// This static list serves as a fallback while commands are loading.
+  static const defaults = <SlashCommand>[];
 }
 
 class ComposerMention {
