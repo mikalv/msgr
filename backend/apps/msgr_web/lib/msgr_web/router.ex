@@ -34,6 +34,14 @@ defmodule MessngrWeb.Router do
     resources "/users", AccountController, only: [:index, :create, :update]
   end
 
+  # ── App Platform (public, authenticated) ─────────────────────
+  scope "/api/apps", MessngrWeb do
+    pipe_through [:api, :actor]
+
+    get "/", AppController, :index
+    post "/", AppController, :create
+  end
+
   scope "/api", MessngrWeb do
     pipe_through [:api, :actor]
 
@@ -99,7 +107,16 @@ defmodule MessngrWeb.Router do
     get "/profiles", TeamProfileController, :index
     put "/profiles/me", TeamProfileController, :update
     post "/media/presign", TeamMediaController, :presign
+    get "/media/:object_key/url", TeamMediaController, :download_url
     post "/dms", TeamDmController, :create
+
+    # ── App Platform (team-scoped) ─────────────────────────────
+    post "/channels/:channel_id/commands", CommandController, :execute
+    get "/apps", AppController, :team_index
+    post "/apps/:app_slug/install", AppController, :install
+    delete "/apps/:app_slug", AppController, :uninstall
+    post "/apps/:app_slug/tokens", AppController, :create_token
+    delete "/apps/:app_slug/tokens/:token_id", AppController, :revoke_token
   end
 
   # Team-level endpoints (no tenant resolution needed)

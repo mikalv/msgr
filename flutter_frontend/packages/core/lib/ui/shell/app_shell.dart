@@ -1,4 +1,7 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:core/providers/auth_state_provider.dart';
@@ -10,6 +13,7 @@ import 'package:core/providers/team_list_provider.dart';
 import 'package:core/providers/unread_provider.dart';
 
 import 'channel_sidebar.dart';
+import 'quick_switcher.dart';
 import 'shell_models.dart';
 import 'shell_theme.dart';
 import 'team_rail.dart';
@@ -41,9 +45,79 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell> {
   bool _sidebarCollapsed = false;
 
+  /// Channel navigation history for Cmd+[ / Cmd+] support.
+  final List<String> _channelHistory = [];
+  int _channelHistoryIndex = -1;
+
+  /// Whether the modifier key is Meta (macOS) or Control (other platforms).
+  bool get _useMeta {
+    try {
+      return Platform.isMacOS;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _navigateBack() {
+    if (_channelHistoryIndex > 0) {
+      _channelHistoryIndex--;
+      final channelId = _channelHistory[_channelHistoryIndex];
+      final channels = ref.read(channelListProvider).channels;
+      final ch = channels.where((c) => c.id == channelId).firstOrNull;
+      if (ch != null) {
+        ref.read(selectedChannelProvider.notifier).select(ch);
+      }
+    }
+  }
+
+  void _navigateForward() {
+    if (_channelHistoryIndex < _channelHistory.length - 1) {
+      _channelHistoryIndex++;
+      final channelId = _channelHistory[_channelHistoryIndex];
+      final channels = ref.read(channelListProvider).channels;
+      final ch = channels.where((c) => c.id == channelId).firstOrNull;
+      if (ch != null) {
+        ref.read(selectedChannelProvider.notifier).select(ch);
+      }
+    }
+  }
+
+  void _pushChannelHistory(String channelId) {
+    // Trim forward history when navigating to a new channel
+    if (_channelHistoryIndex < _channelHistory.length - 1) {
+      _channelHistory.removeRange(
+          _channelHistoryIndex + 1, _channelHistory.length);
+    }
+    // Avoid duplicate consecutive entries
+    if (_channelHistory.isEmpty || _channelHistory.last != channelId) {
+      _channelHistory.add(channelId);
+    }
+    _channelHistoryIndex = _channelHistory.length - 1;
+  }
+
+  void _switchToTeamByIndex(int index) {
+    final teams = ref.read(teamsProvider);
+    if (index < teams.length) {
+      ref.read(selectedTeamProvider.notifier).select(teams[index]);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final teamState = ref.watch(teamListProvider);
+
+    // Track channel changes for navigation history
+    final currentChannel = ref.watch(selectedChannelProvider);
+    if (currentChannel != null) {
+      // Only push if it differs from current history position
+      if (_channelHistory.isEmpty ||
+          _channelHistoryIndex < 0 ||
+          _channelHistory[_channelHistoryIndex] != currentChannel.id) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _pushChannelHistory(currentChannel.id);
+        });
+      }
+    }
 
     // Show loading while teams are being fetched
     if (teamState.isLoading && teamState.teams.isEmpty) {
@@ -63,20 +137,55 @@ class _AppShellState extends ConsumerState<AppShell> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth > 1024;
-        final isTablet =
-            constraints.maxWidth >= 600 && constraints.maxWidth <= 1024;
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        // Cmd+K / Ctrl+K: Quick switcher
+        SingleActivator(LogicalKeyboardKey.keyK, meta: _useMeta, control: !_useMeta):
+            () => showQuickSwitcher(context),
 
-        if (isDesktop) {
-          return _buildDesktop();
-        } else if (isTablet) {
-          return _buildTablet();
-        } else {
-          return _buildMobile();
-        }
+        // Cmd+[ / Ctrl+[: Navigate back
+        SingleActivator(LogicalKeyboardKey.bracketLeft, meta: _useMeta, control: !_useMeta):
+            _navigateBack,
+
+        // Cmd+] / Ctrl+]: Navigate forward
+        SingleActivator(LogicalKeyboardKey.bracketRight, meta: _useMeta, control: !_useMeta):
+            _navigateForward,
+
+        // Cmd+Shift+N / Ctrl+Shift+N: Create channel
+        SingleActivator(LogicalKeyboardKey.keyN, meta: _useMeta, control: !_useMeta, shift: true):
+            () => _showCreateChannelDialog(),
+
+        // Cmd+1 through Cmd+9: Switch team by index
+        for (var i = 0; i < 9; i++)
+          SingleActivator(
+            LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + i),
+            meta: _useMeta,
+            control: !_useMeta,
+          ): () => _switchToTeamByIndex(i),
+
+        // Escape: Toggle sidebar collapsed (close panels)
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          setState(() => _sidebarCollapsed = !_sidebarCollapsed);
+        },
       },
+      child: Focus(
+        autofocus: true,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isDesktop = constraints.maxWidth > 1024;
+            final isTablet =
+                constraints.maxWidth >= 600 && constraints.maxWidth <= 1024;
+
+            if (isDesktop) {
+              return _buildDesktop();
+            } else if (isTablet) {
+              return _buildTablet();
+            } else {
+              return _buildMobile();
+            }
+          },
+        ),
+      ),
     );
   }
 

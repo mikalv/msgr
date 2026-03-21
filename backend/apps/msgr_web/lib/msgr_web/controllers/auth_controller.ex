@@ -39,6 +39,24 @@ defmodule MessngrWeb.AuthController do
     end
   end
 
+  def refresh(conn, %{"refresh_token" => refresh_token}) when is_binary(refresh_token) do
+    case Messngr.Auth.refresh_access_token(refresh_token) do
+      {:ok, access_token} ->
+        json(conn, %{access_token: access_token})
+
+      {:error, _reason} ->
+        conn
+        |> put_status(:unauthorized)
+        |> json(%{error: "invalid or expired refresh token"})
+    end
+  end
+
+  def refresh(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "refresh_token is required"})
+  end
+
   defp maybe_expose_code(code) do
     if Application.get_env(:msgr_web, :expose_otp_codes, false) do
       code

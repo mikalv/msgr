@@ -16,6 +16,14 @@ defmodule Messngr.Accounts do
   @spec get_account!(Ecto.UUID.t()) :: Account.t()
   def get_account!(id), do: Repo.get!(Account, id) |> Repo.preload([:profiles, :devices])
 
+  @spec get_account_safe(Ecto.UUID.t()) :: {:ok, Account.t()} | {:error, :not_found}
+  def get_account_safe(id) do
+    case Repo.get(Account, id) do
+      nil -> {:error, :not_found}
+      account -> {:ok, Repo.preload(account, [:profiles, :devices])}
+    end
+  end
+
   @spec create_account(map()) :: {:ok, Account.t()} | {:error, Ecto.Changeset.t()}
   def create_account(attrs) do
     Repo.transaction(fn ->

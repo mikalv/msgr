@@ -1,15 +1,12 @@
 defmodule MessngrWeb.Plugs.SessionContext do
   @moduledoc """
-  Extract session context from headers injected by Rust Gateway.
+  Extract session context from JWT Bearer token or headers injected by Rust Gateway.
 
-  The Rust Gateway validates Noise sessions and injects authenticated session
-  information via HTTP headers:
-  - X-Account-Id
-  - X-Profile-Id
-  - X-Device-Id
-  - X-Session-Id
+  Authentication priority:
+  1. Authorization: Bearer <JWT> header — decode JWT, extract account_id, profile_id, teams
+  2. X-Account-Id / X-Profile-Id / X-Device-Id / X-Session-Id headers (backward compat)
 
-  This plug reads these headers and loads the corresponding database records,
+  This plug reads the authentication data and loads the corresponding database records,
   making them available to controllers and channels via assigns.
   """
 
@@ -25,29 +22,61 @@ defmodule MessngrWeb.Plugs.SessionContext do
 
   @impl Plug
   def call(conn, _opts) do
-    # Extract headers set by Rust Gateway
-    account_id = get_req_header(conn, "x-account-id") |> List.first()
-    profile_id = get_req_header(conn, "x-profile-id") |> List.first()
-    device_id = get_req_header(conn, "x-device-id") |> List.first()
-    session_id = get_req_header(conn, "x-session-id") |> List.first()
+    case get_jwt_from_header(conn) do
+      {:ok, claims} ->
+        Logger.debug("Session context from JWT",
+          account_id: claims["sub"],
+          profile_id: claims["pid"]
+        )
 
-    if account_id || profile_id do
-      Logger.debug("Session context from Rust Gateway",
-        account_id: account_id,
-        profile_id: profile_id,
-        session_id: session_id
-      )
+        conn
+        |> assign(:current_account_id, claims["sub"])
+        |> assign(:current_profile_id, claims["pid"])
+        |> assign(:current_device_id, nil)
+        |> assign(:session_id, nil)
+        |> assign(:jwt_teams, claims["ten"])
+        |> load_current_account()
+        |> load_current_profile()
+        |> validate_authentication()
+
+      :error ->
+        # Fall back to X-header auth (Rust Gateway)
+        account_id = get_req_header(conn, "x-account-id") |> List.first()
+        profile_id = get_req_header(conn, "x-profile-id") |> List.first()
+        device_id = get_req_header(conn, "x-device-id") |> List.first()
+        session_id = get_req_header(conn, "x-session-id") |> List.first()
+
+        if account_id || profile_id do
+          Logger.debug("Session context from Rust Gateway",
+            account_id: account_id,
+            profile_id: profile_id,
+            session_id: session_id
+          )
+        end
+
+        conn
+        |> assign(:current_account_id, account_id)
+        |> assign(:current_profile_id, profile_id)
+        |> assign(:current_device_id, device_id)
+        |> assign(:session_id, session_id)
+        |> load_current_account()
+        |> load_current_profile()
+        |> load_current_device()
+        |> validate_authentication()
     end
+  end
 
-    conn
-    |> assign(:current_account_id, account_id)
-    |> assign(:current_profile_id, profile_id)
-    |> assign(:current_device_id, device_id)
-    |> assign(:session_id, session_id)
-    |> load_current_account()
-    |> load_current_profile()
-    |> load_current_device()
-    |> validate_authentication()
+  defp get_jwt_from_header(conn) do
+    case get_req_header(conn, "authorization") do
+      ["Bearer " <> token | _] ->
+        case AuthProvider.Guardian.decode_and_verify(token, %{"typ" => "access"}) do
+          {:ok, claims} -> {:ok, claims}
+          {:error, _reason} -> :error
+        end
+
+      _ ->
+        :error
+    end
   end
 
   defp load_current_account(%{assigns: %{current_account_id: nil}} = conn), do: conn
@@ -57,7 +86,7 @@ defmodule MessngrWeb.Plugs.SessionContext do
     assign(conn, :current_account, account)
   rescue
     error ->
-      Logger.warning("Account not found from Rust Gateway headers",
+      Logger.warning("Account not found",
         account_id: account_id,
         error: inspect(error)
       )
@@ -84,7 +113,7 @@ defmodule MessngrWeb.Plugs.SessionContext do
     end
   rescue
     error ->
-      Logger.warning("Profile not found from Rust Gateway headers",
+      Logger.warning("Profile not found",
         profile_id: profile_id,
         error: inspect(error)
       )

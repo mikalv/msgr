@@ -49,12 +49,25 @@ class MsgrClient {
   void setSession(SessionResult session) {
     api.accountId = session.accountId;
     api.profileId = session.profileId;
+    if (session.accessToken != null) {
+      api.accessToken = session.accessToken;
+      api.refreshToken = session.refreshToken;
+    }
   }
 
   /// Set account and profile IDs directly (e.g. when restoring from storage).
-  void setCredentials({required String accountId, required String profileId}) {
+  void setCredentials({
+    required String accountId,
+    required String profileId,
+    String? accessToken,
+    String? refreshToken,
+  }) {
     api.accountId = accountId;
     api.profileId = profileId;
+    if (accessToken != null) {
+      api.accessToken = accessToken;
+      api.refreshToken = refreshToken;
+    }
   }
 
   /// Connect the Phoenix WebSocket for real-time events.
@@ -78,6 +91,7 @@ class MsgrClient {
       accountId: api.accountId!,
       profileId: api.profileId!,
       sessionId: sessionId,
+      token: api.accessToken,
     );
 
     await _realtime!.connect();

@@ -49,17 +49,112 @@ defmodule Messngr.Auth do
            {:ok, %{identity: identity, device: device}} <-
              Accounts.attach_device_for_identity(identity, device_attrs_from(challenge, attrs)),
            :ok <- bind_noise_session_to_account(session_id, session_token, identity.account, Map.get(identity, :profile), device) do
+
+        account = identity.account
+        default_profile = List.first(List.wrap(account.profiles))
+        default_profile_id = default_profile && default_profile.id
+
+        # Build team memberships map and issue JWT tokens
+        {access_token, refresh_token} = issue_jwt_tokens(account, default_profile_id)
+
         %{
-          account: identity.account,
+          account: account,
           identity: identity,
           device: device,
-          session_id: session_id
+          session_id: session_id,
+          access_token: access_token,
+          refresh_token: refresh_token
         }
       else
         {:error, reason} -> Repo.rollback(reason)
         error -> Repo.rollback(error)
       end
     end)
+  end
+
+  @doc """
+  Issues a new access token / refresh token pair for the given account.
+  """
+  def issue_jwt_tokens(account, default_profile_id) do
+    team_memberships = build_team_memberships_map(account.id)
+
+    resource = %{id: account.id}
+
+    custom_claims = %{
+      "ten" => team_memberships,
+      "pid" => default_profile_id,
+      "hdl" => account.handle || account.display_name
+    }
+
+    {:ok, access_token, _claims} =
+      AuthProvider.Guardian.encode_and_sign(
+        resource,
+        custom_claims,
+        token_type: "access",
+        ttl: {15, :minute}
+      )
+
+    {:ok, refresh_token, _claims} =
+      AuthProvider.Guardian.encode_and_sign(
+        resource,
+        custom_claims,
+        token_type: "refresh",
+        ttl: {30, :day}
+      )
+
+    {access_token, refresh_token}
+  end
+
+  @doc """
+  Refreshes an access token using a valid refresh token.
+
+  Returns `{:ok, new_access_token}` or `{:error, reason}`.
+  """
+  def refresh_access_token(refresh_token) do
+    case AuthProvider.Guardian.decode_and_verify(refresh_token, %{"typ" => "refresh"}) do
+      {:ok, claims} ->
+        account_id = claims["sub"]
+
+        case Accounts.get_account_safe(account_id) do
+          {:ok, account} ->
+            default_profile_id = claims["pid"]
+            team_memberships = build_team_memberships_map(account.id)
+
+            custom_claims = %{
+              "ten" => team_memberships,
+              "pid" => default_profile_id,
+              "hdl" => account.handle || account.display_name
+            }
+
+            {:ok, access_token, _claims} =
+              AuthProvider.Guardian.encode_and_sign(
+                %{id: account.id},
+                custom_claims,
+                token_type: "access",
+                ttl: {15, :minute}
+              )
+
+            {:ok, access_token}
+
+          {:error, _} ->
+            {:error, :account_not_found}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp build_team_memberships_map(account_id) do
+    import Ecto.Query
+
+    from(tm in Messngr.Teams.TeamMembership,
+      where: tm.account_id == ^account_id,
+      join: t in assoc(tm, :team),
+      select: {t.slug, %{role: tm.role, team_id: t.id}}
+    )
+    |> Repo.all()
+    |> Enum.into(%{})
   end
 
   @spec complete_oidc(map()) ::

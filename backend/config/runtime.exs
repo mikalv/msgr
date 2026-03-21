@@ -261,6 +261,22 @@ config :msgr, Messngr.Chat.WatcherPruner,
 
 # DevHandshake configuration removed - part of Noise which is now in Rust gateway
 
+guardian_secret =
+  case System.get_env("GUARDIAN_SECRET_KEY") do
+    nil when env in [:dev, :test] ->
+      Base.encode16(:crypto.strong_rand_bytes(32))
+
+    nil ->
+      raise "GUARDIAN_SECRET_KEY environment variable is missing."
+
+    value ->
+      value
+  end
+
+config :auth_provider, AuthProvider.Guardian,
+  issuer: "msgr",
+  secret_key: guardian_secret
+
 guardian_schema = System.get_env("GUARDIAN_DB_SCHEMA", "guardian_tokens")
 guardian_interval_minutes =
   System.get_env("GUARDIAN_DB_SWEEP_MINUTES", "60")

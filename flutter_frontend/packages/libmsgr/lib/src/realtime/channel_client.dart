@@ -20,12 +20,17 @@ class MsgrRealtimeClient {
     required this.accountId,
     required this.profileId,
     this.sessionId,
+    this.token,
   });
 
   final String wsUrl;
   final String accountId;
   final String profileId;
   final String? sessionId;
+
+  /// JWT access token. When set, sent as `token` connect param for
+  /// server-side JWT authentication (preferred over account_id/profile_id).
+  final String? token;
 
   PhoenixSocket? _socket;
   final Map<String, PhoenixChannel> _channels = {};
@@ -50,6 +55,9 @@ class MsgrRealtimeClient {
       'account_id': accountId,
       'profile_id': profileId,
     };
+    if (token != null) {
+      params['token'] = token!;
+    }
     if (sessionId != null) {
       params['session_id'] = sessionId!;
     }

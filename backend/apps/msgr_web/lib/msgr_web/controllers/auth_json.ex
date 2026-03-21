@@ -47,7 +47,16 @@ defmodule MessngrWeb.AuthJSON do
       }
     }
 
-    maybe_put_noise_session(base, Map.get(result, :noise_session))
+    base
+    |> maybe_put_noise_session(Map.get(result, :noise_session))
+    |> maybe_put_tokens(Map.get(result, :access_token), Map.get(result, :refresh_token))
+  end
+
+  defp maybe_put_tokens(map, nil, _), do: map
+  defp maybe_put_tokens(map, access_token, refresh_token) do
+    map
+    |> Map.put(:access_token, access_token)
+    |> Map.put(:refresh_token, refresh_token)
   end
 
   defp maybe_put_noise_session(map, nil), do: map

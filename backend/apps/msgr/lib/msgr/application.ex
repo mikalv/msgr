@@ -57,6 +57,20 @@ defmodule Messngr.Application do
     result = Supervisor.start_link(children, strategy: :one_for_one, name: Messngr.Supervisor)
 
     Logger.info("✅ Supervisor started successfully!")
+
+    # Seed built-in app commands (idempotent)
+    spawn(fn ->
+      # Small delay to let Repo start
+      Process.sleep(1_000)
+
+      try do
+        Messngr.Apps.BuiltinCommands.seed!()
+      rescue
+        e ->
+          Logger.warning("Could not seed built-in commands: #{inspect(e)}")
+      end
+    end)
+
     result
   end
 

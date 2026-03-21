@@ -13,6 +13,8 @@ class SimpleAuthState {
     this.profileId,
     this.email,
     this.displayName,
+    this.accessToken,
+    this.refreshToken,
     this.isLoading = false,
   });
 
@@ -20,6 +22,13 @@ class SimpleAuthState {
   final String? profileId;
   final String? email;
   final String? displayName;
+
+  /// JWT access token (short-lived).
+  final String? accessToken;
+
+  /// JWT refresh token (long-lived).
+  final String? refreshToken;
+
   final bool isLoading;
 
   bool get isLoggedIn => accountId != null && profileId != null;
@@ -29,6 +38,8 @@ class SimpleAuthState {
     String? profileId,
     String? email,
     String? displayName,
+    String? accessToken,
+    String? refreshToken,
     bool? isLoading,
   }) {
     return SimpleAuthState(
@@ -36,6 +47,8 @@ class SimpleAuthState {
       profileId: profileId ?? this.profileId,
       email: email ?? this.email,
       displayName: displayName ?? this.displayName,
+      accessToken: accessToken ?? this.accessToken,
+      refreshToken: refreshToken ?? this.refreshToken,
       isLoading: isLoading ?? this.isLoading,
     );
   }
@@ -52,12 +65,16 @@ class SimpleAuthNotifier extends StateNotifier<SimpleAuthState> {
     final profileId = prefs.getString('auth_profile_id');
     final email = prefs.getString('auth_email');
     final displayName = prefs.getString('auth_display_name');
+    final accessToken = prefs.getString('auth_access_token');
+    final refreshToken = prefs.getString('auth_refresh_token');
     if (accountId != null && profileId != null) {
       state = SimpleAuthState(
         accountId: accountId,
         profileId: profileId,
         email: email,
         displayName: displayName,
+        accessToken: accessToken,
+        refreshToken: refreshToken,
         isLoading: false,
       );
     } else {
@@ -70,18 +87,40 @@ class SimpleAuthNotifier extends StateNotifier<SimpleAuthState> {
     required String profileId,
     String? email,
     String? displayName,
+    String? accessToken,
+    String? refreshToken,
   }) async {
     state = SimpleAuthState(
       accountId: accountId,
       profileId: profileId,
       email: email,
       displayName: displayName,
+      accessToken: accessToken,
+      refreshToken: refreshToken,
     );
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('auth_account_id', accountId);
     await prefs.setString('auth_profile_id', profileId);
     if (email != null) await prefs.setString('auth_email', email);
     if (displayName != null) await prefs.setString('auth_display_name', displayName);
+    if (accessToken != null) await prefs.setString('auth_access_token', accessToken);
+    if (refreshToken != null) await prefs.setString('auth_refresh_token', refreshToken);
+  }
+
+  /// Update stored tokens (e.g. after a refresh).
+  Future<void> updateTokens({
+    required String accessToken,
+    String? refreshToken,
+  }) async {
+    state = state.copyWith(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    );
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_access_token', accessToken);
+    if (refreshToken != null) {
+      await prefs.setString('auth_refresh_token', refreshToken);
+    }
   }
 
   Future<void> logout() async {
@@ -91,6 +130,8 @@ class SimpleAuthNotifier extends StateNotifier<SimpleAuthState> {
     await prefs.remove('auth_profile_id');
     await prefs.remove('auth_email');
     await prefs.remove('auth_display_name');
+    await prefs.remove('auth_access_token');
+    await prefs.remove('auth_refresh_token');
     await prefs.remove('last_team_slug');
     await prefs.remove('last_channel_id');
   }

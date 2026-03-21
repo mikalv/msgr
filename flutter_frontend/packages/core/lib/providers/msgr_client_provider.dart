@@ -16,8 +16,23 @@ final msgrClientProvider = Provider<MsgrClient>((ref) {
     client.setCredentials(
       accountId: auth.accountId!,
       profileId: auth.profileId!,
+      accessToken: auth.accessToken,
+      refreshToken: auth.refreshToken,
     );
   }
+
+  // Wire up token refresh callbacks to persist new tokens.
+  client.api.onTokensRefreshed = (accessToken, refreshToken) {
+    ref.read(simpleAuthProvider.notifier).updateTokens(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    );
+  };
+
+  // Wire up auth failure to trigger logout.
+  client.api.onAuthFailure = () {
+    ref.read(simpleAuthProvider.notifier).logout();
+  };
 
   ref.onDispose(() => client.dispose());
   return client;

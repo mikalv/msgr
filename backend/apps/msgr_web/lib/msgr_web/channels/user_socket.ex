@@ -37,6 +37,48 @@ defmodule MessngrWeb.UserSocket do
   # See `Phoenix.Token` documentation for examples in
   # performing token verification on connect.
   @impl true
+  def connect(%{"token" => token} = params, socket, _connect_info) when is_binary(token) and token != "" do
+    # JWT-based authentication
+    Logger.debug("WebSocket connection attempt via JWT")
+
+    case AuthProvider.Guardian.decode_and_verify(token, %{"typ" => "access"}) do
+      {:ok, claims} ->
+        account_id = claims["sub"]
+        profile_id = claims["pid"]
+
+        with account when not is_nil(account) <- load_account(account_id) do
+          profile = case validate_uuid(profile_id, "profile_id") do
+            {:ok, pid} -> load_profile(pid, account)
+            _ -> nil
+          end
+
+          socket =
+            socket
+            |> assign(:current_account, account)
+            |> assign(:current_profile, profile)
+            |> assign(:uid, account_id)
+            |> assign(:account_id, account_id)
+            |> assign(:profile_id, profile_id)
+            |> assign(:session_id, nil)
+            |> assign(:jwt_teams, claims["ten"])
+            |> assign(:tenant, nil)
+            |> assign(:team_id, nil)
+
+          Logger.info("WebSocket authenticated via JWT: account=#{account_id}")
+          {:ok, socket}
+        else
+          _ ->
+            Logger.warning("WebSocket JWT auth failed: account not found")
+            :error
+        end
+
+      {:error, reason} ->
+        Logger.warning("WebSocket JWT auth failed", reason: inspect(reason))
+        :error
+    end
+  end
+
+  @impl true
   def connect(params, socket, _connect_info) do
     # Rust Gateway validates session and passes account/profile IDs
     account_id = params["account_id"]

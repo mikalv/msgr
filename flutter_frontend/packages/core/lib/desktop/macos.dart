@@ -1,9 +1,13 @@
+import 'dart:io' show exit;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:core/config/app_constants.dart';
 import 'package:core/config/theme.dart';
 import 'package:core/providers/auth_state_provider.dart';
+import 'package:core/providers/unread_provider.dart';
 import 'package:core/services/app_localizations.dart';
 import 'package:core/services/localization/translator.dart';
 import 'package:core/ui/auth/simple_login_screen.dart';
@@ -149,36 +153,175 @@ class _MacOSAppState extends State<MacOSApp>
   Widget build(BuildContext context) {
     final appThemeData = AppThemeData(brightness: _brightness);
     return ProviderScope(
-      child: TitlebarSafeArea(
-        child: AppTheme(
-          data: appThemeData,
-          child: MaterialApp(
-            title: appTitle,
-            debugShowCheckedModeBanner: false,
-            theme: ThemeData.dark().copyWith(
-              colorScheme: ColorScheme.dark(
-                primary: const Color(0xFF02ac88),
-                secondary: const Color(0xFF02ac88),
+      child: PlatformMenuBar(
+        menus: [
+          PlatformMenu(
+            label: 'Messngr',
+            menus: [
+              PlatformMenuItem(
+                label: 'Om Messngr',
+                onSelected: () {
+                  showAboutDialog(
+                    context: context,
+                    applicationName: 'Messngr',
+                    applicationVersion: '0.1.1',
+                  );
+                },
               ),
-              scaffoldBackgroundColor: const Color(0xFF1E1E1E),
-            ),
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              DefaultMaterialLocalizations.delegate,
-              DefaultCupertinoLocalizations.delegate,
-              DefaultWidgetsLocalizations.delegate,
+              PlatformMenuItemGroup(
+                members: [
+                  PlatformMenuItem(
+                    label: 'Innstillinger...',
+                    shortcut: const SingleActivator(
+                      LogicalKeyboardKey.comma,
+                      meta: true,
+                    ),
+                    onSelected: () {
+                      // TODO: Open settings
+                    },
+                  ),
+                ],
+              ),
+              PlatformMenuItemGroup(
+                members: [
+                  PlatformMenuItem(
+                    label: 'Avslutt Messngr',
+                    shortcut: const SingleActivator(
+                      LogicalKeyboardKey.keyQ,
+                      meta: true,
+                    ),
+                    onSelected: () => exit(0),
+                  ),
+                ],
+              ),
             ],
-            supportedLocales: kSupportedLocales,
-            localeResolutionCallback: (locale, supportedLocales) {
-              for (var supportedLocale in supportedLocales) {
-                if (supportedLocale.languageCode == locale!.languageCode &&
-                    supportedLocale.countryCode == locale.countryCode) {
-                  return supportedLocale;
+          ),
+          PlatformMenu(
+            label: 'Rediger',
+            menus: [
+              PlatformMenuItem(
+                label: 'Angre',
+                shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyZ,
+                  meta: true,
+                ),
+                onSelected: null,
+              ),
+              PlatformMenuItem(
+                label: 'Gjenta',
+                shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyZ,
+                  meta: true,
+                  shift: true,
+                ),
+                onSelected: null,
+              ),
+              PlatformMenuItemGroup(
+                members: [
+                  PlatformMenuItem(
+                    label: 'Klipp ut',
+                    shortcut: const SingleActivator(
+                      LogicalKeyboardKey.keyX,
+                      meta: true,
+                    ),
+                    onSelected: null,
+                  ),
+                  PlatformMenuItem(
+                    label: 'Kopier',
+                    shortcut: const SingleActivator(
+                      LogicalKeyboardKey.keyC,
+                      meta: true,
+                    ),
+                    onSelected: null,
+                  ),
+                  PlatformMenuItem(
+                    label: 'Lim inn',
+                    shortcut: const SingleActivator(
+                      LogicalKeyboardKey.keyV,
+                      meta: true,
+                    ),
+                    onSelected: null,
+                  ),
+                  PlatformMenuItem(
+                    label: 'Merk alt',
+                    shortcut: const SingleActivator(
+                      LogicalKeyboardKey.keyA,
+                      meta: true,
+                    ),
+                    onSelected: null,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          PlatformMenu(
+            label: 'Vis',
+            menus: [
+              PlatformMenuItem(
+                label: 'Hurtigveksler',
+                shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyK,
+                  meta: true,
+                ),
+                onSelected: null,
+              ),
+            ],
+          ),
+          PlatformMenu(
+            label: 'Vindu',
+            menus: [
+              PlatformMenuItem(
+                label: 'Minimer',
+                shortcut: const SingleActivator(
+                  LogicalKeyboardKey.keyM,
+                  meta: true,
+                ),
+                onSelected: () => windowManager.minimize(),
+              ),
+              PlatformMenuItem(
+                label: 'Zoom',
+                onSelected: () async {
+                  if (await windowManager.isMaximized()) {
+                    windowManager.unmaximize();
+                  } else {
+                    windowManager.maximize();
+                  }
+                },
+              ),
+            ],
+          ),
+        ],
+        child: TitlebarSafeArea(
+          child: AppTheme(
+            data: appThemeData,
+            child: MaterialApp(
+              title: appTitle,
+              debugShowCheckedModeBanner: false,
+              theme: ThemeData.dark().copyWith(
+                colorScheme: ColorScheme.dark(
+                  primary: const Color(0xFF02ac88),
+                  secondary: const Color(0xFF02ac88),
+                ),
+                scaffoldBackgroundColor: const Color(0xFF1E1E1E),
+              ),
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                DefaultMaterialLocalizations.delegate,
+                DefaultCupertinoLocalizations.delegate,
+                DefaultWidgetsLocalizations.delegate,
+              ],
+              supportedLocales: kSupportedLocales,
+              localeResolutionCallback: (locale, supportedLocales) {
+                for (var supportedLocale in supportedLocales) {
+                  if (supportedLocale.languageCode == locale!.languageCode &&
+                      supportedLocale.countryCode == locale.countryCode) {
+                    return supportedLocale;
+                  }
                 }
-              }
-              return null;
-            },
-            home: const _AuthGate(),
+                return null;
+              },
+              home: const _AuthGate(),
+            ),
           ),
         ),
       ),
@@ -235,7 +378,16 @@ class _AuthGate extends ConsumerWidget {
     }
 
     if (!authState.isLoggedIn) {
+      windowManager.setBadgeLabel('');
       return const SimpleLoginScreen();
+    }
+
+    // Update dock badge with total unread count
+    final totalUnread = ref.watch(totalUnreadProvider);
+    if (totalUnread > 0) {
+      windowManager.setBadgeLabel('$totalUnread');
+    } else {
+      windowManager.setBadgeLabel('');
     }
 
     return const AppShell(child: SimpleChatContent());

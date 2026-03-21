@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -20,6 +21,21 @@ class MsgrApiClient {
   String? profileId;
   final http.Client _http;
 
+  /// JWT access token (preferred over X-header auth when set).
+  String? accessToken;
+
+  /// JWT refresh token for obtaining new access tokens.
+  String? refreshToken;
+
+  /// Whether a token refresh is currently in progress.
+  bool _isRefreshing = false;
+
+  /// Callback invoked when tokens are refreshed (e.g. to persist them).
+  void Function(String accessToken, String? refreshToken)? onTokensRefreshed;
+
+  /// Callback invoked when refresh fails (tokens expired) -- triggers logout.
+  void Function()? onAuthFailure;
+
   // ---------------------------------------------------------------------------
   // Internal helpers
   // ---------------------------------------------------------------------------
@@ -29,11 +45,16 @@ class MsgrApiClient {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
     };
-    if (accountId != null) {
-      headers['X-Account-Id'] = accountId!;
-    }
-    if (profileId != null) {
-      headers['X-Profile-Id'] = profileId!;
+    if (accessToken != null) {
+      headers['Authorization'] = 'Bearer $accessToken';
+    } else {
+      // Fall back to X-header auth
+      if (accountId != null) {
+        headers['X-Account-Id'] = accountId!;
+      }
+      if (profileId != null) {
+        headers['X-Profile-Id'] = profileId!;
+      }
     }
     return headers;
   }
@@ -75,44 +96,109 @@ class MsgrApiClient {
   }
 
   // ---------------------------------------------------------------------------
+  // Token refresh
+  // ---------------------------------------------------------------------------
+
+  /// Refresh the access token using the stored refresh token.
+  ///
+  /// Returns `true` if the token was refreshed successfully.
+  Future<bool> refreshAuth() async {
+    if (refreshToken == null || _isRefreshing) return false;
+
+    _isRefreshing = true;
+    try {
+      final response = await _http.post(
+        _uri('/api/v1/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh_token': refreshToken}),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final newAccessToken = data['access_token'] as String?;
+        if (newAccessToken != null) {
+          accessToken = newAccessToken;
+          onTokensRefreshed?.call(newAccessToken, refreshToken);
+          return true;
+        }
+      }
+
+      // Refresh failed -- tokens are invalid
+      accessToken = null;
+      refreshToken = null;
+      onAuthFailure?.call();
+      return false;
+    } catch (_) {
+      return false;
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  /// Execute an HTTP request with automatic 401 retry via token refresh.
+  Future<http.Response> _requestWithRetry(
+    Future<http.Response> Function() request,
+  ) async {
+    final response = await request();
+
+    // If 401 and we have a refresh token, try refreshing and retry once
+    if (response.statusCode == 401 && accessToken != null && refreshToken != null) {
+      final refreshed = await refreshAuth();
+      if (refreshed) {
+        return request();
+      }
+    }
+
+    return response;
+  }
+
+  // ---------------------------------------------------------------------------
   // Low-level HTTP verbs
   // ---------------------------------------------------------------------------
 
   Future<dynamic> getRaw(String path, {Map<String, String>? query}) async {
-    final response =
-        await _http.get(_uri(path, query: query), headers: _headers());
+    final response = await _requestWithRetry(
+      () => _http.get(_uri(path, query: query), headers: _headers()),
+    );
     return _handleResponseRaw(response);
   }
 
   Future<Map<String, dynamic>> get(String path,
       {Map<String, String>? query}) async {
-    final response =
-        await _http.get(_uri(path, query: query), headers: _headers());
+    final response = await _requestWithRetry(
+      () => _http.get(_uri(path, query: query), headers: _headers()),
+    );
     return _handleResponse(response);
   }
 
   Future<Map<String, dynamic>> post(String path,
       {Map<String, dynamic>? body}) async {
-    final response = await _http.post(
-      _uri(path),
-      headers: _headers(),
-      body: body != null ? jsonEncode(body) : null,
+    final response = await _requestWithRetry(
+      () => _http.post(
+        _uri(path),
+        headers: _headers(),
+        body: body != null ? jsonEncode(body) : null,
+      ),
     );
     return _handleResponse(response);
   }
 
   Future<Map<String, dynamic>> put(String path,
       {Map<String, dynamic>? body}) async {
-    final response = await _http.put(
-      _uri(path),
-      headers: _headers(),
-      body: body != null ? jsonEncode(body) : null,
+    final response = await _requestWithRetry(
+      () => _http.put(
+        _uri(path),
+        headers: _headers(),
+        body: body != null ? jsonEncode(body) : null,
+      ),
     );
     return _handleResponse(response);
   }
 
   Future<Map<String, dynamic>> delete(String path) async {
-    final response = await _http.delete(_uri(path), headers: _headers());
+    final response = await _requestWithRetry(
+      () => _http.delete(_uri(path), headers: _headers()),
+    );
     return _handleResponse(response);
   }
 
@@ -203,12 +289,24 @@ class MsgrApiClient {
         ?.map((p) => p as Map<String, dynamic>)
         .toList();
 
+    // Extract JWT tokens if present
+    final accessTokenValue = data['access_token'] as String?;
+    final refreshTokenValue = data['refresh_token'] as String?;
+
+    // Auto-set tokens on this client when received
+    if (accessTokenValue != null) {
+      accessToken = accessTokenValue;
+      refreshToken = refreshTokenValue;
+    }
+
     return SessionResult(
       accountId: accountIdValue,
       profileId: profileIdValue,
       email: account['email'] as String?,
       displayName: account['display_name'] as String?,
       profiles: profiles,
+      accessToken: accessTokenValue,
+      refreshToken: refreshTokenValue,
     );
   }
 
@@ -321,10 +419,12 @@ class MsgrApiClient {
   Future<Map<String, dynamic>> sendMessage(
     String teamSlug,
     String channelId,
-    String content,
-  ) async {
+    String content, {
+    List<String>? mediaRefs,
+  }) async {
     return post('/api/teams/$teamSlug/channels/$channelId/messages', body: {
       'content': {'text': content},
+      if (mediaRefs != null && mediaRefs.isNotEmpty) 'media_refs': mediaRefs,
     });
   }
 
@@ -335,11 +435,13 @@ class MsgrApiClient {
   Future<Map<String, dynamic>> sendMessageRich(
     String teamSlug,
     String channelId,
-    dynamic content,
-  ) async {
+    dynamic content, {
+    List<String>? mediaRefs,
+  }) async {
     final contentValue = content is String ? {'text': content} : content;
     return post('/api/teams/$teamSlug/channels/$channelId/messages', body: {
       'content': contentValue,
+      if (mediaRefs != null && mediaRefs.isNotEmpty) 'media_refs': mediaRefs,
     });
   }
 
@@ -429,5 +531,110 @@ class MsgrApiClient {
     return post('/api/teams/$teamSlug/dms', body: {
       'profile_ids': profileIds,
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Media / File uploads
+  // ---------------------------------------------------------------------------
+
+  /// Maximum file size allowed (50 MB).
+  static const maxFileSize = 50 * 1024 * 1024;
+
+  /// Request a presigned upload URL from the server.
+  ///
+  /// POST /api/teams/:slug/media/presign
+  Future<PresignedUpload> getUploadUrl(
+    String teamSlug, {
+    required String filename,
+    required String contentType,
+    required int size,
+  }) async {
+    final raw = await post('/api/teams/$teamSlug/media/presign', body: {
+      'filename': filename,
+      'content_type': contentType,
+      'size': size,
+    });
+    final data =
+        raw.containsKey('data') ? raw['data'] as Map<String, dynamic> : raw;
+    return PresignedUpload(
+      uploadId: data['upload_id']?.toString() ?? '',
+      objectKey: data['object_key']?.toString() ?? '',
+      uploadUrl: data['upload_url']?.toString() ?? data['presigned_url']?.toString() ?? '',
+      uploadMethod: data['upload_method']?.toString() ?? 'PUT',
+      uploadHeaders: (data['upload_headers'] as Map?)?.cast<String, String>() ?? {},
+      expiresAt: data['expires_at']?.toString(),
+    );
+  }
+
+  /// Upload file bytes to a presigned URL (direct to MinIO/S3).
+  ///
+  /// Returns the HTTP status code.
+  Future<int> uploadFileToPresignedUrl(
+    String uploadUrl,
+    Uint8List bytes,
+    String contentType, {
+    Map<String, String>? headers,
+  }) async {
+    final uploadHeaders = <String, String>{
+      'Content-Type': contentType,
+      ...?headers,
+    };
+    final response = await _http.put(
+      Uri.parse(uploadUrl),
+      headers: uploadHeaders,
+      body: bytes,
+    );
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.statusCode;
+    }
+    throw MsgrApiException(
+      statusCode: response.statusCode,
+      message: 'Upload failed: ${response.body}',
+    );
+  }
+
+  /// Get a presigned download URL for a media object.
+  ///
+  /// GET /api/teams/:slug/media/:objectKey/url
+  Future<String> getDownloadUrl(String teamSlug, String objectKey) async {
+    final encoded = Uri.encodeComponent(objectKey);
+    final raw = await get('/api/teams/$teamSlug/media/$encoded/url');
+    final data =
+        raw.containsKey('data') ? raw['data'] as Map<String, dynamic> : raw;
+    return data['download_url']?.toString() ?? '';
+  }
+
+  /// Convenience: upload a file and return its object_key.
+  ///
+  /// Validates file size, requests presigned URL, uploads bytes, returns the key.
+  Future<String> uploadFileToChannel(
+    String teamSlug,
+    String channelId, {
+    required String filename,
+    required Uint8List bytes,
+    required String contentType,
+  }) async {
+    if (bytes.length > maxFileSize) {
+      throw const MsgrApiException(
+        statusCode: 413,
+        message: 'File exceeds 50 MB size limit',
+      );
+    }
+
+    final presign = await getUploadUrl(
+      teamSlug,
+      filename: filename,
+      contentType: contentType,
+      size: bytes.length,
+    );
+
+    await uploadFileToPresignedUrl(
+      presign.uploadUrl,
+      bytes,
+      contentType,
+      headers: presign.uploadHeaders,
+    );
+
+    return presign.objectKey;
   }
 }
