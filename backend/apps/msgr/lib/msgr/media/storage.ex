@@ -45,9 +45,7 @@ defmodule Messngr.Media.Storage do
         query_params: [{"Content-Type", content_type}]
       )
 
-    headers =
-      encryption_headers()
-      |> Map.put("content-type", content_type)
+    headers = %{"content-type" => content_type}
 
     %{
       method: "PUT",
