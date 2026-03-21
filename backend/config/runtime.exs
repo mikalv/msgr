@@ -213,7 +213,12 @@ config :ex_aws, :s3,
 config :msgr, Messngr.Media.Storage,
   media_storage_config
   |> Keyword.put(:bucket, System.get_env("MINIO_BUCKET", Keyword.get(media_storage_config, :bucket, "msgr-media")))
-  |> Keyword.put(:public_endpoint, "#{minio_public_scheme}#{minio_public_host}:#{minio_public_port}")
+  |> Keyword.put(:public_endpoint,
+    case {minio_public_scheme, minio_public_port} do
+      {"https://", 443} -> "https://#{minio_public_host}"
+      {"http://", 80} -> "http://#{minio_public_host}"
+      _ -> "#{minio_public_scheme}#{minio_public_host}:#{minio_public_port}"
+    end)
   |> Keyword.put(:internal_endpoint, "#{minio_scheme}#{minio_host}:#{minio_port}")
 
 retention_pruner_config = Application.get_env(:msgr, Messngr.Media.RetentionPruner, [])
