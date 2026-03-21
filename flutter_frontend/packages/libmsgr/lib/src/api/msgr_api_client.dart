@@ -324,6 +324,21 @@ class MsgrApiClient {
   }
 
   // ---------------------------------------------------------------------------
+  // Account Settings
+  // ---------------------------------------------------------------------------
+
+  /// GET /api/settings — fetch the current account's synced preferences.
+  Future<Map<String, dynamic>> getSettings() async {
+    return get('/api/settings');
+  }
+
+  /// PUT /api/settings — update the current account's synced preferences.
+  Future<Map<String, dynamic>> updateSettings(
+      Map<String, dynamic> settings) async {
+    return put('/api/settings', body: settings);
+  }
+
+  // ---------------------------------------------------------------------------
   // Teams
   // ---------------------------------------------------------------------------
 

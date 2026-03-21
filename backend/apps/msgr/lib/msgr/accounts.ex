@@ -5,7 +5,7 @@ defmodule Messngr.Accounts do
 
   import Ecto.Query
 
-  alias Messngr.Accounts.{Account, Contact, Device, DeviceKey, Identity, Profile}
+  alias Messngr.Accounts.{Account, AccountSettings, Contact, Device, DeviceKey, Identity, Profile}
   alias Messngr.Repo
 
   @spec list_accounts() :: [Account.t()]
@@ -877,5 +877,44 @@ defmodule Messngr.Accounts do
   defp derive_phone_name(number) do
     suffix = number |> String.trim_leading("+") |> String.slice(-4, 4)
     "Bruker #{suffix}"
+  end
+
+  # ---------------------------------------------------------------------------
+  # Account Settings
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Returns the settings for the given account, creating defaults if none exist.
+  """
+  @spec get_settings(Ecto.UUID.t()) :: {:ok, AccountSettings.t()}
+  def get_settings(account_id) do
+    case Repo.get(AccountSettings, account_id) do
+      nil ->
+        %AccountSettings{account_id: account_id}
+        |> AccountSettings.changeset(%{})
+        |> Repo.insert()
+
+      settings ->
+        {:ok, settings}
+    end
+  end
+
+  @doc """
+  Upserts settings for the given account.
+  """
+  @spec update_settings(Ecto.UUID.t(), map()) ::
+          {:ok, AccountSettings.t()} | {:error, Ecto.Changeset.t()}
+  def update_settings(account_id, attrs) do
+    case Repo.get(AccountSettings, account_id) do
+      nil ->
+        %AccountSettings{account_id: account_id}
+        |> AccountSettings.changeset(attrs)
+        |> Repo.insert()
+
+      settings ->
+        settings
+        |> AccountSettings.changeset(attrs)
+        |> Repo.update()
+    end
   end
 end

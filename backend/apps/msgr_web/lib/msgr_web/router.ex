@@ -83,6 +83,8 @@ defmodule MessngrWeb.Router do
     post "/bridges/:bridge_id/sessions/:id/credentials", BridgeAuthSessionController, :submit_credentials
     delete "/bridges/:bridge_id", BridgeAccountController, :delete
     get "/account/me", AccountController, :me
+    get "/settings", SettingsController, :show
+    put "/settings", SettingsController, :update
     resources "/profiles", ProfileController, only: [:index, :create, :update, :delete]
     post "/profiles/:id/switch", ProfileController, :switch
   end

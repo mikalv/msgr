@@ -12,6 +12,8 @@ import 'package:core/providers/msgr_client_provider.dart';
 import 'package:core/providers/team_list_provider.dart';
 import 'package:core/providers/unread_provider.dart';
 
+import 'package:core/ui/settings/settings_page.dart';
+
 import 'channel_sidebar.dart';
 import 'quick_switcher.dart';
 import 'shell_models.dart';
@@ -381,6 +383,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         _onDmSelected(dm.id);
       },
       onCreateChannel: _showCreateChannelDialog,
+      onOpenSettings: () => openSettingsPage(context),
       userDisplayName: ref.watch(simpleAuthProvider).displayName,
       userEmail: ref.watch(simpleAuthProvider).email,
       onEditProfile: () {

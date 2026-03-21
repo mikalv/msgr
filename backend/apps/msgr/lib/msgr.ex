@@ -24,6 +24,8 @@ defmodule Messngr do
   defdelegate delete_device(device), to: Accounts
   defdelegate activate_device(device), to: Accounts
   defdelegate deactivate_device(device), to: Accounts
+  defdelegate get_settings(account_id), to: Accounts
+  defdelegate update_settings(account_id, attrs), to: Accounts
 
   def import_contacts(account_id, contacts_attrs, opts \\ []) do
     Accounts.import_contacts(account_id, contacts_attrs, opts)

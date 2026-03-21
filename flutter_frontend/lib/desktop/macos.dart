@@ -14,6 +14,7 @@ import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/providers/unread_provider.dart';
 import 'package:core/ui/auth/simple_login_screen.dart';
 import 'package:core/ui/shell/app_shell.dart';
+import 'package:core/ui/settings/settings_page.dart';
 import 'package:core/ui/shell/simple_chat_content.dart';
 
 class MacOSApp extends StatefulWidget {
@@ -27,6 +28,8 @@ class MacOSApp extends StatefulWidget {
   @override
   State<MacOSApp> createState() => _MacOSAppState();
 }
+
+final _navigatorKey = GlobalKey<NavigatorState>();
 
 class _MacOSAppState extends State<MacOSApp>
     with WidgetsBindingObserver, TickerProviderStateMixin, WindowListener {
@@ -181,7 +184,10 @@ class _MacOSAppState extends State<MacOSApp>
                       meta: true,
                     ),
                     onSelected: () {
-                      // TODO: Open settings
+                      final ctx = _navigatorKey.currentContext;
+                      if (ctx != null) {
+                        openSettingsPage(ctx);
+                      }
                     },
                   ),
                 ],
@@ -296,6 +302,7 @@ class _MacOSAppState extends State<MacOSApp>
           ),
         ],
         child: MaterialApp(
+            navigatorKey: _navigatorKey,
             title: appTitle,
             debugShowCheckedModeBanner: false,
             theme: ThemeData(

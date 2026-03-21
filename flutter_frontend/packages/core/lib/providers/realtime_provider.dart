@@ -11,6 +11,7 @@ import 'messages_provider.dart';
 import 'models.dart';
 import 'msgr_client_provider.dart';
 import 'notification_provider.dart';
+import 'settings_provider.dart';
 import 'team_list_provider.dart';
 import 'thread_provider.dart';
 import 'typing_provider.dart';
@@ -252,7 +253,12 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   }
 
   /// Send typing indicator via channel push.
+  ///
+  /// Respects the user's typing indicators privacy setting.
   void sendTypingStart(String channelId) {
+    final sendTyping = _ref.read(sendTypingIndicatorsProvider);
+    if (!sendTyping) return;
+
     final client = _ref.read(msgrClientProvider);
     if (!client.isRealtimeConnected) return;
 
@@ -262,6 +268,9 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   }
 
   void sendTypingStop(String channelId) {
+    final sendTyping = _ref.read(sendTypingIndicatorsProvider);
+    if (!sendTyping) return;
+
     final client = _ref.read(msgrClientProvider);
     if (!client.isRealtimeConnected) return;
 
@@ -481,6 +490,10 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     String channelId,
     Map<String, dynamic> rawData,
   ) {
+    // Respect the user's desktop notification preference
+    final desktopEnabled = _ref.read(desktopNotificationsEnabledProvider);
+    if (!desktopEnabled) return;
+
     final notifService = _ref.read(desktopNotificationServiceProvider);
 
     // Check if message contains a mention of the current user

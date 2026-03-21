@@ -12,6 +12,7 @@ import 'package:core/services/app_localizations.dart';
 import 'package:core/services/desktop_notification_service.dart';
 import 'package:core/services/localization/translator.dart';
 import 'package:core/ui/auth/simple_login_screen.dart';
+import 'package:core/ui/settings/settings_page.dart';
 import 'package:core/ui/shell/app_shell.dart';
 import 'package:core/ui/shell/simple_chat_content.dart';
 import 'package:core/ui/widgets/desktop/TitlebarSafeArea.dart';
@@ -34,6 +35,7 @@ class _MacOSAppState extends State<MacOSApp>
   Locale? _locale;
   bool hasFocus = true;
   Brightness? _brightness;
+  final _navigatorKey = GlobalKey<NavigatorState>();
 
   _MacOSAppState();
 
@@ -174,13 +176,16 @@ class _MacOSAppState extends State<MacOSApp>
               PlatformMenuItemGroup(
                 members: [
                   PlatformMenuItem(
-                    label: 'Innstillinger...',
+                    label: 'Settings...',
                     shortcut: const SingleActivator(
                       LogicalKeyboardKey.comma,
                       meta: true,
                     ),
                     onSelected: () {
-                      // TODO: Open settings
+                      final ctx = _navigatorKey.currentContext;
+                      if (ctx != null) {
+                        openSettingsPage(ctx);
+                      }
                     },
                   ),
                 ],
@@ -298,6 +303,7 @@ class _MacOSAppState extends State<MacOSApp>
           child: AppTheme(
             data: appThemeData,
             child: MaterialApp(
+              navigatorKey: _navigatorKey,
               title: appTitle,
               debugShowCheckedModeBanner: false,
               theme: ThemeData.dark().copyWith(

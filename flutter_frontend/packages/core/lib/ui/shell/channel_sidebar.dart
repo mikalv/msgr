@@ -22,6 +22,7 @@ class ChannelSidebar extends StatelessWidget {
     this.onCreateChannel,
     this.onLogout,
     this.onEditProfile,
+    this.onOpenSettings,
     this.userEmail,
     this.userDisplayName,
   });
@@ -36,6 +37,7 @@ class ChannelSidebar extends StatelessWidget {
   final VoidCallback? onCreateChannel;
   final VoidCallback? onLogout;
   final VoidCallback? onEditProfile;
+  final VoidCallback? onOpenSettings;
   final String? userEmail;
   final String? userDisplayName;
 
@@ -90,8 +92,8 @@ class ChannelSidebar extends StatelessWidget {
                   ),
                   IconButton(
                     icon: const Icon(Icons.tune, color: ShellTheme.sidebarText, size: 18),
-                    onPressed: () {},
-                    tooltip: 'Innstillinger',
+                    onPressed: onOpenSettings,
+                    tooltip: 'Settings',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                   ),
