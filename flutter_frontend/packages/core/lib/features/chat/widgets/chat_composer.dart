@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
+import 'package:super_clipboard/super_clipboard.dart';
 import 'package:core/features/chat/widgets/chat_theme.dart';
 
 part 'chat_composer/composer_widget.dart';

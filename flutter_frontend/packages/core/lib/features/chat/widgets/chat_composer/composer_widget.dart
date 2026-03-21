@@ -196,7 +196,9 @@ class _ChatComposerState extends State<ChatComposer>
                 horizontal: isCompact ? 12 : 16,
                 vertical: isCompact ? 10 : 12,
               ),
-              child: CallbackShortcuts(
+              child: Focus(
+                onKeyEvent: _onKeyEventForPaste,
+                child: CallbackShortcuts(
                 bindings: <ShortcutActivator, VoidCallback>{
                   const SingleActivator(LogicalKeyboardKey.enter, control: true):
                       () => _submit(forceSend: true),
@@ -369,6 +371,7 @@ class _ChatComposerState extends State<ChatComposer>
               ),
             ),
           ),
+          ),
           ],
         ),
           ],
@@ -461,6 +464,67 @@ class _ChatComposerState extends State<ChatComposer>
       widget.controller.setError('Kunne ikke åpne kamera: ${error.message}');
     } catch (error) {
       widget.controller.setError('Klarte ikke å hente bildet.');
+    }
+  }
+
+  KeyEventResult _onKeyEventForPaste(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final isPaste = event.logicalKey == LogicalKeyboardKey.keyV &&
+        (HardwareKeyboard.instance.isMetaPressed ||
+         HardwareKeyboard.instance.isControlPressed);
+    if (isPaste) {
+      unawaited(_handlePaste());
+    }
+    return KeyEventResult.ignored;
+  }
+
+  Future<void> _handlePaste() async {
+    if (_isComposerBusy) return;
+    final clipboard = SystemClipboard.instance;
+    if (clipboard == null) return;
+
+    try {
+      final reader = await clipboard.read();
+
+      for (final format in <FileFormat>[Formats.png, Formats.jpeg]) {
+        if (reader.canProvide(format)) {
+          final completer = Completer<Uint8List?>();
+          reader.getFile(format, (file) async {
+            try {
+              final data = await file.readAll();
+              completer.complete(data);
+            } catch (e) {
+              completer.complete(null);
+            }
+          }, onError: (_) {
+            if (!completer.isCompleted) completer.complete(null);
+          });
+
+          final data = await completer.future;
+          if (data == null || data.isEmpty) continue;
+
+          final ext = format == Formats.png ? 'png' : 'jpg';
+          final mimeType =
+              format == Formats.png ? 'image/png' : 'image/jpeg';
+          final name =
+              'pasted-image-${DateTime.now().millisecondsSinceEpoch}.$ext';
+
+          if (!mounted) return;
+          widget.controller.addAttachments([
+            ComposerAttachment(
+              id: name,
+              name: name,
+              size: data.length,
+              bytes: data,
+              mimeType: mimeType,
+            ),
+          ]);
+          return;
+        }
+      }
+      // No image found — fall through so the default text paste works.
+    } catch (_) {
+      // Clipboard read failed; ignore and let default paste handle it.
     }
   }
 

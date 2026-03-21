@@ -54,9 +54,25 @@ class _AttachmentChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final imageBytes = attachment.bytes;
+    final showThumbnail = attachment.isImage && imageBytes != null;
+
     return InputChip(
       onDeleted: onRemove,
       deleteIcon: const Icon(Icons.cancel, size: 18),
+      avatar: showThumbnail
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.memory(
+                imageBytes,
+                width: 32,
+                height: 32,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    const Icon(Icons.image, size: 18),
+              ),
+            )
+          : null,
       label: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,6 +81,7 @@ class _AttachmentChip extends StatelessWidget {
             attachment.name,
             style:
                 theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             attachment.humanSize,
