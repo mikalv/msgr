@@ -645,6 +645,12 @@ class _MessageList extends StatelessWidget {
         items.add(_DateSeparator(date: msg.insertedAt));
       }
 
+      // System messages render with a distinct centered style
+      if (msg.isSystem) {
+        items.add(_SystemMessageRow(message: msg));
+        continue;
+      }
+
       final isGroupStart = _startsNewGroup(msg, prev);
       final isOwn = msg.senderProfileId == currentProfileId;
 
@@ -697,6 +703,40 @@ class _DateSeparator extends StatelessWidget {
           ),
           Expanded(child: Divider(color: Colors.white.withOpacity(0.12), height: 1)),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// System message row (centered, muted, no avatar)
+// ---------------------------------------------------------------------------
+
+class _SystemMessageRow extends StatelessWidget {
+  const _SystemMessageRow({required this.message});
+  final SlackMessage message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            message.content,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.55),
+              fontSize: 13,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ),
       ),
     );
   }

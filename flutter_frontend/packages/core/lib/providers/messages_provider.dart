@@ -370,16 +370,21 @@ SlackMessage parseMessageJson(
     }
   }
 
+  // Detect system messages: no sender profile, or content has system: true
+  final isSystem = _isSystemMessage(m['content'], sender);
+
   return SlackMessage(
     id: m['id']?.toString() ?? '',
     channelId: channelId,
     senderProfileId: m['profile_id']?.toString() ??
         sender['id']?.toString() ??
         '',
-    senderName: m['sender_name']?.toString() ??
-        sender['display_name']?.toString() ??
-        sender['name']?.toString() ??
-        'Ukjent',
+    senderName: isSystem
+        ? 'System'
+        : (m['sender_name']?.toString() ??
+            sender['display_name']?.toString() ??
+            sender['name']?.toString() ??
+            'Ukjent'),
     content: _extractContent(m['content']),
     insertedAt:
         DateTime.tryParse(m['inserted_at']?.toString() ?? '') ?? DateTime.now(),
@@ -390,7 +395,15 @@ SlackMessage parseMessageJson(
     status: MessageStatus.sent,
     reactions: reactions,
     mentions: _extractMentions(m['content']),
+    isSystem: isSystem,
   );
+}
+
+/// Check if a message is a system message (no sender or content.system == true).
+bool _isSystemMessage(dynamic content, Map<String, dynamic> sender) {
+  if (sender.isEmpty || sender['id'] == null) return true;
+  if (content is Map && content['system'] == true) return true;
+  return false;
 }
 
 /// Extract text from content field -- handles both String and Map (JSONB).

@@ -3,22 +3,16 @@ defmodule Messngr.Apps.Executors.TopicExecutor do
   Built-in executor for /topic commands.
 
   Usage: /topic New channel topic here
-  Updates the channel's topic.
+  Returns an :update_topic action that the controller applies.
   """
 
   @behaviour Messngr.Apps.Executor
 
   @impl true
-  def execute(%{args: args, channel_id: channel_id} = _command, %{tenant_prefix: prefix} = _context) do
+  def execute(%{args: args} = _command, _context) do
     case validate_args(args) do
       {:ok, topic} ->
-        case Teams.Channels.update_topic(prefix, channel_id, topic) do
-          {:ok, _channel} ->
-            {:ok, %{type: :message, content: "📝 Topic oppdatert: #{topic}"}}
-
-          {:error, reason} ->
-            {:error, "Kunne ikke oppdatere topic: #{inspect(reason)}"}
-        end
+        {:ok, %{type: :update_topic, topic: topic, content: "📝 Topic oppdatert: #{topic}"}}
 
       {:error, reason} ->
         {:error, reason}

@@ -43,8 +43,11 @@ defmodule MessngrWeb.CommandController do
 
           result = dispatch_command(app, slash_command, command, context)
 
+          # Apply side effects and respond
+          result = apply_side_effects(result, prefix, channel_id)
+
           case result do
-            {:ok, %{type: :message, content: content} = response} ->
+            {:ok, %{content: content}} ->
               # Post result as a system message in the channel
               maybe_post_system_message(prefix, channel_id, content)
 
@@ -102,15 +105,15 @@ defmodule MessngrWeb.CommandController do
   # ── Dispatcher ─────────────────────────────────────────────────
 
   defp dispatch_command(%{executor_type: "builtin"} = _app, slash_command, command, context) do
-    executor = executor_for_builtin(slash_command.name)
+    case executor_for_builtin(slash_command.name) do
+      nil ->
+        {:ok, %{
+          type: :message,
+          content: "Kommando /#{slash_command.name} er ikke implementert ennå"
+        }}
 
-    if executor do
-      executor.execute(command, context)
-    else
-      {:ok, %{
-        type: :message,
-        content: "Kommando /#{slash_command.name} er ikke implementert ennå"
-      }}
+      executor ->
+        executor.execute(command, context)
     end
   end
 
@@ -141,6 +144,22 @@ defmodule MessngrWeb.CommandController do
   defp executor_for_builtin("remind"), do: Messngr.Apps.Executors.RemindExecutor
   defp executor_for_builtin("topic"), do: Messngr.Apps.Executors.TopicExecutor
   defp executor_for_builtin(_), do: nil
+
+  # ── Side effects ───────────────────────────────────────────────
+
+  # Handle :update_topic by updating the channel and converting to a message result.
+  defp apply_side_effects({:ok, %{type: :update_topic, topic: topic} = result}, prefix, channel_id) do
+    case Teams.Channels.update_topic(prefix, channel_id, topic) do
+      {:ok, _channel} ->
+        {:ok, %{type: :message, content: result.content}}
+
+      {:error, reason} ->
+        {:error, "Kunne ikke oppdatere topic: #{inspect(reason)}"}
+    end
+  end
+
+  # Pass through all other results unchanged.
+  defp apply_side_effects(result, _prefix, _channel_id), do: result
 
   # ── Helpers ────────────────────────────────────────────────────
 
