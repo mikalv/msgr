@@ -95,9 +95,11 @@ class SlackMessage {
     required this.content,
     required this.insertedAt,
     this.threadParentId,
+    this.threadReplyCount = 0,
     this.mediaRefs = const [],
     this.editedAt,
     this.status = MessageStatus.sent,
+    this.reactions = const [],
   });
 
   final String id;
@@ -107,11 +109,14 @@ class SlackMessage {
   final String content;
   final DateTime insertedAt;
   final String? threadParentId;
+  final int threadReplyCount;
   final List<String> mediaRefs;
   final DateTime? editedAt;
   final MessageStatus status;
+  final List<MessageReaction> reactions;
 
   bool get isThreadReply => threadParentId != null;
+  bool get hasThreadReplies => threadReplyCount > 0;
 
   SlackMessage copyWith({
     String? id,
@@ -121,9 +126,11 @@ class SlackMessage {
     String? content,
     DateTime? insertedAt,
     String? threadParentId,
+    int? threadReplyCount,
     List<String>? mediaRefs,
     DateTime? editedAt,
     MessageStatus? status,
+    List<MessageReaction>? reactions,
   }) {
     return SlackMessage(
       id: id ?? this.id,
@@ -133,9 +140,11 @@ class SlackMessage {
       content: content ?? this.content,
       insertedAt: insertedAt ?? this.insertedAt,
       threadParentId: threadParentId ?? this.threadParentId,
+      threadReplyCount: threadReplyCount ?? this.threadReplyCount,
       mediaRefs: mediaRefs ?? this.mediaRefs,
       editedAt: editedAt ?? this.editedAt,
       status: status ?? this.status,
+      reactions: reactions ?? this.reactions,
     );
   }
 
@@ -151,6 +160,47 @@ class SlackMessage {
 }
 
 enum MessageStatus { sending, sent, delivered, read, failed }
+
+class MessageReaction {
+  const MessageReaction({
+    required this.emoji,
+    required this.count,
+    required this.profileIds,
+    this.includesMe = false,
+  });
+
+  final String emoji;
+  final int count;
+  final List<String> profileIds;
+  final bool includesMe;
+
+  MessageReaction copyWith({
+    String? emoji,
+    int? count,
+    List<String>? profileIds,
+    bool? includesMe,
+  }) {
+    return MessageReaction(
+      emoji: emoji ?? this.emoji,
+      count: count ?? this.count,
+      profileIds: profileIds ?? this.profileIds,
+      includesMe: includesMe ?? this.includesMe,
+    );
+  }
+
+  factory MessageReaction.fromJson(Map<String, dynamic> json, {String? currentProfileId}) {
+    final ids = <String>[
+      for (final entry in (json['profile_ids'] as List? ?? const []))
+        if (entry is String) entry
+    ];
+    return MessageReaction(
+      emoji: json['emoji'] as String? ?? '',
+      count: json['count'] as int? ?? ids.length,
+      profileIds: ids,
+      includesMe: currentProfileId != null && ids.contains(currentProfileId),
+    );
+  }
+}
 
 class PresenceInfo {
   const PresenceInfo({

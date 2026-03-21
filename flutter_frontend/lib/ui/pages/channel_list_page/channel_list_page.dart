@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:messngr/features/chat/models/reaction_aggregate.dart';
 import 'package:messngr/ui/chat_kit/chat_kit.dart';
 
 class ChannelListPage extends StatelessWidget {
@@ -107,7 +108,7 @@ class ChannelListPage extends StatelessWidget {
         body: 'Jeg skisserte en ny variant av presensbadgen.',
         timestamp: now.subtract(const Duration(minutes: 2)),
         isOwn: false,
-        reactions: const {'👍': 2},
+        reactions: const [ReactionAggregate(emoji: '\u{1F44D}', count: 2, profileIds: [])],
         isOnline: true,
       ),
       ChatThreadMessage(
@@ -117,7 +118,10 @@ class ChannelListPage extends StatelessWidget {
         body: 'Ser nydelig ut! Jeg polerer UI-kortene også.',
         timestamp: now.subtract(const Duration(minutes: 1)),
         isOwn: true,
-        reactions: const {'🔥': 3, '❤️': 1},
+        reactions: const [
+          ReactionAggregate(emoji: '\u{1F525}', count: 3, profileIds: []),
+          ReactionAggregate(emoji: '\u{2764}\u{FE0F}', count: 1, profileIds: []),
+        ],
         isOnline: true,
       ),
     ];

@@ -10,6 +10,7 @@ import 'messages_provider.dart';
 import 'models.dart';
 import 'msgr_client_provider.dart';
 import 'team_list_provider.dart';
+import 'thread_provider.dart';
 import 'typing_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -216,6 +217,36 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     }
   }
 
+  /// Toggle a reaction via Phoenix Channel push.
+  ///
+  /// Returns true if push succeeded, false if caller should use REST fallback.
+  Future<bool> toggleReactionViaChannel(
+    String channelId,
+    String messageId,
+    String emoji,
+  ) async {
+    final client = _ref.read(msgrClientProvider);
+    if (!client.isRealtimeConnected ||
+        client.realtime.getChannel('channel:$channelId') == null) {
+      return false;
+    }
+
+    try {
+      await client.realtime.push(
+        'channel:$channelId',
+        'toggle:reaction',
+        {
+          'message_id': messageId,
+          'emoji': emoji,
+        },
+      );
+      return true;
+    } catch (e) {
+      _log.warning('Channel reaction push failed: $e');
+      return false;
+    }
+  }
+
   /// Send typing indicator via channel push.
   void sendTypingStart(String channelId) {
     final client = _ref.read(msgrClientProvider);
@@ -258,15 +289,12 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
       case 'new:message':
         _onNewMessage(channelId, payload);
       case 'new:thread_reply':
-        final msgData = payload['message'] as Map<String, dynamic>?;
-        if (msgData != null) {
-          _onNewMessage(channelId, msgData);
-        }
+        final msgData = payload['message'] as Map<String, dynamic>? ?? payload;
+        _onNewThreadReply(channelId, msgData);
       case 'typing:update':
         _onTypingUpdate(channelId, payload);
       case 'reaction:updated':
-        // Could route to a reactions provider in the future
-        _log.fine('Reaction updated on message ${payload['message_id']}');
+        _onReactionUpdated(channelId, payload);
       case 'read_cursor:updated':
         _log.fine('Read cursor updated for ${payload['profile_id']}');
       case 'phx_reply' || 'phx_error' || 'phx_close':
@@ -339,9 +367,80 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     }
   }
 
+  void _onNewThreadReply(String channelId, Map<String, dynamic> data) {
+    final auth = _ref.read(simpleAuthProvider);
+    final senderProfileId = data['sender_profile_id']?.toString() ?? '';
+
+    // Skip messages we sent ourselves (already handled by optimistic insert)
+    if (senderProfileId == auth.profileId) return;
+
+    final senderProfile =
+        data['sender_profile'] as Map<String, dynamic>? ?? {};
+
+    final reply = SlackMessage(
+      id: data['id']?.toString() ?? '',
+      channelId: channelId,
+      senderProfileId: senderProfileId,
+      senderName: senderProfile['display_name']?.toString() ??
+          data['sender_name']?.toString() ??
+          'Ukjent',
+      content: _extractContent(data['content']),
+      insertedAt:
+          DateTime.tryParse(data['inserted_at']?.toString() ?? '') ??
+              DateTime.now(),
+      threadParentId: data['thread_parent_id'] as String?,
+      status: MessageStatus.sent,
+    );
+
+    // Forward to thread provider if this thread is currently open
+    _ref.read(threadMessagesProvider.notifier).mergeIncomingReply(reply);
+
+    // Also increment the reply count on the parent message in the channel list
+    final parentId = reply.threadParentId;
+    if (parentId != null) {
+      final selectedChannel = _ref.read(selectedChannelProvider);
+      if (selectedChannel != null && selectedChannel.id == channelId) {
+        final messagesState = _ref.read(channelMessagesProvider);
+        final idx =
+            messagesState.messages.indexWhere((m) => m.id == parentId);
+        if (idx >= 0) {
+          final msg = messagesState.messages[idx];
+          final updated =
+              msg.copyWith(threadReplyCount: msg.threadReplyCount + 1);
+          _ref.read(channelMessagesProvider.notifier).mergeIncoming(updated);
+        }
+      }
+    }
+  }
+
   void _onNewChannel(Map<String, dynamic> data) {
     // Refresh the channel list from the server to get the full channel data
     _ref.read(channelListProvider.notifier).refresh();
+  }
+
+  void _onReactionUpdated(String channelId, Map<String, dynamic> data) {
+    final messageId = data['message_id']?.toString();
+    if (messageId == null) return;
+
+    final auth = _ref.read(simpleAuthProvider);
+    final rawReactions = data['reactions'];
+    if (rawReactions is! List) return;
+
+    final reactions = <MessageReaction>[];
+    for (final r in rawReactions) {
+      if (r is Map<String, dynamic>) {
+        reactions.add(
+          MessageReaction.fromJson(r, currentProfileId: auth.profileId),
+        );
+      }
+    }
+
+    final selectedChannel = _ref.read(selectedChannelProvider);
+    if (selectedChannel != null && selectedChannel.id == channelId) {
+      _ref
+          .read(channelMessagesProvider.notifier)
+          .updateReactions(messageId, reactions);
+    }
   }
 
   void _onTypingUpdate(String channelId, Map<String, dynamic> data) {

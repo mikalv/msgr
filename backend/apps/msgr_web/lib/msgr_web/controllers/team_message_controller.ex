@@ -85,6 +85,7 @@ defmodule MessngrWeb.TeamMessageController do
       sender_profile_id: message.sender_profile_id,
       sender_profile: profile_json(message.sender_profile),
       thread_parent_id: message.thread_parent_id,
+      thread_reply_count: thread_reply_count(message),
       content: message.content,
       media_refs: message.media_refs,
       edited_at: message.edited_at,
@@ -92,6 +93,11 @@ defmodule MessngrWeb.TeamMessageController do
       reactions: reactions_json(message.reactions)
     }
   end
+
+  defp thread_reply_count(%{thread_replies: replies}) when is_list(replies),
+    do: length(replies)
+
+  defp thread_reply_count(_), do: 0
 
   defp profile_json(nil), do: nil
 

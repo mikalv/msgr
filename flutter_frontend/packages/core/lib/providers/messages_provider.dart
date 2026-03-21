@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -68,29 +69,12 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
         return;
       }
 
+      final auth = _ref.read(simpleAuthProvider);
       final client = _ref.read(msgrApiProvider);
       final data = await client.getMessages(team.slug, channelId, limit: _pageSize);
-      final messages = data.map((m) {
-        final sender = m['sender_profile'] as Map<String, dynamic>? ?? m['sender'] as Map<String, dynamic>? ?? {};
-        return SlackMessage(
-          id: m['id']?.toString() ?? '',
-          channelId: channelId,
-          senderProfileId: m['profile_id']?.toString() ?? sender['id']?.toString() ?? '',
-          senderName: m['sender_name']?.toString() ??
-              sender['display_name']?.toString() ??
-              sender['name']?.toString() ??
-              'Ukjent',
-          content: _extractContent(m['content']),
-          insertedAt: DateTime.tryParse(m['inserted_at']?.toString() ?? '') ??
-              DateTime.now(),
-          threadParentId: m['thread_parent_id'] as String?,
-          mediaRefs: (m['media_refs'] as List?)
-                  ?.map((r) => r.toString())
-                  .toList() ??
-              [],
-          status: MessageStatus.sent,
-        );
-      }).toList();
+      final messages = data
+          .map((m) => parseMessageJson(m, channelId, currentProfileId: auth.profileId))
+          .toList();
 
       state = state.copyWith(
         messages: messages,
@@ -109,24 +93,12 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
       final team = _ref.read(selectedTeamProvider);
       if (team == null) return;
 
+      final auth = _ref.read(simpleAuthProvider);
       final client = _ref.read(msgrApiProvider);
       final data = await client.getMessages(team.slug, channelId, limit: _pageSize);
-      final fresh = data.map((m) {
-        final sender = m['sender_profile'] as Map<String, dynamic>? ?? m['sender'] as Map<String, dynamic>? ?? {};
-        return SlackMessage(
-          id: m['id']?.toString() ?? '',
-          channelId: channelId,
-          senderProfileId: m['profile_id']?.toString() ?? sender['id']?.toString() ?? '',
-          senderName: m['sender_name']?.toString() ??
-              sender['display_name']?.toString() ??
-              sender['name']?.toString() ?? 'Ukjent',
-          content: _extractContent(m['content']),
-          insertedAt: DateTime.tryParse(m['inserted_at']?.toString() ?? '') ?? DateTime.now(),
-          threadParentId: m['thread_parent_id'] as String?,
-          mediaRefs: (m['media_refs'] as List?)?.map((r) => r.toString()).toList() ?? [],
-          status: MessageStatus.sent,
-        );
-      }).toList();
+      final fresh = data
+          .map((m) => parseMessageJson(m, channelId, currentProfileId: auth.profileId))
+          .toList();
 
       // Only update if there are new messages
       final existingIds = state.messages.map((m) => m.id).toSet();
@@ -135,7 +107,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
         state = state.copyWith(messages: fresh);
       }
     } catch (_) {
-      // Silent refresh — don't show errors
+      // Silent refresh -- don't show errors
     }
   }
 
@@ -150,6 +122,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
         return;
       }
 
+      final auth = _ref.read(simpleAuthProvider);
       final client = _ref.read(msgrApiProvider);
       final data = await client.getMessages(
         team.slug,
@@ -163,21 +136,9 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
         return;
       }
 
-      final messages = data.map((m) {
-        final sender = m['sender_profile'] as Map<String, dynamic>? ?? m['sender'] as Map<String, dynamic>? ?? {};
-        return SlackMessage(
-          id: m['id']?.toString() ?? '',
-          channelId: channelId,
-          senderProfileId: m['profile_id']?.toString() ?? sender['id']?.toString() ?? '',
-          senderName: m['sender_name']?.toString() ??
-              sender['display_name']?.toString() ??
-              'Ukjent',
-          content: _extractContent(m['content']),
-          insertedAt: DateTime.tryParse(m['inserted_at']?.toString() ?? '') ??
-              DateTime.now(),
-          status: MessageStatus.sent,
-        );
-      }).toList();
+      final messages = data
+          .map((m) => parseMessageJson(m, channelId, currentProfileId: auth.profileId))
+          .toList();
 
       state = state.copyWith(
         messages: [...messages, ...state.messages],
@@ -256,6 +217,83 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
     }
   }
 
+  /// Toggle a reaction on a message (optimistic update + server call).
+  Future<void> toggleReaction(String messageId, String emoji) async {
+    final auth = _ref.read(simpleAuthProvider);
+    final myProfileId = auth.profileId ?? '';
+
+    // Optimistic update
+    final updated = state.messages.map((m) {
+      if (m.id != messageId) return m;
+      final reactions = List<MessageReaction>.from(m.reactions);
+      final idx = reactions.indexWhere((r) => r.emoji == emoji);
+      if (idx >= 0) {
+        final r = reactions[idx];
+        if (r.includesMe) {
+          // Remove my reaction
+          final newIds = r.profileIds.where((id) => id != myProfileId).toList();
+          if (newIds.isEmpty) {
+            reactions.removeAt(idx);
+          } else {
+            reactions[idx] = r.copyWith(
+              count: r.count - 1,
+              profileIds: newIds,
+              includesMe: false,
+            );
+          }
+        } else {
+          // Add my reaction
+          reactions[idx] = r.copyWith(
+            count: r.count + 1,
+            profileIds: [...r.profileIds, myProfileId],
+            includesMe: true,
+          );
+        }
+      } else {
+        // New reaction
+        reactions.add(MessageReaction(
+          emoji: emoji,
+          count: 1,
+          profileIds: [myProfileId],
+          includesMe: true,
+        ));
+      }
+      return m.copyWith(reactions: reactions);
+    }).toList();
+    state = state.copyWith(messages: updated);
+
+    // Send to server -- try WebSocket push first, fall back to REST
+    try {
+      final team = _ref.read(selectedTeamProvider);
+      final channel = _ref.read(selectedChannelProvider);
+      if (team == null || channel == null) return;
+
+      final realtime = _ref.read(realtimeProvider.notifier);
+      final pushed = await realtime.toggleReactionViaChannel(
+        channel.id,
+        messageId,
+        emoji,
+      );
+
+      if (!pushed) {
+        // REST fallback
+        final client = _ref.read(msgrApiProvider);
+        await client.toggleReaction(team.slug, channel.id, messageId, emoji);
+      }
+    } catch (_) {
+      // Optimistic update stays -- server will reconcile on next fetch
+    }
+  }
+
+  /// Update reactions for a specific message from a server event.
+  void updateReactions(String messageId, List<MessageReaction> reactions) {
+    final idx = state.messages.indexWhere((m) => m.id == messageId);
+    if (idx < 0) return;
+    final updated = [...state.messages];
+    updated[idx] = updated[idx].copyWith(reactions: reactions);
+    state = state.copyWith(messages: updated);
+  }
+
   /// Merge an incoming realtime message.
   void mergeIncoming(SlackMessage message) {
     // Check for exact ID match first
@@ -303,7 +341,53 @@ final messagesListProvider = Provider<List<SlackMessage>>((ref) {
   return ref.watch(channelMessagesProvider).messages;
 });
 
-/// Extract text from content field — handles both String and Map (JSONB).
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Parse a message JSON map into a [SlackMessage], including reactions.
+SlackMessage parseMessageJson(
+  Map<String, dynamic> m,
+  String channelId, {
+  String? currentProfileId,
+}) {
+  final sender = m['sender_profile'] as Map<String, dynamic>? ??
+      m['sender'] as Map<String, dynamic>? ??
+      {};
+
+  final rawReactions = m['reactions'];
+  final reactions = <MessageReaction>[];
+  if (rawReactions is List) {
+    for (final r in rawReactions) {
+      if (r is Map<String, dynamic>) {
+        reactions.add(MessageReaction.fromJson(r, currentProfileId: currentProfileId));
+      }
+    }
+  }
+
+  return SlackMessage(
+    id: m['id']?.toString() ?? '',
+    channelId: channelId,
+    senderProfileId: m['profile_id']?.toString() ??
+        sender['id']?.toString() ??
+        '',
+    senderName: m['sender_name']?.toString() ??
+        sender['display_name']?.toString() ??
+        sender['name']?.toString() ??
+        'Ukjent',
+    content: _extractContent(m['content']),
+    insertedAt:
+        DateTime.tryParse(m['inserted_at']?.toString() ?? '') ?? DateTime.now(),
+    threadParentId: m['thread_parent_id'] as String?,
+    mediaRefs:
+        (m['media_refs'] as List?)?.map((r) => r.toString()).toList() ?? [],
+    threadReplyCount: (m['thread_reply_count'] as num?)?.toInt() ?? 0,
+    status: MessageStatus.sent,
+    reactions: reactions,
+  );
+}
+
+/// Extract text from content field -- handles both String and Map (JSONB).
 String _extractContent(dynamic content) {
   if (content is String) return content;
   if (content is Map) return content['text']?.toString() ?? content.toString();

@@ -313,6 +313,51 @@ class MsgrApiClient {
     });
   }
 
+  /// GET /api/teams/:slug/channels/:channelId/threads/:messageId
+  Future<Map<String, dynamic>> getThread(
+    String teamSlug,
+    String channelId,
+    String messageId,
+  ) async {
+    final raw = await get(
+      '/api/teams/$teamSlug/channels/$channelId/threads/$messageId',
+    );
+    final data = raw['data'] as Map<String, dynamic>? ?? raw;
+    return data;
+  }
+
+  /// POST /api/teams/:slug/channels/:channelId/messages — send a thread reply
+  Future<Map<String, dynamic>> sendThreadReply(
+    String teamSlug,
+    String channelId,
+    String parentMessageId,
+    String content,
+  ) async {
+    return post('/api/teams/$teamSlug/channels/$channelId/messages', body: {
+      'content': {'text': content},
+      'thread_parent_id': parentMessageId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Reactions
+  // ---------------------------------------------------------------------------
+
+  /// POST /api/teams/:slug/channels/:id/messages/:id/reactions
+  ///
+  /// Toggles a reaction on a message (adds if not present, removes if present).
+  Future<Map<String, dynamic>> toggleReaction(
+    String teamSlug,
+    String channelId,
+    String messageId,
+    String emoji,
+  ) async {
+    return post(
+      '/api/teams/$teamSlug/channels/$channelId/messages/$messageId/reactions',
+      body: {'emoji': emoji},
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Profiles
   // ---------------------------------------------------------------------------

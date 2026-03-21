@@ -25,7 +25,7 @@ defmodule Teams.Messages do
     base =
       from(m in Message,
         where: m.channel_id == ^channel_id and is_nil(m.thread_parent_id),
-        preload: [:sender_profile, :reactions]
+        preload: [:sender_profile, :reactions, :thread_replies]
       )
 
     {query, meta} = Pagination.paginate(base, cursor_opts)
