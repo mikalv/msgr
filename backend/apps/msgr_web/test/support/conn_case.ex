@@ -49,4 +49,28 @@ defmodule MessngrWeb.ConnCase do
     conn = Plug.Conn.put_req_header(conn, "authorization", "Noise #{session_info.token}")
     {conn, session_info}
   end
+
+  @doc """
+  Issues a JWT access token for the given account/profile and attaches it to the
+  connection as a Bearer token. Returns the conn with the Authorization header set.
+  """
+  def attach_jwt_session(conn, account, profile) do
+    resource = %{id: account.id}
+
+    custom_claims = %{
+      "pid" => profile.id,
+      "ten" => %{},
+      "hdl" => account.handle || account.display_name
+    }
+
+    {:ok, access_token, _claims} =
+      AuthProvider.Guardian.encode_and_sign(
+        resource,
+        custom_claims,
+        token_type: "access",
+        ttl: {15, :minute}
+      )
+
+    Plug.Conn.put_req_header(conn, "authorization", "Bearer #{access_token}")
+  end
 end
