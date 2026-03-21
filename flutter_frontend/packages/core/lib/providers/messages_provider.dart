@@ -156,6 +156,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
     String channelId,
     String content, {
     List<String>? mediaRefs,
+    List<MentionData>? mentions,
   }) async {
     final auth = _ref.read(simpleAuthProvider);
 
@@ -170,6 +171,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
       insertedAt: DateTime.now(),
       mediaRefs: mediaRefs ?? [],
       status: MessageStatus.sending,
+      mentions: mentions ?? [],
     );
 
     state = state.copyWith(messages: [...state.messages, optimistic]);
@@ -178,11 +180,14 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
       final team = _ref.read(selectedTeamProvider);
       if (team == null) throw Exception('No team selected');
 
+      // Build content JSONB with mentions if present.
+      final contentPayload = _buildContentPayload(content, mentions);
+
       // Try Phoenix Channel push first, fall back to REST.
       final realtime = _ref.read(realtimeProvider.notifier);
       final pushed = await realtime.sendMessageViaChannel(
         channelId,
-        content,
+        contentPayload,
         mediaRefs: mediaRefs,
       );
 
@@ -190,7 +195,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
       if (!pushed) {
         // REST fallback
         final client = _ref.read(msgrApiProvider);
-        final raw = await client.sendMessage(team.slug, channelId, content);
+        final raw = await client.sendMessageRich(team.slug, channelId, contentPayload);
         final data = raw.containsKey('data') && raw['data'] is Map
             ? raw['data'] as Map<String, dynamic>
             : raw;
@@ -384,6 +389,7 @@ SlackMessage parseMessageJson(
     threadReplyCount: (m['thread_reply_count'] as num?)?.toInt() ?? 0,
     status: MessageStatus.sent,
     reactions: reactions,
+    mentions: _extractMentions(m['content']),
   );
 }
 
@@ -392,4 +398,25 @@ String _extractContent(dynamic content) {
   if (content is String) return content;
   if (content is Map) return content['text']?.toString() ?? content.toString();
   return content?.toString() ?? '';
+}
+
+/// Extract mention data from content JSONB.
+List<MentionData> _extractMentions(dynamic content) {
+  if (content is! Map) return const [];
+  final rawMentions = content['mentions'];
+  if (rawMentions is! List) return const [];
+  return rawMentions
+      .whereType<Map<String, dynamic>>()
+      .map((m) => MentionData.fromJson(m))
+      .toList();
+}
+
+/// Build the content payload for sending. If mentions are present,
+/// returns a Map with text + mentions; otherwise returns plain text string.
+dynamic _buildContentPayload(String text, List<MentionData>? mentions) {
+  if (mentions == null || mentions.isEmpty) return text;
+  return {
+    'text': text,
+    'mentions': mentions.map((m) => m.toJson()).toList(),
+  };
 }

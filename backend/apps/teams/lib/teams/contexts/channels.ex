@@ -106,6 +106,33 @@ defmodule Teams.Channels do
   end
 
   @doc """
+  Adds multiple members to a channel.
+
+  Skips any profile that is already a member (upsert-safe via
+  `ON CONFLICT DO NOTHING` on the unique constraint).
+
+  Returns `{:ok, count}` with the number of newly inserted memberships.
+  """
+  def add_members(prefix, channel_id, profile_ids) when is_list(profile_ids) do
+    now = DateTime.utc_now()
+
+    results =
+      Enum.reduce(profile_ids, 0, fn pid, acc ->
+        case ChannelMembership.join(prefix, %{
+               channel_id: channel_id,
+               profile_id: pid,
+               role: "member",
+               joined_at: now
+             }) do
+          {:ok, _} -> acc + 1
+          {:error, _} -> acc  # already a member or invalid
+        end
+      end)
+
+    {:ok, results}
+  end
+
+  @doc """
   Lists members of a channel.
   """
   def list_members(prefix, channel_id) do

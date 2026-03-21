@@ -190,7 +190,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   /// Returns true if push succeeded, false if fell back to REST.
   Future<bool> sendMessageViaChannel(
     String channelId,
-    String content, {
+    dynamic content, {
     List<String>? mediaRefs,
   }) async {
     final client = _ref.read(msgrClientProvider);
@@ -200,11 +200,13 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     }
 
     try {
+      // content can be a plain String or a Map with 'text' + 'mentions'.
+      final contentPayload = content is String ? {'text': content} : content;
       final reply = await client.realtime.push(
         'channel:$channelId',
         'new:message',
         {
-          'content': {'text': content},
+          'content': contentPayload,
           if (mediaRefs != null && mediaRefs.isNotEmpty)
             'media_refs': mediaRefs,
         },

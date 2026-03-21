@@ -90,6 +90,7 @@ defmodule MessngrWeb.Router do
 
     get "/channels", TeamChannelController, :index
     post "/channels", TeamChannelController, :create
+    post "/channels/:channel_id/members", TeamChannelController, :add_members
     get "/channels/:channel_id/messages", TeamMessageController, :index
     post "/channels/:channel_id/messages", TeamMessageController, :create
     post "/channels/:channel_id/messages/:message_id/reactions", TeamReactionController, :toggle

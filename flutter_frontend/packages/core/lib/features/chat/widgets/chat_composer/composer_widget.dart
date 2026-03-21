@@ -159,10 +159,44 @@ class _ChatComposerState extends State<ChatComposer>
       onDragDone: _handleDrop,
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
+            // Mention/command palette positioned ABOVE the composer
+            if (_shouldShowMentionPalette)
+              Positioned(
+                left: 8,
+                right: 8,
+                bottom: 0,
+                child: Transform.translate(
+                  offset: const Offset(0, -4),
+                  child: _MentionPalette(
+                    mentions: _mentionCandidates,
+                    highlightedIndex: _mentionSelection,
+                    query: _mentionQuery,
+                    onSelect: _applyMention,
+                  ),
+                ),
+              ),
+            if (_shouldShowCommandPalette)
+              Positioned(
+                left: 8,
+                right: 8,
+                bottom: 0,
+                child: Transform.translate(
+                  offset: const Offset(0, -4),
+                  child: _CommandPalette(
+                    commands: _matchedCommands,
+                    highlightedIndex: _commandSelection,
+                    onSelect: _applyCommand,
+                  ),
+                ),
+              ),
+            // The actual composer
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
             if (composerError != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
@@ -347,19 +381,7 @@ class _ChatComposerState extends State<ChatComposer>
                             onReset: _resetLineSpan,
                           ),
                         ),
-                      if (_shouldShowMentionPalette)
-                        _MentionPalette(
-                          mentions: _mentionCandidates,
-                          highlightedIndex: _mentionSelection,
-                          query: _mentionQuery,
-                          onSelect: _applyMention,
-                        ),
-                      if (_shouldShowCommandPalette)
-                        _CommandPalette(
-                          commands: _matchedCommands,
-                          highlightedIndex: _commandSelection,
-                          onSelect: _applyCommand,
-                        ),
+                      // Mention and command palettes are now in the Stack above
                       SizeTransition(
                         sizeFactor: CurvedAnimation(
                           parent: _expanderController,
@@ -374,6 +396,8 @@ class _ChatComposerState extends State<ChatComposer>
               ),
             ),
           ),
+          ],
+        ),
           ],
         ),
       ),
@@ -512,9 +536,15 @@ class _ChatComposerState extends State<ChatComposer>
 
   void _handleFocusChanged() {
     if (!_focusNode.hasFocus) {
-      setState(() {
-        _showEmoji = false;
-        _clearMentionPalette();
+      // Delay clearing so that taps on the mention/command palette
+      // can fire onSelect before the palette disappears.
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (mounted && !_focusNode.hasFocus) {
+          setState(() {
+            _showEmoji = false;
+            _clearMentionPalette();
+          });
+        }
       });
     }
   }

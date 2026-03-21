@@ -98,11 +98,13 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
     required String teamSlug,
     required String name,
     String? icon,
+    String visibility = 'public',
+    List<String>? memberIds,
   }) async {
     try {
       final client = _ref.read(msgrApiProvider);
       final slug = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-|-$'), '');
-      final raw = await client.createChannel(teamSlug, name: name, slug: slug, icon: icon);
+      final raw = await client.createChannel(teamSlug, name: name, slug: slug, icon: icon, visibility: visibility, memberIds: memberIds);
       // Handle both {data: {...}} and flat response
       final data = raw.containsKey('data') && raw['data'] is Map
           ? raw['data'] as Map<String, dynamic>

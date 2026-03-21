@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/providers/channel_list_provider.dart';
+import 'package:core/providers/mention_provider.dart';
 import 'package:core/providers/messages_provider.dart';
 import 'package:core/providers/models.dart';
 import 'package:core/providers/realtime_provider.dart';
@@ -197,8 +199,35 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     final channel = ref.read(selectedChannelProvider);
     if (channel == null) return;
 
+    // Build structured mention data from the composer result.
+    final text = result.text.trim();
+    final mentionDataList = <MentionData>[];
+    if (result.hasMentions) {
+      for (final mention in result.mentions) {
+        final pattern = '@${mention.handle}';
+        var searchFrom = 0;
+        while (true) {
+          final idx = text.indexOf(pattern, searchFrom);
+          if (idx < 0) break;
+          mentionDataList.add(MentionData(
+            profileId: mention.id,
+            displayName: mention.handle,
+            offset: idx,
+            length: pattern.length,
+          ));
+          searchFrom = idx + pattern.length;
+        }
+      }
+      // Sort by offset so they are in document order.
+      mentionDataList.sort((a, b) => a.offset.compareTo(b.offset));
+    }
+
     setState(() => _isSending = true);
-    ref.read(channelMessagesProvider.notifier).sendMessage(channel.id, result.text.trim());
+    ref.read(channelMessagesProvider.notifier).sendMessage(
+      channel.id,
+      text,
+      mentions: mentionDataList.isNotEmpty ? mentionDataList : null,
+    );
     _composerController.clear();
     setState(() => _isSending = false);
     _scrollToBottom();
@@ -247,6 +276,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     final selectedChannel = ref.watch(selectedChannelProvider);
     final messagesState = ref.watch(channelMessagesProvider);
     final auth = ref.watch(simpleAuthProvider);
+    final mentionCandidates = ref.watch(mentionCandidatesProvider);
 
     final realtimeState = ref.watch(realtimeProvider);
     _syncFallbackPolling(realtimeState.isConnected);
@@ -422,6 +452,11 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                   controller: _composerController,
                   isSending: _isSending,
                   onSubmit: _onComposerSubmit,
+                  availableMentions: mentionCandidates.when(
+                    data: (mentions) => mentions,
+                    loading: () => ComposerMention.defaults,
+                    error: (_, __) => ComposerMention.defaults,
+                  ),
                 ),
               ],
             ),
@@ -564,6 +599,78 @@ class _MessageRow extends ConsumerStatefulWidget {
 class _MessageRowState extends ConsumerState<_MessageRow> {
   bool _hovered = false;
 
+  void _showContextMenu(BuildContext context, Offset globalPosition) async {
+    final msg = widget.message;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+
+    final position = RelativeRect.fromLTRB(
+      globalPosition.dx,
+      globalPosition.dy,
+      globalPosition.dx + 1,
+      globalPosition.dy + 1,
+    );
+
+    final result = await showMenu<String>(
+      context: context,
+      position: position,
+      color: const Color(0xFF2A2A2A),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      items: [
+        _buildContextMenuItem('copy', Icons.copy, 'Kopier tekst'),
+        _buildContextMenuItem('thread', Icons.reply, 'Svar i tr\u00e5d'),
+        _buildContextMenuItem('reaction', Icons.emoji_emotions_outlined, 'Legg til reaksjon'),
+        _buildContextMenuItem('pin', Icons.push_pin_outlined, 'Fest melding'),
+        const PopupMenuDivider(),
+        if (widget.isOwn) ...[
+          _buildContextMenuItem('edit', Icons.edit_outlined, 'Rediger'),
+          _buildContextMenuItem('delete', Icons.delete_outline, 'Slett', isDestructive: true),
+          const PopupMenuDivider(),
+        ],
+        _buildContextMenuItem('link', Icons.link, 'Kopier lenke'),
+      ],
+    );
+
+    if (result == null || !context.mounted) return;
+
+    switch (result) {
+      case 'copy':
+        await Clipboard.setData(ClipboardData(text: msg.content));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tekst kopiert'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        break;
+      case 'thread':
+        widget.onOpenThread(msg);
+        break;
+      case 'link':
+        final link = 'msgr://channel/${msg.channelId}/message/${msg.id}';
+        await Clipboard.setData(ClipboardData(text: link));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Lenke kopiert'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        break;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Kommer snart'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final msg = widget.message;
@@ -571,7 +678,12 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: Container(
+      child: GestureDetector(
+        onSecondaryTapUp: (details) =>
+            _showContextMenu(context, details.globalPosition),
+        onLongPressStart: (details) =>
+            _showContextMenu(context, details.globalPosition),
+        child: Container(
         color: _hovered ? Colors.white.withOpacity(0.03) : Colors.transparent,
         padding: EdgeInsets.only(
           top: widget.isGroupStart ? 8 : 1,
@@ -665,10 +777,11 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                       ),
                     ),
 
-                  // Message content (markdown or plain text with links)
+                  // Message content (markdown or plain text with links + mentions)
                   _MessageContent(
                     content: msg.content,
                     status: msg.status,
+                    mentions: msg.mentions,
                   ),
 
                   // Reaction bar — always reserve space to prevent layout jumps.
@@ -698,8 +811,42 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
           ],
         ),
       ),
+      ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Shared context menu item builder
+// ---------------------------------------------------------------------------
+
+PopupMenuEntry<String> _buildContextMenuItem(
+  String value,
+  IconData icon,
+  String label, {
+  bool isDestructive = false,
+}) {
+  return PopupMenuItem<String>(
+    value: value,
+    height: 36,
+    child: Row(
+      children: [
+        Icon(
+          icon,
+          size: 16,
+          color: isDestructive ? Colors.redAccent : Colors.white70,
+        ),
+        const SizedBox(width: 10),
+        Text(
+          label,
+          style: TextStyle(
+            color: isDestructive ? Colors.redAccent : Colors.white,
+            fontSize: 13,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -969,10 +1116,12 @@ class _MessageContent extends StatelessWidget {
   const _MessageContent({
     required this.content,
     required this.status,
+    this.mentions = const [],
   });
 
   final String content;
   final MessageStatus status;
+  final List<MentionData> mentions;
 
   /// Returns true if the text likely contains markdown formatting.
   bool get _hasMarkdown {
@@ -998,7 +1147,7 @@ class _MessageContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (_hasMarkdown) {
+    if (_hasMarkdown && mentions.isEmpty) {
       return MarkdownBody(
         data: content,
         selectable: true,
@@ -1064,8 +1213,12 @@ class _MessageContent extends StatelessWidget {
       );
     }
 
-    // Plain text with auto-linked URLs
-    return _LinkedText(content: content, color: _textColor());
+    // Plain text with auto-linked URLs + mention highlighting
+    return _LinkedText(
+      content: content,
+      color: _textColor(),
+      mentions: mentions,
+    );
   }
 }
 
@@ -1073,57 +1226,166 @@ class _MessageContent extends StatelessWidget {
 // Auto-linked plain text
 // ---------------------------------------------------------------------------
 
+/// Regex to detect @mentions in plain text (fallback when no structured data).
+final _mentionRegex = RegExp(r'@[\w.]+');
+
 class _LinkedText extends StatelessWidget {
-  const _LinkedText({required this.content, required this.color});
+  const _LinkedText({
+    required this.content,
+    required this.color,
+    this.mentions = const [],
+  });
 
   final String content;
   final Color color;
+  final List<MentionData> mentions;
 
   @override
   Widget build(BuildContext context) {
+    final baseStyle = TextStyle(color: color, fontSize: 14, height: 1.4);
+
+    // Build a set of highlighted ranges from structured mention data.
+    // If no structured mentions exist, fall back to regex detection.
+    final highlightRanges = <_HighlightRange>[];
+
+    if (mentions.isNotEmpty) {
+      for (final m in mentions) {
+        if (m.offset >= 0 && m.offset + m.length <= content.length) {
+          highlightRanges.add(_HighlightRange(
+            start: m.offset,
+            end: m.offset + m.length,
+            name: m.displayName,
+          ));
+        }
+      }
+    } else {
+      // Regex fallback: detect @word patterns in text.
+      for (final match in _mentionRegex.allMatches(content)) {
+        highlightRanges.add(_HighlightRange(
+          start: match.start,
+          end: match.end,
+          name: content.substring(match.start + 1, match.end),
+        ));
+      }
+    }
+
+    // Merge URL matches and mention highlights into a single sorted list
+    // of "special" ranges, then build spans.
+    final urlMatches = _urlRegex.allMatches(content).toList();
+
+    // Combine all special ranges (urls + mentions), sorted by start.
+    final allRanges = <_TextRange>[];
+    for (final m in urlMatches) {
+      allRanges.add(_TextRange(start: m.start, end: m.end, kind: _RangeKind.url));
+    }
+    for (final h in highlightRanges) {
+      allRanges.add(_TextRange(start: h.start, end: h.end, kind: _RangeKind.mention, name: h.name));
+    }
+    allRanges.sort((a, b) => a.start.compareTo(b.start));
+
+    // Remove overlapping ranges (first-come wins).
+    final resolved = <_TextRange>[];
+    var occupiedUntil = 0;
+    for (final r in allRanges) {
+      if (r.start >= occupiedUntil) {
+        resolved.add(r);
+        occupiedUntil = r.end;
+      }
+    }
+
+    if (resolved.isEmpty) {
+      return Text(content, style: baseStyle);
+    }
+
     final spans = <InlineSpan>[];
     var lastEnd = 0;
 
-    for (final match in _urlRegex.allMatches(content)) {
-      if (match.start > lastEnd) {
+    for (final range in resolved) {
+      if (range.start > lastEnd) {
         spans.add(TextSpan(
-          text: content.substring(lastEnd, match.start),
-          style: TextStyle(color: color, fontSize: 14, height: 1.4),
+          text: content.substring(lastEnd, range.start),
+          style: baseStyle,
         ));
       }
-      final url = match.group(0)!;
-      spans.add(TextSpan(
-        text: url,
-        style: const TextStyle(
-          color: Color(0xFF4FC3F7),
-          decoration: TextDecoration.underline,
-          fontSize: 14,
-          height: 1.4,
-        ),
-        recognizer: TapGestureRecognizer()
-          ..onTap = () {
-            launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-          },
-      ));
-      lastEnd = match.end;
+
+      final segment = content.substring(range.start, range.end);
+
+      if (range.kind == _RangeKind.url) {
+        spans.add(TextSpan(
+          text: segment,
+          style: const TextStyle(
+            color: Color(0xFF4FC3F7),
+            decoration: TextDecoration.underline,
+            fontSize: 14,
+            height: 1.4,
+          ),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () {
+              launchUrl(Uri.parse(segment), mode: LaunchMode.externalApplication);
+            },
+        ));
+      } else {
+        // Mention pill-style highlight.
+        final mentionColor = _colorForName(range.name ?? segment);
+        spans.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: mentionColor.withOpacity(0.18),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              segment,
+              style: TextStyle(
+                color: mentionColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ));
+      }
+
+      lastEnd = range.end;
     }
 
     if (lastEnd < content.length) {
       spans.add(TextSpan(
         text: content.substring(lastEnd),
-        style: TextStyle(color: color, fontSize: 14, height: 1.4),
+        style: baseStyle,
       ));
-    }
-
-    if (spans.isEmpty) {
-      return Text(
-        content,
-        style: TextStyle(color: color, fontSize: 14, height: 1.4),
-      );
     }
 
     return SelectableText.rich(TextSpan(children: spans));
   }
+}
+
+enum _RangeKind { url, mention }
+
+class _TextRange {
+  const _TextRange({
+    required this.start,
+    required this.end,
+    required this.kind,
+    this.name,
+  });
+  final int start;
+  final int end;
+  final _RangeKind kind;
+  final String? name;
+}
+
+class _HighlightRange {
+  const _HighlightRange({
+    required this.start,
+    required this.end,
+    required this.name,
+  });
+  final int start;
+  final int end;
+  final String name;
 }
 
 // ---------------------------------------------------------------------------

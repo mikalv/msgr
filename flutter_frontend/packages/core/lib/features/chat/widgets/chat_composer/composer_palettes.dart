@@ -20,11 +20,15 @@ class _MentionPalette extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return Container(
-      margin: const EdgeInsets.only(top: 12),
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(12),
+      color: const Color(0xFF2A2A3E),
+      child: Container(
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(0.58),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -41,12 +45,11 @@ class _MentionPalette extends StatelessWidget {
               ),
             ),
           for (var i = 0; i < mentions.length; i++)
-            InkWell(
-              onTap: () => onSelect(mentions[i]),
-              borderRadius: BorderRadius.vertical(
-                top: Radius.circular(i == 0 ? 18 : 0),
-                bottom: Radius.circular(i == mentions.length - 1 ? 18 : 0),
-              ),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (_) => onSelect(mentions[i]),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
                 padding:
@@ -95,7 +98,9 @@ class _MentionPalette extends StatelessWidget {
                 ),
               ),
             ),
+            ),
         ],
+      ),
       ),
     );
   }

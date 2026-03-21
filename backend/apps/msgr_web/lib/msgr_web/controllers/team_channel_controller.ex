@@ -43,12 +43,46 @@ defmodule MessngrWeb.TeamChannelController do
 
       case Channels.create_channel(prefix, attrs) do
         {:ok, channel} ->
+          # Add invited members (if any)
+          member_ids = params["member_ids"]
+
+          if is_list(member_ids) and member_ids != [] do
+            # Filter out the creator (already added) and add the rest
+            extra_ids = Enum.reject(member_ids, &(&1 == profile.id))
+            Channels.add_members(prefix, channel.id, extra_ids)
+          end
+
           conn
           |> put_status(:created)
           |> json(%{data: channel_json(channel)})
 
         {:error, changeset} ->
           {:error, changeset}
+      end
+    end
+  end
+
+  @doc "POST /api/teams/:slug/channels/:channel_id/members — add members to a channel"
+  def add_members(conn, %{"channel_id" => channel_id} = params) do
+    prefix = conn.assigns.tenant_prefix
+
+    member_ids = params["profile_ids"]
+
+    unless is_list(member_ids) and member_ids != [] do
+      conn
+      |> put_status(:unprocessable_entity)
+      |> json(%{error: "profile_ids must be a non-empty list"})
+    else
+      case Channels.add_members(prefix, channel_id, member_ids) do
+        {:ok, count} ->
+          conn
+          |> put_status(:created)
+          |> json(%{data: %{added: count}})
+
+        {:error, reason} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: inspect(reason)})
       end
     end
   end

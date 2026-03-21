@@ -86,6 +86,37 @@ class SlackChannel {
   String toString() => 'SlackChannel(#$slug)';
 }
 
+/// Structured mention data stored alongside message content.
+class MentionData {
+  const MentionData({
+    required this.profileId,
+    required this.displayName,
+    required this.offset,
+    required this.length,
+  });
+
+  final String profileId;
+  final String displayName;
+  final int offset;
+  final int length;
+
+  factory MentionData.fromJson(Map<String, dynamic> json) {
+    return MentionData(
+      profileId: json['profile_id']?.toString() ?? '',
+      displayName: json['display_name']?.toString() ?? '',
+      offset: (json['offset'] as num?)?.toInt() ?? 0,
+      length: (json['length'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'profile_id': profileId,
+        'display_name': displayName,
+        'offset': offset,
+        'length': length,
+      };
+}
+
 class SlackMessage {
   const SlackMessage({
     required this.id,
@@ -100,6 +131,7 @@ class SlackMessage {
     this.editedAt,
     this.status = MessageStatus.sent,
     this.reactions = const [],
+    this.mentions = const [],
   });
 
   final String id;
@@ -114,9 +146,11 @@ class SlackMessage {
   final DateTime? editedAt;
   final MessageStatus status;
   final List<MessageReaction> reactions;
+  final List<MentionData> mentions;
 
   bool get isThreadReply => threadParentId != null;
   bool get hasThreadReplies => threadReplyCount > 0;
+  bool get hasMentions => mentions.isNotEmpty;
 
   SlackMessage copyWith({
     String? id,
@@ -131,6 +165,7 @@ class SlackMessage {
     DateTime? editedAt,
     MessageStatus? status,
     List<MessageReaction>? reactions,
+    List<MentionData>? mentions,
   }) {
     return SlackMessage(
       id: id ?? this.id,
@@ -145,6 +180,7 @@ class SlackMessage {
       editedAt: editedAt ?? this.editedAt,
       status: status ?? this.status,
       reactions: reactions ?? this.reactions,
+      mentions: mentions ?? this.mentions,
     );
   }
 

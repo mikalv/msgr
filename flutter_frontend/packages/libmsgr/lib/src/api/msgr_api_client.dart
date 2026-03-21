@@ -264,6 +264,8 @@ class MsgrApiClient {
     required String name,
     String? slug,
     String? icon,
+    String visibility = 'public',
+    List<String>? memberIds,
   }) async {
     final channelSlug = slug ??
         name
@@ -273,7 +275,20 @@ class MsgrApiClient {
     return post('/api/teams/$teamSlug/channels', body: {
       'name': name,
       'slug': channelSlug,
+      'visibility': visibility,
       if (icon != null) 'icon': icon,
+      if (memberIds != null && memberIds.isNotEmpty) 'member_ids': memberIds,
+    });
+  }
+
+  /// POST /api/teams/:slug/channels/:channelId/members
+  Future<Map<String, dynamic>> addChannelMembers(
+    String teamSlug,
+    String channelId,
+    List<String> profileIds,
+  ) async {
+    return post('/api/teams/$teamSlug/channels/$channelId/members', body: {
+      'profile_ids': profileIds,
     });
   }
 
@@ -310,6 +325,21 @@ class MsgrApiClient {
   ) async {
     return post('/api/teams/$teamSlug/channels/$channelId/messages', body: {
       'content': {'text': content},
+    });
+  }
+
+  /// POST /api/teams/:slug/channels/:id/messages with rich content (JSONB).
+  ///
+  /// [content] can be a plain String or a Map with 'text' and optional
+  /// 'mentions' list for structured content.
+  Future<Map<String, dynamic>> sendMessageRich(
+    String teamSlug,
+    String channelId,
+    dynamic content,
+  ) async {
+    final contentValue = content is String ? {'text': content} : content;
+    return post('/api/teams/$teamSlug/channels/$channelId/messages', body: {
+      'content': contentValue,
     });
   }
 

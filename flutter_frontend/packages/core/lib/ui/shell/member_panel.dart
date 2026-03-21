@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:core/providers/msgr_client_provider.dart';
@@ -145,9 +146,76 @@ class _MemberTile extends StatelessWidget {
 
   final SlackProfile profile;
 
+  void _showMemberContextMenu(BuildContext context, Offset globalPosition) async {
+    final result = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPosition.dx,
+        globalPosition.dy,
+        globalPosition.dx + 1,
+        globalPosition.dy + 1,
+      ),
+      color: const Color(0xFF2A2A2A),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      items: [
+        _memberMenuItem('profile', Icons.person_outline, 'Vis profil'),
+        _memberMenuItem('dm', Icons.chat_bubble_outline, 'Send DM'),
+        const PopupMenuDivider(),
+        _memberMenuItem('mention', Icons.alternate_email, 'Nevn i melding'),
+        _memberMenuItem('copy', Icons.copy, 'Kopier brukernavn'),
+      ],
+    );
+
+    if (result == null || !context.mounted) return;
+
+    switch (result) {
+      case 'copy':
+        await Clipboard.setData(ClipboardData(text: profile.displayName));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Brukernavn kopiert'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        break;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Kommer snart'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+    }
+  }
+
+  static PopupMenuItem<String> _memberMenuItem(
+    String value,
+    IconData icon,
+    String label,
+  ) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 36,
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.white70),
+          const SizedBox(width: 10),
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return GestureDetector(
+      onSecondaryTapUp: (details) =>
+          _showMemberContextMenu(context, details.globalPosition),
+      onLongPressStart: (details) =>
+          _showMemberContextMenu(context, details.globalPosition),
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Row(
         children: [
@@ -218,6 +286,7 @@ class _MemberTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

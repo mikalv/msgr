@@ -258,11 +258,10 @@ class ComposerMention {
         handle.toLowerCase().contains(lower);
   }
 
+  /// Default mentions available before team profiles are loaded.
+  /// Includes special mentions (@channel, @here).
   static const defaults = <ComposerMention>[
-    ComposerMention(id: '1', displayName: 'Ada Lovelace', handle: 'ada'),
-    ComposerMention(id: '2', displayName: 'Nikola Tesla', handle: 'tesla'),
-    ComposerMention(id: '3', displayName: 'Katherine Johnson', handle: 'kjohnson'),
-    ComposerMention(id: '4', displayName: 'Jo Nesbø', handle: 'jnesbo'),
-    ComposerMention(id: '5', displayName: 'Astrid Lindgren', handle: 'astrid'),
+    ComposerMention(id: '__channel__', displayName: 'channel', handle: 'channel'),
+    ComposerMention(id: '__here__', displayName: 'here', handle: 'here'),
   ];
 }

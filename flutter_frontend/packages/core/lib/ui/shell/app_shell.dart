@@ -636,71 +636,326 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     final nameController = TextEditingController();
     final iconController = TextEditingController();
+    final searchController = TextEditingController();
+    bool isPrivate = false;
+    List<Map<String, dynamic>> allProfiles = [];
+    Set<String> selectedMemberIds = {};
+    String searchQuery = '';
+    bool loadingProfiles = true;
+
+    // Load team members via libmsgr
+    final client = ref.read(msgrApiProvider);
+    try {
+      allProfiles = await client.getProfiles(team.slug);
+    } catch (_) {
+      // If loading profiles fails, continue without member selection
+    }
+    loadingProfiles = false;
+
+    // Current user's profile id
+    final currentProfileId = client.profileId;
 
     final result = await showDialog<bool>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF2A2A3E),
-          title: const Text(
-            'Opprett kanal',
-            style: TextStyle(color: Colors.white),
-          ),
-          content: SizedBox(
-            width: 360,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  autofocus: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Kanalnavn',
-                    labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
-                    hintText: 'F.eks. general',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final filteredProfiles = allProfiles.where((p) {
+              if (searchQuery.isEmpty) return true;
+              final name = (p['display_name'] ?? p['email'] ?? '').toString().toLowerCase();
+              return name.contains(searchQuery.toLowerCase());
+            }).toList();
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF2A2A3E),
+              title: const Text(
+                'Opprett kanal',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: SizedBox(
+                width: 420,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Channel name
+                      TextField(
+                        controller: nameController,
+                        autofocus: true,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'Kanalnavn',
+                          labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                          hintText: 'F.eks. general',
+                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                          filled: true,
+                          fillColor: Colors.white.withOpacity(0.05),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Icon field
+                      TextField(
+                        controller: iconController,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'Ikon (emoji, valgfritt)',
+                          labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                          hintText: '#',
+                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                          filled: true,
+                          fillColor: Colors.white.withOpacity(0.05),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Visibility toggle
+                      Text(
+                        'Synlighet',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setDialogState(() => isPrivate = false),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: !isPrivate
+                                      ? const Color(0xFF02ac88).withOpacity(0.2)
+                                      : Colors.white.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: !isPrivate
+                                        ? const Color(0xFF02ac88)
+                                        : Colors.transparent,
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.public,
+                                      color: !isPrivate
+                                          ? const Color(0xFF02ac88)
+                                          : Colors.white54,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Offentlig',
+                                      style: TextStyle(
+                                        color: !isPrivate ? Colors.white : Colors.white54,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setDialogState(() => isPrivate = true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: isPrivate
+                                      ? const Color(0xFF02ac88).withOpacity(0.2)
+                                      : Colors.white.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isPrivate
+                                        ? const Color(0xFF02ac88)
+                                        : Colors.transparent,
+                                  ),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.lock_outline,
+                                      color: isPrivate
+                                          ? const Color(0xFF02ac88)
+                                          : Colors.white54,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Privat',
+                                      style: TextStyle(
+                                        color: isPrivate ? Colors.white : Colors.white54,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Member selection section
+                      Text(
+                        'Inviter medlemmer',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Selected members chips
+                      if (selectedMemberIds.isNotEmpty || currentProfileId != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              // Creator chip (not removable)
+                              if (currentProfileId != null)
+                                _buildMemberChip(
+                                  allProfiles,
+                                  currentProfileId,
+                                  isCreator: true,
+                                  onRemove: null,
+                                ),
+                              // Selected members (removable)
+                              ...selectedMemberIds
+                                  .where((id) => id != currentProfileId)
+                                  .map((id) => _buildMemberChip(
+                                        allProfiles,
+                                        id,
+                                        isCreator: false,
+                                        onRemove: () => setDialogState(() {
+                                          selectedMemberIds.remove(id);
+                                        }),
+                                      )),
+                            ],
+                          ),
+                        ),
+
+                      // Search field
+                      TextField(
+                        controller: searchController,
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: 'Sok etter medlemmer...',
+                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
+                          prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.3), size: 18),
+                          filled: true,
+                          fillColor: Colors.white.withOpacity(0.05),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        onChanged: (value) {
+                          setDialogState(() => searchQuery = value);
+                        },
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Profile list
+                      if (loadingProfiles)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      else
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 180),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filteredProfiles.length,
+                            itemBuilder: (context, index) {
+                              final profile = filteredProfiles[index];
+                              final profileId = profile['id']?.toString() ?? '';
+                              final isCreator = profileId == currentProfileId;
+                              final isSelected = selectedMemberIds.contains(profileId) || isCreator;
+                              final displayName = profile['display_name']?.toString() ?? profile['email']?.toString() ?? 'Ukjent';
+
+                              return ListTile(
+                                dense: true,
+                                visualDensity: VisualDensity.compact,
+                                leading: CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: const Color(0xFF3A3A5E),
+                                  child: Text(
+                                    displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
+                                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                                  ),
+                                ),
+                                title: Text(
+                                  displayName,
+                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                ),
+                                subtitle: isCreator
+                                    ? Text(
+                                        'Oppretter',
+                                        style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                                      )
+                                    : null,
+                                trailing: isCreator
+                                    ? Icon(Icons.check_circle, color: const Color(0xFF02ac88).withOpacity(0.5), size: 18)
+                                    : isSelected
+                                        ? const Icon(Icons.check_circle, color: Color(0xFF02ac88), size: 18)
+                                        : Icon(Icons.circle_outlined, color: Colors.white.withOpacity(0.2), size: 18),
+                                onTap: isCreator
+                                    ? null
+                                    : () {
+                                        setDialogState(() {
+                                          if (selectedMemberIds.contains(profileId)) {
+                                            selectedMemberIds.remove(profileId);
+                                          } else {
+                                            selectedMemberIds.add(profileId);
+                                          }
+                                        });
+                                      },
+                              );
+                            },
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: iconController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    labelText: 'Ikon (emoji, valgfritt)',
-                    labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
-                    hintText: '#',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                    filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Avbryt', style: TextStyle(color: Colors.white54)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF02ac88),
                   ),
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Opprett'),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Avbryt', style: TextStyle(color: Colors.white54)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF02ac88),
-              ),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Opprett'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
@@ -709,10 +964,16 @@ class _AppShellState extends ConsumerState<AppShell> {
       final name = nameController.text.trim();
       if (name.isNotEmpty) {
         final icon = iconController.text.trim();
+        final visibility = isPrivate ? 'private' : 'public';
+        final memberIds = selectedMemberIds.isNotEmpty
+            ? selectedMemberIds.toList()
+            : null;
         await ref.read(channelListProvider.notifier).createChannel(
               teamSlug: team.slug,
               name: name,
               icon: icon.isNotEmpty ? icon : null,
+              visibility: visibility,
+              memberIds: memberIds,
             );
         // Refresh from server to ensure sidebar is in sync (the local
         // optimistic add may lack fields like kind, which causes the
@@ -733,6 +994,50 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     nameController.dispose();
     iconController.dispose();
+    searchController.dispose();
+  }
+
+  Widget _buildMemberChip(
+    List<Map<String, dynamic>> profiles,
+    String profileId, {
+    required bool isCreator,
+    VoidCallback? onRemove,
+  }) {
+    final profile = profiles.where((p) => p['id']?.toString() == profileId).firstOrNull;
+    final name = profile?['display_name']?.toString() ?? profile?['email']?.toString() ?? 'Ukjent';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isCreator
+            ? const Color(0xFF02ac88).withOpacity(0.15)
+            : const Color(0xFF3A3A5E),
+        borderRadius: BorderRadius.circular(16),
+        border: isCreator
+            ? Border.all(color: const Color(0xFF02ac88).withOpacity(0.3))
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            name,
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
+          if (isCreator) ...[
+            const SizedBox(width: 4),
+            Icon(Icons.star, size: 12, color: const Color(0xFF02ac88).withOpacity(0.7)),
+          ],
+          if (onRemove != null) ...[
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: onRemove,
+              child: Icon(Icons.close, size: 14, color: Colors.white.withOpacity(0.5)),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
