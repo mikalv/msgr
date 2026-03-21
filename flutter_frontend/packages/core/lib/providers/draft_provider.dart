@@ -49,7 +49,9 @@ class ChannelDraftsNotifier extends StateNotifier<Map<String, String>> {
       clearDraft(channelId);
       return;
     }
-    state = {...state, channelId: text};
+    final updated = Map<String, String>.from(state);
+    updated[channelId] = text;
+    state = updated;
     _debouncePersist(channelId, text);
   }
 

@@ -22,7 +22,9 @@ class UnreadCountsNotifier extends StateNotifier<Map<String, int>> {
   /// Mark a channel as read (set count to 0).
   void markRead(String channelId) {
     if (!state.containsKey(channelId) || state[channelId] == 0) return;
-    state = {...state, channelId: 0};
+    final updated = Map<String, int>.from(state);
+    updated[channelId] = 0;
+    state = updated;
     // TODO: PUT /api/teams/:slug/channels/:id/read_cursor
   }
 
@@ -30,7 +32,9 @@ class UnreadCountsNotifier extends StateNotifier<Map<String, int>> {
   /// arrives for a channel that is not currently being viewed).
   void increment(String channelId) {
     final current = state[channelId] ?? 0;
-    state = {...state, channelId: current + 1};
+    final updated = Map<String, int>.from(state);
+    updated[channelId] = current + 1;
+    state = updated;
   }
 
   /// Get unread count for a channel.
