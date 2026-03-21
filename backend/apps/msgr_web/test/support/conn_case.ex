@@ -36,6 +36,12 @@ defmodule MessngrWeb.ConnCase do
 
   setup tags do
     Messngr.DataCase.setup_sandbox(tags)
+
+    # Teams.Repo shares the same database; sandbox it so tenant operations
+    # are rolled back after each test.
+    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Teams.Repo, shared: not tags[:async])
+    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 
@@ -72,5 +78,34 @@ defmodule MessngrWeb.ConnCase do
       )
 
     Plug.Conn.put_req_header(conn, "authorization", "Bearer #{access_token}")
+  end
+
+  @doc """
+  Creates an account, a team (with tenant schema), and a team profile.
+  Returns a map with :account, :profile, :team, :team_profile, :conn (authenticated),
+  and :prefix (the tenant schema name).
+  """
+  def setup_team(conn) do
+    {:ok, account} = Messngr.Accounts.create_account(%{"display_name" => "Team Tester"})
+    profile = hd(account.profiles)
+    conn = attach_jwt_session(conn, account, profile)
+
+    slug = "test-team-#{System.unique_integer([:positive])}"
+
+    create_conn = Phoenix.ConnTest.post(conn, "/api/teams", %{name: "Test Team", slug: slug})
+    %{"data" => %{"id" => team_id}} = Phoenix.ConnTest.json_response(create_conn, 201)
+
+    team = Teams.Repo.get!(Teams.Schemas.Team, team_id)
+    team_profile = Teams.TeamManagement.get_profile_for_account(team.schema_name, account.id)
+
+    %{
+      account: account,
+      profile: profile,
+      team: team,
+      team_profile: team_profile,
+      conn: conn,
+      prefix: team.schema_name,
+      slug: slug
+    }
   end
 end
