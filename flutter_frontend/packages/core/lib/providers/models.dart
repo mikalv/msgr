@@ -262,14 +262,38 @@ class SlackProfile {
     required this.displayName,
     this.avatarUrl,
     this.email,
+    this.phone,
     this.role,
+    this.accountId,
+    this.insertedAt,
   });
 
   final String id;
   final String displayName;
   final String? avatarUrl;
   final String? email;
+  final String? phone;
   final String? role;
+  final String? accountId;
+  final DateTime? insertedAt;
+
+  factory SlackProfile.fromJson(Map<String, dynamic> json) {
+    DateTime? insertedAt;
+    final raw = json['inserted_at'];
+    if (raw is String) {
+      insertedAt = DateTime.tryParse(raw);
+    }
+    return SlackProfile(
+      id: json['id']?.toString() ?? '',
+      displayName: json['display_name']?.toString() ?? json['name']?.toString() ?? '',
+      avatarUrl: json['avatar_url'] as String?,
+      email: json['email'] as String?,
+      phone: json['phone'] as String?,
+      role: json['role'] as String?,
+      accountId: json['account_id']?.toString(),
+      insertedAt: insertedAt,
+    );
+  }
 
   @override
   bool operator ==(Object other) =>

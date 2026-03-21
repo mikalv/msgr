@@ -106,6 +106,7 @@ defmodule MessngrWeb.Router do
     get "/channels/:channel_id/threads/:message_id", TeamMessageController, :thread
     put "/channels/:channel_id/read_cursor", TeamReadCursorController, :update
     get "/profiles", TeamProfileController, :index
+    get "/profiles/:id", TeamProfileController, :show
     put "/profiles/me", TeamProfileController, :update
     post "/media/presign", TeamMediaController, :presign
     get "/media/:object_key/url", TeamMediaController, :download_url

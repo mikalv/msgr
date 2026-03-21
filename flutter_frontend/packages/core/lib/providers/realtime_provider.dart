@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
@@ -9,6 +10,7 @@ import 'channel_list_provider.dart';
 import 'messages_provider.dart';
 import 'models.dart';
 import 'msgr_client_provider.dart';
+import 'notification_provider.dart';
 import 'team_list_provider.dart';
 import 'thread_provider.dart';
 import 'typing_provider.dart';
@@ -367,6 +369,11 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     if (selectedChannel != null && selectedChannel.id == channelId) {
       _ref.read(channelMessagesProvider.notifier).mergeIncoming(message);
     }
+
+    // Show desktop notification if app is not focused
+    if (Platform.isMacOS) {
+      _showNotificationForMessage(message, channelId, data);
+    }
   }
 
   void _onNewThreadReply(String channelId, Map<String, dynamic> data) {
@@ -412,6 +419,11 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
           _ref.read(channelMessagesProvider.notifier).mergeIncoming(updated);
         }
       }
+    }
+
+    // Show desktop notification for thread replies
+    if (Platform.isMacOS) {
+      _showNotificationForMessage(reply, channelId, data);
     }
   }
 
@@ -460,6 +472,80 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     } else {
       typingNotifier.stopTyping(channelId, profileId);
     }
+  }
+
+  // ── Desktop notifications ─────────────────────────────────────
+
+  void _showNotificationForMessage(
+    SlackMessage message,
+    String channelId,
+    Map<String, dynamic> rawData,
+  ) {
+    final notifService = _ref.read(desktopNotificationServiceProvider);
+
+    // Check if message contains a mention of the current user
+    final auth = _ref.read(simpleAuthProvider);
+    final mentions = rawData['content'] is Map
+        ? (rawData['content']['mentions'] as List?)
+        : null;
+    final isMentioned = mentions != null &&
+        mentions.any((m) =>
+            m is Map<String, dynamic> &&
+            m['profile_id']?.toString() == auth.profileId);
+
+    // Always notify for @mentions, even when focused
+    if (isMentioned) {
+      final channelName = _resolveChannelName(channelId);
+      notifService.showMentionNotification(
+        channelName: channelName,
+        senderName: message.senderName,
+        body: message.content,
+        channelId: channelId,
+      );
+      return;
+    }
+
+    // Don't notify when app is focused
+    if (notifService.isAppFocused) return;
+
+    // Build notification title based on channel type
+    final title = _buildNotificationTitle(channelId, message.senderName);
+
+    notifService.showMessageNotification(
+      title: title,
+      body: '${message.senderName}: ${message.content}',
+      channelId: channelId,
+    );
+  }
+
+  /// Resolve a channel name from the channel list state.
+  String _resolveChannelName(String channelId) {
+    try {
+      final channelsState = _ref.read(channelListProvider);
+      final channel = channelsState.channels
+          .where((c) => c.id == channelId)
+          .firstOrNull;
+      if (channel != null) return channel.name;
+    } catch (_) {}
+    return channelId;
+  }
+
+  /// Build a notification title like "#general" or "DM: Alice".
+  String _buildNotificationTitle(String channelId, String senderName) {
+    try {
+      final channelsState = _ref.read(channelListProvider);
+      final channel = channelsState.channels
+          .where((c) => c.id == channelId)
+          .firstOrNull;
+      if (channel != null) {
+        if (channel.kind == ChannelKind.dm ||
+            channel.kind == ChannelKind.groupDm) {
+          return 'DM: $senderName';
+        }
+        return '#${channel.name}';
+      }
+    } catch (_) {}
+    return '#$channelId';
   }
 
   // ── Reconnection ───────────────────────────────────────────────

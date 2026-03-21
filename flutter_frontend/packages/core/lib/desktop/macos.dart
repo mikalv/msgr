@@ -9,6 +9,7 @@ import 'package:core/config/theme.dart';
 import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/providers/unread_provider.dart';
 import 'package:core/services/app_localizations.dart';
+import 'package:core/services/desktop_notification_service.dart';
 import 'package:core/services/localization/translator.dart';
 import 'package:core/ui/auth/simple_login_screen.dart';
 import 'package:core/ui/shell/app_shell.dart';
@@ -83,6 +84,7 @@ class _MacOSAppState extends State<MacOSApp>
     setState(() {
       hasFocus = true;
     });
+    DesktopNotificationService.isWindowFocused = true;
   }
 
   @override
@@ -90,6 +92,7 @@ class _MacOSAppState extends State<MacOSApp>
     setState(() {
       hasFocus = false;
     });
+    DesktopNotificationService.isWindowFocused = false;
   }
 
   @override

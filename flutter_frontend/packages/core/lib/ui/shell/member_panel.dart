@@ -29,15 +29,7 @@ final teamMembersProvider =
     items = [];
   }
 
-  return items.map((p) {
-    return SlackProfile(
-      id: p['id']?.toString() ?? '',
-      displayName: p['display_name']?.toString() ?? p['name']?.toString() ?? '',
-      avatarUrl: p['avatar_url'] as String?,
-      email: p['email'] as String?,
-      role: p['role'] as String?,
-    );
-  }).toList();
+  return items.map((p) => SlackProfile.fromJson(p)).toList();
 });
 
 /// A 240px wide panel showing team members on the right side of the chat area.

@@ -505,6 +505,16 @@ class MsgrApiClient {
     return [];
   }
 
+  /// GET /api/teams/:slug/profiles/:id
+  Future<Map<String, dynamic>> getProfile(
+    String teamSlug,
+    String profileId,
+  ) async {
+    final raw = await get('/api/teams/$teamSlug/profiles/$profileId');
+    final data = raw.containsKey('data') ? raw['data'] as Map<String, dynamic> : raw;
+    return data;
+  }
+
   /// PUT /api/teams/:slug/profiles/me
   Future<Map<String, dynamic>> updateMyProfile(
     String teamSlug, {

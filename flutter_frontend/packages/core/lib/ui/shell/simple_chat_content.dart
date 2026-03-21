@@ -21,6 +21,7 @@ import 'package:core/providers/thread_provider.dart';
 import 'package:core/providers/typing_provider.dart';
 import 'package:core/features/chat/widgets/chat_composer.dart';
 import 'package:core/ui/shell/member_panel.dart';
+import 'package:core/ui/shell/profile_card.dart';
 import 'package:core/ui/shell/thread_panel.dart';
 
 // ---------------------------------------------------------------------------
@@ -766,6 +767,21 @@ class _MessageRow extends ConsumerStatefulWidget {
 class _MessageRowState extends ConsumerState<_MessageRow> {
   bool _hovered = false;
 
+  void _showSenderProfile(BuildContext context) {
+    final msg = widget.message;
+    final auth = ref.read(simpleAuthProvider);
+    final isOwn = auth.profileId == msg.senderProfileId;
+
+    showProfileCard(
+      context,
+      profile: SlackProfile(
+        id: msg.senderProfileId,
+        displayName: msg.senderName,
+      ),
+      isOwnProfile: isOwn,
+    );
+  }
+
   void _showContextMenu(BuildContext context, Offset globalPosition) async {
     final msg = widget.message;
     final overlay =
@@ -867,18 +883,24 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
               child: widget.isGroupStart
                   ? Padding(
                       padding: const EdgeInsets.only(top: 2),
-                      child: CircleAvatar(
-                        radius: _avatarRadius,
-                        backgroundColor: _colorForName(msg.senderName)
-                            .withOpacity(0.25),
-                        child: Text(
-                          msg.senderName.isNotEmpty
-                              ? msg.senderName[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(
-                            color: _colorForName(msg.senderName),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
+                      child: GestureDetector(
+                        onTap: () => _showSenderProfile(context),
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: CircleAvatar(
+                            radius: _avatarRadius,
+                            backgroundColor: _colorForName(msg.senderName)
+                                .withOpacity(0.25),
+                            child: Text(
+                              msg.senderName.isNotEmpty
+                                  ? msg.senderName[0].toUpperCase()
+                                  : '?',
+                              style: TextStyle(
+                                color: _colorForName(msg.senderName),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -910,12 +932,18 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                       padding: const EdgeInsets.only(bottom: 2),
                       child: Row(
                         children: [
-                          Text(
-                            msg.senderName,
-                            style: TextStyle(
-                              color: _colorForName(msg.senderName),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
+                          GestureDetector(
+                            onTap: () => _showSenderProfile(context),
+                            child: MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              child: Text(
+                                msg.senderName,
+                                style: TextStyle(
+                                  color: _colorForName(msg.senderName),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),

@@ -13,6 +13,19 @@ defmodule MessngrWeb.TeamProfileController do
     json(conn, %{data: Enum.map(profiles, &profile_json/1)})
   end
 
+  @doc "GET /api/teams/:slug/profiles/:id — show a single team profile"
+  def show(conn, %{"id" => profile_id}) do
+    prefix = conn.assigns.tenant_prefix
+
+    case Profile.get_by_id(prefix, profile_id) do
+      nil ->
+        {:error, :not_found}
+
+      profile ->
+        json(conn, %{data: profile_json(profile)})
+    end
+  end
+
   @doc "PUT /api/teams/:slug/profiles/me — update my team profile"
   def update(conn, params) do
     prefix = conn.assigns.tenant_prefix
