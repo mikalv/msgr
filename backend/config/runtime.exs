@@ -190,22 +190,31 @@ config :msgr_web, :prometheus,
 
 media_storage_config = Application.get_env(:msgr, Messngr.Media.Storage, [])
 
-media_signing_secret =
-  case blank_to_nil.(System.get_env("MEDIA_SIGNING_SECRET")) do
-    nil ->
-      case blank_to_nil.(Keyword.get(media_storage_config, :signing_secret)) do
-        nil when env in [:dev, :test] -> "dev-secret"
-        nil ->
-          raise "MEDIA_SIGNING_SECRET environment variable is missing."
+# MinIO / S3 configuration for ExAws
+minio_host = System.get_env("MINIO_HOST", "localhost")
+minio_port = port_env.(System.get_env("MINIO_PORT"), 9000, "MINIO_PORT")
+minio_scheme = System.get_env("MINIO_SCHEME", "http://")
+minio_public_host = System.get_env("MINIO_PUBLIC_HOST", "localhost")
+minio_public_port = port_env.(System.get_env("MINIO_PUBLIC_PORT"), minio_port, "MINIO_PUBLIC_PORT")
+minio_public_scheme = System.get_env("MINIO_PUBLIC_SCHEME", minio_scheme)
 
-        secret -> secret
-      end
+config :ex_aws,
+  access_key_id: System.get_env("MINIO_ROOT_USER", "minioadmin"),
+  secret_access_key: System.get_env("MINIO_ROOT_PASSWORD", "minioadmin"),
+  region: "us-east-1",
+  json_codec: Jason
 
-    secret -> secret
-  end
+config :ex_aws, :s3,
+  scheme: minio_scheme,
+  host: minio_host,
+  port: minio_port,
+  force_path_style: true
 
 config :msgr, Messngr.Media.Storage,
-  Keyword.put(media_storage_config, :signing_secret, media_signing_secret)
+  media_storage_config
+  |> Keyword.put(:bucket, System.get_env("MINIO_BUCKET", Keyword.get(media_storage_config, :bucket, "msgr-media")))
+  |> Keyword.put(:public_endpoint, "#{minio_public_scheme}#{minio_public_host}:#{minio_public_port}")
+  |> Keyword.put(:internal_endpoint, "#{minio_scheme}#{minio_host}:#{minio_port}")
 
 retention_pruner_config = Application.get_env(:msgr, Messngr.Media.RetentionPruner, [])
 

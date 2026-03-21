@@ -71,6 +71,18 @@ defmodule Messngr.Application do
       end
     end)
 
+    # Ensure the media storage bucket exists (idempotent)
+    spawn(fn ->
+      Process.sleep(2_000)
+
+      try do
+        Messngr.Media.Storage.ensure_bucket!(Messngr.Media.Storage.bucket())
+      rescue
+        e ->
+          Logger.warning("Could not ensure media bucket: #{inspect(e)}")
+      end
+    end)
+
     result
   end
 

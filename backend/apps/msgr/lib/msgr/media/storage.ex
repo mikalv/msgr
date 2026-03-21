@@ -1,21 +1,16 @@
 defmodule Messngr.Media.Storage do
   @moduledoc """
-  Configuration backed helper for generating object storage URLs and keys.
+  S3/MinIO storage with real presigned URLs via ExAws.
+
+  Replaces the previous custom HMAC-signed URL scheme with proper
+  AWS Signature V4 presigned URLs that MinIO understands natively.
   """
+
+  require Logger
 
   @spec bucket() :: String.t()
   def bucket do
     config() |> Keyword.get(:bucket, "msgr-media")
-  end
-
-  @spec endpoint() :: String.t()
-  def endpoint do
-    config() |> Keyword.get(:endpoint, "http://localhost:9000")
-  end
-
-  @spec public_endpoint() :: String.t()
-  def public_endpoint do
-    config() |> Keyword.get(:public_endpoint, endpoint())
   end
 
   @spec object_key(binary(), binary() | nil, binary() | nil) :: String.t()
@@ -30,16 +25,6 @@ defmodule Messngr.Media.Storage do
     |> Path.join()
   end
 
-  @spec upload_url(String.t(), String.t()) :: String.t()
-  def upload_url(bucket, object_key) do
-    URI.merge(endpoint(), "#{bucket}/#{object_key}") |> to_string()
-  end
-
-  @spec public_url(String.t(), String.t()) :: String.t()
-  def public_url(bucket, object_key) do
-    URI.merge(public_endpoint(), "#{bucket}/#{object_key}") |> to_string()
-  end
-
   @spec presign_upload(String.t(), String.t(), keyword()) :: %{
           required(:method) => String.t(),
           required(:url) => String.t(),
@@ -48,22 +33,28 @@ defmodule Messngr.Media.Storage do
         }
   def presign_upload(bucket, object_key, opts \\ []) do
     content_type = Keyword.get(opts, :content_type, "application/octet-stream")
-    expires_at = expires_at(:upload)
+    ttl = config() |> Keyword.get(:upload_expiry_seconds, 900)
+
+    {:ok, url} =
+      ExAws.S3.presigned_url(
+        ex_aws_config(),
+        :put,
+        bucket,
+        object_key,
+        expires_in: ttl,
+        query_params: [{"Content-Type", content_type}]
+      )
+
+    url = maybe_replace_host(url)
 
     headers =
       encryption_headers()
       |> Map.put("content-type", content_type)
 
-    url =
-      presigned_url(:put, endpoint(), bucket, object_key, expires_at,
-        content_type: content_type,
-        headers: headers
-      )
-
     %{
       method: "PUT",
       url: url,
-      expires_at: expires_at,
+      expires_at: DateTime.add(DateTime.utc_now(), ttl, :second),
       headers: headers
     }
   end
@@ -73,156 +64,94 @@ defmodule Messngr.Media.Storage do
           required(:url) => String.t(),
           required(:expires_at) => DateTime.t()
         }
-  def presign_download(bucket, object_key, opts \\ []) do
-    content_type = Keyword.get(opts, :content_type)
-    checksum = Keyword.get(opts, :checksum)
-    expires_at = expires_at(:download)
+  def presign_download(bucket, object_key, _opts \\ []) do
+    ttl = config() |> Keyword.get(:download_expiry_seconds, 3600)
 
-    url =
-      presigned_url(:get, public_endpoint(), bucket, object_key, expires_at,
-        content_type: content_type,
-        checksum: checksum
+    {:ok, url} =
+      ExAws.S3.presigned_url(
+        ex_aws_config(),
+        :get,
+        bucket,
+        object_key,
+        expires_in: ttl
       )
+
+    url = maybe_replace_host(url)
 
     %{
       method: "GET",
       url: url,
-      expires_at: expires_at
+      expires_at: DateTime.add(DateTime.utc_now(), ttl, :second)
     }
   end
 
-  @doc """
-  Generates a signed delete request for removing media objects from storage.
-  """
-  @spec presign_delete(String.t(), String.t()) :: %{
-          required(:method) => String.t(),
-          required(:url) => String.t(),
-          required(:expires_at) => DateTime.t(),
-          required(:headers) => map()
-        }
-  def presign_delete(bucket, object_key) do
-    expires_at = expires_at(:delete)
-
-    url =
-      presigned_url(:delete, endpoint(), bucket, object_key, expires_at,
-        headers: %{}
-      )
-
-    %{
-      method: "DELETE",
-      url: url,
-      expires_at: expires_at,
-      headers: %{}
-    }
+  @spec public_url(String.t(), String.t()) :: String.t()
+  def public_url(bucket, object_key) do
+    public_endpoint = config() |> Keyword.get(:public_endpoint, "http://localhost:9000")
+    URI.merge(public_endpoint, "#{bucket}/#{object_key}") |> to_string()
   end
 
-  @doc """
-  Deletes an object from storage using the configured HTTP client.
-  """
   @spec delete_object(String.t(), String.t()) :: :ok | {:error, term()}
   def delete_object(bucket, object_key) do
-    %{url: url, headers: headers} = presign_delete(bucket, object_key)
-
-    request = Finch.build("DELETE", url, headers)
-
-    case http_client().(request) do
-      {:ok, %{status: status}} when status in 200..299 -> :ok
-      {:ok, %{status: 404}} -> :ok
-      {:ok, %{status: status}} -> {:error, {:http_error, status}}
+    case ExAws.S3.delete_object(bucket, object_key) |> ExAws.request() do
+      {:ok, _} -> :ok
+      {:error, {:http_error, 404, _}} -> :ok
       {:error, reason} -> {:error, reason}
     end
   end
+
+  @spec ensure_bucket!(String.t()) :: :ok
+  def ensure_bucket!(bucket_name) do
+    case ExAws.S3.head_bucket(bucket_name) |> ExAws.request() do
+      {:ok, _} ->
+        Logger.info("Media bucket '#{bucket_name}' exists")
+        :ok
+
+      {:error, _} ->
+        Logger.info("Creating media bucket '#{bucket_name}'...")
+        ExAws.S3.put_bucket(bucket_name, "us-east-1") |> ExAws.request!()
+        Logger.info("Media bucket '#{bucket_name}' created")
+        :ok
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private
+  # ---------------------------------------------------------------------------
 
   defp config do
     Application.get_env(:msgr, __MODULE__, [])
   end
 
-  defp http_client do
-    case Keyword.get(config(), :http_client) do
-      fun when is_function(fun, 1) -> fun
-      _ -> &default_http_client/1
+  defp ex_aws_config do
+    ExAws.Config.new(:s3)
+  end
+
+  @doc false
+  # Replace the internal MinIO hostname (e.g. msgr_minio:9000 inside Docker)
+  # with the public-facing endpoint so clients can actually reach the URL.
+  defp maybe_replace_host(url) do
+    internal = config() |> Keyword.get(:internal_endpoint)
+    public = config() |> Keyword.get(:public_endpoint)
+
+    cond do
+      is_nil(internal) or is_nil(public) -> url
+      internal == public -> url
+      true -> String.replace(url, internal, public)
     end
   end
 
-  defp default_http_client(request) do
-    Finch.request(request, Messngr.Finch)
-  end
-
-  defp presigned_url(method, base, bucket, object_key, expires_at, opts) do
-    uri = URI.merge(base, "#{bucket}/#{object_key}")
-    expires = DateTime.to_unix(expires_at)
-    content_type = Keyword.get(opts, :content_type)
-    headers = Keyword.get(opts, :headers, %{})
-    checksum = Keyword.get(opts, :checksum)
-    signature = sign(method, uri.path || "/", expires, content_type, headers, checksum)
-
-    query_params =
-      %{expires: expires, signature: signature}
-      |> maybe_put_content_type(content_type)
-      |> maybe_put_checksum(checksum)
-
-    uri
-    |> Map.put(:query, URI.encode_query(query_params))
-    |> to_string()
-  end
-
-  defp sign(method, path, expires, content_type, headers, checksum) do
-    secret = signing_secret!()
-    canonical_headers = canonical_headers(headers)
-
-    payload =
-      [
-        method |> to_string() |> String.upcase(),
-        path,
-        Integer.to_string(expires),
-        content_type || "",
-        canonical_headers,
-        checksum || ""
-      ]
-      |> Enum.join(":")
-
-    :crypto.mac(:hmac, :sha256, secret, payload)
-    |> Base.url_encode64(padding: false)
-  end
-
-  defp canonical_headers(headers) when map_size(headers) == 0, do: ""
-
-  defp canonical_headers(headers) do
-    headers
-    |> Enum.map(fn {key, value} ->
-      normalized_key =
-        key
-        |> to_string()
-        |> String.downcase()
-        |> String.trim()
-
-      "#{normalized_key}=#{value}"
-    end)
-    |> Enum.sort()
-    |> Enum.join("&")
-  end
-
-  defp maybe_put_content_type(params, nil), do: params
-
-  defp maybe_put_content_type(params, content_type) do
-    Map.put(params, :content_type, content_type)
-  end
-
-  defp maybe_put_checksum(params, nil), do: params
-
-  defp maybe_put_checksum(params, checksum) do
-    Map.put(params, :checksum, checksum)
-  end
-
   defp encryption_headers do
-    config = config()
+    cfg = config()
 
-    case config |> Keyword.get(:server_side_encryption) |> blank_to_nil() do
-      nil -> %{}
+    case cfg |> Keyword.get(:server_side_encryption) |> blank_to_nil() do
+      nil ->
+        %{}
+
       algorithm ->
         headers = %{"x-amz-server-side-encryption" => algorithm}
 
-        case config |> Keyword.get(:sse_kms_key_id) |> blank_to_nil() do
+        case cfg |> Keyword.get(:sse_kms_key_id) |> blank_to_nil() do
           nil -> headers
           kms_key -> Map.put(headers, "x-amz-server-side-encryption-aws-kms-key-id", kms_key)
         end
@@ -232,22 +161,4 @@ defmodule Messngr.Media.Storage do
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value
-
-  defp signing_secret! do
-    case config() |> Keyword.get(:signing_secret) |> blank_to_nil() do
-      nil -> raise ArgumentError, "media signing secret is not configured"
-      secret -> secret
-    end
-  end
-
-  defp expires_at(kind) do
-    seconds =
-      case kind do
-        :upload -> config() |> Keyword.get(:upload_expiry_seconds, 600)
-        :download -> config() |> Keyword.get(:download_expiry_seconds, 1200)
-        :delete -> config() |> Keyword.get(:delete_expiry_seconds, 60)
-      end
-
-    DateTime.add(DateTime.utc_now(), seconds, :second)
-  end
 end

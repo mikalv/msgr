@@ -94,6 +94,8 @@ services:
         condition: service_started
       msgr_redis:
         condition: service_healthy
+      msgr_minio:
+        condition: service_healthy
     environment:
       MIX_ENV: prod
       PHX_SERVER: "true"
@@ -123,6 +125,12 @@ services:
       MSGR_TLS_CACERT_PATH: ${MSGR_TLS_CACERT_PATH:-}
       MSGR_FORCE_SSL: ${MSGR_FORCE_SSL:-false}
       MSGR_FORCE_SSL_HSTS: ${MSGR_FORCE_SSL_HSTS:-false}
+      MINIO_HOST: msgr_minio
+      MINIO_PORT: "9000"
+      MINIO_PUBLIC_HOST: ${MINIO_PUBLIC_HOST:-localhost}
+      MINIO_PUBLIC_PORT: ${MINIO_PUBLIC_PORT:-9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     working_dir: /app
     ports:
       - "127.0.0.1:4001:4000"

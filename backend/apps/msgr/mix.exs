@@ -53,7 +53,11 @@ defmodule Messngr.MixProject do
       {:plug_crypto, "~> 2.0"},
       {:grpc, "~> 0.9.0"},
       {:protobuf, "~> 0.12.0"},
-      {:mox, "~> 0.5", only: :test}
+      {:mox, "~> 0.5", only: :test},
+      {:ex_aws, "~> 2.5"},
+      {:ex_aws_s3, "~> 2.5"},
+      {:sweet_xml, "~> 0.7"},
+      {:hackney, "~> 1.20"}
     ]
   end
 
