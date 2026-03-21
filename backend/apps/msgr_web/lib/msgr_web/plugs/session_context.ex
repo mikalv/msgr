@@ -40,28 +40,9 @@ defmodule MessngrWeb.Plugs.SessionContext do
         |> validate_authentication()
 
       :error ->
-        # Fall back to X-header auth (Rust Gateway)
-        account_id = get_req_header(conn, "x-account-id") |> List.first()
-        profile_id = get_req_header(conn, "x-profile-id") |> List.first()
-        device_id = get_req_header(conn, "x-device-id") |> List.first()
-        session_id = get_req_header(conn, "x-session-id") |> List.first()
-
-        if account_id || profile_id do
-          Logger.debug("Session context from Rust Gateway",
-            account_id: account_id,
-            profile_id: profile_id,
-            session_id: session_id
-          )
-        end
-
-        conn
-        |> assign(:current_account_id, account_id)
-        |> assign(:current_profile_id, profile_id)
-        |> assign(:current_device_id, device_id)
-        |> assign(:session_id, session_id)
-        |> load_current_account()
-        |> load_current_profile()
-        |> load_current_device()
+        # No valid JWT — reject
+        Logger.debug("No valid JWT token in request")
+        respond_unauthorized(conn)
         |> validate_authentication()
     end
   end

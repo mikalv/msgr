@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/providers/msgr_client_provider.dart';
 import 'package:core/providers/models.dart';
 import 'package:core/providers/team_list_provider.dart';
+import 'package:core/ui/shell/profile_card.dart';
 
 /// Provider that fetches team member profiles from GET /api/teams/:slug/profiles.
 final teamMembersProvider =
@@ -133,12 +135,22 @@ class MemberPanel extends ConsumerWidget {
   }
 }
 
-class _MemberTile extends StatelessWidget {
+class _MemberTile extends ConsumerWidget {
   const _MemberTile({required this.profile});
 
   final SlackProfile profile;
 
-  void _showMemberContextMenu(BuildContext context, Offset globalPosition) async {
+  void _showProfile(BuildContext context, WidgetRef ref) {
+    final auth = ref.read(simpleAuthProvider);
+    final isOwn = auth.profileId == profile.id;
+    showProfileCard(
+      context,
+      profile: profile,
+      isOwnProfile: isOwn,
+    );
+  }
+
+  void _showMemberContextMenu(BuildContext context, Offset globalPosition, WidgetRef ref) async {
     final result = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -161,6 +173,9 @@ class _MemberTile extends StatelessWidget {
     if (result == null || !context.mounted) return;
 
     switch (result) {
+      case 'profile':
+        if (context.mounted) _showProfile(context, ref);
+        break;
       case 'copy':
         await Clipboard.setData(ClipboardData(text: profile.displayName));
         if (context.mounted) {
@@ -201,12 +216,13 @@ class _MemberTile extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
+      onTap: () => _showProfile(context, ref),
       onSecondaryTapUp: (details) =>
-          _showMemberContextMenu(context, details.globalPosition),
+          _showMemberContextMenu(context, details.globalPosition, ref),
       onLongPressStart: (details) =>
-          _showMemberContextMenu(context, details.globalPosition),
+          _showMemberContextMenu(context, details.globalPosition, ref),
       child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Row(

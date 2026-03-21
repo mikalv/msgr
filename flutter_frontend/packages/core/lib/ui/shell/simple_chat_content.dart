@@ -1768,7 +1768,7 @@ class _MessageContent extends StatelessWidget {
 /// Regex to detect @mentions in plain text (fallback when no structured data).
 final _mentionRegex = RegExp(r'@[\w.]+');
 
-class _LinkedText extends StatelessWidget {
+class _LinkedText extends ConsumerWidget {
   const _LinkedText({
     required this.content,
     required this.color,
@@ -1780,7 +1780,7 @@ class _LinkedText extends StatelessWidget {
   final List<MentionData> mentions;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final baseStyle = TextStyle(color: color, fontSize: 14, height: 1.4);
 
     // Build a set of highlighted ranges from structured mention data.
@@ -1794,6 +1794,7 @@ class _LinkedText extends StatelessWidget {
             start: m.offset,
             end: m.offset + m.length,
             name: m.displayName,
+            profileId: m.profileId,
           ));
         }
       }
@@ -1818,7 +1819,7 @@ class _LinkedText extends StatelessWidget {
       allRanges.add(_TextRange(start: m.start, end: m.end, kind: _RangeKind.url));
     }
     for (final h in highlightRanges) {
-      allRanges.add(_TextRange(start: h.start, end: h.end, kind: _RangeKind.mention, name: h.name));
+      allRanges.add(_TextRange(start: h.start, end: h.end, kind: _RangeKind.mention, name: h.name, profileId: h.profileId));
     }
     allRanges.sort((a, b) => a.start.compareTo(b.start));
 
@@ -1868,19 +1869,29 @@ class _LinkedText extends StatelessWidget {
         final mentionColor = _colorForName(range.name ?? segment);
         spans.add(WidgetSpan(
           alignment: PlaceholderAlignment.middle,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-            decoration: BoxDecoration(
-              color: mentionColor.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              segment,
-              style: TextStyle(
-                color: mentionColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                height: 1.4,
+          child: GestureDetector(
+            onTap: range.profileId != null
+                ? () => showProfileCardById(context, ref, profileId: range.profileId!)
+                : null,
+            child: MouseRegion(
+              cursor: range.profileId != null
+                  ? SystemMouseCursors.click
+                  : SystemMouseCursors.text,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                decoration: BoxDecoration(
+                  color: mentionColor.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  segment,
+                  style: TextStyle(
+                    color: mentionColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
               ),
             ),
           ),
@@ -1909,11 +1920,13 @@ class _TextRange {
     required this.end,
     required this.kind,
     this.name,
+    this.profileId,
   });
   final int start;
   final int end;
   final _RangeKind kind;
   final String? name;
+  final String? profileId;
 }
 
 class _HighlightRange {
@@ -1921,10 +1934,12 @@ class _HighlightRange {
     required this.start,
     required this.end,
     required this.name,
+    this.profileId,
   });
   final int start;
   final int end;
   final String name;
+  final String? profileId;
 }
 
 // ---------------------------------------------------------------------------

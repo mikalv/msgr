@@ -67,7 +67,7 @@ class SimpleAuthNotifier extends StateNotifier<SimpleAuthState> {
     final displayName = prefs.getString('auth_display_name');
     final accessToken = prefs.getString('auth_access_token');
     final refreshToken = prefs.getString('auth_refresh_token');
-    if (accountId != null && profileId != null) {
+    if (accountId != null && profileId != null && accessToken != null) {
       state = SimpleAuthState(
         accountId: accountId,
         profileId: profileId,
