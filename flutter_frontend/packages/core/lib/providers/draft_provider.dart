@@ -1,48 +1,63 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
-import 'package:libmsgr/libmsgr.dart';
-import 'package:libmsgr/src/database/daos/draft_dao.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'team_list_provider.dart';
 
 // ---------------------------------------------------------------------------
-// ChannelDrafts — draft text per channel, persisted to local SQLite DB
+// ChannelDrafts — draft text per channel, persisted to SharedPreferences
 // ---------------------------------------------------------------------------
 
 class ChannelDraftsNotifier extends StateNotifier<Map<String, String>> {
-  ChannelDraftsNotifier({
-    DraftDao? dao,
-    required String teamSlug,
-  })  : _dao = dao,
-        _teamSlug = teamSlug,
+  ChannelDraftsNotifier({required String teamSlug})
+      : _teamSlug = teamSlug,
         super({}) {
-    if (_dao != null) _loadFromStorage();
+    _loadFromPrefs();
   }
 
-  final DraftDao? _dao;
   final String _teamSlug;
 
-  /// Debounce timers per channel to avoid hammering the DB.
+  /// Debounce timers per channel to avoid hammering SharedPreferences.
   final Map<String, Timer> _debounceTimers = {};
   static const _debounceDuration = Duration(milliseconds: 500);
 
-  /// Load all persisted drafts for this team from the local DB.
-  Future<void> _loadFromStorage() async {
+  String get _prefsKey => 'drafts_$_teamSlug';
+
+  /// Load all persisted drafts for this team from SharedPreferences.
+  Future<void> _loadFromPrefs() async {
     try {
-      final drafts = await _dao!.getAllDrafts(_teamSlug);
-      if (drafts.isNotEmpty && mounted) {
-        state = {...state, ...drafts};
+      final prefs = await SharedPreferences.getInstance();
+      final json = prefs.getString(_prefsKey);
+      if (json != null && mounted) {
+        final map = jsonDecode(json) as Map<String, dynamic>;
+        state = map.map((k, v) => MapEntry(k, v.toString()));
       }
     } catch (_) {
       // Silently ignore — drafts are best-effort.
     }
   }
 
+  /// Persist all drafts to SharedPreferences.
+  Future<void> _saveToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (state.isEmpty) {
+        await prefs.remove(_prefsKey);
+      } else {
+        await prefs.setString(_prefsKey, jsonEncode(state));
+      }
+    } catch (_) {
+      // Best-effort persistence.
+    }
+  }
+
   /// Update the draft for a channel.
   ///
-  /// Immediately updates in-memory state and debounces the DB write
+  /// Immediately updates in-memory state and debounces the prefs write
   /// by 500 ms to avoid excessive I/O while the user is typing.
   void updateDraft(String channelId, String text) {
     if (text.isEmpty) {
@@ -52,7 +67,7 @@ class ChannelDraftsNotifier extends StateNotifier<Map<String, String>> {
     final updated = Map<String, String>.from(state);
     updated[channelId] = text;
     state = updated;
-    _debouncePersist(channelId, text);
+    _debounceSave();
   }
 
   /// Clear the draft for a channel (e.g., after sending a message).
@@ -63,7 +78,7 @@ class ChannelDraftsNotifier extends StateNotifier<Map<String, String>> {
     final updated = Map<String, String>.from(state);
     updated.remove(channelId);
     state = updated;
-    _removeDraft(channelId);
+    _saveToPrefs(); // immediate save on clear
   }
 
   /// Get the draft for a specific channel.
@@ -81,10 +96,16 @@ class ChannelDraftsNotifier extends StateNotifier<Map<String, String>> {
     }
     _debounceTimers.clear();
     state = {};
+    _saveToPrefs();
   }
 
   @override
   void dispose() {
+    // Flush any pending debounced save before disposing.
+    if (_debounceTimers.containsKey('__save__')) {
+      _debounceTimers['__save__']?.cancel();
+      _saveToPrefs();
+    }
     for (final timer in _debounceTimers.values) {
       timer.cancel();
     }
@@ -92,27 +113,17 @@ class ChannelDraftsNotifier extends StateNotifier<Map<String, String>> {
     super.dispose();
   }
 
-  void _debouncePersist(String channelId, String text) {
-    _debounceTimers[channelId]?.cancel();
-    _debounceTimers[channelId] = Timer(_debounceDuration, () {
-      _persistDraft(channelId, text);
-    });
+  void _debounceSave() {
+    _debounceTimers['__save__']?.cancel();
+    _debounceTimers['__save__'] = Timer(_debounceDuration, _saveToPrefs);
   }
 
-  Future<void> _persistDraft(String channelId, String text) async {
-    try {
-      await _dao?.saveDraft(channelId, _teamSlug, text);
-    } catch (_) {
-      // Best-effort persistence. Draft is still in memory.
-    }
-  }
-
-  Future<void> _removeDraft(String channelId) async {
-    try {
-      await _dao?.deleteDraft(channelId, _teamSlug);
-    } catch (_) {
-      // Best-effort.
-    }
+  /// Flush any pending debounced save immediately. Exposed for tests.
+  @visibleForTesting
+  Future<void> flushSave() async {
+    _debounceTimers['__save__']?.cancel();
+    _debounceTimers.remove('__save__');
+    await _saveToPrefs();
   }
 }
 
@@ -121,16 +132,7 @@ final channelDraftsProvider =
   final team = ref.watch(selectedTeamProvider);
   final teamSlug = team?.slug ?? 'default';
 
-  // Try to use libmsgr database for persistent drafts, fall back to in-memory
-  DraftDao? dao;
-  try {
-    final db = LibMsgr().databaseService.instance;
-    dao = DraftDao(db);
-  } catch (_) {
-    // LibMsgr not bootstrapped yet — drafts will be in-memory only
-  }
-
-  return ChannelDraftsNotifier(dao: dao, teamSlug: teamSlug);
+  return ChannelDraftsNotifier(teamSlug: teamSlug);
 });
 
 /// Draft text for a specific channel (null if no draft).
