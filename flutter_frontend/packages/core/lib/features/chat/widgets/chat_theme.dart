@@ -63,18 +63,10 @@ class ChatTheme {
   }
 
   static BoxDecoration composerDecoration(ThemeData theme) {
-    final scheme = theme.colorScheme;
     return BoxDecoration(
-      color: scheme.surface.withOpacity(0.98),
-      borderRadius: BorderRadius.circular(28),
-      border: Border.all(color: scheme.outlineVariant.withOpacity(0.35)),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x1A000000),
-          blurRadius: 32,
-          offset: Offset(0, 22),
-        ),
-      ],
+      color: const Color(0xFF222529),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: const Color(0xFF2E3035)),
     );
   }
 

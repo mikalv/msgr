@@ -31,12 +31,15 @@ class _ComposerTextField extends StatelessWidget {
       maxLines: maxLines,
       enabled: !isSending,
       onSubmitted: onSubmitted,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        color: const Color(0xFFE8E8E8),
+      ),
       decoration: InputDecoration(
         isDense: true,
         border: InputBorder.none,
         hintText: placeholder,
         hintStyle: theme.textTheme.bodyMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+          color: const Color(0x59FFFFFF),
         ),
       ),
     );
@@ -58,19 +61,18 @@ class _ComposerIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final enabled = onTap != null;
     final color = isActive
-        ? theme.colorScheme.primary
+        ? const Color(0xFF4FC3F7)
         : enabled
-            ? theme.colorScheme.onSurfaceVariant
-            : theme.disabledColor;
+            ? const Color(0xFFD1D2D3)
+            : const Color(0xFF666666);
     return Tooltip(
       message: tooltip,
       child: InkResponse(
         onTap: onTap,
-        radius: 24,
-        child: Icon(icon, color: color),
+        radius: 16,
+        child: Icon(icon, color: color, size: 20),
       ),
     );
   }
