@@ -339,13 +339,14 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     final realtimeState = ref.watch(realtimeProvider);
     _syncFallbackPolling(realtimeState.isConnected);
 
-    // Mark channel as read when viewing it
+    // Mark channel as read when viewing it (deferred to avoid modifying provider during build)
     if (selectedChannel != null && messagesState.messages.isNotEmpty) {
+      final chId = selectedChannel.id;
       final lastMsg = messagesState.messages.last;
-      ref.read(unreadCountsProvider.notifier).markRead(
-        selectedChannel.id,
-        lastMessageId: lastMsg.id.startsWith('local-') ? null : lastMsg.id,
-      );
+      final lastId = lastMsg.id.startsWith('local-') ? null : lastMsg.id;
+      Future.microtask(() {
+        ref.read(unreadCountsProvider.notifier).markRead(chId, lastMessageId: lastId);
+      });
     }
 
     final typing = selectedChannel != null
