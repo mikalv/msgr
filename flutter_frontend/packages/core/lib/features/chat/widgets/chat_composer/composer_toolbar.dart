@@ -4,7 +4,6 @@ class _ComposerTextField extends StatelessWidget {
   const _ComposerTextField({
     required this.controller,
     required this.focusNode,
-    required this.onSubmitted,
     required this.isSending,
     required this.placeholder,
     required this.minLines,
@@ -13,7 +12,6 @@ class _ComposerTextField extends StatelessWidget {
 
   final TextEditingController controller;
   final FocusNode focusNode;
-  final ValueChanged<String> onSubmitted;
   final bool isSending;
   final String placeholder;
   final int minLines;
@@ -26,11 +24,10 @@ class _ComposerTextField extends StatelessWidget {
       controller: controller,
       focusNode: focusNode,
       textCapitalization: TextCapitalization.sentences,
-      textInputAction: TextInputAction.send,
+      textInputAction: TextInputAction.newline,
       minLines: minLines,
       maxLines: maxLines,
       enabled: !isSending,
-      onSubmitted: onSubmitted,
       style: theme.textTheme.bodyMedium?.copyWith(
         color: const Color(0xFFE8E8E8),
       ),

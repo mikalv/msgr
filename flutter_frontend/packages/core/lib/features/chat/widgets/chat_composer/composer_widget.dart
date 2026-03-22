@@ -200,10 +200,14 @@ class _ChatComposerState extends State<ChatComposer>
                 onKeyEvent: _onKeyEventForPaste,
                 child: CallbackShortcuts(
                 bindings: <ShortcutActivator, VoidCallback>{
+                  const SingleActivator(LogicalKeyboardKey.enter):
+                      () => _submit(),
                   const SingleActivator(LogicalKeyboardKey.enter, control: true):
                       () => _submit(forceSend: true),
                   const SingleActivator(LogicalKeyboardKey.enter, meta: true):
                       () => _submit(forceSend: true),
+                  const SingleActivator(LogicalKeyboardKey.enter, shift: true):
+                      _insertNewline,
                   const SingleActivator(LogicalKeyboardKey.escape):
                       _handleEscape,
                   const SingleActivator(LogicalKeyboardKey.arrowDown):
@@ -244,7 +248,6 @@ class _ChatComposerState extends State<ChatComposer>
                               child: _ComposerTextField(
                                 controller: _textController,
                                 focusNode: _focusNode,
-                                onSubmitted: (_) => _submit(),
                                 isSending: isBusy,
                                 placeholder: isCompact
                                     ? 'Melding'
@@ -1140,6 +1143,17 @@ class _ChatComposerState extends State<ChatComposer>
       );
     widget.controller.setText(newText);
     _focusNode.requestFocus();
+  }
+
+  void _insertNewline() {
+    final text = _textController.text;
+    final selection = _textController.selection;
+    final pos = selection.isValid ? selection.baseOffset : text.length;
+    final newText = '${text.substring(0, pos)}\n${text.substring(pos)}';
+    _textController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: pos + 1),
+    );
   }
 
   void _submit({bool forceSend = false}) {

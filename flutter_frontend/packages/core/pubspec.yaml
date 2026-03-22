@@ -102,6 +102,7 @@ dependencies:
   flutter_native_image: ^0.0.6+1
   flutter_webrtc: ^1.4.0
   collection: ^1.18.0
+  flutter_highlight: ^0.7.0
 
 dev_dependencies:
   flutter_test:

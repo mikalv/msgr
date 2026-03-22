@@ -4,6 +4,37 @@ part of 'simple_chat_content.dart';
 // Message content: markdown rendering + auto-link fallback
 // ---------------------------------------------------------------------------
 
+/// Monokai-inspired dark theme for code blocks.
+const _codeTheme = {
+  'root': TextStyle(color: Color(0xFFF8F8F2), backgroundColor: Color(0xFF1E1E1E)),
+  'keyword': TextStyle(color: Color(0xFFF92672)),
+  'built_in': TextStyle(color: Color(0xFF66D9EF)),
+  'type': TextStyle(color: Color(0xFF66D9EF)),
+  'literal': TextStyle(color: Color(0xFFAE81FF)),
+  'number': TextStyle(color: Color(0xFFAE81FF)),
+  'string': TextStyle(color: Color(0xFFE6DB74)),
+  'symbol': TextStyle(color: Color(0xFFE6DB74)),
+  'regexp': TextStyle(color: Color(0xFFE6DB74)),
+  'title': TextStyle(color: Color(0xFFA6E22E)),
+  'function': TextStyle(color: Color(0xFFA6E22E)),
+  'section': TextStyle(color: Color(0xFFA6E22E)),
+  'selector-class': TextStyle(color: Color(0xFFA6E22E)),
+  'attribute': TextStyle(color: Color(0xFFA6E22E)),
+  'attr': TextStyle(color: Color(0xFFA6E22E)),
+  'variable': TextStyle(color: Color(0xFFF8F8F2)),
+  'params': TextStyle(color: Color(0xFFF8F8F2)),
+  'comment': TextStyle(color: Color(0xFF75715E)),
+  'doctag': TextStyle(color: Color(0xFF75715E)),
+  'meta': TextStyle(color: Color(0xFF75715E)),
+  'meta-keyword': TextStyle(color: Color(0xFFF92672)),
+  'meta-string': TextStyle(color: Color(0xFFE6DB74)),
+  'addition': TextStyle(color: Color(0xFFA6E22E)),
+  'deletion': TextStyle(color: Color(0xFFF92672)),
+  'subst': TextStyle(color: Color(0xFFF8F8F2)),
+  'tag': TextStyle(color: Color(0xFFF92672)),
+  'name': TextStyle(color: Color(0xFFF92672)),
+};
+
 class _MessageContent extends StatelessWidget {
   const _MessageContent({
     required this.content,
@@ -43,6 +74,9 @@ class _MessageContent extends StatelessWidget {
       return MarkdownBody(
         data: content,
         selectable: true,
+        builders: {
+          'code': _CodeBlockBuilder(),
+        },
         onTapLink: (text, href, title) {
           if (href != null) {
             launchUrl(Uri.parse(href), mode: LaunchMode.externalApplication);
@@ -68,12 +102,8 @@ class _MessageContent extends StatelessWidget {
             fontSize: 13,
             fontFamily: 'monospace',
           ),
-          codeblockDecoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.06),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
-          ),
-          codeblockPadding: const EdgeInsets.all(10),
+          codeblockDecoration: const BoxDecoration(),
+          codeblockPadding: EdgeInsets.zero,
           codeblockAlign: WrapAlignment.start,
           blockquoteDecoration: BoxDecoration(
             border: Border(
@@ -111,6 +141,76 @@ class _MessageContent extends StatelessWidget {
       color: _textColor(),
       mentions: mentions,
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Syntax-highlighted code block builder for flutter_markdown
+// ---------------------------------------------------------------------------
+
+class _CodeBlockBuilder extends MarkdownElementBuilder {
+  @override
+  Widget? visitElementAfter(md.Element element, TextStyle? preferredStyle) {
+    final code = element.textContent.trimRight();
+    final language = _extractLanguage(element);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (language != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(6),
+                  topRight: Radius.circular(6),
+                ),
+              ),
+              child: Text(
+                language,
+                style: const TextStyle(
+                  color: Color(0xFF888888),
+                  fontSize: 11,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: HighlightView(
+              code,
+              language: language ?? 'plaintext',
+              theme: _codeTheme,
+              textStyle: const TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 13,
+                height: 1.5,
+              ),
+              padding: EdgeInsets.zero,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String? _extractLanguage(md.Element element) {
+    // flutter_markdown passes the language in the element's attributes
+    final className = element.attributes['class'];
+    if (className != null && className.startsWith('language-')) {
+      return className.substring('language-'.length);
+    }
+    return null;
   }
 }
 
