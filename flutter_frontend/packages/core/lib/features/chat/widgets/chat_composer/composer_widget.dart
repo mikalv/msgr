@@ -10,6 +10,8 @@ class ChatComposer extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onSubmit,
+    this.onArrowUp,
+    this.onEscape,
     required this.isSending,
     this.errorMessage,
     this.availableCommands = SlashCommand.defaults,
@@ -20,12 +22,14 @@ class ChatComposer extends StatefulWidget {
 
   final ChatComposerController controller;
   final ValueChanged<ChatComposerResult> onSubmit;
+  final VoidCallback? onArrowUp;
+  final VoidCallback? onEscape;
   final bool isSending;
   final String? errorMessage;
   final List<SlashCommand> availableCommands;
   final List<ComposerMention> availableMentions;
   final ChatVoiceRecorder voiceRecorder;
-  final dynamic filePicker;  // TODO: Add proper FilePickerPlatform type when available
+  final dynamic filePicker;
 
   @override
   State<ChatComposer> createState() => _ChatComposerState();
@@ -209,11 +213,23 @@ class _ChatComposerState extends State<ChatComposer>
                   const SingleActivator(LogicalKeyboardKey.enter, shift: true):
                       _insertNewline,
                   const SingleActivator(LogicalKeyboardKey.escape):
-                      _handleEscape,
+                      () {
+                        if (widget.onEscape != null) {
+                          widget.onEscape!();
+                        } else {
+                          _handleEscape();
+                        }
+                      },
+                  const SingleActivator(LogicalKeyboardKey.arrowUp):
+                      () {
+                        if (_textController.text.isEmpty && widget.onArrowUp != null) {
+                          widget.onArrowUp!();
+                        } else {
+                          _selectPreviousCommand();
+                        }
+                      },
                   const SingleActivator(LogicalKeyboardKey.arrowDown):
                       _selectNextCommand,
-                  const SingleActivator(LogicalKeyboardKey.arrowUp):
-                      _selectPreviousCommand,
                 },
                 child: FocusTraversalGroup(
                   policy: WidgetOrderTraversalPolicy(),

@@ -10,12 +10,14 @@ class _MessageList extends StatelessWidget {
     required this.scrollController,
     required this.currentProfileId,
     required this.onOpenThread,
+    this.onEdit,
   });
 
   final List<SlackMessage> messages;
   final ScrollController scrollController;
   final String? currentProfileId;
   final void Function(SlackMessage) onOpenThread;
+  final void Function(SlackMessage)? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +50,7 @@ class _MessageList extends StatelessWidget {
         isGroupStart: isGroupStart,
         isOwn: isOwn,
         onOpenThread: onOpenThread,
+        onEdit: isOwn ? onEdit : null,
       ));
     }
 

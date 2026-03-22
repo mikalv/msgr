@@ -10,12 +10,14 @@ class _MessageRow extends ConsumerStatefulWidget {
     required this.isGroupStart,
     required this.isOwn,
     required this.onOpenThread,
+    this.onEdit,
   });
 
   final SlackMessage message;
   final bool isGroupStart;
   final bool isOwn;
   final void Function(SlackMessage) onOpenThread;
+  final void Function(SlackMessage)? onEdit;
 
   @override
   ConsumerState<_MessageRow> createState() => _MessageRowState();
@@ -88,6 +90,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         break;
       case 'thread':
         widget.onOpenThread(msg);
+        break;
+      case 'edit':
+        widget.onEdit?.call(msg);
         break;
       case 'link':
         final link = 'msgr://channel/${msg.channelId}/message/${msg.id}';
@@ -203,6 +208,17 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                               fontSize: 11,
                             ),
                           ),
+                          if (msg.editedAt != null) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '(redigert)',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.25),
+                                fontSize: 10,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
                           if (msg.status == MessageStatus.sending) ...[
                             const SizedBox(width: 6),
                             const SizedBox(

@@ -87,6 +87,44 @@ defmodule MessngrWeb.TeamMessageController do
     json(conn, %{ok: true})
   end
 
+  @doc "PATCH /api/teams/:slug/channels/:channel_id/messages/:message_id — edit a message"
+  def update(conn, %{"channel_id" => channel_id, "message_id" => message_id} = params) do
+    prefix = conn.assigns.tenant_prefix
+    account = conn.assigns.current_account
+    profile = TeamManagement.get_profile_for_account(prefix, account.id)
+
+    unless profile do
+      {:error, :forbidden}
+    else
+      case Messages.get_message(prefix, message_id) do
+        nil ->
+          {:error, :not_found}
+
+        message ->
+          if message.sender_profile_id != profile.id do
+            {:error, :forbidden}
+          else
+            new_content = params["content"] || %{}
+            case Messages.update_message(prefix, message, %{content: new_content, edited_at: DateTime.utc_now()}) do
+              {:ok, updated} ->
+                updated = Messages.get_message(prefix, updated.id)
+
+                MessngrWeb.Endpoint.broadcast(
+                  "channel:#{channel_id}",
+                  "message:edited",
+                  message_json(updated)
+                )
+
+                json(conn, %{data: message_json(updated)})
+
+              {:error, changeset} ->
+                {:error, changeset}
+            end
+          end
+      end
+    end
+  end
+
   @doc "GET /api/teams/:slug/channels/:channel_id/threads/:message_id — get a thread"
   def thread(conn, %{"message_id" => message_id} = params) do
     prefix = conn.assigns.tenant_prefix

@@ -67,6 +67,15 @@ defmodule Teams.Messages do
   end
 
   @doc """
+  Updates a message's content and/or edited_at timestamp.
+  """
+  def update_message(prefix, %Message{} = message, attrs) do
+    message
+    |> Ecto.Changeset.change(attrs)
+    |> Teams.Repo.update(prefix: prefix)
+  end
+
+  @doc """
   Gets a thread: the parent message plus its replies with cursor pagination.
   """
   def get_thread(prefix, parent_message_id, cursor_opts \\ %{}) do

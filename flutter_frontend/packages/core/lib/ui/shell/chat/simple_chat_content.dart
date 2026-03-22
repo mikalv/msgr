@@ -62,6 +62,8 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
   bool _showThread = false;
   bool _showNewMessagesBanner = false;
   int _previousMessageCount = 0;
+  SlackMessage? _editingMessage;
+  String? _draftBeforeEdit;
   bool _isSending = false;
 
   @override
@@ -426,6 +428,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                                       scrollController: _scrollController,
                                       currentProfileId: auth.profileId,
                                       onOpenThread: _openThread,
+                                      onEdit: _startEdit,
                                     ),
                                     // "New messages" banner
                                     if (_showNewMessagesBanner)
@@ -458,11 +461,35 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                     ),
                   ),
 
+                // Edit mode banner
+                if (_editingMessage != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    color: const Color(0xFF2E3035),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.edit, size: 14, color: Color(0xFF4FC3F7)),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Redigerer melding',
+                          style: TextStyle(color: Color(0xFF4FC3F7), fontSize: 13),
+                        ),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: _cancelEdit,
+                          child: const Icon(Icons.close, size: 16, color: Color(0xFFD1D2D3)),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Rich composer
                 ChatComposer(
                   controller: _composerController,
                   isSending: _isSending,
-                  onSubmit: _onComposerSubmit,
+                  onSubmit: _editingMessage != null ? _onEditSubmit : _onComposerSubmit,
+                  onArrowUp: _onArrowUp,
+                  onEscape: _editingMessage != null ? _cancelEdit : null,
                   availableCommands: slashCommands.when(
                     data: (commands) => commands,
                     loading: () => SlashCommand.defaults,
@@ -493,6 +520,86 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
   void _openThread(SlackMessage message) {
     ref.read(threadMessagesProvider.notifier).openThread(message);
     setState(() => _showThread = true);
+  }
+
+  void _onArrowUp() {
+    // Only trigger when composer is empty
+    if (_composerController.value.text.isNotEmpty) return;
+
+    final auth = ref.read(simpleAuthProvider);
+    final messages = ref.read(channelMessagesProvider).messages;
+
+    // Find last own message
+    SlackMessage? lastOwn;
+    for (var i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].senderProfileId == auth.profileId && !messages[i].isSystem) {
+        lastOwn = messages[i];
+        break;
+      }
+    }
+    if (lastOwn == null) return;
+
+    _startEdit(lastOwn);
+  }
+
+  void _startEdit(SlackMessage message) {
+    setState(() {
+      _draftBeforeEdit = _composerController.value.text;
+      _editingMessage = message;
+    });
+    _composerController.setText(message.content);
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      _editingMessage = null;
+    });
+    _composerController.setText(_draftBeforeEdit ?? '');
+    _draftBeforeEdit = null;
+  }
+
+  void _onEditSubmit(ChatComposerResult result) async {
+    final message = _editingMessage;
+    if (message == null) return;
+
+    final newText = result.text.trim();
+    if (newText.isEmpty || newText == message.content) {
+      _cancelEdit();
+      return;
+    }
+
+    setState(() {
+      _editingMessage = null;
+      _isSending = true;
+    });
+
+    try {
+      final team = ref.read(selectedTeamProvider);
+      if (team == null) return;
+
+      final client = ref.read(msgrApiProvider);
+      await client.editMessage(team.slug, message.channelId, message.id, newText);
+
+      // Optimistic update
+      ref.read(channelMessagesProvider.notifier).updateMessage(
+        message.id,
+        content: newText,
+        editedAt: DateTime.now(),
+      );
+
+      _composerController.clear();
+      _draftBeforeEdit = null;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Kunne ikke redigere melding: $e'), backgroundColor: Colors.red.shade700),
+        );
+      }
+      // Restore edit mode
+      setState(() => _editingMessage = message);
+    } finally {
+      if (mounted) setState(() => _isSending = false);
+    }
   }
 }
 

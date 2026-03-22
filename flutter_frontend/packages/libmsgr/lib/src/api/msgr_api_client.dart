@@ -195,6 +195,18 @@ class MsgrApiClient {
     return _handleResponse(response);
   }
 
+  Future<Map<String, dynamic>> patch(String path,
+      {Map<String, dynamic>? body}) async {
+    final response = await _requestWithRetry(
+      () => _http.patch(
+        _uri(path),
+        headers: _headers(),
+        body: body != null ? jsonEncode(body) : null,
+      ),
+    );
+    return _handleResponse(response);
+  }
+
   Future<Map<String, dynamic>> delete(String path) async {
     final response = await _requestWithRetry(
       () => _http.delete(_uri(path), headers: _headers()),
@@ -470,6 +482,18 @@ class MsgrApiClient {
     return post('/api/teams/$teamSlug/channels/$channelId/messages', body: {
       'content': contentValue,
       if (mediaRefs != null && mediaRefs.isNotEmpty) 'media_refs': mediaRefs,
+    });
+  }
+
+  /// PATCH /api/teams/:slug/channels/:channelId/messages/:messageId
+  Future<Map<String, dynamic>> editMessage(
+    String teamSlug,
+    String channelId,
+    String messageId,
+    String newText,
+  ) async {
+    return patch('/api/teams/$teamSlug/channels/$channelId/messages/$messageId', body: {
+      'content': {'text': newText},
     });
   }
 

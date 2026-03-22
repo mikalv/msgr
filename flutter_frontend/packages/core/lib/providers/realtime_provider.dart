@@ -306,6 +306,8 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
         _onNewThreadReply(channelId, msgData);
       case 'typing:update':
         _onTypingUpdate(channelId, payload);
+      case 'message:edited':
+        _onMessageEdited(channelId, payload);
       case 'reaction:updated':
         _onReactionUpdated(channelId, payload);
       case 'read_cursor:updated':
@@ -378,11 +380,22 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     if (selectedChannel != null && selectedChannel.id == channelId) {
       _ref.read(channelMessagesProvider.notifier).mergeIncoming(message);
     }
+  }
 
-    // Show desktop notification if app is not focused
-    if (Platform.isMacOS) {
-      _showNotificationForMessage(message, channelId, data);
-    }
+  void _onMessageEdited(String channelId, Map<String, dynamic> data) {
+    final selectedChannel = _ref.read(selectedChannelProvider);
+    if (selectedChannel == null || selectedChannel.id != channelId) return;
+
+    final auth = _ref.read(simpleAuthProvider);
+    final messageId = data['id']?.toString() ?? '';
+    final newContent = _extractContent(data['content']);
+    final editedAt = DateTime.tryParse(data['edited_at']?.toString() ?? '');
+
+    _ref.read(channelMessagesProvider.notifier).updateMessage(
+      messageId,
+      content: newContent,
+      editedAt: editedAt,
+    );
   }
 
   void _onNewThreadReply(String channelId, Map<String, dynamic> data) {
