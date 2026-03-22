@@ -44,11 +44,24 @@ class MsgrBot {
   }
 
   /// Authenticate, join team, discover channels, start polling.
+  /// Auto-reconnects on failure with exponential backoff.
   Future<void> start() async {
-    await _authenticate();
-    await _joinTeam();
-    await _discoverChannels();
-    _startPolling();
+    var retryDelay = const Duration(seconds: 3);
+    const maxDelay = Duration(seconds: 60);
+
+    while (true) {
+      try {
+        await _authenticate();
+        await _joinTeam();
+        await _discoverChannels();
+        print('[Bot] Ready — polling for messages');
+        await _pollLoop();
+      } catch (e) {
+        print('[Bot] Error: $e — reconnecting in ${retryDelay.inSeconds}s');
+        await Future.delayed(retryDelay);
+        retryDelay = Duration(seconds: (retryDelay.inSeconds * 2).clamp(3, maxDelay.inSeconds));
+      }
+    }
   }
 
   Future<void> _authenticate() async {
@@ -174,9 +187,22 @@ class MsgrBot {
     print('[Bot] Indexed ${messages.length} existing messages in #${channelNames[channelId]}');
   }
 
-  void _startPolling() {
-    print('[Bot] Polling every ${pollInterval.inSeconds}s...');
-    Timer.periodic(pollInterval, (_) => _poll());
+  /// Runs the poll loop forever. Throws on persistent HTTP errors to trigger reconnect.
+  Future<void> _pollLoop() async {
+    var consecutiveErrors = 0;
+    while (true) {
+      try {
+        await _poll();
+        consecutiveErrors = 0;
+      } catch (e) {
+        consecutiveErrors++;
+        print('[Bot] Poll error ($consecutiveErrors): $e');
+        if (consecutiveErrors >= 5) {
+          throw MsgrBotException('Too many consecutive poll errors: $e');
+        }
+      }
+      await Future.delayed(pollInterval);
+    }
   }
 
   Future<void> _poll() async {
