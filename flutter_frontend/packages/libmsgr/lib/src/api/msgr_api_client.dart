@@ -499,6 +499,26 @@ class MsgrApiClient {
     });
   }
 
+  /// GET /api/teams/:slug/search?q=query
+  Future<List<Map<String, dynamic>>> searchMessages(
+    String teamSlug,
+    String query, {
+    String? channelId,
+    int limit = 20,
+  }) async {
+    final params = <String, String>{
+      'q': query,
+      'limit': limit.toString(),
+      if (channelId != null) 'channel_id': channelId,
+    };
+    final raw = await get('/api/teams/$teamSlug/search', query: params);
+    final data = raw['data'];
+    if (data is List) {
+      return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
   /// PATCH /api/teams/:slug/channels/:channelId/messages/:messageId
   Future<Map<String, dynamic>> editMessage(
     String teamSlug,

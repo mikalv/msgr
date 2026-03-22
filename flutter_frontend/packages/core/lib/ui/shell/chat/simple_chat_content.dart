@@ -385,6 +385,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                   channelName: selectedChannel.name,
                   topic: selectedChannel.topic,
                   isPrivate: selectedChannel.visibility == ChannelVisibility.private,
+                  onSearchTap: () => _showSearchDialog(context, selectedChannel),
                   onMembersTap: () => setState(() => _showMembers = !_showMembers),
                 ),
 
@@ -526,6 +527,16 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
             ),
         ],
       ),
+    );
+  }
+
+  void _showSearchDialog(BuildContext context, SlackChannel channel) {
+    final team = ref.read(selectedTeamProvider);
+    if (team == null) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => _SearchDialog(teamSlug: team.slug, channelId: channel.id),
     );
   }
 
@@ -708,6 +719,137 @@ class _NoChannelSelected extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Search dialog
+// ---------------------------------------------------------------------------
+
+class _SearchDialog extends ConsumerStatefulWidget {
+  const _SearchDialog({required this.teamSlug, required this.channelId});
+  final String teamSlug;
+  final String channelId;
+
+  @override
+  ConsumerState<_SearchDialog> createState() => _SearchDialogState();
+}
+
+class _SearchDialogState extends ConsumerState<_SearchDialog> {
+  final _controller = TextEditingController();
+  List<Map<String, dynamic>> _results = [];
+  bool _loading = false;
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onQueryChanged(String query) {
+    _debounce?.cancel();
+    if (query.trim().length < 2) {
+      setState(() => _results = []);
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 300), () => _search(query));
+  }
+
+  Future<void> _search(String query) async {
+    setState(() => _loading = true);
+    try {
+      final client = ref.read(msgrApiProvider);
+      final results = await client.searchMessages(
+        widget.teamSlug,
+        query,
+        channelId: widget.channelId,
+      );
+      if (mounted) setState(() { _results = results; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: const Color(0xFF222529),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: SizedBox(
+        width: 500,
+        height: 450,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _controller,
+                autofocus: true,
+                onChanged: _onQueryChanged,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Søk i meldinger...',
+                  hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+                  prefixIcon: const Icon(Icons.search, color: Color(0xFFD1D2D3)),
+                  filled: true,
+                  fillColor: const Color(0xFF1A1D21),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(),
+              )
+            else
+              Expanded(
+                child: _results.isEmpty
+                    ? Center(
+                        child: Text(
+                          _controller.text.length < 2
+                              ? 'Skriv minst 2 tegn'
+                              : 'Ingen resultater',
+                          style: TextStyle(color: Colors.white.withOpacity(0.4)),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: _results.length,
+                        itemBuilder: (context, index) {
+                          final r = _results[index];
+                          return ListTile(
+                            title: Text(
+                              r['sender_name'] ?? 'Ukjent',
+                              style: const TextStyle(
+                                color: Color(0xFF4FC3F7),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                            subtitle: Text(
+                              r['content'] ?? '',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Color(0xFFD1D2D3), fontSize: 13),
+                            ),
+                            trailing: Text(
+                              r['inserted_at']?.toString().substring(0, 10) ?? '',
+                              style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11),
+                            ),
+                            onTap: () => Navigator.of(context).pop(),
+                          );
+                        },
+                      ),
+              ),
+          ],
+        ),
       ),
     );
   }

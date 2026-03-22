@@ -308,6 +308,9 @@ config :guardian, Guardian.DB,
 # OTP codes are NEVER exposed in API responses.
 # They are delivered exclusively via email (SMTP) or SMS (BulkSMS).
 
+# Prism search engine
+config :teams, :prism_url, System.get_env("PRISM_URL", "http://localhost:3080")
+
 # Bot authentication secret (for headless bot clients)
 config :msgr_web, :bot_auth_secret, blank_to_nil.(System.get_env("BOT_AUTH_SECRET"))
 

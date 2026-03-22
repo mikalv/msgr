@@ -64,6 +64,9 @@ defmodule MessngrWeb.TeamMessageController do
             )
           end
 
+          # Index in Prism search (best-effort, async)
+          if slug, do: Teams.Search.index_message(slug, message)
+
           conn
           |> put_status(:created)
           |> json(%{data: message_json(message)})

@@ -253,21 +253,22 @@ services:
       - "49152-49999:49152-49999/udp"
     restart: unless-stopped
 
-  # -------------------------------------------------------------------------
-  # Prism (API mock server) — uncomment to enable
-  # See: https://stoplight.io/open-source/prism
-  # Usage: docker compose up prism
-  # -------------------------------------------------------------------------
-  # prism:
-  #   image: stoplight/prism:4
-  #   container_name: msgr_prism
-  #   command: mock -h 0.0.0.0 /api/openapi.yml
-  #   volumes:
-  #     - ./docs/openapi.yml:/api/openapi.yml:ro
-  #   ports:
-  #     - "4010:4010"
-  #   restart: unless-stopped
-
+  prism:
+    image: pkg42/prismsearch:latest
+    container_name: msgr_prism
+    environment:
+      PRISM_HOST: 0.0.0.0
+      PRISM_PORT: 3080
+    volumes:
+      - prism_data:/var/lib/prismsearch
+    ports:
+      - "127.0.0.1:3080:3080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 volumes:
   postgres_data:
   redis_data:
@@ -280,3 +281,4 @@ volumes:
   prometheus_data:
   grafana_data:
   openobserve_data:
+  prism_data:
