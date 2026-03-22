@@ -19,18 +19,21 @@ defmodule Teams.Search do
   def index_message(team_slug, message) do
     Task.start(fn ->
       doc = %{
-        message_id: message.id,
-        channel_id: message.channel_id,
-        team_slug: team_slug,
-        sender_profile_id: message.sender_profile_id,
-        sender_name: get_in(message, [:sender_profile, :display_name]) || "",
-        content: extract_text(message.content),
-        inserted_at: to_string(message.inserted_at)
+        id: message.id,
+        fields: %{
+          message_id: message.id,
+          channel_id: message.channel_id,
+          team_slug: team_slug,
+          sender_profile_id: message.sender_profile_id,
+          sender_name: get_in(message, [:sender_profile, :display_name]) || "",
+          content: extract_text(message.content),
+          inserted_at: to_string(message.inserted_at)
+        }
       }
 
       url = "#{prism_url()}/collections/#{@collection}/documents"
 
-      case :hackney.request(:post, url, [{"Content-Type", "application/json"}], Jason.encode!([doc]), [:with_body]) do
+      case :hackney.request(:post, url, [{"Content-Type", "application/json"}], Jason.encode!(%{documents: [doc]}), [:with_body]) do
         {:ok, status, _, _} when status in 200..299 ->
           Logger.debug("Indexed message #{message.id} in Prism")
 
@@ -69,26 +72,26 @@ defmodule Teams.Search do
     url = "#{prism_url()}/collections/#{@collection}/search"
 
     case :hackney.request(:post, url, [{"Content-Type", "application/json"}], Jason.encode!(search_body), [:with_body]) do
-      {:ok, 200, _, body} ->
+      {:ok, status, _, body} when status in 200..299 ->
         case Jason.decode(body) do
-          {:ok, %{"hits" => hits}} ->
-            results =
-              Enum.map(hits, fn hit ->
-                source = hit["_source"] || %{}
+          {:ok, %{"results" => results}} ->
+            hits =
+              Enum.map(results, fn hit ->
+                fields = hit["fields"] || hit["_source"] || %{}
                 %{
-                  message_id: source["message_id"],
-                  channel_id: source["channel_id"],
-                  sender_name: source["sender_name"],
-                  content: source["content"],
-                  inserted_at: source["inserted_at"],
+                  message_id: fields["message_id"],
+                  channel_id: fields["channel_id"],
+                  sender_name: fields["sender_name"],
+                  content: fields["content"],
+                  inserted_at: fields["inserted_at"],
                   highlight: get_in(hit, ["highlight", "content"]) || [],
-                  score: hit["_score"]
+                  score: hit["score"] || hit["_score"]
                 }
               end)
 
-            {:ok, results}
+            {:ok, hits}
 
-          {:ok, other} ->
+          {:ok, _other} ->
             {:ok, []}
 
           {:error, reason} ->
