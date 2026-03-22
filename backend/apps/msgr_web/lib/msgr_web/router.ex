@@ -106,6 +106,7 @@ defmodule MessngrWeb.Router do
     get "/channels/:channel_id/messages", TeamMessageController, :index
     post "/channels/:channel_id/messages", TeamMessageController, :create
     patch "/channels/:channel_id/messages/:message_id", TeamMessageController, :update
+    delete "/channels/:channel_id/messages/:message_id", TeamMessageController, :delete
     post "/channels/:channel_id/messages/:message_id/reactions", TeamReactionController, :toggle
     post "/channels/:channel_id/typing", TeamMessageController, :typing
     get "/channels/:channel_id/threads/:message_id", TeamMessageController, :thread

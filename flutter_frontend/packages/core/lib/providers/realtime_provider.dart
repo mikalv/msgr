@@ -321,6 +321,8 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
         _onTypingUpdate(channelId, payload, event);
       case 'message:edited':
         _onMessageEdited(channelId, payload);
+      case 'message:deleted':
+        _onMessageDeleted(channelId, payload);
       case 'reaction:updated':
         _onReactionUpdated(channelId, payload);
       case 'read_cursor:updated':
@@ -414,6 +416,14 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
       content: newContent,
       editedAt: editedAt,
     );
+  }
+
+  void _onMessageDeleted(String channelId, Map<String, dynamic> data) {
+    final selectedChannel = _ref.read(selectedChannelProvider);
+    if (selectedChannel == null || selectedChannel.id != channelId) return;
+
+    final messageId = data['id']?.toString() ?? '';
+    _ref.read(channelMessagesProvider.notifier).removeMessage(messageId);
   }
 
   void _onNewThreadReply(String channelId, Map<String, dynamic> data) {

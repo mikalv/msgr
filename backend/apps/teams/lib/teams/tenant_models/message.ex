@@ -16,6 +16,7 @@ defmodule Teams.TenantModels.Message do
     field :content, :map, default: %{}
     field :media_refs, {:array, :string}, default: []
     field :edited_at, :utc_datetime
+    field :deleted_at, :utc_datetime
 
     has_many :thread_replies, __MODULE__, foreign_key: :thread_parent_id
     has_many :reactions, Teams.TenantModels.Reaction, foreign_key: :message_id
@@ -26,7 +27,7 @@ defmodule Teams.TenantModels.Message do
   @doc false
   def changeset(message, attrs) do
     message
-    |> cast(attrs, [:channel_id, :sender_profile_id, :thread_parent_id, :content, :media_refs, :edited_at])
+    |> cast(attrs, [:channel_id, :sender_profile_id, :thread_parent_id, :content, :media_refs, :edited_at, :deleted_at])
     |> validate_required([:channel_id, :content])
     |> foreign_key_constraint(:channel_id)
     |> foreign_key_constraint(:sender_profile_id)
@@ -40,7 +41,7 @@ defmodule Teams.TenantModels.Message do
 
     base =
       from(m in __MODULE__,
-        where: m.channel_id == ^channel_id and is_nil(m.thread_parent_id),
+        where: m.channel_id == ^channel_id and is_nil(m.thread_parent_id) and is_nil(m.deleted_at),
         order_by: [desc: m.inserted_at],
         limit: ^limit,
         preload: [:sender_profile]
@@ -82,7 +83,9 @@ defmodule Teams.TenantModels.Message do
     |> Teams.Repo.update(prefix: prefix)
   end
 
-  def delete(prefix, %__MODULE__{} = message) do
-    Teams.Repo.delete(message, prefix: prefix)
+  def soft_delete(prefix, %__MODULE__{} = message) do
+    message
+    |> changeset(%{deleted_at: DateTime.truncate(DateTime.utc_now(), :second)})
+    |> Teams.Repo.update(prefix: prefix)
   end
 end

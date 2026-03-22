@@ -11,6 +11,7 @@ class _MessageList extends StatelessWidget {
     required this.currentProfileId,
     required this.onOpenThread,
     this.onEdit,
+    this.onDelete,
   });
 
   final List<SlackMessage> messages;
@@ -18,6 +19,7 @@ class _MessageList extends StatelessWidget {
   final String? currentProfileId;
   final void Function(SlackMessage) onOpenThread;
   final void Function(SlackMessage)? onEdit;
+  final void Function(SlackMessage)? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +53,7 @@ class _MessageList extends StatelessWidget {
         isOwn: isOwn,
         onOpenThread: onOpenThread,
         onEdit: isOwn ? onEdit : null,
+        onDelete: isOwn ? onDelete : null,
       ));
     }
 

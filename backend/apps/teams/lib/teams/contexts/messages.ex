@@ -76,6 +76,13 @@ defmodule Teams.Messages do
   end
 
   @doc """
+  Soft-deletes a message by setting deleted_at.
+  """
+  def delete_message(prefix, %Message{} = message) do
+    Message.soft_delete(prefix, message)
+  end
+
+  @doc """
   Gets a thread: the parent message plus its replies with cursor pagination.
   """
   def get_thread(prefix, parent_message_id, cursor_opts \\ %{}) do

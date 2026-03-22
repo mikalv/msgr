@@ -325,6 +325,11 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
     state = state.copyWith(messages: [...state.messages, message]);
   }
 
+  void removeMessage(String messageId) {
+    final updated = state.messages.where((m) => m.id != messageId).toList();
+    state = state.copyWith(messages: updated);
+  }
+
   void updateMessage(String messageId, {String? content, DateTime? editedAt}) {
     final idx = state.messages.indexWhere((m) => m.id == messageId);
     if (idx < 0) return;

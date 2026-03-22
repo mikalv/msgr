@@ -497,6 +497,15 @@ class MsgrApiClient {
     });
   }
 
+  /// DELETE /api/teams/:slug/channels/:channelId/messages/:messageId
+  Future<Map<String, dynamic>> deleteMessage(
+    String teamSlug,
+    String channelId,
+    String messageId,
+  ) async {
+    return delete('/api/teams/$teamSlug/channels/$channelId/messages/$messageId');
+  }
+
   /// GET /api/teams/:slug/channels/:channelId/threads/:messageId
   Future<Map<String, dynamic>> getThread(
     String teamSlug,

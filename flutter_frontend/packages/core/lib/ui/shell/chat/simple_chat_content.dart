@@ -435,6 +435,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                                       currentProfileId: auth.profileId,
                                       onOpenThread: _openThread,
                                       onEdit: _startEdit,
+                                      onDelete: _deleteMessage,
                                     ),
                                     // "New messages" banner
                                     if (_showNewMessagesBanner)
@@ -521,6 +522,27 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
         ],
       ),
     );
+  }
+
+  void _deleteMessage(SlackMessage message) async {
+    final team = ref.read(selectedTeamProvider);
+    if (team == null) return;
+
+    // Optimistic remove
+    ref.read(channelMessagesProvider.notifier).removeMessage(message.id);
+
+    try {
+      final client = ref.read(msgrApiProvider);
+      await client.deleteMessage(team.slug, message.channelId, message.id);
+    } catch (e) {
+      // Re-add on failure
+      ref.read(channelMessagesProvider.notifier).mergeIncoming(message);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Kunne ikke slette: $e'), backgroundColor: Colors.red.shade700),
+        );
+      }
+    }
   }
 
   void _openThread(SlackMessage message) {

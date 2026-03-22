@@ -11,6 +11,7 @@ class _MessageRow extends ConsumerStatefulWidget {
     required this.isOwn,
     required this.onOpenThread,
     this.onEdit,
+    this.onDelete,
   });
 
   final SlackMessage message;
@@ -18,6 +19,7 @@ class _MessageRow extends ConsumerStatefulWidget {
   final bool isOwn;
   final void Function(SlackMessage) onOpenThread;
   final void Function(SlackMessage)? onEdit;
+  final void Function(SlackMessage)? onDelete;
 
   @override
   ConsumerState<_MessageRow> createState() => _MessageRowState();
@@ -93,6 +95,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         break;
       case 'edit':
         widget.onEdit?.call(msg);
+        break;
+      case 'delete':
+        widget.onDelete?.call(msg);
         break;
       case 'link':
         final link = 'msgr://channel/${msg.channelId}/message/${msg.id}';
