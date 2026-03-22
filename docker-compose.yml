@@ -33,9 +33,9 @@ services:
       retries: 5
     restart: unless-stopped
 
-  msgr_minio:
+  msgr-minio:
     image: minio/minio
-    container_name: msgr_minio
+    container_name: msgr-minio
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
@@ -51,6 +51,23 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+  minio_init:
+    image: minio/mc
+    container_name: msgr-minio-init
+    depends_on:
+      msgr-minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://msgr-minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+      mc mb --ignore-existing local/msgr-media;
+      echo 'Bucket msgr-media ready';
+      "
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    restart: "no"
 
   rust_gateway:
     build:
@@ -85,6 +102,8 @@ services:
       dockerfile: Dockerfile
       target: prod
     container_name: msgr_backend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     env_file:
       - .env
     depends_on:
@@ -94,8 +113,10 @@ services:
         condition: service_started
       msgr_redis:
         condition: service_healthy
-      msgr_minio:
+      msgr-minio:
         condition: service_healthy
+      minio_init:
+        condition: service_completed_successfully
     environment:
       MIX_ENV: prod
       PHX_SERVER: "true"
@@ -125,7 +146,7 @@ services:
       MSGR_TLS_CACERT_PATH: ${MSGR_TLS_CACERT_PATH:-}
       MSGR_FORCE_SSL: ${MSGR_FORCE_SSL:-false}
       MSGR_FORCE_SSL_HSTS: ${MSGR_FORCE_SSL_HSTS:-false}
-      MINIO_HOST: msgr_minio
+      MINIO_HOST: msgr-minio
       MINIO_PORT: "9000"
       MINIO_PUBLIC_HOST: ${MINIO_PUBLIC_HOST:-localhost}
       MINIO_PUBLIC_PORT: ${MINIO_PUBLIC_PORT:-9000}

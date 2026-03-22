@@ -87,7 +87,7 @@ defmodule Messngr.Media.Storage do
 
   @spec delete_object(String.t(), String.t()) :: :ok | {:error, term()}
   def delete_object(bucket, object_key) do
-    case ExAws.S3.delete_object(bucket, object_key) |> ExAws.request() do
+    case ExAws.S3.delete_object(bucket, object_key) |> ExAws.request(internal_overrides()) do
       {:ok, _} -> :ok
       {:error, {:http_error, 404, _}} -> :ok
       {:error, reason} -> {:error, reason}
@@ -96,14 +96,17 @@ defmodule Messngr.Media.Storage do
 
   @spec ensure_bucket!(String.t()) :: :ok
   def ensure_bucket!(bucket_name) do
-    case ExAws.S3.head_bucket(bucket_name) |> ExAws.request() do
+    overrides = internal_overrides()
+    Logger.info("Checking media bucket '#{bucket_name}' via #{inspect(overrides)}")
+
+    case ExAws.S3.head_bucket(bucket_name) |> ExAws.request(overrides) do
       {:ok, _} ->
         Logger.info("Media bucket '#{bucket_name}' exists")
         :ok
 
       {:error, _} ->
         Logger.info("Creating media bucket '#{bucket_name}'...")
-        ExAws.S3.put_bucket(bucket_name, "us-east-1") |> ExAws.request!()
+        ExAws.S3.put_bucket(bucket_name, "us-east-1") |> ExAws.request!(overrides)
         Logger.info("Media bucket '#{bucket_name}' created")
         :ok
     end
@@ -117,9 +120,19 @@ defmodule Messngr.Media.Storage do
     Application.get_env(:msgr, __MODULE__, [])
   end
 
-  # Config for internal operations (bucket creation, delete, etc.)
-  defp ex_aws_config do
-    ExAws.Config.new(:s3)
+  # Config overrides for internal operations (bucket creation, delete, etc.)
+  # Uses the internal endpoint (e.g. http://msgr_minio:9000) so we talk
+  # directly to MinIO, not via the public TLS proxy.
+  defp internal_overrides do
+    internal = config() |> Keyword.get(:internal_endpoint, "http://localhost:9000")
+    uri = URI.parse(internal)
+
+    %{
+      scheme: "#{uri.scheme}://",
+      host: uri.host,
+      port: uri.port || 9000,
+      force_path_style: true
+    }
   end
 
   # Config for presigned URLs — uses PUBLIC host so signatures match

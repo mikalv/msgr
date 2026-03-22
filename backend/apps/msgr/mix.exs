@@ -23,7 +23,7 @@ defmodule Messngr.MixProject do
   def application do
     [
       mod: {Messngr.Application, []},
-      extra_applications: [:logger, :runtime_tools, :hammer]
+      extra_applications: [:logger, :runtime_tools, :hammer, :ssl]
     ]
   end
 
