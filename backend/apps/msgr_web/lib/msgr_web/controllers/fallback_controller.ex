@@ -32,6 +32,24 @@ defmodule MessngrWeb.FallbackController do
     |> json(%{error: "noise_handshake", reason: reason_to_string(reason)})
   end
 
+  def call(conn, {:error, {:email_delivery_failed, _reason}}) do
+    conn
+    |> put_status(:service_unavailable)
+    |> json(%{error: "email_delivery_failed"})
+  end
+
+  def call(conn, {:error, {:bulksms_error, _status, _body}}) do
+    conn
+    |> put_status(:service_unavailable)
+    |> json(%{error: "sms_delivery_failed"})
+  end
+
+  def call(conn, {:error, {:http_error, _reason}}) do
+    conn
+    |> put_status(:service_unavailable)
+    |> json(%{error: "delivery_failed"})
+  end
+
   def call(conn, {:error, reason}) when is_atom(reason) do
     conn
     |> put_status(:bad_request)

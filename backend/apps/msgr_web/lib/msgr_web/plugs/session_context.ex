@@ -41,9 +41,7 @@ defmodule MessngrWeb.Plugs.SessionContext do
 
       :error ->
         # No valid JWT — reject
-        Logger.debug("No valid JWT token in request")
         respond_unauthorized(conn)
-        |> validate_authentication()
     end
   end
 

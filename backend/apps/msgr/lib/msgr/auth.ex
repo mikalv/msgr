@@ -145,6 +145,46 @@ defmodule Messngr.Auth do
     end
   end
 
+  @doc """
+  Authenticates a bot by email using a pre-shared secret.
+  Finds or creates the account and issues JWT tokens without OTP.
+  """
+  def authenticate_bot(email) do
+    display_name =
+      email
+      |> String.split("@")
+      |> List.first()
+      |> String.replace(~r/[._-]/, " ")
+      |> String.split()
+      |> Enum.map(&String.capitalize/1)
+      |> Enum.join(" ")
+
+    Repo.transaction(fn ->
+      with {:ok, identity} <- Accounts.ensure_identity(%{
+             kind: :email,
+             value: email,
+             display_name: display_name,
+             email: email,
+             phone_number: nil
+           }),
+           account <- Repo.preload(identity.account, :profiles) do
+        default_profile = List.first(List.wrap(account.profiles))
+        default_profile_id = default_profile && default_profile.id
+
+        {access_token, refresh_token} = issue_jwt_tokens(account, default_profile_id)
+
+        %{
+          account: account,
+          identity: identity,
+          access_token: access_token,
+          refresh_token: refresh_token
+        }
+      else
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+  end
+
   defp build_team_memberships_map(account_id) do
     import Ecto.Query
 
@@ -300,17 +340,13 @@ defmodule Messngr.Auth do
   end
 
   defp deliver_challenge(challenge, code) do
-    if Application.get_env(:msgr_web, :expose_otp_codes, false) do
-      # Dev mode: skip actual delivery, OTP code is returned in API response
-      Logger.info("Dev mode: OTP code #{code} for #{challenge.target} (not delivered)")
-      :ok
-    else
-      case Notifier.deliver_challenge(challenge, code) do
-        :ok -> :ok
-        {:error, reason} ->
-          Repo.delete(challenge)
-          {:error, reason}
-      end
+    Logger.info("Delivering OTP to #{challenge.channel}:#{challenge.target}")
+
+    case Notifier.deliver_challenge(challenge, code) do
+      :ok -> :ok
+      {:error, reason} ->
+        Repo.delete(challenge)
+        {:error, reason}
     end
   end
 

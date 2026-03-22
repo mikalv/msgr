@@ -305,11 +305,50 @@ config :guardian, Guardian.DB,
   schema_name: guardian_schema,
   sweep_interval: :timer.minutes(guardian_interval_minutes)
 
-# Dev server: expose OTP codes in API response and use local mailer
-expose_otp = bool_env.(System.get_env("EXPOSE_OTP_CODES"), false)
-config :msgr_web, :expose_otp_codes, expose_otp
+# OTP codes are NEVER exposed in API responses.
+# They are delivered exclusively via email (SMTP) or SMS (BulkSMS).
+
+# Bot authentication secret (for headless bot clients)
+config :msgr_web, :bot_auth_secret, blank_to_nil.(System.get_env("BOT_AUTH_SECRET"))
 
 if bool_env.(System.get_env("SWOOSH_LOCAL_ADAPTER"), false) do
   config :msgr, Messngr.Mailer, adapter: Swoosh.Adapters.Local
   config :swoosh, :api_client, false
+else
+  smtp_host = blank_to_nil.(System.get_env("SMTP_HOST"))
+
+  if smtp_host do
+    smtp_port = port_env.(System.get_env("SMTP_PORT"), 587, "SMTP_PORT")
+    smtp_username = System.get_env("SMTP_USERNAME", "")
+    smtp_password = System.get_env("SMTP_PASSWORD", "")
+
+    config :msgr, Messngr.Mailer,
+      adapter: Swoosh.Adapters.SMTP,
+      relay: smtp_host,
+      port: smtp_port,
+      username: smtp_username,
+      password: smtp_password,
+      tls: :always,
+      ssl: false,
+      auth: :always,
+      no_mx_lookups: true,
+      tls_options: [verify: :verify_none]
+  end
+end
+
+# BulkSMS configuration for phone OTP delivery
+bulksms_username = blank_to_nil.(System.get_env("BULKSMS_USERNAME"))
+
+if bulksms_username do
+  config :msgr, Messngr.Auth.Notifier,
+    sms_adapter: Messngr.Auth.Notifier.BulkSmsAdapter,
+    email_sender: {"Msgr", System.get_env("SMTP_FROM", "noreply@msgr.no")}
+
+  config :msgr, Messngr.Auth.Notifier.BulkSmsAdapter,
+    username: bulksms_username,
+    password: System.get_env("BULKSMS_PASSWORD", ""),
+    sender_id: System.get_env("BULKSMS_SENDER_ID", "Msgr")
+else
+  config :msgr, Messngr.Auth.Notifier,
+    email_sender: {"Msgr", System.get_env("SMTP_FROM", "noreply@msgr.no")}
 end

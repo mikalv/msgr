@@ -31,6 +31,7 @@ defmodule MessngrWeb.Router do
     post "/v1/auth/verify", AuthController, :verify
     post "/v1/auth/oidc", AuthController, :oidc
     post "/v1/auth/refresh", AuthController, :refresh
+    post "/v1/auth/bot-token", AuthController, :bot_token
     # Noise handshake is now handled by Rust Gateway
     resources "/users", AccountController, only: [:index, :create, :update]
   end

@@ -47,7 +47,7 @@ defmodule Messngr.Auth.Notifier do
 
   defp email_sender do
     Application.get_env(:msgr, __MODULE__, [])
-    |> Keyword.get(:email_sender, {"Messngr", "login@messngr.local"})
+    |> Keyword.get(:email_sender, {"Msgr", "noreply@msgr.no"})
   end
 
   defp adapter do

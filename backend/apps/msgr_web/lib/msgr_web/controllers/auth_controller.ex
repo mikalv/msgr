@@ -7,12 +7,11 @@ defmodule MessngrWeb.AuthController do
 
   def challenge(conn, params) do
     case Messngr.start_auth_challenge(params) do
-      {:ok, %Challenge{} = challenge, code} ->
+      {:ok, %Challenge{} = challenge, _code} ->
         conn
         |> put_status(:created)
         |> render(:challenge,
           challenge: challenge,
-          code: maybe_expose_code(code),
           target_hint: target_hint(challenge)
         )
 
@@ -30,6 +29,28 @@ defmodule MessngrWeb.AuthController do
       nil -> {:error, :bad_request}
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  def bot_token(conn, %{"email" => email, "bot_secret" => secret}) do
+    configured_secret = Application.get_env(:msgr_web, :bot_auth_secret)
+
+    cond do
+      configured_secret == nil || configured_secret == "" ->
+        conn |> put_status(:not_found) |> json(%{error: "not_found"})
+
+      secret != configured_secret ->
+        conn |> put_status(:unauthorized) |> json(%{error: "invalid_secret"})
+
+      true ->
+        case Messngr.Auth.authenticate_bot(email) do
+          {:ok, result} -> render(conn, :session, result: result)
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  end
+
+  def bot_token(conn, _params) do
+    conn |> put_status(:bad_request) |> json(%{error: "email and bot_secret required"})
   end
 
   def oidc(conn, params) do
@@ -55,14 +76,6 @@ defmodule MessngrWeb.AuthController do
     conn
     |> put_status(:bad_request)
     |> json(%{error: "refresh_token is required"})
-  end
-
-  defp maybe_expose_code(code) do
-    if Application.get_env(:msgr_web, :expose_otp_codes, false) do
-      code
-    else
-      nil
-    end
   end
 
   defp target_hint(%Challenge{channel: :email, target: target}) do

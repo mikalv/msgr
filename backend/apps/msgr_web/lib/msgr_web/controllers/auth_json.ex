@@ -1,19 +1,13 @@
 defmodule MessngrWeb.AuthJSON do
   alias Messngr.Auth.Challenge
 
-  def challenge(%{challenge: %Challenge{} = challenge, code: code, target_hint: hint}) do
-    base = %{
+  def challenge(%{challenge: %Challenge{} = challenge, target_hint: hint}) do
+    %{
       id: challenge.id,
       channel: challenge.channel,
       expires_at: challenge.expires_at,
       target_hint: hint
     }
-
-    if is_binary(code) do
-      Map.put(base, :debug_code, code)
-    else
-      base
-    end
   end
 
   def session(%{result: %{account: account, identity: identity} = result}) do
@@ -70,7 +64,8 @@ defmodule MessngrWeb.AuthJSON do
       id: profile.id,
       name: profile.name,
       mode: profile.mode,
-      slug: profile.slug
+      slug: profile.slug,
+      avatar_url: profile.avatar_url
     }
   end
 
