@@ -229,7 +229,9 @@ class MsgrBot {
             timestamp: DateTime.tryParse(m['inserted_at']?.toString() ?? '') ?? DateTime.now(),
           );
 
+          await _setTyping(channelId, true);
           final reply = await onMessage(botMessage);
+          await _setTyping(channelId, false);
           if (reply != null && reply.isNotEmpty) {
             await sendMessage(channelId, reply);
           }
@@ -238,6 +240,18 @@ class MsgrBot {
         print('[Bot] Poll error: $e');
         print('[Bot] Stack: $stack');
       }
+    }
+  }
+
+  Future<void> _setTyping(String channelId, bool typing) async {
+    try {
+      await _client.post(
+        Uri.parse('$msgrBaseUrl/api/teams/$teamSlug/channels/$channelId/typing'),
+        headers: _headers,
+        body: jsonEncode({'typing': typing}),
+      );
+    } catch (_) {
+      // Best effort — don't fail message flow for typing indicator
     }
   }
 

@@ -59,6 +59,34 @@ defmodule MessngrWeb.TeamMessageController do
     end
   end
 
+  @doc "POST /api/teams/:slug/channels/:channel_id/typing — broadcast typing indicator"
+  def typing(conn, %{"channel_id" => channel_id} = params) do
+    prefix = conn.assigns.tenant_prefix
+    account = conn.assigns.current_account
+    profile = Teams.TeamManagement.get_profile_for_account(prefix, account.id)
+
+    unless profile do
+      conn |> put_status(:forbidden) |> json(%{error: "not_a_member"}) |> halt()
+    end
+
+    typing = Map.get(params, "typing", true)
+    event = if typing, do: "typing_started", else: "typing_stopped"
+
+    payload = %{
+      profile_id: profile.id,
+      profile_name: profile.display_name,
+      thread_id: nil
+    }
+
+    MessngrWeb.Endpoint.broadcast(
+      "conversation:#{channel_id}",
+      event,
+      payload
+    )
+
+    json(conn, %{ok: true})
+  end
+
   @doc "GET /api/teams/:slug/channels/:channel_id/threads/:message_id — get a thread"
   def thread(conn, %{"message_id" => message_id} = params) do
     prefix = conn.assigns.tenant_prefix
