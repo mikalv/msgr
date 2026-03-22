@@ -7,6 +7,16 @@ defmodule Teams.Release do
     for repo <- repos() do
       {:ok, _, _} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.run(&1, :up, all: true))
     end
+
+    # Run tenant migrations for all existing tenants
+    migrate_tenants()
+  end
+
+  def migrate_tenants do
+    load_app()
+    {:ok, _, _} = Ecto.Migrator.with_repo(Teams.Repo, fn _repo ->
+      Teams.Tenancy.migrate_all_tenants()
+    end)
   end
 
   def rollback(repo, version) do

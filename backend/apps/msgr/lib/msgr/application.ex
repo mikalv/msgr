@@ -58,10 +58,22 @@ defmodule Messngr.Application do
 
     Logger.info("✅ Supervisor started successfully!")
 
+    # Run pending tenant migrations on startup (idempotent)
+    spawn(fn ->
+      Process.sleep(1_000)
+
+      try do
+        Teams.Tenancy.migrate_all_tenants()
+        Logger.info("✅ Tenant migrations complete")
+      rescue
+        e ->
+          Logger.warning("Could not run tenant migrations: #{inspect(e)}")
+      end
+    end)
+
     # Seed built-in app commands (idempotent)
     spawn(fn ->
-      # Small delay to let Repo start
-      Process.sleep(1_000)
+      Process.sleep(2_000)
 
       try do
         Messngr.Apps.BuiltinCommands.seed!()
@@ -73,7 +85,7 @@ defmodule Messngr.Application do
 
     # Ensure the media storage bucket exists (idempotent)
     spawn(fn ->
-      Process.sleep(2_000)
+      Process.sleep(3_000)
 
       try do
         Messngr.Media.Storage.ensure_bucket!(Messngr.Media.Storage.bucket())
