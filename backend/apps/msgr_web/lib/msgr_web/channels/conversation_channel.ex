@@ -19,23 +19,38 @@ defmodule MessngrWeb.ConversationChannel do
   alias MessngrWeb.{ConversationJSON, MessageJSON}
 
   @impl true
-  def join("channel:" <> conversation_id, _params, %{assigns: %{current_profile: profile}} = socket) do
-    with :ok <- authorize_membership(conversation_id, profile) do
-      :ok = Chat.subscribe_to_conversation(conversation_id)
+  def join("channel:" <> channel_id, params, %{assigns: assigns} = socket) do
+    team_slug = Map.get(params, "team_slug") || assigns[:team_slug]
+    profile = assigns[:current_profile]
 
-      socket =
-        socket
-        |> assign(:conversation_id, conversation_id)
-        |> assign(:typing_timers, %{})
-        |> assign(:watcher_timer, nil)
-        |> assign(:last_activity_at, System.monotonic_time(:millisecond))
+    # Try Teams membership first (tenant channels), fall back to Messngr conversations
+    authorized =
+      if team_slug do
+        case Teams.TeamManagement.get_team_by_slug(team_slug) do
+          nil -> {:error, %{reason: "team_not_found"}}
+          team ->
+            account_id = assigns[:uid] || (profile && profile.account_id)
+            if account_id && Teams.TeamManagement.member?(team.id, account_id) do
+              :ok
+            else
+              {:error, %{reason: "forbidden"}}
+            end
+        end
+      else
+        authorize_membership(channel_id, profile)
+      end
 
-      send(self(), :after_join)
+    case authorized do
+      :ok ->
+        socket =
+          socket
+          |> assign(:conversation_id, channel_id)
+          |> assign(:typing_timers, %{})
+          |> assign(:watcher_timer, nil)
+          |> assign(:last_activity_at, System.monotonic_time(:millisecond))
 
-      socket = reschedule_watcher(socket)
+        {:ok, socket}
 
-      {:ok, socket}
-    else
       {:error, reason} -> {:error, reason}
     end
   end

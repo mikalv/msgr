@@ -673,7 +673,8 @@ final realtimeProvider =
     }
   }, fireImmediately: true);
 
-  // Auto-join team topic when selected team changes.
+  // Auto-join team topic when selected team changes (not fireImmediately —
+  // connect() handles initial join).
   ref.listen<SlackTeam?>(selectedTeamProvider, (prev, next) {
     if (next != null && next.slug != prev?.slug) {
       final client = ref.read(msgrClientProvider);
@@ -681,7 +682,7 @@ final realtimeProvider =
         notifier.joinTeam(next.slug);
       }
     }
-  }, fireImmediately: true);
+  });
 
   // Auto-join channel topic when selected channel changes.
   ref.listen<SlackChannel?>(selectedChannelProvider, (prev, next) {
@@ -691,7 +692,7 @@ final realtimeProvider =
         notifier.joinChannel(next.id);
       }
     }
-  }, fireImmediately: true);
+  });
 
   ref.onDispose(() => notifier.disconnect());
   return notifier;
