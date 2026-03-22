@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'package:core/ui/theme/msgr_theme.dart';
+import 'package:core/ui/widgets/profile_avatar.dart';
+
 import 'shell_models.dart';
-import 'shell_theme.dart';
 
 /// A single DM contact row in Slack-style flat list.
 ///
@@ -21,40 +23,32 @@ class DmListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = MsgrTheme.of(context);
     final hasUnread = contact.unreadCount > 0;
     final textColor =
-        hasUnread ? ShellTheme.sidebarTextBright : ShellTheme.sidebarText;
+        hasUnread ? t.sidebarTextBright : t.sidebarText;
     final fontWeight = hasUnread ? FontWeight.w600 : FontWeight.w400;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
-      hoverColor: ShellTheme.sidebarHoverItem,
+      hoverColor: t.sidebarItemHover,
       child: Container(
         height: 28,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          color: isSelected ? ShellTheme.sidebarActiveItem : null,
+          color: isSelected ? t.sidebarItemActive : null,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
           children: [
-            // Inline presence dot
-            Container(
-              width: 9,
-              height: 9,
-              decoration: BoxDecoration(
-                color: contact.isOnline
-                    ? ShellTheme.onlineDot
-                    : Colors.transparent,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: contact.isOnline
-                      ? ShellTheme.onlineDot
-                      : ShellTheme.sidebarText.withAlpha(128),
-                  width: 1.5,
-                ),
-              ),
+            // Mini profile avatar with presence indicator
+            ProfileAvatar(
+              profileId: contact.id,
+              displayName: contact.name,
+              size: MsgrDimensions.sidebarAvatarSize,
+              showOnlineIndicator: true,
+              isOnline: contact.isOnline,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -74,13 +68,13 @@ class DmListItem extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
-                  color: ShellTheme.unreadBadge,
+                  color: t.unreadBadge,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   '${contact.unreadCount}',
-                  style: const TextStyle(
-                    color: ShellTheme.sidebarTextBright,
+                  style: TextStyle(
+                    color: t.sidebarTextBright,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),

@@ -20,17 +20,18 @@ import 'package:core/providers/team_list_provider.dart';
 import 'package:core/providers/thread_provider.dart';
 import 'package:core/providers/typing_provider.dart';
 import 'package:core/features/chat/widgets/chat_composer.dart';
+import 'package:core/ui/shell/channel_header.dart';
 import 'package:core/ui/shell/member_panel.dart';
 import 'package:core/ui/shell/profile_card.dart';
 import 'package:core/ui/shell/thread_panel.dart';
+import 'package:core/ui/widgets/profile_avatar.dart';
+import 'package:core/ui/theme/msgr_theme.dart';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 const _groupingThreshold = Duration(minutes: 5);
-const _avatarRadius = 18.0; // 36px diameter
-const _avatarSlotWidth = 36.0 + 10.0; // avatar + gap
 
 /// Deterministic color palette for sender names.
 const _nameColors = <Color>[
@@ -167,10 +168,18 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
   }
 
   /// Start or stop fallback polling based on WebSocket connection state.
+  /// Only polls when WebSocket is disconnected AND user is authenticated.
   void _syncFallbackPolling(bool isRealtimeConnected) {
     if (!isRealtimeConnected) {
-      _fallbackPollTimer ??=
-          Timer.periodic(const Duration(seconds: 5), (_) => _refreshMessages());
+      final auth = ref.read(simpleAuthProvider);
+      if (auth.accessToken != null && auth.accessToken!.isNotEmpty) {
+        _fallbackPollTimer ??=
+            Timer.periodic(const Duration(seconds: 15), (_) => _refreshMessages());
+      } else {
+        // Not authenticated — don't poll
+        _fallbackPollTimer?.cancel();
+        _fallbackPollTimer = null;
+      }
     } else {
       _fallbackPollTimer?.cancel();
       _fallbackPollTimer = null;
@@ -436,55 +445,11 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                   ),
 
                 // Channel header
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A2A2A),
-                    border: Border(
-                      bottom:
-                          BorderSide(color: Colors.white.withOpacity(0.1)),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        '# ${selectedChannel.name}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (selectedChannel.topic != null) ...[
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            selectedChannel.topic!,
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.5),
-                              fontSize: 13,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                      const Spacer(),
-                      IconButton(
-                        icon: Icon(
-                          _showMembers ? Icons.people : Icons.people_outline,
-                          color: _showMembers
-                              ? const Color(0xFF02ac88)
-                              : Colors.white54,
-                          size: 20,
-                        ),
-                        tooltip: 'Medlemmer',
-                        onPressed: () {
-                          setState(() => _showMembers = !_showMembers);
-                        },
-                      ),
-                    ],
-                  ),
+                ChannelHeader(
+                  channelName: selectedChannel.name,
+                  topic: selectedChannel.topic,
+                  isPrivate: selectedChannel.visibility == ChannelVisibility.private,
+                  onMembersTap: () => setState(() => _showMembers = !_showMembers),
                 ),
 
                 // Messages list
@@ -875,7 +840,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
           children: [
             // Avatar or empty slot
             SizedBox(
-              width: _avatarSlotWidth,
+              width: MsgrDimensions.messageAvatarSlot,
               child: widget.isGroupStart
                   ? Padding(
                       padding: const EdgeInsets.only(top: 2),
@@ -883,20 +848,12 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                         onTap: () => _showSenderProfile(context),
                         child: MouseRegion(
                           cursor: SystemMouseCursors.click,
-                          child: CircleAvatar(
-                            radius: _avatarRadius,
-                            backgroundColor: _colorForName(msg.senderName)
-                                .withOpacity(0.25),
-                            child: Text(
-                              msg.senderName.isNotEmpty
-                                  ? msg.senderName[0].toUpperCase()
-                                  : '?',
-                              style: TextStyle(
-                                color: _colorForName(msg.senderName),
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                          child: ProfileAvatar(
+                            profileId: msg.senderProfileId,
+                            displayName: msg.senderName,
+                            avatarUrl: msg.senderAvatarUrl,
+                            email: msg.senderEmail,
+                            size: MsgrDimensions.messageAvatarSize,
                           ),
                         ),
                       ),

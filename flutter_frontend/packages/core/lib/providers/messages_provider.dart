@@ -396,6 +396,8 @@ SlackMessage parseMessageJson(
     reactions: reactions,
     mentions: _extractMentions(m['content']),
     isSystem: isSystem,
+    senderAvatarUrl: sender['avatar_url'] as String?,
+    senderEmail: sender['email'] as String?,
   );
 }
 

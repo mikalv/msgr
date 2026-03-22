@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'package:core/ui/theme/msgr_theme.dart';
+import 'package:core/ui/widgets/profile_avatar.dart';
+
 import 'channel_list_item.dart';
 import 'dm_list_item.dart';
 import 'shell_models.dart';
-import 'shell_theme.dart';
 
 /// Slack-style channel sidebar (240 px wide) with flat list layout.
 ///
@@ -25,6 +27,7 @@ class ChannelSidebar extends StatelessWidget {
     this.onOpenSettings,
     this.userEmail,
     this.userDisplayName,
+    this.userProfileId,
   });
 
   final String teamName;
@@ -40,6 +43,7 @@ class ChannelSidebar extends StatelessWidget {
   final VoidCallback? onOpenSettings;
   final String? userEmail;
   final String? userDisplayName;
+  final String? userProfileId;
 
   List<MockChannel> get _sortedChannels {
     final sorted = List<MockChannel>.from(channels);
@@ -67,10 +71,11 @@ class ChannelSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = MsgrTheme.of(context);
     return Material(
-      color: ShellTheme.sidebarBg,
+      color: t.sidebarBg,
       child: SizedBox(
-        width: ShellTheme.sidebarWidth,
+        width: MsgrDimensions.sidebarWidth,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -82,8 +87,8 @@ class ChannelSidebar extends StatelessWidget {
                   Expanded(
                     child: Text(
                       teamName,
-                      style: const TextStyle(
-                        color: ShellTheme.sidebarTextBright,
+                      style: TextStyle(
+                        color: t.sidebarTextBright,
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
@@ -91,14 +96,14 @@ class ChannelSidebar extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.tune, color: ShellTheme.sidebarText, size: 18),
+                    icon: Icon(Icons.tune, color: t.sidebarText, size: 18),
                     onPressed: onOpenSettings,
                     tooltip: 'Settings',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.edit_square, color: ShellTheme.sidebarText, size: 18),
+                    icon: Icon(Icons.edit_square, color: t.sidebarText, size: 18),
                     onPressed: () {},
                     tooltip: 'Ny melding',
                     padding: EdgeInsets.zero,
@@ -175,13 +180,13 @@ class ChannelSidebar extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      width: 9,
-                      height: 9,
-                      decoration: const BoxDecoration(
-                        color: ShellTheme.onlineDot,
-                        shape: BoxShape.circle,
-                      ),
+                    ProfileAvatar(
+                      profileId: userProfileId ?? '',
+                      displayName: userDisplayName ?? '',
+                      email: userEmail,
+                      size: MsgrDimensions.sidebarProfileAvatarSize,
+                      showOnlineIndicator: true,
+                      isOnline: true,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -193,8 +198,8 @@ class ChannelSidebar extends StatelessWidget {
                           children: [
                             Text(
                               userDisplayName ?? userEmail ?? '',
-                              style: const TextStyle(
-                                color: ShellTheme.sidebarTextBright,
+                              style: TextStyle(
+                                color: t.sidebarTextBright,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -204,7 +209,7 @@ class ChannelSidebar extends StatelessWidget {
                               Text(
                                 userEmail!,
                                 style: TextStyle(
-                                  color: ShellTheme.sidebarText.withAlpha(150),
+                                  color: t.sidebarText.withAlpha(150),
                                   fontSize: 10,
                                 ),
                                 overflow: TextOverflow.ellipsis,
@@ -215,7 +220,7 @@ class ChannelSidebar extends StatelessWidget {
                     ),
                     if (onLogout != null)
                       IconButton(
-                        icon: const Icon(Icons.logout, color: ShellTheme.sidebarText, size: 16),
+                        icon: Icon(Icons.logout, color: t.sidebarText, size: 16),
                         tooltip: 'Logg ut',
                         onPressed: onLogout,
                         padding: EdgeInsets.zero,
@@ -250,16 +255,17 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = MsgrTheme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         children: [
-          Icon(icon, color: ShellTheme.sidebarText, size: 16),
+          Icon(icon, color: t.sidebarText, size: 16),
           const SizedBox(width: 6),
           Text(
             title,
-            style: const TextStyle(
-              color: ShellTheme.sidebarText,
+            style: TextStyle(
+              color: t.sidebarText,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -282,10 +288,11 @@ class _AddButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = MsgrTheme.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
-      hoverColor: ShellTheme.sidebarHoverItem,
+      hoverColor: t.sidebarItemHover,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
         child: Row(
@@ -295,18 +302,18 @@ class _AddButton extends StatelessWidget {
               height: 18,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: ShellTheme.sidebarText.withAlpha(128),
+                  color: t.sidebarText.withAlpha(128),
                   width: 1,
                 ),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: const Icon(Icons.add, size: 12, color: ShellTheme.sidebarText),
+              child: Icon(Icons.add, size: 12, color: t.sidebarText),
             ),
             const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                color: ShellTheme.sidebarText.withAlpha(180),
+                color: t.sidebarText.withAlpha(180),
                 fontSize: 13,
               ),
             ),

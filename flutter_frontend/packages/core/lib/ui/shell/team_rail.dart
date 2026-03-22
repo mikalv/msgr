@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:core/ui/theme/msgr_theme.dart';
+
 import 'shell_models.dart';
-import 'shell_theme.dart';
 
 /// Vertical team icon rail (56 px wide).
 ///
@@ -24,9 +25,10 @@ class TeamRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = MsgrTheme.of(context);
     return Container(
-      width: ShellTheme.teamRailWidth,
-      color: ShellTheme.teamRailBg,
+      width: MsgrDimensions.teamRailWidth,
+      color: t.teamRailBg,
       child: Column(
         children: [
           const SizedBox(height: 12),
@@ -39,9 +41,9 @@ class TeamRail extends StatelessWidget {
               onTap: () => onTeamSelected(index),
             );
           }),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Divider(color: ShellTheme.sidebarText, thickness: 0.5),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Divider(color: t.sidebarText, thickness: 0.5),
           ),
           _AddTeamButton(onTap: () => onAddTeam?.call()),
           const Spacer(),
@@ -64,13 +66,14 @@ class _TeamIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = MsgrTheme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: SizedBox(
-          width: ShellTheme.teamRailWidth,
+          width: MsgrDimensions.teamRailWidth,
           height: 48,
           child: Row(
             children: [
@@ -80,7 +83,7 @@ class _TeamIcon extends StatelessWidget {
                 width: 3,
                 height: isSelected ? 28 : 0,
                 decoration: BoxDecoration(
-                  color: ShellTheme.accentColor,
+                  color: t.accent,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -91,7 +94,7 @@ class _TeamIcon extends StatelessWidget {
                   CircleAvatar(
                     radius: 18,
                     backgroundColor:
-                        isSelected ? ShellTheme.sidebarActiveItem : ShellTheme.sidebarHoverItem,
+                        isSelected ? t.sidebarItemActive : t.sidebarItemHover,
                     child: Text(
                       team.iconEmoji,
                       style: const TextStyle(fontSize: 18),
@@ -104,8 +107,8 @@ class _TeamIcon extends StatelessWidget {
                       child: Container(
                         width: 10,
                         height: 10,
-                        decoration: const BoxDecoration(
-                          color: ShellTheme.unreadBadge,
+                        decoration: BoxDecoration(
+                          color: t.unreadBadge,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -128,17 +131,18 @@ class _AddTeamButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = MsgrTheme.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
-      child: const SizedBox(
-        width: ShellTheme.teamRailWidth,
+      child: SizedBox(
+        width: MsgrDimensions.teamRailWidth,
         height: 48,
         child: Center(
           child: CircleAvatar(
             radius: 18,
-            backgroundColor: ShellTheme.sidebarHoverItem,
-            child: Icon(Icons.add, color: ShellTheme.sidebarText, size: 20),
+            backgroundColor: t.sidebarItemHover,
+            child: Icon(Icons.add, color: t.sidebarText, size: 20),
           ),
         ),
       ),

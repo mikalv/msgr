@@ -14,10 +14,11 @@ import 'package:core/providers/unread_provider.dart';
 
 import 'package:core/ui/settings/settings_page.dart';
 
+import 'package:core/ui/theme/msgr_theme.dart';
+
 import 'channel_sidebar.dart';
 import 'quick_switcher.dart';
 import 'shell_models.dart';
-import 'shell_theme.dart';
 import 'team_rail.dart';
 
 /// Main responsive app shell wrapping the chat content area.
@@ -139,7 +140,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       );
     }
 
-    return CallbackShortcuts(
+    return MsgrTheme(
+      colors: MsgrColorTokens.dark,
+      child: CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
         // Cmd+K / Ctrl+K: Quick switcher
         SingleActivator(LogicalKeyboardKey.keyK, meta: _useMeta, control: !_useMeta):
@@ -188,6 +191,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           },
         ),
       ),
+    ),
     );
   }
 
@@ -277,7 +281,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           ),
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            width: _sidebarCollapsed ? 0 : ShellTheme.sidebarWidth,
+            width: _sidebarCollapsed ? 0 : MsgrDimensions.sidebarWidth,
             curve: Curves.easeInOut,
             clipBehavior: Clip.hardEdge,
             decoration: const BoxDecoration(),
@@ -285,7 +289,13 @@ class _AppShellState extends ConsumerState<AppShell> {
                 ? const SizedBox.shrink()
                 : _buildSidebar(),
           ),
-          Expanded(child: widget.child),
+          Container(width: 1, color: MsgrTheme.of(context).contentBorder),
+          Expanded(
+            child: Container(
+              color: MsgrTheme.of(context).contentBg,
+              child: widget.child,
+            ),
+          ),
         ],
       ),
     );
@@ -298,7 +308,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       drawer: Drawer(
-        width: ShellTheme.teamRailWidth + ShellTheme.sidebarWidth,
+        width: MsgrDimensions.teamRailWidth + MsgrDimensions.sidebarWidth,
         child: Row(
           children: [
             TeamRail(
@@ -351,8 +361,8 @@ class _AppShellState extends ConsumerState<AppShell> {
           teamName,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
-        backgroundColor: ShellTheme.sidebarBg,
-        foregroundColor: ShellTheme.sidebarTextBright,
+        backgroundColor: MsgrTheme.of(context).sidebarBg,
+        foregroundColor: MsgrTheme.of(context).sidebarTextBright,
         elevation: 0,
         actions: [
           IconButton(
@@ -386,6 +396,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       onOpenSettings: () => openSettingsPage(context),
       userDisplayName: ref.watch(simpleAuthProvider).displayName,
       userEmail: ref.watch(simpleAuthProvider).email,
+      userProfileId: ref.watch(simpleAuthProvider).profileId,
       onEditProfile: () {
         final team = ref.read(selectedTeamProvider);
         if (team != null) _showProfileSetupDialog(team.slug);

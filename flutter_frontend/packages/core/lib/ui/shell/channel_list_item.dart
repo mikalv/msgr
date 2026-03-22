@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:core/ui/theme/msgr_theme.dart';
+
 import 'shell_models.dart';
-import 'shell_theme.dart';
 
 /// A single channel row in Slack-style flat list.
 ///
@@ -85,9 +86,10 @@ class ChannelListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = MsgrTheme.of(context);
     final hasUnread = channel.unreadCount > 0;
     final textColor =
-        hasUnread ? ShellTheme.sidebarTextBright : ShellTheme.sidebarText;
+        hasUnread ? t.sidebarTextBright : t.sidebarText;
     final fontWeight = hasUnread ? FontWeight.w600 : FontWeight.w400;
     final isPrivate = channel.kind == ChannelKind.private;
 
@@ -99,12 +101,12 @@ class ChannelListItem extends StatelessWidget {
       child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
-      hoverColor: ShellTheme.sidebarHoverItem,
+      hoverColor: t.sidebarItemHover,
       child: Container(
         height: 28,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          color: isSelected ? ShellTheme.sidebarActiveItem : null,
+          color: isSelected ? t.sidebarItemActive : null,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
@@ -113,7 +115,7 @@ class ChannelListItem extends StatelessWidget {
             Text(
               isPrivate ? '\u{1F512}' : '#',
               style: TextStyle(
-                color: ShellTheme.sidebarText,
+                color: t.sidebarText,
                 fontSize: isPrivate ? 12 : 14,
                 fontWeight: FontWeight.w400,
               ),
@@ -136,13 +138,13 @@ class ChannelListItem extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
-                  color: ShellTheme.unreadBadge,
+                  color: t.unreadBadge,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   '${channel.unreadCount}',
-                  style: const TextStyle(
-                    color: ShellTheme.sidebarTextBright,
+                  style: TextStyle(
+                    color: t.sidebarTextBright,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),

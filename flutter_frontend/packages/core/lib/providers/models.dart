@@ -133,6 +133,8 @@ class SlackMessage {
     this.reactions = const [],
     this.mentions = const [],
     this.isSystem = false,
+    this.senderAvatarUrl,
+    this.senderEmail,
   });
 
   final String id;
@@ -149,6 +151,8 @@ class SlackMessage {
   final List<MessageReaction> reactions;
   final List<MentionData> mentions;
   final bool isSystem;
+  final String? senderAvatarUrl;
+  final String? senderEmail;
 
   bool get isThreadReply => threadParentId != null;
   bool get hasThreadReplies => threadReplyCount > 0;
@@ -169,6 +173,8 @@ class SlackMessage {
     List<MessageReaction>? reactions,
     List<MentionData>? mentions,
     bool? isSystem,
+    String? senderAvatarUrl,
+    String? senderEmail,
   }) {
     return SlackMessage(
       id: id ?? this.id,
@@ -185,6 +191,8 @@ class SlackMessage {
       reactions: reactions ?? this.reactions,
       mentions: mentions ?? this.mentions,
       isSystem: isSystem ?? this.isSystem,
+      senderAvatarUrl: senderAvatarUrl ?? this.senderAvatarUrl,
+      senderEmail: senderEmail ?? this.senderEmail,
     );
   }
 
