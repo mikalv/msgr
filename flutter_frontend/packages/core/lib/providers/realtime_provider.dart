@@ -304,8 +304,8 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
       case 'new:thread_reply':
         final msgData = payload['message'] as Map<String, dynamic>? ?? payload;
         _onNewThreadReply(channelId, msgData);
-      case 'typing:update':
-        _onTypingUpdate(channelId, payload);
+      case 'typing:update' || 'typing_started' || 'typing_stopped':
+        _onTypingUpdate(channelId, payload, event);
       case 'message:edited':
         _onMessageEdited(channelId, payload);
       case 'reaction:updated':
@@ -479,20 +479,21 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     }
   }
 
-  void _onTypingUpdate(String channelId, Map<String, dynamic> data) {
+  void _onTypingUpdate(String channelId, Map<String, dynamic> data, String event) {
     final profileId = data['profile_id']?.toString() ?? '';
-    final isTyping = data['is_typing'] as bool? ?? false;
+    final profileName = data['profile_name']?.toString() ?? profileId;
     final auth = _ref.read(simpleAuthProvider);
 
     // Don't show our own typing indicator
     if (profileId == auth.profileId) return;
 
+    final isTyping = event == 'typing_started' || (data['is_typing'] as bool? ?? false);
+
     final typingNotifier = _ref.read(typingIndicatorsProvider.notifier);
     if (isTyping) {
-      // Use profileId as display name for now -- could look up from members
-      typingNotifier.setTyping(channelId, profileId);
+      typingNotifier.setTyping(channelId, profileName);
     } else {
-      typingNotifier.stopTyping(channelId, profileId);
+      typingNotifier.stopTyping(channelId, profileName);
     }
   }
 
