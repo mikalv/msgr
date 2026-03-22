@@ -27,11 +27,14 @@ class UnreadCountsNotifier extends StateNotifier<Map<String, int>> {
 
   /// Mark a channel as read (set count to 0) and persist to server.
   void markRead(String channelId, {String? lastMessageId}) {
-    if (!state.containsKey(channelId) || state[channelId] == 0) return;
-    final updated = Map<String, int>.from(state);
-    updated[channelId] = 0;
-    state = updated;
+    final current = state[channelId] ?? 0;
+    if (current > 0) {
+      final updated = Map<String, int>.from(state);
+      updated[channelId] = 0;
+      state = updated;
+    }
 
+    // Always persist cursor so server remembers where we left off
     if (lastMessageId != null) {
       _persistReadCursor(channelId, lastMessageId);
     }

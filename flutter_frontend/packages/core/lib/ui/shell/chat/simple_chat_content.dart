@@ -342,11 +342,20 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     // Mark channel as read when viewing it (deferred to avoid modifying provider during build)
     if (selectedChannel != null && messagesState.messages.isNotEmpty) {
       final chId = selectedChannel.id;
-      final lastMsg = messagesState.messages.last;
-      final lastId = lastMsg.id.startsWith('local-') ? null : lastMsg.id;
-      Future.microtask(() {
-        ref.read(unreadCountsProvider.notifier).markRead(chId, lastMessageId: lastId);
-      });
+      // Find the last server-confirmed message ID (not local-*)
+      String? lastServerId;
+      for (var i = messagesState.messages.length - 1; i >= 0; i--) {
+        final id = messagesState.messages[i].id;
+        if (!id.startsWith('local-')) {
+          lastServerId = id;
+          break;
+        }
+      }
+      if (lastServerId != null) {
+        Future.microtask(() {
+          ref.read(unreadCountsProvider.notifier).markRead(chId, lastMessageId: lastServerId);
+        });
+      }
     }
 
     final typing = selectedChannel != null
