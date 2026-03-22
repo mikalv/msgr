@@ -15,7 +15,7 @@ import 'package:core/providers/unread_provider.dart';
 import 'package:core/ui/auth/simple_login_screen.dart';
 import 'package:core/ui/shell/app_shell.dart';
 import 'package:core/ui/settings/settings_page.dart';
-import 'package:core/ui/shell/simple_chat_content.dart';
+import 'package:core/ui/shell/chat/simple_chat_content.dart';
 
 class MacOSApp extends StatefulWidget {
   const MacOSApp({super.key});

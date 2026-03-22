@@ -37,6 +37,7 @@ class _ComposerTextField extends StatelessWidget {
       decoration: InputDecoration(
         isDense: true,
         border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(vertical: 8),
         hintText: placeholder,
         hintStyle: theme.textTheme.bodyMedium?.copyWith(
           color: const Color(0x59FFFFFF),

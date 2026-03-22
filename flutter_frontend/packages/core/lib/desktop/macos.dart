@@ -14,7 +14,7 @@ import 'package:core/services/localization/translator.dart';
 import 'package:core/ui/auth/simple_login_screen.dart';
 import 'package:core/ui/settings/settings_page.dart';
 import 'package:core/ui/shell/app_shell.dart';
-import 'package:core/ui/shell/simple_chat_content.dart';
+import 'package:core/ui/shell/chat/simple_chat_content.dart';
 import 'package:core/ui/widgets/desktop/TitlebarSafeArea.dart';
 import 'package:window_manager/window_manager.dart';
 

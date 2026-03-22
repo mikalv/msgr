@@ -194,7 +194,7 @@ class _ChatComposerState extends State<ChatComposer>
               decoration: decoration,
               padding: EdgeInsets.symmetric(
                 horizontal: isCompact ? 12 : 16,
-                vertical: isCompact ? 10 : 12,
+                vertical: isCompact ? 6 : 8,
               ),
               child: Focus(
                 onKeyEvent: _onKeyEventForPaste,
@@ -269,20 +269,9 @@ class _ChatComposerState extends State<ChatComposer>
                             ),
                           ],
                         ),
-                      if (autosaveStatus != ComposerAutosaveStatus.idle)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: _AutosaveStatusLabel(
-                              status: autosaveStatus,
-                              timestamp: _value.lastAutosave,
-                            ),
-                          ),
-                        ),
                       if (showFormatting)
                         Padding(
-                          padding: const EdgeInsets.only(top: 12),
+                          padding: const EdgeInsets.only(top: 8),
                           child: SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: Row(

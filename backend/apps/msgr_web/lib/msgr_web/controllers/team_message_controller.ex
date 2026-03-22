@@ -79,7 +79,7 @@ defmodule MessngrWeb.TeamMessageController do
     }
 
     MessngrWeb.Endpoint.broadcast(
-      "conversation:#{channel_id}",
+      "channel:#{channel_id}",
       event,
       payload
     )

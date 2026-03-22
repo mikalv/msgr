@@ -19,7 +19,7 @@ defmodule MessngrWeb.ConversationChannel do
   alias MessngrWeb.{ConversationJSON, MessageJSON}
 
   @impl true
-  def join("conversation:" <> conversation_id, _params, %{assigns: %{current_profile: profile}} = socket) do
+  def join("channel:" <> conversation_id, _params, %{assigns: %{current_profile: profile}} = socket) do
     with :ok <- authorize_membership(conversation_id, profile) do
       :ok = Chat.subscribe_to_conversation(conversation_id)
 
@@ -239,7 +239,7 @@ defmodule MessngrWeb.ConversationChannel do
     {:reply, {:error, %{errors: ["invalid payload"]}}, socket}
   end
 
-  def handle_in("conversation:watch", _payload, socket) do
+  def handle_in("channel:watch", _payload, socket) do
     socket = touch_activity(socket)
 
     case Messngr.watch_conversation(socket.assigns.conversation_id, socket.assigns.current_profile.id) do
@@ -253,7 +253,7 @@ defmodule MessngrWeb.ConversationChannel do
     Ecto.NoResultsError -> {:reply, {:error, %{reason: "forbidden"}}, socket}
   end
 
-  def handle_in("conversation:unwatch", _payload, socket) do
+  def handle_in("channel:unwatch", _payload, socket) do
     socket = touch_activity(socket)
 
     case Messngr.unwatch_conversation(socket.assigns.conversation_id, socket.assigns.current_profile.id) do

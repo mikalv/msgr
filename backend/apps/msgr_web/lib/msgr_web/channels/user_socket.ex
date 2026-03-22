@@ -124,7 +124,7 @@ defmodule MessngrWeb.UserSocket do
   end
 
   channel "msgr:device", MessngrWeb.DeviceChannel
-  channel "conversation:*", MessngrWeb.ConversationChannel
+  channel "channel:*", MessngrWeb.ConversationChannel
   channel "rtc:*", MessngrWeb.RTCChannel
 
   # Team channels (from TeamsWeb, routed here since MessngrWeb.Endpoint serves /socket)
