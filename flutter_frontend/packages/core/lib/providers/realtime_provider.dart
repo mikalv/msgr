@@ -68,18 +68,26 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   Future<void> connect() async {
     final client = _ref.read(msgrClientProvider);
     if (client.accountId == null || client.profileId == null) {
-      _log.warning('Cannot connect realtime: not authenticated');
+      print('[WS] Cannot connect: not authenticated');
       return;
     }
 
     if (client.isRealtimeConnected) {
+      print('[WS] Already connected');
       state = state.copyWith(isConnected: true, isConnecting: false);
       return;
     }
 
+    if (state.isConnecting) {
+      print('[WS] Already connecting, skip');
+      return;
+    }
+    print('[WS] Connecting...');
     state = state.copyWith(isConnecting: true, error: null);
     try {
       await client.connectRealtime();
+      if (!mounted) return;
+      print('[WS] Connected OK');
 
       client.realtime.onEvent = _handleEvent;
 
@@ -106,13 +114,20 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
       // Auto-join current team/channel after successful connect
       final selectedTeam = _ref.read(selectedTeamProvider);
       if (selectedTeam != null) {
+        print('[WS] Auto-joining team: ${selectedTeam.slug}');
         await joinTeam(selectedTeam.slug);
+      } else {
+        print('[WS] No team selected at connect time');
       }
       final selectedChannel = _ref.read(selectedChannelProvider);
       if (selectedChannel != null) {
+        print('[WS] Auto-joining channel: ${selectedChannel.id}');
         await joinChannel(selectedChannel.id);
+      } else {
+        print('[WS] No channel selected at connect time');
       }
     } catch (e) {
+      print('[WS] Connect FAILED: $e');
       _log.warning('WebSocket connect failed: $e');
       state = state.copyWith(isConnecting: false, error: e);
       _scheduleReconnect();
@@ -162,8 +177,11 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   /// Join a channel topic. Leaves the previous channel topic automatically.
   Future<void> joinChannel(String channelId) async {
     final client = _ref.read(msgrClientProvider);
-    _log.info('joinChannel($channelId) called, isRealtimeConnected=${client.isRealtimeConnected}');
-    if (!client.isRealtimeConnected) return;
+    print('[WS] joinChannel($channelId), connected=${client.isRealtimeConnected}');
+    if (!client.isRealtimeConnected) {
+      print('[WS] NOT CONNECTED — cannot join channel');
+      return;
+    }
 
     // Leave previous channel topic
     if (_currentChannelId != null && _currentChannelId != channelId) {
@@ -284,7 +302,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
 
   void _handleEvent(
       String topic, String event, Map<String, dynamic> payload) {
-    _log.info('WS Event: $topic / $event');
+    print('[WS] EVENT: $topic / $event');
 
     if (topic.startsWith('channel:')) {
       _handleChannelEvent(topic, event, payload);
@@ -353,8 +371,13 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     final auth = _ref.read(simpleAuthProvider);
     final senderProfileId = data['sender_profile_id']?.toString() ?? '';
 
+    print('[WS] new:message in $channelId from $senderProfileId (me=${auth.profileId})');
+
     // Skip messages we sent ourselves (already handled by optimistic insert)
-    if (senderProfileId == auth.profileId) return;
+    if (senderProfileId == auth.profileId) {
+      print('[WS] Skipping own message');
+      return;
+    }
 
     final senderProfile =
         data['sender_profile'] as Map<String, dynamic>? ?? {};
@@ -638,34 +661,37 @@ final realtimeProvider =
     StateNotifierProvider<RealtimeNotifier, RealtimeState>((ref) {
   final notifier = RealtimeNotifier(ref);
 
+  // Use ref.listen (not ref.watch) to avoid provider rebuilds that
+  // dispose and recreate the notifier on every state change.
+
   // Auto-connect when auth state becomes logged in.
-  // connect() will auto-join the current team/channel after success.
-  final auth = ref.watch(simpleAuthProvider);
-  if (auth.isLoggedIn && !auth.isLoading) {
-    Future.microtask(() => notifier.connect());
-  }
+  ref.listen<SimpleAuthState>(simpleAuthProvider, (prev, next) {
+    if (next.isLoggedIn && !next.isLoading) {
+      notifier.connect();
+    } else if (prev?.isLoggedIn == true && !next.isLoggedIn) {
+      notifier.disconnect();
+    }
+  }, fireImmediately: true);
 
-  // Auto-join team topic when selected team changes AFTER already connected.
-  final selectedTeam = ref.watch(selectedTeamProvider);
-  if (selectedTeam != null) {
-    Future.microtask(() {
+  // Auto-join team topic when selected team changes.
+  ref.listen<SlackTeam?>(selectedTeamProvider, (prev, next) {
+    if (next != null && next.slug != prev?.slug) {
       final client = ref.read(msgrClientProvider);
       if (client.isRealtimeConnected) {
-        notifier.joinTeam(selectedTeam.slug);
+        notifier.joinTeam(next.slug);
       }
-    });
-  }
+    }
+  }, fireImmediately: true);
 
-  // Auto-join channel topic when selected channel changes AFTER already connected.
-  final selectedChannel = ref.watch(selectedChannelProvider);
-  if (selectedChannel != null) {
-    Future.microtask(() {
+  // Auto-join channel topic when selected channel changes.
+  ref.listen<SlackChannel?>(selectedChannelProvider, (prev, next) {
+    if (next != null && next.id != prev?.id) {
       final client = ref.read(msgrClientProvider);
       if (client.isRealtimeConnected) {
-        notifier.joinChannel(selectedChannel.id);
+        notifier.joinChannel(next.id);
       }
-    });
-  }
+    }
+  }, fireImmediately: true);
 
   ref.onDispose(() => notifier.disconnect());
   return notifier;
