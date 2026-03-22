@@ -728,7 +728,8 @@ defmodule MessngrWeb.ConversationChannel do
     %{
       id: profile.id,
       name: profile.name,
-      mode: profile.mode
+      mode: profile.mode,
+      avatar_url: profile.avatar_url
     }
   end
 

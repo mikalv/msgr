@@ -36,7 +36,8 @@ defmodule MessngrWeb.ConversationJSON do
         id: profile.id,
         name: profile.name,
         slug: profile.slug,
-        mode: profile.mode
+        mode: profile.mode,
+        avatar_url: profile.avatar_url
       },
       role: participant.role,
       last_read_at: participant.last_read_at

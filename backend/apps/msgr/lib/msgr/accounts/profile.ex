@@ -49,6 +49,7 @@ defmodule Messngr.Accounts.Profile do
     field :theme, :map, default: @default_theme
     field :notification_policy, :map, default: @default_notification_policy
     field :security_policy, :map, default: @default_security_policy
+    field :avatar_url, :string
 
     belongs_to :account, Messngr.Accounts.Account
     has_many :devices, Messngr.Accounts.Device
@@ -61,7 +62,7 @@ defmodule Messngr.Accounts.Profile do
   @doc false
   def changeset(profile, attrs) do
     profile
-    |> cast(attrs, [:name, :slug, :mode, :theme, :notification_policy, :security_policy, :account_id])
+    |> cast(attrs, [:name, :slug, :mode, :theme, :notification_policy, :security_policy, :account_id, :avatar_url])
     |> validate_required([:name, :account_id])
     |> validate_length(:name, min: 2, max: 80)
     |> normalize_preferences()
