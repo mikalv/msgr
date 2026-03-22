@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
+import 'msgr_client_provider.dart';
 import 'team_list_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -12,20 +13,39 @@ class UnreadCountsNotifier extends StateNotifier<Map<String, int>> {
 
   final Ref _ref;
 
-  /// Load initial unread counts for a team.
-  void loadForTeam(String teamSlug) {
-    // TODO: Receive unread counts from Phoenix channel or initial API response.
-    // Start with empty counts; real-time updates will populate them.
-    state = {};
+  /// Load initial unread counts for a team from the server.
+  Future<void> loadForTeam(String teamSlug) async {
+    try {
+      final client = _ref.read(msgrApiProvider);
+      final counts = await client.getUnreadCounts(teamSlug);
+      state = counts;
+    } catch (_) {
+      // Start with empty counts; real-time updates will populate them.
+      state = {};
+    }
   }
 
-  /// Mark a channel as read (set count to 0).
-  void markRead(String channelId) {
+  /// Mark a channel as read (set count to 0) and persist to server.
+  void markRead(String channelId, {String? lastMessageId}) {
     if (!state.containsKey(channelId) || state[channelId] == 0) return;
     final updated = Map<String, int>.from(state);
     updated[channelId] = 0;
     state = updated;
-    // TODO: PUT /api/teams/:slug/channels/:id/read_cursor
+
+    if (lastMessageId != null) {
+      _persistReadCursor(channelId, lastMessageId);
+    }
+  }
+
+  Future<void> _persistReadCursor(String channelId, String lastMessageId) async {
+    try {
+      final team = _ref.read(selectedTeamProvider);
+      if (team == null) return;
+      final client = _ref.read(msgrApiProvider);
+      await client.markChannelRead(team.slug, channelId, lastMessageId);
+    } catch (_) {
+      // Best effort
+    }
   }
 
   /// Increment unread count for a channel (called when a realtime message

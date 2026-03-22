@@ -340,8 +340,12 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     _syncFallbackPolling(realtimeState.isConnected);
 
     // Mark channel as read when viewing it
-    if (selectedChannel != null) {
-      ref.read(unreadCountsProvider.notifier).markRead(selectedChannel.id);
+    if (selectedChannel != null && messagesState.messages.isNotEmpty) {
+      final lastMsg = messagesState.messages.last;
+      ref.read(unreadCountsProvider.notifier).markRead(
+        selectedChannel.id,
+        lastMessageId: lastMsg.id.startsWith('local-') ? null : lastMsg.id,
+      );
     }
 
     final typing = selectedChannel != null

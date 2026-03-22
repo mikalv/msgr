@@ -485,6 +485,20 @@ class MsgrApiClient {
     });
   }
 
+  /// GET /api/teams/:slug/unread_counts
+  Future<Map<String, int>> getUnreadCounts(String teamSlug) async {
+    final raw = await get('/api/teams/$teamSlug/unread_counts');
+    final data = raw['data'] as Map<String, dynamic>? ?? {};
+    return data.map((k, v) => MapEntry(k, (v as num).toInt()));
+  }
+
+  /// PUT /api/teams/:slug/channels/:channelId/read_cursor
+  Future<void> markChannelRead(String teamSlug, String channelId, String lastMessageId) async {
+    await put('/api/teams/$teamSlug/channels/$channelId/read_cursor', body: {
+      'last_read_message_id': lastMessageId,
+    });
+  }
+
   /// PATCH /api/teams/:slug/channels/:channelId/messages/:messageId
   Future<Map<String, dynamic>> editMessage(
     String teamSlug,

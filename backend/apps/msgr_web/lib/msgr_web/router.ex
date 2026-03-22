@@ -110,6 +110,7 @@ defmodule MessngrWeb.Router do
     post "/channels/:channel_id/messages/:message_id/reactions", TeamReactionController, :toggle
     post "/channels/:channel_id/typing", TeamMessageController, :typing
     get "/channels/:channel_id/threads/:message_id", TeamMessageController, :thread
+    get "/unread_counts", TeamReadCursorController, :index
     put "/channels/:channel_id/read_cursor", TeamReadCursorController, :update
     get "/profiles", TeamProfileController, :index
     get "/profiles/:id", TeamProfileController, :show
