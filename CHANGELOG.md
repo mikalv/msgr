@@ -1,5 +1,78 @@
 # Changelog
 
+## [0.3.0] — 2026-03-22
+
+### Added — UI Polish
+- MsgrTheme system with semantic color tokens, dimensions, and InheritedWidget
+- ProfileAvatar widget: Gravatar + letter fallback + online indicator
+- Flat Slack-style composer (replaced rounded bubble design)
+- ChannelHeader with topic display and action icons
+- Sidebar: 1px border, accent-blue selection, content area contrast, profile footer with avatar
+- DM list items with mini ProfileAvatars
+- Syntax highlighting in code blocks (Monokai theme via flutter_highlight)
+- `(redigert)` indicator on edited messages
+
+### Added — Messaging
+- Message editing: arrow-up shortcut + context menu, edit banner, Escape to cancel
+- Message delete: soft delete with deleted_at, real-time removal via channel broadcast
+- Optimistic media upload: images/files show immediately with spinner overlay
+- Shift+Enter for newline, Enter to send (Slack-style)
+- Typing indicator: REST endpoint for bots, event matching for typing_started/stopped
+
+### Added — Auth & OTP
+- SMTP email OTP via mail.meeh.dev with STARTTLS
+- BulkSMS phone OTP via eAPI (simple HTTP GET)
+- Bot-token auth endpoint (pre-shared secret, no OTP needed)
+- debug_code removed entirely from API protocol and Flutter client
+
+### Added — Search
+- Prism 0.6.7 hybrid search engine installed on server
+- Messages collection schema with full-text indexing
+- Teams.Search module: async indexing on message send
+- GET /api/teams/:slug/search endpoint
+- Flutter search dialog with debounced results (search icon in header)
+- Batch-indexed 119 existing messages
+
+### Added — Infrastructure
+- MinIO bucket auto-creation via minio/mc init container
+- Auto tenant migrations on backend startup (Teams.Tenancy.migrate_all_tenants)
+- Persistent unread counts with server-side read cursors
+- GET /api/teams/:slug/unread_counts endpoint
+
+### Fixed — Real-time Architecture (major overhaul)
+- Deleted duplicate websocket_provider.dart (old system)
+- Fixed WebSocket provider Riverpod rebuild race condition (ref.watch → ref.listen)
+- Fixed channel join "forbidden" — ConversationChannel now authorizes Teams membership
+- Fixed event name mismatch (client sent new:message, server expected message:create)
+- Fixed channel push "succeeded with error" — client now checks reply for errors
+- Added Teams-context handle_in("message:create") with proper broadcast
+- Backend broadcasts to team:{slug} topic for sidebar unread counts
+- Completed conversation: → channel: topic migration
+- JWT token refresh before WebSocket reconnect (prevents 401 storm)
+- Fixed 401 stacktrace spam (double respond_unauthorized in session plug)
+- Fallback polling checks auth state and uses 15s interval
+
+### Fixed — MinIO
+- Renamed msgr_minio → msgr-minio (underscores invalid per RFC 952)
+- Fixed ensure_bucket! with explicit force_path_style config
+- Added :ssl to extra_applications for SMTP STARTTLS
+
+### Changed
+- Split simple_chat_content.dart (1973 lines) into 8 part files
+- Removed unused business/personal app skeletons
+- Backend avatar_url field added to profiles with API serialization
+
+### Closed Issues
+- #107 SMS verification (BulkSMS implemented)
+- #109 S3 storage with presigned URLs
+- #71 Backend Prism search integration
+- #81 Flutter Search UI
+- #112 Message delete
+- #113 JWT token refresh (already implemented)
+- #114 Unread counts
+
+---
+
 ## [0.2.0] — 2026-03-21
 
 ### Added — Backend
