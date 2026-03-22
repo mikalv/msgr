@@ -68,26 +68,21 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   Future<void> connect() async {
     final client = _ref.read(msgrClientProvider);
     if (client.accountId == null || client.profileId == null) {
-      print('[WS] Cannot connect: not authenticated');
       return;
     }
 
     if (client.isRealtimeConnected) {
-      print('[WS] Already connected');
       state = state.copyWith(isConnected: true, isConnecting: false);
       return;
     }
 
     if (state.isConnecting) {
-      print('[WS] Already connecting, skip');
       return;
     }
-    print('[WS] Connecting...');
     state = state.copyWith(isConnecting: true, error: null);
     try {
       await client.connectRealtime();
       if (!mounted) return;
-      print('[WS] Connected OK');
 
       client.realtime.onEvent = _handleEvent;
 
@@ -114,20 +109,15 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
       // Auto-join current team/channel after successful connect
       final selectedTeam = _ref.read(selectedTeamProvider);
       if (selectedTeam != null) {
-        print('[WS] Auto-joining team: ${selectedTeam.slug}');
         await joinTeam(selectedTeam.slug);
       } else {
-        print('[WS] No team selected at connect time');
       }
       final selectedChannel = _ref.read(selectedChannelProvider);
       if (selectedChannel != null) {
-        print('[WS] Auto-joining channel: ${selectedChannel.id}');
         await joinChannel(selectedChannel.id);
       } else {
-        print('[WS] No channel selected at connect time');
       }
     } catch (e) {
-      print('[WS] Connect FAILED: $e');
       _log.warning('WebSocket connect failed: $e');
       state = state.copyWith(isConnecting: false, error: e);
       _scheduleReconnect();
@@ -177,9 +167,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   /// Join a channel topic. Leaves the previous channel topic automatically.
   Future<void> joinChannel(String channelId) async {
     final client = _ref.read(msgrClientProvider);
-    print('[WS] joinChannel($channelId), connected=${client.isRealtimeConnected}');
     if (!client.isRealtimeConnected) {
-      print('[WS] NOT CONNECTED — cannot join channel');
       return;
     }
 
@@ -226,17 +214,24 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
       final contentPayload = content is String ? {'text': content} : content;
       final reply = await client.realtime.push(
         'channel:$channelId',
-        'new:message',
+        'message:create',
         {
           'content': contentPayload,
           if (mediaRefs != null && mediaRefs.isNotEmpty)
             'media_refs': mediaRefs,
         },
       );
+
+      // Check if server returned an error
+      if (reply is Map && reply['errors'] != null) {
+        _log.warning('Channel push rejected: $reply, falling back to REST');
+        return false;
+      }
+
       _log.fine('Message sent via channel push: $reply');
       return true;
     } catch (e) {
-      _log.warning('Channel push failed, caller should use REST: $e');
+      _log.warning('Channel push failed, falling back to REST: $e');
       return false;
     }
   }
@@ -302,7 +297,6 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
 
   void _handleEvent(
       String topic, String event, Map<String, dynamic> payload) {
-    print('[WS] EVENT: $topic / $event');
 
     if (topic.startsWith('channel:')) {
       _handleChannelEvent(topic, event, payload);
@@ -371,11 +365,9 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     final auth = _ref.read(simpleAuthProvider);
     final senderProfileId = data['sender_profile_id']?.toString() ?? '';
 
-    print('[WS] new:message in $channelId from $senderProfileId (me=${auth.profileId})');
 
     // Skip messages we sent ourselves (already handled by optimistic insert)
     if (senderProfileId == auth.profileId) {
-      print('[WS] Skipping own message');
       return;
     }
 

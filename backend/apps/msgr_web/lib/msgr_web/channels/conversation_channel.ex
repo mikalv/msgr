@@ -42,9 +42,22 @@ defmodule MessngrWeb.ConversationChannel do
 
     case authorized do
       :ok ->
+        # Resolve tenant prefix for Teams channels
+        {resolved_slug, resolved_prefix} =
+          if team_slug do
+            case Teams.TeamManagement.get_team_by_slug(team_slug) do
+              nil -> {nil, nil}
+              team -> {team_slug, team.schema_name}
+            end
+          else
+            {nil, nil}
+          end
+
         socket =
           socket
           |> assign(:conversation_id, channel_id)
+          |> assign(:team_slug, resolved_slug)
+          |> assign(:prefix, resolved_prefix)
           |> assign(:typing_timers, %{})
           |> assign(:watcher_timer, nil)
           |> assign(:last_activity_at, System.monotonic_time(:millisecond))
@@ -60,23 +73,80 @@ defmodule MessngrWeb.ConversationChannel do
   @impl true
   def handle_in("message:create", payload, socket) when is_map(payload) do
     socket = touch_activity(socket)
+    channel_id = socket.assigns.conversation_id
 
-    with :ok <- enforce_rate_limit(socket, :conversation_message_event),
-         {:ok, body} <- extract_body(payload),
-         {:ok, message} <-
-         Messngr.send_message(socket.assigns.conversation_id, socket.assigns.current_profile.id, %{
-           "body" => body
-          }) do
-      SocketTelemetry.message_sent(
-        socket.assigns.conversation_id,
-        socket.assigns.current_profile.id,
-        %{message_id: message.id}
+    # Teams channels: use Teams.Messages, broadcast to channel + team
+    team_slug = socket.assigns[:team_slug]
+    prefix = socket.assigns[:prefix]
+
+    if prefix do
+      # Teams context
+      profile = Teams.TeamManagement.get_profile_for_account(
+        prefix,
+        socket.assigns[:uid] || socket.assigns.current_profile.account_id
       )
 
-      {:reply, {:ok, MessageJSON.show(%{message: message})}, socket}
+      unless profile do
+        {:reply, {:error, %{errors: ["not a member"]}}, socket}
+      else
+        content = payload["content"] || %{}
+        attrs = %{
+          channel_id: channel_id,
+          sender_profile_id: profile.id,
+          content: content,
+          media_refs: payload["media_refs"] || []
+        }
+
+        case Teams.Messages.create_message(prefix, attrs) do
+          {:ok, message} ->
+            message = Teams.Messages.get_message(prefix, message.id)
+            msg_json = %{
+              id: message.id,
+              channel_id: channel_id,
+              sender_profile_id: message.sender_profile_id,
+              sender_profile: %{
+                id: profile.id,
+                display_name: profile.display_name,
+                avatar_url: profile.avatar_url,
+                role: profile.role
+              },
+              content: message.content,
+              media_refs: message.media_refs,
+              edited_at: message.edited_at,
+              inserted_at: message.inserted_at,
+              reactions: []
+            }
+
+            broadcast!(socket, "new:message", msg_json)
+
+            if team_slug do
+              MessngrWeb.Endpoint.broadcast(
+                "team:#{team_slug}",
+                "channel:new_message",
+                %{channel_id: channel_id, message_id: message.id, sender_profile_id: profile.id, inserted_at: message.inserted_at}
+              )
+            end
+
+            {:reply, {:ok, %{data: msg_json}}, socket}
+
+          {:error, changeset} ->
+            {:reply, {:error, %{errors: ["create failed"]}}, socket}
+        end
+      end
     else
-      {:error, %Changeset{} = changeset} -> reply_changeset_error(socket, changeset)
-      {:error, reason} -> reply_reason_error(socket, reason)
+      # Legacy Messngr context
+      with :ok <- enforce_rate_limit(socket, :conversation_message_event),
+           {:ok, body} <- extract_body(payload),
+           {:ok, message} <-
+           Messngr.send_message(channel_id, socket.assigns.current_profile.id, %{
+             "body" => body
+            }) do
+        SocketTelemetry.message_sent(channel_id, socket.assigns.current_profile.id, %{message_id: message.id})
+        {:reply, {:ok, MessageJSON.show(%{message: message})}, socket}
+      else
+        {:error, %Changeset{} = changeset} -> reply_changeset_error(socket, changeset)
+        {:error, reason} -> reply_reason_error(socket, reason)
+      end
     end
   end
 
