@@ -28,6 +28,7 @@ import 'package:core/ui/shell/profile_card.dart';
 import 'package:core/ui/shell/thread_panel.dart';
 import 'package:core/ui/widgets/profile_avatar.dart';
 import 'package:core/ui/theme/msgr_theme.dart';
+import 'package:core/providers/unread_provider.dart';
 
 part 'chat_helpers.dart';
 part 'message_list.dart';
@@ -337,6 +338,11 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
 
     final realtimeState = ref.watch(realtimeProvider);
     _syncFallbackPolling(realtimeState.isConnected);
+
+    // Mark channel as read when viewing it
+    if (selectedChannel != null) {
+      ref.read(unreadCountsProvider.notifier).markRead(selectedChannel.id);
+    }
 
     final typing = selectedChannel != null
         ? ref.watch(channelTypingProvider(selectedChannel.id))

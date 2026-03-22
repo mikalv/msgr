@@ -42,12 +42,27 @@ defmodule MessngrWeb.TeamMessageController do
         {:ok, message} ->
           message = Messages.get_message(prefix, message.id)
 
-          # Broadcast to Phoenix Channel so all connected clients get the message
+          # Broadcast to channel topic (active viewers get full message)
           MessngrWeb.Endpoint.broadcast(
             "channel:#{channel_id}",
             "new:message",
             message_json(message)
           )
+
+          # Broadcast to team topic (sidebar unread for everyone)
+          slug = conn.path_params["slug"]
+          if slug do
+            MessngrWeb.Endpoint.broadcast(
+              "team:#{slug}",
+              "channel:new_message",
+              %{
+                channel_id: channel_id,
+                message_id: message.id,
+                sender_profile_id: message.sender_profile_id,
+                inserted_at: message.inserted_at
+              }
+            )
+          end
 
           conn
           |> put_status(:created)

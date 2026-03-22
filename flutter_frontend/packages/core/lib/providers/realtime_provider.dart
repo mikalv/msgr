@@ -15,6 +15,7 @@ import 'settings_provider.dart';
 import 'team_list_provider.dart';
 import 'thread_provider.dart';
 import 'typing_provider.dart';
+import 'unread_provider.dart';
 
 // ---------------------------------------------------------------------------
 // RealtimeState
@@ -283,7 +284,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
 
   void _handleEvent(
       String topic, String event, Map<String, dynamic> payload) {
-    _log.fine('Event: $topic / $event');
+    _log.info('WS Event: $topic / $event');
 
     if (topic.startsWith('channel:')) {
       _handleChannelEvent(topic, event, payload);
@@ -328,6 +329,8 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
         _log.fine('Channel updated: ${payload['id']}');
         // Refresh channel list
         _ref.read(channelListProvider.notifier).refresh();
+      case 'channel:new_message':
+        _onTeamNewMessage(payload);
       case 'member:joined':
         _log.fine('Member joined: ${payload['profile_id']}');
       case 'member:left':
@@ -450,8 +453,23 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   }
 
   void _onNewChannel(Map<String, dynamic> data) {
-    // Refresh the channel list from the server to get the full channel data
     _ref.read(channelListProvider.notifier).refresh();
+  }
+
+  void _onTeamNewMessage(Map<String, dynamic> data) {
+    final channelId = data['channel_id']?.toString() ?? '';
+    final senderProfileId = data['sender_profile_id']?.toString() ?? '';
+    final auth = _ref.read(simpleAuthProvider);
+
+    // Skip our own messages
+    if (senderProfileId == auth.profileId) return;
+
+    // If this is the active channel, the channel:* event already handles it
+    final selectedChannel = _ref.read(selectedChannelProvider);
+    if (selectedChannel != null && selectedChannel.id == channelId) return;
+
+    // Increment unread count for inactive channels
+    _ref.read(unreadCountsProvider.notifier).increment(channelId);
   }
 
   void _onReactionUpdated(String channelId, Map<String, dynamic> data) {
