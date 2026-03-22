@@ -2,18 +2,20 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-/// A headless Msgr bot that authenticates via OTP, joins a team, and polls for messages.
+/// A headless Msgr bot that authenticates via bot-token, joins a team, and polls for messages.
 class MsgrBot {
   MsgrBot({
     required this.email,
     required this.teamSlug,
     required this.onMessage,
+    required this.botSecret,
     this.msgrBaseUrl = 'https://dev.msgr.no',
     this.pollInterval = const Duration(seconds: 2),
   });
 
   final String email;
   final String teamSlug;
+  final String botSecret;
   final String msgrBaseUrl;
   final Duration pollInterval;
   final Future<String?> Function(BotMessage message) onMessage;
@@ -50,49 +52,27 @@ class MsgrBot {
   }
 
   Future<void> _authenticate() async {
-    // Step 1: Request OTP challenge
-    final challengeRes = await _client.post(
-      Uri.parse('$msgrBaseUrl/api/v1/auth/challenge'),
+    // Authenticate via bot-token endpoint (pre-shared secret, no OTP)
+    final res = await _client.post(
+      Uri.parse('$msgrBaseUrl/api/v1/auth/bot-token'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'channel': 'email', 'identifier': email}),
+      body: jsonEncode({'email': email, 'bot_secret': botSecret}),
     );
 
-    if (challengeRes.statusCode < 200 || challengeRes.statusCode >= 300) {
-      throw MsgrBotException('Challenge failed (${challengeRes.statusCode}): ${challengeRes.body}');
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw MsgrBotException('Bot auth failed (${res.statusCode}): ${res.body}');
     }
 
-    final challengeData = jsonDecode(challengeRes.body) as Map<String, dynamic>;
-    final challengeId = challengeData['id'] as String;
-    final debugCode = challengeData['debug_code'] as String?;
-
-    if (debugCode == null) {
-      throw MsgrBotException('No debug_code in response — is EXPOSE_OTP_CODES=true set?');
-    }
-
-    print('[Bot] OTP challenge: $challengeId, code: $debugCode');
-
-    // Step 2: Verify OTP
-    final verifyRes = await _client.post(
-      Uri.parse('$msgrBaseUrl/api/v1/auth/verify'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'challenge_id': challengeId, 'code': debugCode}),
-    );
-
-    if (verifyRes.statusCode < 200 || verifyRes.statusCode >= 300) {
-      throw MsgrBotException('Verify failed (${verifyRes.statusCode}): ${verifyRes.body}');
-    }
-
-    final verifyData = jsonDecode(verifyRes.body) as Map<String, dynamic>;
-    final account = verifyData['account'] as Map<String, dynamic>? ?? {};
+    final data = jsonDecode(res.body) as Map<String, dynamic>;
+    final account = data['account'] as Map<String, dynamic>? ?? {};
     accountId = account['id'] as String?;
-    profileId = verifyData['profile_id'] as String?;
+    profileId = data['profile_id'] as String?;
 
-    // Extract JWT tokens for Bearer auth (backend now requires JWT).
-    _accessToken = verifyData['access_token'] as String?;
-    _refreshToken = verifyData['refresh_token'] as String?;
+    _accessToken = data['access_token'] as String?;
+    _refreshToken = data['refresh_token'] as String?;
 
     if (accountId == null || profileId == null) {
-      throw MsgrBotException('No account/profile in verify response');
+      throw MsgrBotException('No account/profile in bot-token response');
     }
 
     print('[Bot] Authenticated: account=$accountId, profile=$profileId, jwt=${_accessToken != null ? "yes" : "no"}');

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:core/features/chat/models/chat_message.dart';
@@ -17,6 +18,7 @@ import 'package:core/services/api/chat_api.dart';
 import 'package:core/services/api/chat_socket.dart';
 import 'package:core/services/api/chat_realtime_event.dart';
 import 'package:core/services/api/contact_api.dart';
+import 'package:msgr_messages/msgr_messages.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatViewModel extends ChangeNotifier {
@@ -89,6 +91,11 @@ class ChatViewModel extends ChangeNotifier {
   bool _typingActive = false;
   final Set<String> _acknowledgedReads = <String>{};
   bool _suppressComposerPersistence = false;
+
+  /// Local media bytes for optimistic display before upload completes.
+  /// Keyed by temporary message ID (local-*).
+  static final Map<String, Uint8List> localMediaBytes = {};
+
 
   bool get isLoading => _isLoading;
   bool get isSending => _isSending;
@@ -288,7 +295,95 @@ class ChatViewModel extends ChangeNotifier {
     _isSending = true;
     notifyListeners();
 
-    var shouldClearComposer = true;
+    // Build optimistic local messages for each attachment so they appear
+    // immediately in the chat (grayed out with spinner).
+    final tempIds = <String>[];
+    final now = DateTime.now();
+
+    if (voiceNote != null) {
+      final tempId = 'local-voice-${now.microsecondsSinceEpoch}';
+      tempIds.add(tempId);
+      localMediaBytes[tempId] = voiceNote.bytes;
+      final localMsg = ChatMessage.fromMsgrMessage(MsgrAudioMessage(
+        id: tempId,
+        url: 'local://$tempId',
+        duration: voiceNote.duration.inMilliseconds / 1000.0,
+        waveform: const [],
+        kind: MsgrMessageKind.voice,
+        profileId: _identity.profileId,
+        profileName: 'Deg',
+        profileMode: 'private',
+        status: 'sending',
+        sentAt: now,
+        insertedAt: now,
+        isLocal: true,
+      ));
+      _messages = [..._messages, localMsg];
+      notifyListeners();
+    }
+
+    for (var i = 0; i < attachments.length; i++) {
+      final attachment = attachments[i];
+      final tempId = 'local-media-${now.microsecondsSinceEpoch}-$i';
+      tempIds.add(tempId);
+      if (attachment.bytes != null) {
+        localMediaBytes[tempId] = attachment.bytes!;
+      }
+      final caption =
+          (i == 0 && remainingText.isNotEmpty) ? remainingText : null;
+
+      final ChatMessage localMsg;
+      if (attachment.isImage) {
+        localMsg = ChatMessage.fromMsgrMessage(MsgrImageMessage(
+          id: tempId,
+          url: 'local://$tempId',
+          description: caption,
+          profileId: _identity.profileId,
+          profileName: 'Deg',
+          profileMode: 'private',
+          status: 'sending',
+          sentAt: now,
+          insertedAt: now,
+          isLocal: true,
+        ));
+      } else if (attachment.isVideo) {
+        localMsg = ChatMessage.fromMsgrMessage(MsgrVideoMessage(
+          id: tempId,
+          url: 'local://$tempId',
+          caption: caption,
+          profileId: _identity.profileId,
+          profileName: 'Deg',
+          profileMode: 'private',
+          status: 'sending',
+          sentAt: now,
+          insertedAt: now,
+          isLocal: true,
+        ));
+      } else {
+        localMsg = ChatMessage.fromMsgrMessage(MsgrFileMessage(
+          id: tempId,
+          url: 'local://$tempId',
+          fileName: attachment.name,
+          byteSize: attachment.size,
+          caption: caption,
+          profileId: _identity.profileId,
+          profileName: 'Deg',
+          profileMode: 'private',
+          status: 'sending',
+          sentAt: now,
+          insertedAt: now,
+          isLocal: true,
+        ));
+      }
+      _messages = [..._messages, localMsg];
+      notifyListeners();
+    }
+
+    // Clear composer immediately — the optimistic messages are shown.
+    composerController.clear();
+
+    var shouldClearComposer = false; // already cleared above
+    var uploadIndex = voiceNote != null ? 1 : 0;
     try {
       if (voiceNote != null) {
         final caption = remainingText.isNotEmpty ? remainingText : null;
@@ -305,11 +400,13 @@ class ChatViewModel extends ChangeNotifier {
           conversationId: _thread!.id,
           message: payload.message,
         );
-        _mergeMessage(persisted);
+        _mergeMessage(persisted, replaceTempId: tempIds[0]);
+        localMediaBytes.remove(tempIds[0]);
       }
 
       for (var i = 0; i < attachments.length; i++) {
         final attachment = attachments[i];
+        final tempId = tempIds[uploadIndex + i];
         final caption =
             (i == 0 && remainingText.isNotEmpty) ? remainingText : null;
         if (caption != null) {
@@ -325,42 +422,44 @@ class ChatViewModel extends ChangeNotifier {
           conversationId: _thread!.id,
           message: payload.message,
         );
-        _mergeMessage(persisted);
+        _mergeMessage(persisted, replaceTempId: tempId);
+        localMediaBytes.remove(tempId);
       }
 
       if (remainingText.trim().isNotEmpty) {
-        final sent = await _sendTextOnly(remainingText);
-        if (!sent) {
-          shouldClearComposer = false;
-        }
+        await _sendTextOnly(remainingText);
       }
 
       await _cache.saveMessages(_thread!.id, _messages);
     } on ApiException catch (error) {
       debugPrint('media send failed: $error');
+      // Remove failed optimistic messages
+      for (final tempId in tempIds) {
+        _messages = _messages.where((m) => m.id != tempId).toList();
+        localMediaBytes.remove(tempId);
+      }
       final message = 'Kunne ikke sende media (${error.statusCode}).';
       _setError(message);
       composerController.setSendState(
         ComposerSendState.failed,
         error: message,
       );
-      shouldClearComposer = false;
     } catch (error, stack) {
       debugPrint('media upload failed: $error\n$stack');
+      for (final tempId in tempIds) {
+        _messages = _messages.where((m) => m.id != tempId).toList();
+        localMediaBytes.remove(tempId);
+      }
       const message = 'Kunne ikke sende media.';
       _setError(message);
       composerController.setSendState(
         ComposerSendState.failed,
         error: message,
       );
-      shouldClearComposer = false;
     } finally {
       _isSending = false;
       composerController.setSendState(ComposerSendState.idle);
       notifyListeners();
-      if (shouldClearComposer) {
-        composerController.clear();
-      }
     }
   }
 

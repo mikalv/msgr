@@ -40,12 +40,10 @@ class NoiseServerInfo {
 class OtpChallenge {
   const OtpChallenge({
     required this.id,
-    this.debugCode,
     this.expiresAt,
   });
 
   final String id;
-  final String? debugCode;
   final DateTime? expiresAt;
 }
 
@@ -128,7 +126,6 @@ class AuthApi {
 
     return OtpChallenge(
       id: id,
-      debugCode: decoded['debug_code'] as String?,
       expiresAt: expires.isEmpty ? null : DateTime.tryParse(expires),
     );
   }

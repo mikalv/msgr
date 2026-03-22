@@ -20,7 +20,6 @@ class _SimpleLoginScreenState extends ConsumerState<SimpleLoginScreen> {
   bool _isLoading = false;
   String? _error;
   ChallengeResult? _challenge;
-  String? _debugCode;
   bool _usePhone = false; // toggle between email and phone
 
   @override
@@ -46,11 +45,7 @@ class _SimpleLoginScreenState extends ConsumerState<SimpleLoginScreen> {
       final challenge = await api.requestChallenge(identifier, channel: _channel);
       setState(() {
         _challenge = challenge;
-        _debugCode = challenge.debugCode;
         _isLoading = false;
-        if (challenge.debugCode != null) {
-          _codeController.text = challenge.debugCode!;
-        }
       });
     } catch (e) {
       setState(() { _error = e.toString(); _isLoading = false; });
@@ -176,12 +171,6 @@ class _SimpleLoginScreenState extends ConsumerState<SimpleLoginScreen> {
                     decoration: _inputDecoration('Kode'),
                     onSubmitted: (_) => _verifyCode(),
                   ),
-                  if (_debugCode != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text('Debug-kode: $_debugCode',
-                        style: const TextStyle(color: Colors.amber, fontSize: 12)),
-                    ),
                 ],
 
                 // Error
@@ -218,7 +207,7 @@ class _SimpleLoginScreenState extends ConsumerState<SimpleLoginScreen> {
                 if (_challenge != null)
                   TextButton(
                     onPressed: _isLoading ? null : () {
-                      setState(() { _challenge = null; _debugCode = null; _codeController.clear(); _error = null; });
+                      setState(() { _challenge = null; _codeController.clear(); _error = null; });
                     },
                     child: Text('Bruk ${_usePhone ? "annet nummer" : "annen e-post"}',
                       style: const TextStyle(color: Colors.white54)),

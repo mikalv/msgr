@@ -69,8 +69,6 @@ class _PinputLoginCodeState extends ConsumerState<PinputLoginCode> {
     final targetHint = authState.pendingTargetHint ??
         authState.pendingEmail ??
         authState.pendingMsisdn;
-    final debugCode = authState.pendingDebugCode;
-
     const focusedBorderColor = Color(0xFF6366F1);
     final fillColor = Colors.white.withOpacity(0.06);
     final borderColor = Colors.white.withOpacity(0.28);
@@ -116,17 +114,6 @@ class _PinputLoginCodeState extends ConsumerState<PinputLoginCode> {
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.white70),
                   ),
-                  if (debugCode != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        'Kode (kun utvikling): $debugCode',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.amberAccent,
-                        ),
-                      ),
-                    )
                 ],
               ),
             ),

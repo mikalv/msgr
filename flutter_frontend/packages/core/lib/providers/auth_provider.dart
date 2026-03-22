@@ -22,7 +22,6 @@ class AuthState {
   final String? pendingChallengeId;
   final String? pendingChannel;
   final String? pendingTargetHint;
-  final String? pendingDebugCode;
   final DateTime? pendingChallengeExpiresAt;
   final String? pendingDisplayName;
 
@@ -43,7 +42,6 @@ class AuthState {
     this.pendingChallengeId,
     this.pendingChannel,
     this.pendingTargetHint,
-    this.pendingDebugCode,
     this.pendingChallengeExpiresAt,
     this.pendingDisplayName,
   });
@@ -62,7 +60,6 @@ class AuthState {
     String? pendingChallengeId,
     String? pendingChannel,
     String? pendingTargetHint,
-    String? pendingDebugCode,
     DateTime? pendingChallengeExpiresAt,
     String? pendingDisplayName,
   }) {
@@ -80,7 +77,6 @@ class AuthState {
       pendingChallengeId: pendingChallengeId ?? this.pendingChallengeId,
       pendingChannel: pendingChannel ?? this.pendingChannel,
       pendingTargetHint: pendingTargetHint ?? this.pendingTargetHint,
-      pendingDebugCode: pendingDebugCode ?? this.pendingDebugCode,
       pendingChallengeExpiresAt:
           pendingChallengeExpiresAt ?? this.pendingChallengeExpiresAt,
       pendingDisplayName: pendingDisplayName ?? this.pendingDisplayName,
@@ -227,7 +223,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
           pendingMsisdn: isEmail ? null : emailOrPhone,
           pendingChannel: challenge.channel,
           pendingTargetHint: challenge.targetHint,
-          pendingDebugCode: challenge.debugCode,
           pendingChallengeExpiresAt: challenge.expiresAt,
           pendingDisplayName: displayName,
           isLoading: false,
@@ -290,7 +285,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
           pendingMsisdn: null,
           pendingChannel: null,
           pendingTargetHint: null,
-          pendingDebugCode: null,
           pendingChallengeExpiresAt: null,
           pendingDisplayName: null,
         );
@@ -473,7 +467,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? challengeId,
     String? channel,
     String? targetHint,
-    String? debugCode,
     DateTime? challengeExpiresAt,
     String? displayName,
   }) {
@@ -484,7 +477,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       pendingChallengeId: challengeId,
       pendingChannel: channel,
       pendingTargetHint: targetHint,
-      pendingDebugCode: debugCode,
       pendingChallengeExpiresAt: challengeExpiresAt,
       pendingDisplayName: displayName,
     );

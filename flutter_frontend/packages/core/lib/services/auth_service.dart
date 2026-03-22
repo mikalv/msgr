@@ -6,13 +6,11 @@ class ChallengeResult {
   const ChallengeResult({
     required this.id,
     this.channel,
-    this.debugCode,
     this.targetHint,
   });
 
   final String id;
   final String? channel;
-  final String? debugCode;
   final String? targetHint;
 }
 
@@ -36,7 +34,7 @@ class SessionResult {
 /// Simple auth service that talks directly to the dev.msgr.no REST API.
 ///
 /// Uses email OTP flow:
-///   1. requestChallenge(email) -> ChallengeResult with debug_code
+///   1. requestChallenge(email) -> ChallengeResult with target_hint
 ///   2. verifyCode(challengeId, code) -> SessionResult with account_id + profile_id
 class AuthService {
   AuthService({http.Client? client})
@@ -72,7 +70,6 @@ class AuthService {
     return ChallengeResult(
       id: id,
       channel: data['channel'] as String?,
-      debugCode: data['debug_code'] as String?,
       targetHint: data['target_hint'] as String?,
     );
   }

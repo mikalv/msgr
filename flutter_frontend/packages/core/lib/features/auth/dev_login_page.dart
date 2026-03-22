@@ -146,9 +146,6 @@ class _DevLoginPageState extends State<DevLoginPage> {
   }
 
   Future<String?> _resolveOtpCode(OtpChallenge challenge) async {
-    if (challenge.debugCode != null && challenge.debugCode!.isNotEmpty) {
-      return challenge.debugCode;
-    }
     return _promptForOtpCode();
   }
 

@@ -35,6 +35,9 @@ void main(List<String> args) async {
         defaultsTo:
             Platform.environment['LLM_MODEL'] ?? 'claude-sonnet-4-20250514',
         help: 'LLM model name')
+    ..addOption('bot-secret',
+        defaultsTo: Platform.environment['MSGR_BOT_SECRET'],
+        help: 'Bot authentication secret')
     ..addFlag('help', abbr: 'h', negatable: false, help: 'Show usage');
 
   final ArgResults results;
@@ -62,6 +65,13 @@ void main(List<String> args) async {
     exit(1);
   }
 
+  final botSecret = results['bot-secret'] as String?;
+  if (botSecret == null || botSecret.isEmpty) {
+    print('[Kåre] Feil: Bot-secret mangler.');
+    print('       Bruk --bot-secret eller sett MSGR_BOT_SECRET.');
+    exit(1);
+  }
+
   final llmClient = LlmClient(
     baseUrl: results['llm-url'] as String,
     apiKey: llmKey,
@@ -75,6 +85,7 @@ void main(List<String> args) async {
   bot = MsgrBot(
     email: results['email'] as String,
     teamSlug: results['team'] as String,
+    botSecret: botSecret,
     msgrBaseUrl: results['msgr-url'] as String,
     onMessage: (message) async {
       // Don't reply to own messages

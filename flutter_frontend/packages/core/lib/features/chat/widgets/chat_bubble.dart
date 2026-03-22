@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:core/features/chat/models/chat_message.dart';
+import 'package:core/features/chat/state/chat_view_model.dart';
 import 'package:core/features/chat/widgets/chat_theme.dart';
 import 'package:msgr_messages/msgr_messages.dart';
 
@@ -164,8 +165,12 @@ class ChatBubble extends StatelessWidget {
     Color subtleColor,
   ) {
     if (data is MsgrImageMessage) {
+      final isLocalMedia = data.isLocal && data.url.startsWith('local://');
+      final localBytes = isLocalMedia
+          ? ChatViewModel.localMediaBytes[data.id]
+          : null;
       final url = data.thumbnailUrl ?? data.url;
-      if (url.isEmpty) {
+      if (url.isEmpty && localBytes == null) {
         return null;
       }
       final ratio = _aspectRatio(
@@ -179,14 +184,45 @@ class ChatBubble extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.network(
-                url,
-                fit: BoxFit.cover,
-                errorBuilder: (context, _, __) => _BrokenMediaPlaceholder(
-                  icon: Icons.broken_image_outlined,
-                  color: subtleColor,
+              if (localBytes != null)
+                Opacity(
+                  opacity: 0.5,
+                  child: Image.memory(
+                    localBytes,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, _, __) => _BrokenMediaPlaceholder(
+                      icon: Icons.broken_image_outlined,
+                      color: subtleColor,
+                    ),
+                  ),
+                )
+              else
+                Image.network(
+                  url,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, _, __) => _BrokenMediaPlaceholder(
+                    icon: Icons.broken_image_outlined,
+                    color: subtleColor,
+                  ),
                 ),
-              ),
+              if (isLocalMedia)
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.4),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -194,6 +230,7 @@ class ChatBubble extends StatelessWidget {
     }
 
     if (data is MsgrVideoMessage) {
+      final isLocalMedia = data.isLocal && data.url.startsWith('local://');
       final thumb = data.thumbnailUrl ?? data.url;
       final ratio = _aspectRatio(
         data.thumbnailWidth,
@@ -207,7 +244,7 @@ class ChatBubble extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              if (thumb.isNotEmpty)
+              if (!isLocalMedia && thumb.isNotEmpty)
                 Image.network(
                   thumb,
                   fit: BoxFit.cover,
@@ -222,10 +259,26 @@ class ChatBubble extends StatelessWidget {
                   color: subtleColor,
                 ),
               Container(
-                color: Colors.black.withOpacity(0.25),
+                color: Colors.black.withOpacity(isLocalMedia ? 0.45 : 0.25),
               ),
               Center(
-                child: Container(
+                child: isLocalMedia
+                    ? Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.4),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        ),
+                      )
+                    : Container(
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.45),
                     shape: BoxShape.circle,
@@ -245,11 +298,16 @@ class ChatBubble extends StatelessWidget {
     }
 
     if (data is MsgrAudioMessage) {
+      final isLocalMedia = data.isLocal && data.url.startsWith('local://');
       final isVoice = data.kind == MsgrMessageKind.voice;
-      final icon = isVoice ? Icons.mic : Icons.graphic_eq;
+      final icon = isLocalMedia
+          ? null
+          : (isVoice ? Icons.mic : Icons.graphic_eq);
       final duration =
           data.duration != null ? _formatDuration(data.duration!) : null;
-      return Container(
+      return Opacity(
+        opacity: isLocalMedia ? 0.5 : 1.0,
+        child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.05),
@@ -258,7 +316,14 @@ class ChatBubble extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: textColor),
+            if (isLocalMedia)
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Icon(icon, color: textColor),
             const SizedBox(width: 10),
             if (data.waveform != null)
               SizedBox(
@@ -290,50 +355,64 @@ class ChatBubble extends StatelessWidget {
             ],
           ],
         ),
+      ),
       );
     }
 
     if (data is MsgrFileMessage) {
+      final isLocalMedia = data.isLocal && data.url.startsWith('local://');
       final size = data.byteSize != null ? _formatBytes(data.byteSize!) : null;
-      return Container(
-        width: 260,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.insert_drive_file_outlined, color: textColor),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    data.fileName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: textColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  if (size != null)
+      return Opacity(
+        opacity: isLocalMedia ? 0.5 : 1.0,
+        child: Container(
+          width: 260,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isLocalMedia)
+                const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                Icon(Icons.insert_drive_file_outlined, color: textColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Text(
-                      size,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: subtleColor,
+                      data.fileName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: textColor,
+                            fontWeight: FontWeight.w600,
                           ),
                     ),
-                ],
+                    if (size != null)
+                      Text(
+                        isLocalMedia ? 'Laster opp...' : size,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: subtleColor,
+                            ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.download, size: 18, color: subtleColor),
-          ],
+              if (!isLocalMedia) ...[
+                const SizedBox(width: 8),
+                Icon(Icons.download, size: 18, color: subtleColor),
+              ],
+            ],
+          ),
         ),
       );
     }
