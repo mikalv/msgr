@@ -25,7 +25,7 @@ defmodule Teams.Search do
           channel_id: message.channel_id,
           team_slug: team_slug,
           sender_profile_id: message.sender_profile_id,
-          sender_name: get_in(message, [:sender_profile, :display_name]) || "",
+          sender_name: deep_get(message, [:sender_profile, :display_name]) || "",
           content: extract_text(message.content),
           inserted_at: to_string(message.inserted_at)
         }
@@ -84,7 +84,7 @@ defmodule Teams.Search do
                   sender_name: fields["sender_name"],
                   content: fields["content"],
                   inserted_at: fields["inserted_at"],
-                  highlight: get_in(hit, ["highlight", "content"]) || [],
+                  highlight: deep_get(hit, ["highlight", "content"]) || [],
                   score: hit["score"] || hit["_score"]
                 }
               end)
@@ -158,7 +158,7 @@ defmodule Teams.Search do
   defp extract_text(content) when is_map(content), do: Map.get(content, "text", "")
   defp extract_text(_), do: ""
 
-  defp get_in(map, keys) when is_map(map) do
+  defp deep_get(map, keys) when is_map(map) do
     Enum.reduce_while(keys, map, fn
       key, acc when is_map(acc) -> {:cont, Map.get(acc, key)}
       key, acc when is_struct(acc) -> {:cont, Map.get(acc, key)}
