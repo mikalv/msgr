@@ -41,7 +41,7 @@
 
         <provider
             android:name="com.superlist.super_native_extensions.DataProvider"
-            android:authorities="dev.meeh.messngr.SuperClipboardDataProvider"
+            android:authorities="no.msgr.app.SuperClipboardDataProvider"
             android:exported="true"
             android:grantUriPermissions="true" >
         </provider>

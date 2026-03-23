@@ -1,4 +1,4 @@
-package dev.meeh.messngr
+package no.msgr.app
 
 import android.widget.Toast
 import androidx.core.net.toFile
@@ -10,7 +10,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterFragmentActivity() {
 
-    private val channelName = "dev.meeh.messngr/snap_camera_kit"
+    private val channelName = "no.msgr.app/snap_camera_kit"
     private lateinit var methodChannel: MethodChannel
     private var pendingResult: MethodChannel.Result? = null
 

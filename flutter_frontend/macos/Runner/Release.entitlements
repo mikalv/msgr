@@ -31,7 +31,7 @@
 	</array>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>$(AppIdentifierPrefix)dev.meeh.messngr</string>
+		<string>$(AppIdentifierPrefix)no.msgr.app</string>
 	</array>
 </dict>
 </plist>

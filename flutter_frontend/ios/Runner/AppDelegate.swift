@@ -3,7 +3,7 @@ import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
-  private let channelName = "dev.meeh.messngr/snap_camera_kit"
+  private let channelName = "no.msgr.app/snap_camera_kit"
   private var supportedOrientations: UIInterfaceOrientationMask = .allButUpsideDown
   private var pendingResult: FlutterResult?
 
