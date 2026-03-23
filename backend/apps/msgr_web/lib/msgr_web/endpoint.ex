@@ -32,8 +32,7 @@ defmodule MessngrWeb.Endpoint do
   plug Plug.Static,
     at: "/",
     from: "/app/web_client",
-    gzip: true,
-    only: ~w(main.dart.js flutter.js index.html manifest.json favicon.png icons assets canvaskit flutter_service_worker.js version.json)
+    gzip: true
 
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
