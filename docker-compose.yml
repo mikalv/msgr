@@ -108,6 +108,7 @@ services:
       - .env
     volumes:
       - /home/mikalv/apns_key.p8:/app/apns_key.p8:ro
+      - /home/mikalv/msgr/web_client:/app/web_client:ro
     depends_on:
       db:
         condition: service_healthy

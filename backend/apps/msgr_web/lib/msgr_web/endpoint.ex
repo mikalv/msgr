@@ -28,6 +28,13 @@ defmodule MessngrWeb.Endpoint do
     gzip: false,
     only: MessngrWeb.static_paths()
 
+  # Serve Flutter web client from /app/web_client (mounted volume)
+  plug Plug.Static,
+    at: "/",
+    from: "/app/web_client",
+    gzip: true,
+    only: ~w(main.dart.js flutter.js index.html manifest.json favicon.png icons assets canvaskit flutter_service_worker.js version.json)
+
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
   if code_reloading? do
@@ -52,5 +59,9 @@ defmodule MessngrWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
+
+  # SPA fallback: serve Flutter web client for non-API routes
+  plug MessngrWeb.Plugs.SpaFallback
+
   plug MessngrWeb.Router
 end

@@ -16,14 +16,16 @@ Future<void> main() async {
   await bootstrapper.initialize();
 
   if (kIsWeb) {
-    Logger.root.info('Is Web');
-    runApp(const WebApp());
+    // IOSApp = shared AppShell entry (works for web, iOS, any non-windowed platform)
+    // WebApp/MessngrApp = old single-user/personal mode UI (reserved for future E2EE personal mode)
+    runApp(const IOSApp());
     return;
   }
 
   if (Platform.isIOS) {
     runApp(const IOSApp());
   } else if (Platform.isAndroid || Platform.isFuchsia) {
+    // MessngrApp = old single-user/personal mode UI (reserved for future E2EE personal mode)
     await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     runApp(const OverlaySupport.global(child: MessngrApp()));
   } else if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
