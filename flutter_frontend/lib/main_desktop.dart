@@ -14,6 +14,11 @@ const _kWindowW = 'window_w';
 const _kWindowH = 'window_h';
 
 Future<void> runDesktopApp() async {
+  // Skip window_manager on iOS — it's not a windowed platform
+  if (Platform.isIOS) {
+    return runApp(const MacOSApp());
+  }
+
   await windowManager.ensureInitialized();
 
   // Restore saved window bounds, or use defaults
@@ -49,7 +54,7 @@ Future<void> runDesktopApp() async {
     await windowManager.focus();
   });
 
-  if (Platform.isMacOS) {
+  if (Platform.isMacOS || Platform.isIOS) {
     return runApp(const MacOSApp());
   } else if (Platform.isWindows) {
     return runApp(const WindowsApp());

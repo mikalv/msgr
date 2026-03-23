@@ -20,11 +20,10 @@ Future<void> main() async {
     return;
   }
 
-  if (Platform.isAndroid || Platform.isIOS || Platform.isFuchsia) {
+  if (Platform.isAndroid || Platform.isFuchsia) {
     await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     runApp(const OverlaySupport.global(child: MessngrApp()));
-  } else if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
-    // Desktop
+  } else if (Platform.isIOS || Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
     runDesktopApp();
   } else {
     Logger.root.severe('What the fuck, don\'t get the platform...');
