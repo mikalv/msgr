@@ -30,7 +30,7 @@ class MsgrRealtimeClient {
 
   /// JWT access token. When set, sent as `token` connect param for
   /// server-side JWT authentication (preferred over account_id/profile_id).
-  final String? token;
+  String? token;
 
   PhoenixSocket? _socket;
   final Map<String, PhoenixChannel> _channels = {};
@@ -64,7 +64,14 @@ class MsgrRealtimeClient {
 
     _socket = PhoenixSocket(
       wsUrl,
-      socketOptions: PhoenixSocketOptions(params: params),
+      socketOptions: PhoenixSocketOptions(
+        dynamicParams: () async => {
+          'account_id': accountId ?? '',
+          'profile_id': profileId ?? '',
+          if (token != null) 'token': token!,
+          if (sessionId != null) 'session_id': sessionId!,
+        },
+      ),
     );
 
     _socket!.closeStream.listen((_) {

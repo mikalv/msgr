@@ -629,9 +629,12 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     _reconnectTimer = Timer(const Duration(seconds: 5), () async {
       if (mounted && !state.isConnected && !state.isConnecting) {
         _log.info('Attempting reconnect — refreshing token first...');
-        // Refresh JWT before reconnecting WebSocket
         final client = _ref.read(msgrClientProvider);
         await client.api.refreshAuth();
+        // Update realtime client token so reconnect uses fresh JWT
+        if (client.api.accessToken != null) {
+          client.realtime.token = client.api.accessToken;
+        }
         if (mounted) connect();
       }
     });
