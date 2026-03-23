@@ -180,9 +180,13 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
 
     _currentChannelId = channelId;
 
+    // Ensure team slug is always available for channel join
+    if (_currentTeamSlug == null) {
+      final team = _ref.read(selectedTeamProvider);
+      if (team != null) _currentTeamSlug = team.slug;
+    }
+
     try {
-      // Pass team_slug so the backend can resolve the tenant prefix
-      // when connected without a JWT token.
       await client.realtime.join(
         'channel:$channelId',
         payload: {
