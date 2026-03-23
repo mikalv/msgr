@@ -205,6 +205,32 @@ class MsgrBot {
     }
   }
 
+  Future<void> _refreshAccessToken() async {
+    if (_refreshToken == null) {
+      print('[Bot] No refresh token — re-authenticating');
+      await _authenticate();
+      return;
+    }
+    try {
+      final res = await _client.post(
+        Uri.parse('$msgrBaseUrl/api/v1/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh_token': _refreshToken}),
+      );
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        _accessToken = data['access_token'] as String?;
+        print('[Bot] Token refreshed');
+      } else {
+        print('[Bot] Refresh failed (${res.statusCode}) — re-authenticating');
+        await _authenticate();
+      }
+    } catch (e) {
+      print('[Bot] Refresh error: $e — re-authenticating');
+      await _authenticate();
+    }
+  }
+
   Future<void> _poll() async {
     for (final channelId in channelNames.keys) {
       try {
@@ -212,6 +238,10 @@ class MsgrBot {
           Uri.parse('$msgrBaseUrl/api/teams/$teamSlug/channels/$channelId/messages?limit=10'),
           headers: _headers,
         );
+        if (res.statusCode == 401) {
+          await _refreshAccessToken();
+          continue;
+        }
         if (res.statusCode != 200) continue;
 
         final data = jsonDecode(res.body);
