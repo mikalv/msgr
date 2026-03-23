@@ -59,8 +59,6 @@ class ChannelHeader extends StatelessWidget {
             const Spacer(),
           _HeaderIcon(Icons.search, onTap: onSearchTap),
           _HeaderIcon(Icons.people_outline, onTap: onMembersTap),
-          _HeaderIcon(Icons.push_pin_outlined, onTap: onPinTap),
-          _HeaderIcon(Icons.settings_outlined, onTap: onSettingsTap),
         ],
       ),
     );
