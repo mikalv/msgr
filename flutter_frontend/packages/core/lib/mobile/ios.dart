@@ -32,14 +32,15 @@ class _AuthGate extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(simpleAuthProvider);
 
-    // Initialize push manager
-    ref.watch(pushManagerProvider);
-
     if (!auth.isLoggedIn) {
       return SimpleLoginScreen(
         onLoginSuccess: () {},
       );
     }
+
+    // Initialize push notifications when logged in
+    final pushManager = ref.read(pushManagerProvider);
+    Future.microtask(() => pushManager.init());
 
     return const AppShell(child: SimpleChatContent());
   }
