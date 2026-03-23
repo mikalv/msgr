@@ -117,7 +117,7 @@ defmodule Teams.Search do
 
     base = from(m in Teams.TenantModels.Message,
       where: is_nil(m.deleted_at) and is_nil(m.thread_parent_id),
-      where: fragment("(?->>'text') ILIKE ?", m.content, ^pattern),
+      where: fragment("coalesce(content->>'text', '') ILIKE ?", ^pattern),
       preload: [:sender_profile],
       order_by: [desc: m.inserted_at],
       limit: ^limit
