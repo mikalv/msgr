@@ -3,7 +3,7 @@
 class S {
   S._();
 
-  static String _locale = 'nb';
+  static String _locale = 'en';
 
   static void setLocale(String locale) => _locale = locale;
   static String get locale => _locale;

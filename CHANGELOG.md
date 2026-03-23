@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.4.0] — 2026-03-23
+
+### Added — Push Notifications
+- APNS push notification backend with JWT ES256 auth via Finch HTTP/2
+- Device token registration endpoint (POST /api/push/register)
+- Push dispatcher: async notify channel members on new message
+- macOS: native AppDelegate requests notification permission + registers token
+- iOS: native AppDelegate with APNS token registration
+- Push entitlements for both macOS and iOS (aps-environment, app groups)
+- Token cached to file for cross-native/Flutter bridge
+
+### Added — iOS App
+- IOSApp entry point using AppShell/SimpleChatContent (same as desktop)
+- Separate from desktop entry — no window_manager dependency
+- iOS deployment target bumped to 16.0
+- Ad Hoc and TestFlight distribution support
+
+### Added — i18n
+- Centralized `S` strings class with English (default) + Norwegian
+- All hardcoded UI strings replaced with `S.xxx` across 6 files
+- Locale switchable via `S.setLocale('en')`
+
+### Added — Infrastructure
+- Prism search engine running as systemd service (auto-start)
+- Kåre bot deployed as systemd service with auto-reconnect
+- PostgreSQL ILIKE search fallback while Prism text-field bug is open
+- Auto-run ALL Ecto migrations on startup (both standard and tenant)
+
+### Added — Features
+- Avatar upload dialog: file picker, URL fetch, clipboard paste
+- Bot auto-refreshes JWT token on 401 (no more silent death)
+
+### Fixed
+- Bundle ID renamed from dev.meeh.messngr to no.msgr.app (iOS, macOS, Android)
+- WebSocket channel join REFUSED — ensure team_slug always set before join
+- Commands endpoint returns empty list instead of 500 (missing slash_commands table)
+- SnapCameraKit references removed from iOS AppDelegate (not installed)
+- Removed unused submodules (async_redux, wire-server)
+- APNS key mount fixed (was directory, now file)
+- PEM key parsing fixed (PKCS#8 PrivateKeyInfo, not ECPrivateKey)
+
+---
+
 ## [0.3.0] — 2026-03-22
 
 ### Added — UI Polish
