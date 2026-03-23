@@ -58,11 +58,16 @@ defmodule Messngr.Application do
 
     Logger.info("✅ Supervisor started successfully!")
 
-    # Run pending tenant migrations on startup (idempotent)
+    # Run ALL pending migrations on startup (idempotent)
     spawn(fn ->
       Process.sleep(1_000)
 
       try do
+        # Standard Ecto migrations (msgr app)
+        Ecto.Migrator.run(Messngr.Repo, Application.app_dir(:msgr, "priv/repo/migrations"), :up, all: true)
+        Logger.info("✅ Msgr migrations complete")
+
+        # Tenant migrations (per-team schemas)
         Teams.Tenancy.migrate_all_tenants()
         Logger.info("✅ Tenant migrations complete")
       rescue

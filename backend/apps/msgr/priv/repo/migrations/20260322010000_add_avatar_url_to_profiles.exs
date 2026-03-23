@@ -3,7 +3,7 @@ defmodule Messngr.Repo.Migrations.AddAvatarUrlToProfiles do
 
   def change do
     alter table(:profiles) do
-      add :avatar_url, :text
+      add_if_not_exists :avatar_url, :text
     end
   end
 end
