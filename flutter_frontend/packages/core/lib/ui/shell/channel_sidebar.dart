@@ -28,6 +28,7 @@ class ChannelSidebar extends StatelessWidget {
     this.userEmail,
     this.userDisplayName,
     this.userProfileId,
+    this.onAvatarTap,
   });
 
   final String teamName;
@@ -44,6 +45,7 @@ class ChannelSidebar extends StatelessWidget {
   final String? userEmail;
   final String? userDisplayName;
   final String? userProfileId;
+  final VoidCallback? onAvatarTap;
 
   List<MockChannel> get _sortedChannels {
     final sorted = List<MockChannel>.from(channels);
@@ -180,13 +182,19 @@ class ChannelSidebar extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    ProfileAvatar(
+                    GestureDetector(
+                      onTap: onAvatarTap,
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.click,
+                        child: ProfileAvatar(
                       profileId: userProfileId ?? '',
                       displayName: userDisplayName ?? '',
                       email: userEmail,
                       size: MsgrDimensions.sidebarProfileAvatarSize,
                       showOnlineIndicator: true,
                       isOnline: true,
+                    ),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(

@@ -778,7 +778,8 @@ class _SearchDialogState extends ConsumerState<_SearchDialog> {
         channelId: widget.channelId,
       );
       if (mounted) setState(() { _results = results; _loading = false; });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[Search] Error: $e');
       if (mounted) setState(() => _loading = false);
     }
   }

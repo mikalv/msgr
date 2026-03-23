@@ -15,6 +15,7 @@ import 'package:core/providers/unread_provider.dart';
 import 'package:core/ui/settings/settings_page.dart';
 
 import 'package:core/ui/theme/msgr_theme.dart';
+import 'package:core/ui/widgets/avatar_upload_dialog.dart';
 
 import 'channel_sidebar.dart';
 import 'quick_switcher.dart';
@@ -397,6 +398,12 @@ class _AppShellState extends ConsumerState<AppShell> {
       userDisplayName: ref.watch(simpleAuthProvider).displayName,
       userEmail: ref.watch(simpleAuthProvider).email,
       userProfileId: ref.watch(simpleAuthProvider).profileId,
+      onAvatarTap: () {
+        final team = ref.read(selectedTeamProvider);
+        if (team != null) {
+          showAvatarUploadDialog(context, teamSlug: team.slug, currentAvatarUrl: null);
+        }
+      },
       onEditProfile: () {
         final team = ref.read(selectedTeamProvider);
         if (team != null) _showProfileSetupDialog(team.slug);
