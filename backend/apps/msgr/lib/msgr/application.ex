@@ -35,7 +35,10 @@ defmodule Messngr.Application do
         Messngr.Calls.CallRegistry,
         # {Guardian.DB.SweeperServer, []},
         # Start the Finch HTTP client for sending emails
-        {Finch, name: Messngr.Finch},
+        {Finch, name: Messngr.Finch, pools: %{
+          "https://api.sandbox.push.apple.com" => [protocols: [:http2]],
+          "https://api.push.apple.com" => [protocols: [:http2]]
+        }},
         retention_pruner_child,
         watcher_pruner_child
         # Start a worker by calling: Messngr.Worker.start_link(arg)

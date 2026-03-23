@@ -40,16 +40,14 @@ defmodule Messngr.Push.APNS do
 
     body = Jason.encode!(payload)
 
-    case :hackney.request(:post, url, headers, body, [
-      {:connect_timeout, 5000},
-      {:recv_timeout, 10000}
-    ]) do
-      {:ok, 200, _headers, _ref} ->
+    request = Finch.build(:post, url, headers, body)
+
+    case Finch.request(request, Messngr.Finch, receive_timeout: 10_000) do
+      {:ok, %Finch.Response{status: 200}} ->
         Logger.debug("APNS push sent to #{String.slice(device_token, 0..8)}...")
         :ok
 
-      {:ok, status, _headers, ref} ->
-        {:ok, resp_body} = :hackney.body(ref)
+      {:ok, %Finch.Response{status: status, body: resp_body}} ->
         Logger.warning("APNS push failed (#{status}): #{resp_body}")
         {:error, {:apns_error, status, resp_body}}
 
@@ -137,8 +135,8 @@ defmodule Messngr.Push.APNS do
   end
 
   defp decode_p8_key(pem) do
-    [{:ECPrivateKey, der, :not_encrypted}] = :public_key.pem_decode(pem)
-    :public_key.pem_entry_decode({:ECPrivateKey, der, :not_encrypted})
+    [entry] = :public_key.pem_decode(pem)
+    :public_key.pem_entry_decode(entry)
   end
 
   defp remove_nils(map) when is_map(map) do

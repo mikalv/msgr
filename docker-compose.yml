@@ -107,7 +107,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ${HOME}/apns_key.p8:/app/apns_key.p8:ro
+      - /home/mikalv/apns_key.p8:/app/apns_key.p8:ro
     depends_on:
       db:
         condition: service_healthy
