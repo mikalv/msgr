@@ -86,8 +86,13 @@ defmodule MessngrWeb.CommandController do
 
   @doc "GET /api/teams/:slug/commands — list available commands for team"
   def index(conn, _params) do
-    team = conn.assigns.current_team
-    commands = Apps.list_commands_for_team(team.id)
+    commands =
+      try do
+        team = conn.assigns.current_team
+        Apps.list_commands_for_team(team.id)
+      rescue
+        _ -> []
+      end
 
     json(conn, %{
       data: Enum.map(commands, fn cmd ->
