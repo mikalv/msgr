@@ -15,11 +15,17 @@ class PushNotificationManager {
   String? _lastRegisteredToken;
 
   /// Initialize: listen for token updates from native side.
+  bool _initialized = false;
+
   void init() {
+    if (_initialized) return;
+    _initialized = true;
+
     _channel.setMethodCallHandler((call) async {
       switch (call.method) {
         case 'onPushToken':
           final token = call.arguments as String?;
+          print('[Push] Received token: ${token?.substring(0, 16)}...');
           if (token != null && token.isNotEmpty) {
             await _registerToken(token, 'apns');
           }
@@ -49,8 +55,10 @@ class PushNotificationManager {
         'device_name': 'iOS',
       });
       _lastRegisteredToken = token;
-    } catch (_) {
-      // Will retry on next app launch
+      print('[Push] Token registered with backend');
+      _lastRegisteredToken = token;
+    } catch (e) {
+      print('[Push] Registration failed: $e');
     }
   }
 }

@@ -4,7 +4,6 @@ import UserNotifications
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
-  private var supportedOrientations: UIInterfaceOrientationMask = .allButUpsideDown
 
   override func application(
     _ application: UIApplication,
@@ -26,16 +25,10 @@ import UserNotifications
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
-  override func application(
-    _ application: UIApplication,
-    supportedInterfaceOrientationsFor window: UIWindow?
-  ) -> UIInterfaceOrientationMask {
-    supportedOrientations
-  }
-
   // MARK: - Push Notifications
 
   private var pushChannel: FlutterMethodChannel?
+  private var cachedDeviceToken: String?
 
   private func setupPushChannel() {
     guard let controller = window?.rootViewController as? FlutterViewController else { return }
@@ -43,6 +36,10 @@ import UserNotifications
     pushChannel?.setMethodCallHandler { [weak self] call, result in
       switch call.method {
       case "requestToken":
+        // If we already have a token, send it immediately
+        if let token = self?.cachedDeviceToken {
+          self?.pushChannel?.invokeMethod("onPushToken", arguments: token)
+        }
         result(nil)
       default:
         result(FlutterMethodNotImplemented)
@@ -52,6 +49,8 @@ import UserNotifications
 
   override func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
     let token = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+    print("[Push] Got device token: \(token.prefix(16))...")
+    cachedDeviceToken = token
     pushChannel?.invokeMethod("onPushToken", arguments: token)
   }
 
