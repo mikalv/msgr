@@ -1,77 +1,70 @@
-import 'package:flutter/services.dart';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'auth_state_provider.dart';
 import 'msgr_client_provider.dart';
 
-/// Manages push notification token registration.
-/// Receives APNS/FCM tokens from native and sends them to the backend.
+/// Reads APNS token from UserDefaults (set by native AppDelegate)
+/// and registers it with the backend when the user is logged in.
 class PushNotificationManager {
   PushNotificationManager(this._ref);
 
   final Ref _ref;
-  static const _channel = MethodChannel('no.msgr.app/push');
   String? _lastRegisteredToken;
-
-  /// Initialize: listen for token updates from native side.
   bool _initialized = false;
 
-  void init() {
+  Future<void> init() async {
     if (_initialized) return;
     _initialized = true;
 
-    _channel.setMethodCallHandler((call) async {
-      switch (call.method) {
-        case 'onPushToken':
-          final token = call.arguments as String?;
-          print('[Push] Received token: ${token?.substring(0, 16)}...');
-          if (token != null && token.isNotEmpty) {
-            await _registerToken(token, 'apns');
-          }
-        case 'onPushNotification':
-          // Handle foreground notification tap
-          final data = call.arguments as Map?;
-          // TODO: Navigate to channel/message
-          break;
-      }
-    });
-
-    // Request token from native
-    _channel.invokeMethod('requestToken');
-  }
-
-  Future<void> _registerToken(String token, String platform) async {
-    if (token == _lastRegisteredToken) return;
+    // Only on iOS
+    if (!Platform.isIOS) return;
 
     final auth = _ref.read(simpleAuthProvider);
     if (!auth.isLoggedIn) return;
+
+    // Read token from UserDefaults (set by native AppDelegate)
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('apns_device_token');
+
+    if (token != null && token.isNotEmpty) {
+      debugPrint('[Push] Found APNS token: ${token.substring(0, 16)}...');
+      await _registerToken(token);
+    } else {
+      debugPrint('[Push] No APNS token found in UserDefaults');
+      // Retry after a delay — token might not be ready yet
+      Future.delayed(const Duration(seconds: 5), () async {
+        final prefs2 = await SharedPreferences.getInstance();
+        final token2 = prefs2.getString('apns_device_token');
+        if (token2 != null && token2.isNotEmpty) {
+          debugPrint('[Push] Found APNS token on retry: ${token2.substring(0, 16)}...');
+          await _registerToken(token2);
+        }
+      });
+    }
+  }
+
+  Future<void> _registerToken(String token) async {
+    if (token == _lastRegisteredToken) return;
 
     try {
       final client = _ref.read(msgrApiProvider);
       await client.post('/api/push/register', body: {
         'token': token,
-        'platform': platform,
+        'platform': 'apns',
         'device_name': 'iOS',
       });
-      _lastRegisteredToken = token;
-      print('[Push] Token registered with backend');
+      debugPrint('[Push] Token registered with backend');
       _lastRegisteredToken = token;
     } catch (e) {
-      print('[Push] Registration failed: $e');
+      debugPrint('[Push] Registration failed: $e');
     }
   }
 }
 
 final pushManagerProvider = Provider<PushNotificationManager>((ref) {
-  final manager = PushNotificationManager(ref);
-
-  // Auto-init when logged in
-  ref.listen<SimpleAuthState>(simpleAuthProvider, (prev, next) {
-    if (next.isLoggedIn && !next.isLoading) {
-      manager.init();
-    }
-  }, fireImmediately: true);
-
-  return manager;
+  return PushNotificationManager(ref);
 });
