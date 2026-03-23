@@ -311,6 +311,18 @@ config :guardian, Guardian.DB,
 # Prism search engine
 config :teams, :prism_url, System.get_env("PRISM_URL", "http://localhost:3080")
 
+# APNS Push Notifications
+apns_key_id = blank_to_nil.(System.get_env("APNS_KEY_ID"))
+if apns_key_id do
+  config :msgr, Messngr.Push.APNS,
+    key_id: apns_key_id,
+    team_id: System.get_env("APNS_TEAM_ID", "W3C42P2LA8"),
+    key_path: blank_to_nil.(System.get_env("APNS_KEY_PATH")),
+    key_content: blank_to_nil.(System.get_env("APNS_KEY_CONTENT")),
+    bundle_id: System.get_env("APNS_BUNDLE_ID", "no.msgr.app"),
+    environment: if(System.get_env("APNS_SANDBOX") == "true", do: :sandbox, else: :production)
+end
+
 # Bot authentication secret (for headless bot clients)
 config :msgr_web, :bot_auth_secret, blank_to_nil.(System.get_env("BOT_AUTH_SECRET"))
 

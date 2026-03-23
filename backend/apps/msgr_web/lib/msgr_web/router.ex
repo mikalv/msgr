@@ -47,6 +47,8 @@ defmodule MessngrWeb.Router do
   scope "/api", MessngrWeb do
     pipe_through [:api, :actor]
 
+    post "/push/register", PushTokenController, :register
+
     get "/conversations", ConversationController, :index
     post "/conversations", ConversationController, :create
     patch "/conversations/:id", ConversationController, :update

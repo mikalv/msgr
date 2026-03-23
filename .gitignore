@@ -13,3 +13,4 @@ backend/.envrc
 *.wat
 *.decomp
 .env
+AuthKey_*.p8

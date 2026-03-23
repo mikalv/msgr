@@ -67,6 +67,9 @@ defmodule MessngrWeb.TeamMessageController do
           # Index in Prism search (best-effort, async)
           if slug, do: Teams.Search.index_message(slug, message)
 
+          # Send push notifications to offline members (best-effort, async)
+          if slug, do: Messngr.Push.Dispatcher.notify_new_message(slug, prefix, message)
+
           conn
           |> put_status(:created)
           |> json(%{data: message_json(message)})
