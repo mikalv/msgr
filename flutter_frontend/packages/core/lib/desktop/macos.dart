@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:core/config/app_constants.dart';
 import 'package:core/config/theme.dart';
 import 'package:core/providers/auth_state_provider.dart';
+import 'package:core/providers/push_provider.dart';
 import 'package:core/providers/unread_provider.dart';
 import 'package:core/services/app_localizations.dart';
 import 'package:core/services/desktop_notification_service.dart';
@@ -398,6 +399,9 @@ class _AuthGate extends ConsumerWidget {
     } else {
       windowManager.setBadgeLabel('');
     }
+
+    // Initialize push notification manager (auto-registers token when logged in)
+    ref.watch(pushManagerProvider);
 
     return const AppShell(child: SimpleChatContent());
   }
