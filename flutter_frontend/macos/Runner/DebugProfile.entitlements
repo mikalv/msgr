@@ -31,6 +31,8 @@
 	<array>
 		<string>com.apple.systemevents</string>
 	</array>
+	<key>com.apple.developer.aps-environment</key>
+	<string>development</string>
 	<key>keychain-access-groups</key>
 	<array>
 		<string>$(AppIdentifierPrefix)no.msgr.app</string>

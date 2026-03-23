@@ -1,14 +1,15 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'auth_state_provider.dart';
 import 'msgr_client_provider.dart';
 
-/// Reads APNS token from UserDefaults (set by native AppDelegate)
-/// and registers it with the backend when the user is logged in.
+/// Registers APNS device token with backend.
+/// Native side writes token to a file; Flutter reads it.
 class PushNotificationManager {
   PushNotificationManager(this._ref);
 
@@ -20,30 +21,39 @@ class PushNotificationManager {
     if (_initialized) return;
     _initialized = true;
 
-    // Only on iOS
-    if (!Platform.isIOS) return;
+    debugPrint('[Push] init() called, platform=${Platform.operatingSystem}');
+
+    if (!Platform.isIOS && !Platform.isMacOS) return;
 
     final auth = _ref.read(simpleAuthProvider);
+    debugPrint('[Push] isLoggedIn=${auth.isLoggedIn}');
     if (!auth.isLoggedIn) return;
 
-    // Read token from UserDefaults (set by native AppDelegate)
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('apns_device_token');
+    // Try reading token from file (written by native AppDelegate)
+    await _tryRegisterFromFile();
 
-    if (token != null && token.isNotEmpty) {
-      debugPrint('[Push] Found APNS token: ${token.substring(0, 16)}...');
-      await _registerToken(token);
-    } else {
-      debugPrint('[Push] No APNS token found in UserDefaults');
-      // Retry after a delay — token might not be ready yet
-      Future.delayed(const Duration(seconds: 5), () async {
-        final prefs2 = await SharedPreferences.getInstance();
-        final token2 = prefs2.getString('apns_device_token');
-        if (token2 != null && token2.isNotEmpty) {
-          debugPrint('[Push] Found APNS token on retry: ${token2.substring(0, 16)}...');
-          await _registerToken(token2);
+    // Retry after delay if token wasn't available yet
+    if (_lastRegisteredToken == null) {
+      Future.delayed(const Duration(seconds: 5), _tryRegisterFromFile);
+    }
+  }
+
+  Future<void> _tryRegisterFromFile() async {
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final file = File('${dir.path}/apns_token.txt');
+
+      if (await file.exists()) {
+        final token = (await file.readAsString()).trim();
+        if (token.isNotEmpty) {
+          debugPrint('[Push] Found APNS token: ${token.substring(0, 16.clamp(0, token.length))}...');
+          await _registerToken(token);
         }
-      });
+      } else {
+        debugPrint('[Push] No apns_token.txt found at ${file.path}');
+      }
+    } catch (e) {
+      debugPrint('[Push] Error reading token: $e');
     }
   }
 
@@ -55,9 +65,9 @@ class PushNotificationManager {
       await client.post('/api/push/register', body: {
         'token': token,
         'platform': 'apns',
-        'device_name': 'iOS',
+        'device_name': Platform.isIOS ? 'iOS' : 'macOS',
       });
-      debugPrint('[Push] Token registered with backend');
+      debugPrint('[Push] Token registered with backend!');
       _lastRegisteredToken = token;
     } catch (e) {
       debugPrint('[Push] Registration failed: $e');
@@ -66,5 +76,14 @@ class PushNotificationManager {
 }
 
 final pushManagerProvider = Provider<PushNotificationManager>((ref) {
-  return PushNotificationManager(ref);
+  final manager = PushNotificationManager(ref);
+
+  // Auto-init after auth is ready
+  ref.listen<SimpleAuthState>(simpleAuthProvider, (prev, next) {
+    if (next.isLoggedIn && !next.isLoading) {
+      manager.init();
+    }
+  }, fireImmediately: true);
+
+  return manager;
 });

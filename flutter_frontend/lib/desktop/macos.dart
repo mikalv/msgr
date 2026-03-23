@@ -11,6 +11,7 @@ import 'package:messngr/services/localization/translator.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:messngr/main_desktop.dart' show saveWindowBounds;
 import 'package:core/providers/auth_state_provider.dart';
+import 'package:core/providers/push_provider.dart';
 import 'package:core/providers/unread_provider.dart';
 import 'package:core/ui/auth/simple_login_screen.dart';
 import 'package:core/ui/shell/app_shell.dart';
@@ -369,12 +370,16 @@ class _AuthGate extends ConsumerWidget {
     // Update dock badge with total unread count
     if (auth.isLoggedIn) {
       final totalUnread = ref.watch(totalUnreadProvider);
-      // window_manager supports setBadgeLabel on macOS
       if (totalUnread > 0) {
         windowManager.setBadgeLabel('$totalUnread');
       } else {
         windowManager.setBadgeLabel('');
       }
+
+      // Register push token
+      final pushManager = ref.watch(pushManagerProvider);
+      Future.microtask(() => pushManager.init());
+
       return const AppShell(child: SimpleChatContent());
     }
 

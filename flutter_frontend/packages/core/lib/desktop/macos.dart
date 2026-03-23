@@ -401,7 +401,10 @@ class _AuthGate extends ConsumerWidget {
     }
 
     // Initialize push notification manager (auto-registers token when logged in)
-    ref.watch(pushManagerProvider);
+    print('[DEBUG] About to watch pushManagerProvider');
+    final pushManager = ref.watch(pushManagerProvider);
+    print('[DEBUG] pushManager obtained, calling init');
+    Future.microtask(() => pushManager.init());
 
     return const AppShell(child: SimpleChatContent());
   }
