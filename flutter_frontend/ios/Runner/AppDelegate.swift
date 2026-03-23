@@ -29,8 +29,8 @@ import UserNotifications
     let token = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
     print("[APNS] Device token: \(token)")
 
-    // Store token for later registration when user logs in
-    UserDefaults.standard.set(token, forKey: "apns_device_token")
+    // Store token with flutter. prefix so SharedPreferences can read it
+    UserDefaults.standard.set(token, forKey: "flutter.apns_device_token")
   }
 
   override func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
