@@ -106,6 +106,45 @@ defmodule Teams.Search do
     end
   end
 
+  @doc """
+  PostgreSQL ILIKE fallback search. Used temporarily while Prism text-field bug is unresolved.
+  """
+  def search_pg(prefix, query, opts \\ []) do
+    import Ecto.Query
+    limit = Keyword.get(opts, :limit, 20)
+    channel_id = Keyword.get(opts, :channel_id)
+    pattern = "%#{String.replace(query, "%", "\\%")}%"
+
+    base = from(m in Teams.TenantModels.Message,
+      where: is_nil(m.deleted_at) and is_nil(m.thread_parent_id),
+      where: fragment("(?->>'text') ILIKE ?", m.content, ^pattern),
+      preload: [:sender_profile],
+      order_by: [desc: m.inserted_at],
+      limit: ^limit
+    )
+
+    base = if channel_id, do: from(m in base, where: m.channel_id == ^channel_id), else: base
+
+    messages = Teams.Repo.all(base, prefix: prefix)
+
+    results = Enum.map(messages, fn m ->
+      %{
+        message_id: m.id,
+        channel_id: m.channel_id,
+        sender_name: if(m.sender_profile, do: m.sender_profile.display_name, else: ""),
+        content: extract_text(m.content),
+        inserted_at: to_string(m.inserted_at),
+        score: 1.0
+      }
+    end)
+
+    {:ok, results}
+  rescue
+    e ->
+      Logger.warning("PostgreSQL search fallback failed: #{inspect(e)}")
+      {:error, e}
+  end
+
   defp build_filter(team_slug, nil) do
     %{team_slug: team_slug}
   end

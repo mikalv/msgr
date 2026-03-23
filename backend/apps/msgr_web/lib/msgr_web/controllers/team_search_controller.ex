@@ -14,14 +14,19 @@ defmodule MessngrWeb.TeamSearchController do
       channel_id = Map.get(params, "channel_id")
       limit = String.to_integer(Map.get(params, "limit", "20"))
 
+      # Try Prism first, fall back to PostgreSQL ILIKE until Prism text-field bug is fixed
+      prefix = conn.assigns.tenant_prefix
+
       case Teams.Search.search(slug, query, limit: limit, channel_id: channel_id) do
-        {:ok, results} ->
+        {:ok, results} when results != [] ->
           json(conn, %{data: results})
 
-        {:error, reason} ->
-          conn
-          |> put_status(:service_unavailable)
-          |> json(%{error: "search_unavailable", detail: inspect(reason)})
+        _ ->
+          # PostgreSQL fallback
+          case Teams.Search.search_pg(prefix, query, limit: limit, channel_id: channel_id) do
+            {:ok, results} -> json(conn, %{data: results})
+            {:error, _} -> json(conn, %{data: []})
+          end
       end
     end
   end
