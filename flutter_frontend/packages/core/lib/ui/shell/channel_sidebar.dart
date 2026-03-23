@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:core/l10n/strings.dart';
 import 'package:core/ui/theme/msgr_theme.dart';
 import 'package:core/ui/widgets/profile_avatar.dart';
 
@@ -100,14 +101,14 @@ class ChannelSidebar extends StatelessWidget {
                   IconButton(
                     icon: Icon(Icons.tune, color: t.sidebarText, size: 18),
                     onPressed: onOpenSettings,
-                    tooltip: 'Settings',
+                    tooltip: S.settings,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                   ),
                   IconButton(
                     icon: Icon(Icons.edit_square, color: t.sidebarText, size: 18),
                     onPressed: () {},
-                    tooltip: 'Ny melding',
+                    tooltip: S.newMessage,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                   ),
@@ -125,7 +126,7 @@ class ChannelSidebar extends StatelessWidget {
                   // --- Channels section ---
                   _SectionHeader(
                     icon: Icons.grid_view_rounded,
-                    title: 'Kanaler',
+                    title: S.channels,
                   ),
                   const SizedBox(height: 2),
                   for (final channel in _sortedChannels)
@@ -139,7 +140,7 @@ class ChannelSidebar extends StatelessWidget {
                     ),
                   // + Legg til kanaler
                   _AddButton(
-                    label: 'Legg til kanaler',
+                    label: S.addChannels,
                     onTap: () => onCreateChannel?.call(),
                   ),
 
@@ -150,7 +151,7 @@ class ChannelSidebar extends StatelessWidget {
                   // --- Direct messages section ---
                   _SectionHeader(
                     icon: Icons.chat_bubble_outline,
-                    title: 'Direktemeldinger',
+                    title: S.directMessages,
                   ),
                   const SizedBox(height: 2),
                   for (final dm in _sortedDms)
@@ -164,7 +165,7 @@ class ChannelSidebar extends StatelessWidget {
                     ),
                   // + Inviter folk
                   _AddButton(
-                    label: 'Inviter folk',
+                    label: S.invitePeople,
                     onTap: () {},
                   ),
                 ],
@@ -229,7 +230,7 @@ class ChannelSidebar extends StatelessWidget {
                     if (onLogout != null)
                       IconButton(
                         icon: Icon(Icons.logout, color: t.sidebarText, size: 16),
-                        tooltip: 'Logg ut',
+                        tooltip: S.logout,
                         onPressed: onLogout,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(minWidth: 28, minHeight: 28),

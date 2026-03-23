@@ -41,7 +41,7 @@ class _ThreadIndicatorState extends State<_ThreadIndicator> {
               ),
               const SizedBox(width: 4),
               Text(
-                '${widget.replyCount} svar',
+                S.replies(widget.replyCount),
                 style: TextStyle(
                   color: _hovered
                       ? const Color(0xFF4FC3F7)

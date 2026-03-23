@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:libmsgr/api.dart' show MsgrApiClient;
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:core/l10n/strings.dart';
 import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/providers/channel_list_provider.dart';
 import 'package:core/providers/command_provider.dart';
@@ -220,7 +221,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Opplasting feilet: $e'),
+            content: Text('${S.uploadFailed}: $e'),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -279,7 +280,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Kommando feilet: $e'),
+            content: Text('${S.commandFailed}: $e'),
             backgroundColor: Colors.red.shade700,
           ),
         );
@@ -382,8 +383,8 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     color: Colors.orange.shade800,
-                    child: const Text(
-                      'Kobler til igjen...',
+                    child: Text(
+                      S.reconnecting,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white, fontSize: 12),
                     ),
@@ -408,7 +409,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    'Feil ved lasting av meldinger',
+                                    S.loadingError,
                                     style:
                                         TextStyle(color: Colors.red.shade300),
                                   ),
@@ -429,7 +430,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                                               channelMessagesProvider.notifier)
                                           .loadMessages(selectedChannel.id);
                                     },
-                                    child: const Text('Pr\u00f8v igjen'),
+                                    child: Text(S.tryAgain),
                                   ),
                                 ],
                               ),
@@ -437,7 +438,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                           : messages.isEmpty
                               ? Center(
                                   child: Text(
-                                    'Ingen meldinger enn\u00e5',
+                                    S.noMessagesYet,
                                     style: TextStyle(
                                         color: Colors.white.withOpacity(0.5)),
                                   ),
@@ -474,7 +475,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                     child: Text(
-                      '${typing.join(', ')} skriver...',
+                      S.typing(typing),
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.5),
                         fontSize: 12,
@@ -492,8 +493,8 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                       children: [
                         const Icon(Icons.edit, size: 14, color: Color(0xFF4FC3F7)),
                         const SizedBox(width: 8),
-                        const Text(
-                          'Redigerer melding',
+                        Text(
+                          S.editingMessage,
                           style: TextStyle(color: Color(0xFF4FC3F7), fontSize: 13),
                         ),
                         const Spacer(),
@@ -564,7 +565,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
       ref.read(channelMessagesProvider.notifier).mergeIncoming(message);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Kunne ikke slette: $e'), backgroundColor: Colors.red.shade700),
+          SnackBar(content: Text('${S.couldNotDelete}: $e'), backgroundColor: Colors.red.shade700),
         );
       }
     }
@@ -645,7 +646,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Kunne ikke redigere melding: $e'), backgroundColor: Colors.red.shade700),
+          SnackBar(content: Text('${S.couldNotEdit}: $e'), backgroundColor: Colors.red.shade700),
         );
       }
       // Restore edit mode
@@ -681,11 +682,11 @@ class _NewMessagesBanner extends StatelessWidget {
             ),
           ],
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Nye meldinger',
+              S.newMessages,
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 13,
@@ -721,7 +722,7 @@ class _NoChannelSelected extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Velg en kanal for \u00e5 starte',
+            S.selectChannelToStart,
             style: TextStyle(
               color: Colors.white.withOpacity(0.5),
               fontSize: 16,
@@ -802,7 +803,7 @@ class _SearchDialogState extends ConsumerState<_SearchDialog> {
                 onChanged: _onQueryChanged,
                 style: const TextStyle(color: Colors.white),
                 decoration: InputDecoration(
-                  hintText: 'Søk i meldinger...',
+                  hintText: S.searchMessages,
                   hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
                   prefixIcon: const Icon(Icons.search, color: Color(0xFFD1D2D3)),
                   filled: true,
@@ -825,8 +826,8 @@ class _SearchDialogState extends ConsumerState<_SearchDialog> {
                     ? Center(
                         child: Text(
                           _controller.text.length < 2
-                              ? 'Skriv minst 2 tegn'
-                              : 'Ingen resultater',
+                              ? S.minTwoChars
+                              : S.noResults,
                           style: TextStyle(color: Colors.white.withOpacity(0.4)),
                         ),
                       )

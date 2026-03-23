@@ -62,17 +62,17 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
       color: const Color(0xFF2A2A2A),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       items: [
-        _buildContextMenuItem('copy', Icons.copy, 'Kopier tekst'),
-        _buildContextMenuItem('thread', Icons.reply, 'Svar i tr\u00e5d'),
-        _buildContextMenuItem('reaction', Icons.emoji_emotions_outlined, 'Legg til reaksjon'),
-        _buildContextMenuItem('pin', Icons.push_pin_outlined, 'Fest melding'),
+        _buildContextMenuItem('copy', Icons.copy, S.copyText),
+        _buildContextMenuItem('thread', Icons.reply, S.replyInThread),
+        _buildContextMenuItem('reaction', Icons.emoji_emotions_outlined, S.addReaction),
+        _buildContextMenuItem('pin', Icons.push_pin_outlined, S.pinMessage),
         const PopupMenuDivider(),
         if (widget.isOwn) ...[
-          _buildContextMenuItem('edit', Icons.edit_outlined, 'Rediger'),
-          _buildContextMenuItem('delete', Icons.delete_outline, 'Slett', isDestructive: true),
+          _buildContextMenuItem('edit', Icons.edit_outlined, S.edit),
+          _buildContextMenuItem('delete', Icons.delete_outline, S.delete, isDestructive: true),
           const PopupMenuDivider(),
         ],
-        _buildContextMenuItem('link', Icons.link, 'Kopier lenke'),
+        _buildContextMenuItem('link', Icons.link, S.copyLink),
       ],
     );
 
@@ -83,8 +83,8 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         await Clipboard.setData(ClipboardData(text: msg.content));
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Tekst kopiert'),
+            SnackBar(
+              content: Text(S.textCopied),
               duration: Duration(seconds: 2),
             ),
           );
@@ -104,8 +104,8 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         await Clipboard.setData(ClipboardData(text: link));
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Lenke kopiert'),
+            SnackBar(
+              content: Text(S.linkCopied),
               duration: Duration(seconds: 2),
             ),
           );
@@ -113,8 +113,8 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         break;
       default:
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Kommer snart'),
+          SnackBar(
+            content: Text(S.comingSoon),
             duration: Duration(seconds: 2),
           ),
         );
@@ -216,7 +216,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                           if (msg.editedAt != null) ...[
                             const SizedBox(width: 6),
                             Text(
-                              '(redigert)',
+                              S.edited,
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.25),
                                 fontSize: 10,

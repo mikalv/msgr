@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:core/l10n/strings.dart';
 import 'package:core/providers/msgr_client_provider.dart';
 import 'package:core/ui/theme/msgr_theme.dart';
 
@@ -149,8 +150,8 @@ class _AvatarUploadDialogState extends ConsumerState<AvatarUploadDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Title
-              const Text(
-                'Endre profilbilde',
+              Text(
+                S.changeProfilePicture,
                 style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 20),
@@ -192,7 +193,7 @@ class _AvatarUploadDialogState extends ConsumerState<AvatarUploadDialog> {
                   Expanded(
                     child: _SourceButton(
                       icon: Icons.folder_open,
-                      label: 'Fil',
+                      label: S.file,
                       onTap: _pickFile,
                     ),
                   ),
@@ -200,7 +201,7 @@ class _AvatarUploadDialogState extends ConsumerState<AvatarUploadDialog> {
                   Expanded(
                     child: _SourceButton(
                       icon: Icons.content_paste,
-                      label: 'Lim inn',
+                      label: S.paste,
                       onTap: _pasteFromClipboard,
                     ),
                   ),
@@ -216,7 +217,7 @@ class _AvatarUploadDialogState extends ConsumerState<AvatarUploadDialog> {
                       controller: _urlController,
                       style: const TextStyle(color: Colors.white, fontSize: 13),
                       decoration: InputDecoration(
-                        hintText: 'Lim inn bilde-URL...',
+                        hintText: S.pasteImageUrl,
                         hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
                         filled: true,
                         fillColor: const Color(0xFF1A1D21),
@@ -234,7 +235,7 @@ class _AvatarUploadDialogState extends ConsumerState<AvatarUploadDialog> {
                   IconButton(
                     icon: const Icon(Icons.download, color: Color(0xFFD1D2D3)),
                     onPressed: _fetchUrl,
-                    tooltip: 'Hent',
+                    tooltip: S.fetch,
                   ),
                 ],
               ),
@@ -254,14 +255,14 @@ class _AvatarUploadDialogState extends ConsumerState<AvatarUploadDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: Text('Avbryt', style: TextStyle(color: Colors.white.withOpacity(0.6))),
+                    child: Text(S.cancel, style: TextStyle(color: Colors.white.withOpacity(0.6))),
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
                     onPressed: _imageBytes != null && !_uploading ? _upload : null,
                     child: _uploading
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text('Lagre'),
+                        : Text(S.save),
                   ),
                 ],
               ),

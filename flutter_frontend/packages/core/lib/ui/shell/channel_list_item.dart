@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:core/l10n/strings.dart';
 import 'package:core/ui/theme/msgr_theme.dart';
 
 import 'shell_models.dart';
@@ -33,11 +34,11 @@ class ChannelListItem extends StatelessWidget {
       color: const Color(0xFF2A2A2A),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       items: [
-        _channelMenuItem('mute', Icons.notifications_off_outlined, 'Demp kanal'),
-        _channelMenuItem('leave', Icons.logout, 'Forlat kanal'),
+        _channelMenuItem('mute', Icons.notifications_off_outlined, S.muteChannel),
+        _channelMenuItem('leave', Icons.logout, S.leaveChannel),
         const PopupMenuDivider(),
-        _channelMenuItem('edit', Icons.edit_outlined, 'Rediger kanal'),
-        _channelMenuItem('link', Icons.link, 'Kopier lenke'),
+        _channelMenuItem('edit', Icons.edit_outlined, S.editChannel),
+        _channelMenuItem('link', Icons.link, S.copyLink),
       ],
     );
 
@@ -49,8 +50,8 @@ class ChannelListItem extends StatelessWidget {
         await Clipboard.setData(ClipboardData(text: link));
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Kanal-lenke kopiert'),
+            SnackBar(
+              content: Text(S.channelLinkCopied),
               duration: Duration(seconds: 2),
             ),
           );
@@ -58,8 +59,8 @@ class ChannelListItem extends StatelessWidget {
         break;
       default:
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Kommer snart'),
+          SnackBar(
+            content: Text(S.comingSoon),
             duration: Duration(seconds: 2),
           ),
         );
