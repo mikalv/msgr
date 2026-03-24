@@ -45,6 +45,21 @@ defmodule MessngrWeb.AccountController do
     render(conn, :show, account: account)
   end
 
+  def update_me(conn, params) do
+    current_account = conn.assigns.current_account
+    attrs = normalize_account_attrs(params)
+
+    with {:ok, _updated} <- Messngr.update_account(current_account, attrs) do
+      account = Messngr.get_account!(current_account.id)
+      json(conn, %{data: %{
+        id: account.id,
+        display_name: account.display_name,
+        handle: account.handle,
+        email: account.email
+      }})
+    end
+  end
+
   defp normalize_account_attrs(params) when is_map(params) do
     params
     |> Map.take([

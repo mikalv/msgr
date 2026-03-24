@@ -16,7 +16,7 @@ defmodule MessngrWeb.Endpoint do
     longpoll: [connect_info: [session: @session_options]]
 
   socket "/socket", MessngrWeb.UserSocket,
-    websocket: true,
+    websocket: [check_origin: false],
     longpoll: true
   # Serve at "/" the static files from "priv/static" directory.
   #
@@ -29,10 +29,12 @@ defmodule MessngrWeb.Endpoint do
     only: MessngrWeb.static_paths()
 
   # Serve Flutter web client from /app/web_client (mounted volume)
+  # Exclude API, socket, health paths — those are handled by the router
   plug Plug.Static,
     at: "/",
     from: "/app/web_client",
-    gzip: true
+    gzip: true,
+    only_matching: ~w(main.dart.js flutter_bootstrap.js flutter_service_worker.js push_sw.js manifest.json favicon.png version.json index.html assets icons canvaskit)
 
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.

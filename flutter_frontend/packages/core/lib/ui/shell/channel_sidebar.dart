@@ -30,6 +30,7 @@ class ChannelSidebar extends StatelessWidget {
     this.userDisplayName,
     this.userProfileId,
     this.onAvatarTap,
+    this.onInvitePeople,
   });
 
   final String teamName;
@@ -47,6 +48,7 @@ class ChannelSidebar extends StatelessWidget {
   final String? userDisplayName;
   final String? userProfileId;
   final VoidCallback? onAvatarTap;
+  final VoidCallback? onInvitePeople;
 
   List<MockChannel> get _sortedChannels {
     final sorted = List<MockChannel>.from(channels);
@@ -166,7 +168,7 @@ class ChannelSidebar extends StatelessWidget {
                   // + Inviter folk
                   _AddButton(
                     label: S.invitePeople,
-                    onTap: () {},
+                    onTap: () => onInvitePeople?.call(),
                   ),
                 ],
               ),

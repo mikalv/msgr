@@ -364,17 +364,16 @@ defmodule Messngr.Auth do
   end
 
   defp derive_display_name(%Challenge{channel: :email, target: target}) do
-    target
-    |> String.split("@")
-    |> List.first()
-    |> String.replace(~r/[._-]/, " ")
-    |> String.split()
-    |> Enum.map(&String.capitalize/1)
-    |> Enum.join(" ")
-    |> case do
-      name when byte_size(name) < 2 -> name <> " "
-      name -> name
-    end
+    local =
+      target
+      |> String.split("@")
+      |> List.first()
+      |> String.replace(~r/[._-]/, " ")
+      |> String.split()
+      |> Enum.map(&String.capitalize/1)
+      |> Enum.join(" ")
+
+    if byte_size(local) >= 2, do: local, else: target
   end
 
   defp derive_display_name(%Challenge{channel: :phone, target: target}) do

@@ -39,7 +39,6 @@ defmodule Messngr.Accounts.Account do
       :read_receipts_enabled
     ])
     |> put_default_display_name()
-    |> validate_required([:display_name])
     |> validate_length(:display_name, min: 2, max: 120)
     |> validate_format(:email, ~r/@/, message: "must look like an email address")
     |> unique_constraint(:email)

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.0] — 2026-03-23
+
+### Added — Team Invitations (#117)
+- Link-based team invitations: any member can generate a shareable invite URL
+- Invite links expire after 7 days, can be revoked by creator/admin
+- Backend: `invite_links` table, InviteLink schema, create/list/revoke endpoints
+- Backend: public `POST /api/invite/:code` endpoint for redeeming invites
+- Flutter: "Invite people" button in sidebar generates link + copy-to-clipboard dialog
+- Flutter web: `/invite/:code` URL handling — auto-redeems after login
+
+### Fixed — Web Client
+- Remove `dart:io` imports crashing Flutter web (realtime_provider, notification_provider, app_shell, desktop_notification_service)
+- Fix Phoenix `check_origin` rejecting WebSocket from web client
+- Conditional imports for desktop notification service (stub on web, osascript on macOS)
+
 ## [0.4.0] — 2026-03-23
 
 ### Added — Push Notifications

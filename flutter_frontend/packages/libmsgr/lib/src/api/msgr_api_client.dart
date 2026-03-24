@@ -382,6 +382,31 @@ class MsgrApiClient {
   }
 
   // ---------------------------------------------------------------------------
+  // Invite Links
+  // ---------------------------------------------------------------------------
+
+  /// POST /api/teams/:slug/invites — generate a new invite link
+  Future<Map<String, dynamic>> createInviteLink(String teamSlug) async {
+    return post('/api/teams/$teamSlug/invites');
+  }
+
+  /// POST /api/invite/:code — redeem an invite code
+  Future<Map<String, dynamic>> redeemInvite(String code) async {
+    return post('/api/invite/$code');
+  }
+
+  /// PUT /api/account/me — update current account profile
+  Future<Map<String, dynamic>> updateAccount({
+    String? displayName,
+    String? handle,
+  }) async {
+    return put('/api/account/me', body: {
+      if (displayName != null) 'display_name': displayName,
+      if (handle != null) 'handle': handle,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Channels
   // ---------------------------------------------------------------------------
 

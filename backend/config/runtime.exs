@@ -323,6 +323,15 @@ if apns_key_id do
     environment: if(System.get_env("APNS_SANDBOX") == "true", do: :sandbox, else: :production)
 end
 
+# Web Push (VAPID)
+vapid_public = blank_to_nil.(System.get_env("VAPID_PUBLIC_KEY"))
+if vapid_public do
+  config :msgr, Messngr.Push.WebPush,
+    public_key: vapid_public,
+    private_key: System.get_env("VAPID_PRIVATE_KEY"),
+    subject: System.get_env("VAPID_SUBJECT", "mailto:admin@msgr.no")
+end
+
 # Bot authentication secret (for headless bot clients)
 config :msgr_web, :bot_auth_secret, blank_to_nil.(System.get_env("BOT_AUTH_SECRET"))
 

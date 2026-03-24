@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:logging/logging.dart';
@@ -476,7 +476,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     }
 
     // Show desktop notification for thread replies
-    if (Platform.isMacOS) {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
       _showNotificationForMessage(reply, channelId, data);
     }
   }

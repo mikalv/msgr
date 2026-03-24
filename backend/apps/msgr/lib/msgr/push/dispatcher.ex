@@ -6,7 +6,7 @@ defmodule Messngr.Push.Dispatcher do
 
   require Logger
 
-  alias Messngr.Push.APNS
+  alias Messngr.Push.{APNS, WebPush}
 
   @doc """
   Send push notifications for a new message to all channel members
@@ -39,9 +39,16 @@ defmodule Messngr.Push.Dispatcher do
           team_slug: team_slug
         )
 
+        web_payload = WebPush.message_payload(sender_name, content,
+          channel_id: channel_id,
+          message_id: message.id,
+          team_slug: team_slug
+        )
+
         for {token, platform} <- tokens do
           case platform do
             "apns" -> APNS.push(token, payload)
+            "web_push" -> WebPush.push(token, web_payload)
             _ -> Logger.debug("Skipping push for platform: #{platform}")
           end
         end

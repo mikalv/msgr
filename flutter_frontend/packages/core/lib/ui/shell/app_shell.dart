@@ -1,5 +1,4 @@
-import 'dart:io' show Platform;
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +10,8 @@ import 'package:core/providers/models.dart' hide ChannelKind;
 import 'package:core/providers/msgr_client_provider.dart';
 import 'package:core/providers/team_list_provider.dart';
 import 'package:core/providers/unread_provider.dart';
+import 'package:core/providers/web_push_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:core/ui/settings/settings_page.dart';
 
@@ -53,13 +54,43 @@ class _AppShellState extends ConsumerState<AppShell> {
   final List<String> _channelHistory = [];
   int _channelHistoryIndex = -1;
 
+  /// Track which teams we've already shown profile setup for this session.
+  final Set<String> _profileSetupShownFor = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // Check profile on first team load
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkProfileSetup());
+  }
+
+  /// Show profile setup dialog if the user's team profile has no display_name.
+  Future<void> _checkProfileSetup() async {
+    final team = ref.read(selectedTeamProvider);
+    if (team == null) return;
+    if (_profileSetupShownFor.contains(team.slug)) return;
+
+    try {
+      final client = ref.read(msgrApiProvider);
+      final profiles = await client.getProfiles(team.slug);
+      final myProfileId = ref.read(simpleAuthProvider).profileId;
+      final myProfile = profiles.where((p) => p['id'] == myProfileId).firstOrNull;
+
+      if (myProfile != null) {
+        final displayName = myProfile['display_name']?.toString() ?? '';
+        if (displayName.isEmpty || displayName == myProfile['email']) {
+          _profileSetupShownFor.add(team.slug);
+          if (mounted) await _showProfileSetupDialog(team.slug);
+          return;
+        }
+      }
+    } catch (_) {}
+    if (team.slug.isNotEmpty) _profileSetupShownFor.add(team.slug);
+  }
+
   /// Whether the modifier key is Meta (macOS) or Control (other platforms).
   bool get _useMeta {
-    try {
-      return Platform.isMacOS;
-    } catch (_) {
-      return false;
-    }
+    return !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
   }
 
   void _navigateBack() {
@@ -294,7 +325,12 @@ class _AppShellState extends ConsumerState<AppShell> {
           Expanded(
             child: Container(
               color: MsgrTheme.of(context).contentBg,
-              child: widget.child,
+              child: Column(
+                children: [
+                  if (kIsWeb) _WebPushBanner(),
+                  Expanded(child: widget.child),
+                ],
+              ),
             ),
           ),
         ],
@@ -328,7 +364,14 @@ class _AppShellState extends ConsumerState<AppShell> {
       body: Row(
         children: [
           _buildSidebar(),
-          Expanded(child: widget.child),
+          Expanded(
+            child: Column(
+              children: [
+                if (kIsWeb) _WebPushBanner(),
+                Expanded(child: widget.child),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -372,7 +415,12 @@ class _AppShellState extends ConsumerState<AppShell> {
           ),
         ],
       ),
-      body: widget.child,
+      body: Column(
+        children: [
+          if (kIsWeb) _WebPushBanner(),
+          Expanded(child: widget.child),
+        ],
+      ),
     );
   }
 
@@ -408,6 +456,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         final team = ref.read(selectedTeamProvider);
         if (team != null) _showProfileSetupDialog(team.slug);
       },
+      onInvitePeople: _showInviteDialog,
       onLogout: () => ref.read(simpleAuthProvider.notifier).logout(),
     );
   }
@@ -420,6 +469,8 @@ class _AppShellState extends ConsumerState<AppShell> {
     if (index >= 0 && index < teams.length) {
       ref.read(selectedTeamProvider.notifier).select(teams[index]);
       ref.read(selectedChannelProvider.notifier).clear();
+      // Check if the new team needs profile setup
+      Future.microtask(() => _checkProfileSetup());
     }
   }
 
@@ -758,6 +809,92 @@ class _AppShellState extends ConsumerState<AppShell> {
     nameController.dispose();
     emailController.dispose();
     phoneController.dispose();
+  }
+
+  Future<void> _showInviteDialog() async {
+    final team = ref.read(selectedTeamProvider);
+    if (team == null) return;
+
+    final client = ref.read(msgrApiProvider);
+    String? inviteUrl;
+    String? error;
+    bool loading = true;
+
+    // Generate invite link immediately
+    try {
+      final result = await client.createInviteLink(team.slug);
+      final data = result['data'] ?? result;
+      inviteUrl = data['url'] as String?;
+    } catch (e) {
+      error = e.toString();
+    }
+    loading = false;
+
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF2A2A3E),
+          title: const Text(
+            'Invite people',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: SizedBox(
+            width: 380,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Share this link to invite people to ${team.name}:',
+                  style: TextStyle(color: Colors.white.withAlpha(180), fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                if (error != null)
+                  Text(error, style: const TextStyle(color: Colors.redAccent, fontSize: 13))
+                else if (inviteUrl != null)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: SelectableText(
+                            inviteUrl,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontFamily: 'monospace',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _InviteCopyButton(url: inviteUrl),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                Text(
+                  'Link expires in 7 days.',
+                  style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Done'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _showCreateChannelDialog() async {
@@ -1301,6 +1438,122 @@ class _WelcomeScreen extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Stateful copy button that shows a checkmark after copying.
+class _InviteCopyButton extends StatefulWidget {
+  const _InviteCopyButton({required this.url});
+  final String url;
+
+  @override
+  State<_InviteCopyButton> createState() => _InviteCopyButtonState();
+}
+
+class _InviteCopyButtonState extends State<_InviteCopyButton> {
+  bool _copied = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(
+        _copied ? Icons.check : Icons.copy,
+        color: _copied ? Colors.greenAccent : Colors.white70,
+        size: 18,
+      ),
+      tooltip: _copied ? 'Copied!' : 'Copy',
+      onPressed: () async {
+        await Clipboard.setData(ClipboardData(text: widget.url));
+        setState(() => _copied = true);
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted) setState(() => _copied = false);
+      },
+    );
+  }
+}
+
+/// Banner that asks web users to enable push notifications.
+/// Dismisses after subscription or manual close.
+class _WebPushBanner extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_WebPushBanner> createState() => _WebPushBannerState();
+}
+
+class _WebPushBannerState extends ConsumerState<_WebPushBanner> {
+  bool _dismissed = false;
+  bool _subscribing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkDismissed();
+  }
+
+  Future<void> _checkDismissed() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool('web_push_banner_dismissed') == true) {
+        if (mounted) setState(() => _dismissed = true);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _dismiss() async {
+    setState(() => _dismissed = true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('web_push_banner_dismissed', true);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_dismissed) return const SizedBox.shrink();
+
+    final manager = ref.read(webPushManagerProvider);
+    if (!manager.isAvailable || manager.isSubscribed) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: const Color(0xFF1D4E3E),
+      child: Row(
+        children: [
+          const Icon(Icons.notifications_active, color: Colors.white70, size: 18),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Enable desktop notifications to stay updated',
+              style: TextStyle(color: Colors.white70, fontSize: 13),
+            ),
+          ),
+          TextButton(
+            onPressed: _subscribing
+                ? null
+                : () async {
+                    setState(() => _subscribing = true);
+                    await manager.subscribe();
+                    if (mounted) {
+                      setState(() => _subscribing = false);
+                      await _dismiss();
+                    }
+                  },
+            child: _subscribing
+                ? const SizedBox(
+                    width: 16, height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Text('Enable', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: Colors.white38, size: 16),
+            onPressed: () => _dismiss(),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+          ),
+        ],
       ),
     );
   }

@@ -48,6 +48,7 @@ defmodule MessngrWeb.Router do
     pipe_through [:api, :actor]
 
     post "/push/register", PushTokenController, :register
+    get "/push/vapid_key", PushTokenController, :vapid_key
 
     get "/conversations", ConversationController, :index
     post "/conversations", ConversationController, :create
@@ -86,6 +87,7 @@ defmodule MessngrWeb.Router do
     post "/bridges/:bridge_id/sessions/:id/credentials", BridgeAuthSessionController, :submit_credentials
     delete "/bridges/:bridge_id", BridgeAccountController, :delete
     get "/account/me", AccountController, :me
+    put "/account/me", AccountController, :update_me
     get "/settings", SettingsController, :show
     put "/settings", SettingsController, :update
     resources "/profiles", ProfileController, only: [:index, :create, :update, :delete]
@@ -122,6 +124,11 @@ defmodule MessngrWeb.Router do
     get "/media/:object_key/url", TeamMediaController, :download_url
     post "/dms", TeamDmController, :create
 
+    # Invite links
+    post "/invites", InviteLinkController, :create
+    get "/invites", InviteLinkController, :index
+    delete "/invites/:id", InviteLinkController, :delete
+
     # ── App Platform (team-scoped) ─────────────────────────────
     get "/commands", CommandController, :index
     post "/channels/:channel_id/commands", CommandController, :execute
@@ -130,6 +137,13 @@ defmodule MessngrWeb.Router do
     delete "/apps/:app_slug", AppController, :uninstall
     post "/apps/:app_slug/tokens", AppController, :create_token
     delete "/apps/:app_slug/tokens/:token_id", AppController, :revoke_token
+  end
+
+  # Invite redemption (authenticated, no team membership required)
+  scope "/api", MessngrWeb do
+    pipe_through [:api, :actor]
+
+    post "/invite/:code", InviteController, :redeem
   end
 
   # Team-level endpoints (no tenant resolution needed)

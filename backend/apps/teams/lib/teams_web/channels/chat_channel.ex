@@ -54,11 +54,18 @@ defmodule TeamsWeb.ChatChannel do
           tenant_profile_id = if tenant_profile, do: tenant_profile.id, else: profile_id
 
           if has_access?(prefix, channel, tenant_profile_id) do
+            # Resolve team_slug for push notifications
+            team_slug =
+              Map.get(payload || %{}, "team_slug") ||
+              socket.assigns[:team_slug] ||
+              resolve_slug_from_prefix(prefix)
+
             socket =
               socket
               |> assign(:channel_id, channel_id)
               |> assign(:prefix, prefix)
               |> assign(:profile_id, tenant_profile_id)
+              |> assign(:team_slug, team_slug)
 
             send(self(), :after_join)
             {:ok, socket}
@@ -110,6 +117,13 @@ defmodule TeamsWeb.ChatChannel do
         message = Messages.get_message(prefix, message.id)
 
         broadcast!(socket, "new:message", serialize_message(message))
+
+        # Dispatch push notifications to offline members
+        team_slug = socket.assigns[:team_slug]
+        if team_slug do
+          Messngr.Push.Dispatcher.notify_new_message(team_slug, prefix, message)
+        end
+
         {:reply, {:ok, %{id: message.id}}, socket}
 
       {:error, changeset} ->
@@ -139,6 +153,12 @@ defmodule TeamsWeb.ChatChannel do
           thread_parent_id: parent_id,
           message: serialize_message(message)
         })
+
+        # Dispatch push notifications for thread replies too
+        team_slug = socket.assigns[:team_slug]
+        if team_slug do
+          Messngr.Push.Dispatcher.notify_new_message(team_slug, prefix, message)
+        end
 
         {:reply, {:ok, %{id: message.id}}, socket}
 
@@ -265,6 +285,15 @@ defmodule TeamsWeb.ChatChannel do
       role: profile.role
     }
   end
+
+  defp resolve_slug_from_prefix(prefix) when is_binary(prefix) do
+    case Teams.Repo.get_by(Teams.Schemas.Team, schema_name: prefix) do
+      nil -> nil
+      team -> team.slug
+    end
+  end
+
+  defp resolve_slug_from_prefix(_), do: nil
 
   defp serialize_reactions(%Ecto.Association.NotLoaded{}), do: []
 

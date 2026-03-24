@@ -1,11 +1,13 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart';
 import 'package:logging/logging.dart';
+
+// Conditional import: dart:io only available on native platforms
+import 'desktop_notification_service_stub.dart'
+    if (dart.library.io) 'desktop_notification_service_io.dart' as impl;
 
 /// Service for showing native macOS desktop notifications via osascript.
 ///
-/// Uses `display notification` AppleScript command which requires no
-/// additional packages or entitlements.
+/// On web, all methods are no-ops.
 class DesktopNotificationService {
   DesktopNotificationService();
 
@@ -17,48 +19,16 @@ class DesktopNotificationService {
   /// Whether the app window is currently focused and visible.
   bool get isAppFocused => isWindowFocused;
 
-  /// Show a macOS notification for a new message.
-  ///
-  /// [title] - Notification title (e.g. "#general" or "DM: Alice")
-  /// [body] - Message content, truncated to 100 chars
-  /// [channelId] - Channel ID for navigation on tap
-  /// [playSound] - Whether to play the default notification sound
   Future<void> showMessageNotification({
     required String title,
     required String body,
     required String channelId,
     bool playSound = true,
   }) async {
-    if (!Platform.isMacOS) return;
-
-    final truncatedBody =
-        body.length > 100 ? '${body.substring(0, 97)}...' : body;
-
-    // Escape quotes and backslashes for AppleScript
-    final escapedTitle =
-        title.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
-    final escapedBody =
-        truncatedBody.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
-
-    final soundClause = playSound ? ' sound name "default"' : '';
-
-    final script =
-        'display notification "$escapedBody" with title "$escapedTitle"$soundClause';
-
-    try {
-      final result = await Process.run('osascript', ['-e', script]);
-      if (result.exitCode != 0) {
-        _log.warning(
-            'osascript notification failed (exit ${result.exitCode}): ${result.stderr}');
-      } else {
-        _log.fine('Notification shown: $title');
-      }
-    } catch (e) {
-      _log.warning('Failed to show notification: $e');
-    }
+    if (kIsWeb) return;
+    await impl.showNotification(title: title, body: body, playSound: playSound);
   }
 
-  /// Show a mention notification. These are higher priority.
   Future<void> showMentionNotification({
     required String channelName,
     required String senderName,

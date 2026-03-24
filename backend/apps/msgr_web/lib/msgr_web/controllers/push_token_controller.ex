@@ -36,4 +36,16 @@ defmodule MessngrWeb.PushTokenController do
   def register(conn, _params) do
     conn |> put_status(:bad_request) |> json(%{error: "token and platform required"})
   end
+
+  @doc "GET /api/push/vapid_key — return the VAPID public key for Web Push subscription"
+  def vapid_key(conn, _params) do
+    vapid_config = Application.get_env(:msgr, Messngr.Push.WebPush, [])
+    public_key = vapid_config[:public_key]
+
+    if public_key do
+      json(conn, %{vapid_public_key: public_key})
+    else
+      conn |> put_status(:not_found) |> json(%{error: "Web push not configured"})
+    end
+  end
 end
