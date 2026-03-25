@@ -177,17 +177,22 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
 
     // Profile setup gate — shown after team join, before chat
-    if (_needsProfileSetup) {
+    // Check SYNCHRONOUSLY: if account has no display_name, show setup
+    final auth = ref.watch(simpleAuthProvider);
+    final needsSetup = _needsProfileSetup ||
+        (auth.displayName == null || auth.displayName!.isEmpty || auth.displayName == auth.email);
+    if (needsSetup) {
       final team = ref.read(selectedTeamProvider);
+      final currentTeam = ref.read(selectedTeamProvider);
       return ProfileSetupScreen(
         onComplete: () {
           setState(() => _needsProfileSetup = false);
           // Also update team profile
-          if (team != null) {
-            final auth = ref.read(simpleAuthProvider);
+          if (currentTeam != null) {
+            final updatedAuth = ref.read(simpleAuthProvider);
             final client = ref.read(msgrApiProvider);
-            if (auth.displayName != null) {
-              client.updateMyProfile(team.slug, displayName: auth.displayName);
+            if (updatedAuth.displayName != null) {
+              client.updateMyProfile(currentTeam.slug, displayName: updatedAuth.displayName);
             }
           }
         },
