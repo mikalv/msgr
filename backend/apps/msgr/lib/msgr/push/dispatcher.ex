@@ -15,6 +15,7 @@ defmodule Messngr.Push.Dispatcher do
   def notify_new_message(team_slug, prefix, message) do
     Task.start(fn ->
       try do
+        Logger.info("Push task started for team=#{team_slug}")
         sender_id = message.sender_profile_id
         channel_id = message.channel_id
 
@@ -31,6 +32,7 @@ defmodule Messngr.Push.Dispatcher do
 
         # Get all device tokens for channel members except sender
         tokens = get_push_tokens(prefix, channel_id, sender_id)
+        Logger.info("Push tokens found: #{length(tokens)} for channel=#{channel_id} sender=#{sender_id}")
         if tokens == [], do: throw(:no_tokens)
 
         payload = APNS.message_payload(sender_name, content,
@@ -56,7 +58,7 @@ defmodule Messngr.Push.Dispatcher do
         Logger.debug("Push dispatched to #{length(tokens)} devices for message #{message.id}")
       catch
         :empty_message -> :ok
-        :no_tokens -> :ok
+        :no_tokens -> Logger.debug("Push: no tokens found for channel members")
       rescue
         e -> Logger.warning("Push dispatch failed: #{inspect(e)}")
       end
@@ -88,8 +90,8 @@ defmodule Messngr.Push.Dispatcher do
       if account_ids == [] do
         []
       else
-        # Get push tokens from device_push_tokens table
-        from(t in "device_push_tokens",
+        # Get push tokens using the proper schema
+        from(t in Messngr.Push.DeviceToken,
           where: t.account_id in ^account_ids and t.enabled == true,
           select: {t.token, t.platform}
         )
@@ -97,7 +99,9 @@ defmodule Messngr.Push.Dispatcher do
       end
     end
   rescue
-    _ -> []
+    e ->
+      Logger.warning("get_push_tokens failed: #{inspect(e)}")
+      []
   end
 
   defp extract_text(%{"text" => text}) when is_binary(text), do: text
