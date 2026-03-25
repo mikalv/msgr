@@ -6,6 +6,15 @@ import 'dart:js' as js;
 import 'dart:js_util' as js_util;
 import 'dart:typed_data';
 
+/// Check if notification permission is already granted.
+bool isNotificationGranted() {
+  try {
+    return html.Notification.permission == 'granted';
+  } catch (_) {
+    return false;
+  }
+}
+
 /// Subscribe to Web Push notifications via browser Push API.
 /// Returns the subscription as a JSON string, or null if denied/unavailable.
 Future<String?> subscribeToPush(String vapidPublicKey) async {

@@ -11,6 +11,7 @@ import 'package:core/providers/msgr_client_provider.dart';
 import 'package:core/providers/team_list_provider.dart';
 import 'package:core/providers/unread_provider.dart';
 import 'package:core/providers/web_push_provider.dart';
+import 'package:core/providers/web_push_stub.dart' if (dart.library.html) 'package:core/providers/web_push_web.dart' as webPushImpl;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:core/ui/settings/settings_page.dart';
@@ -1514,8 +1515,11 @@ class _WebPushBannerState extends ConsumerState<_WebPushBanner> {
   Widget build(BuildContext context) {
     if (_dismissed) return const SizedBox.shrink();
 
+    // Don't show if notifications already granted
+    if (webPushImpl.isNotificationGranted()) return const SizedBox.shrink();
+
     final manager = ref.read(webPushManagerProvider);
-    if (!manager.isAvailable || manager.isSubscribed) return const SizedBox.shrink();
+    if (!manager.isAvailable) return const SizedBox.shrink();
 
     return Container(
       width: double.infinity,
