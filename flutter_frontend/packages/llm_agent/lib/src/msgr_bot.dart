@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:libmsgr/libmsgr.dart';
 
-/// A headless Msgr bot that authenticates via bot-token, joins a team, and polls for messages.
+/// A headless Msgr bot that authenticates via bot-token, joins a team,
+/// and listens for messages via WebSocket (with REST polling fallback).
 class MsgrBot {
   MsgrBot({
     required this.email,
@@ -10,7 +12,8 @@ class MsgrBot {
     required this.onMessage,
     required this.botSecret,
     this.msgrBaseUrl = 'https://dev.msgr.no',
-    this.pollInterval = const Duration(seconds: 2),
+    this.pollInterval = const Duration(seconds: 5),
+    this.useWebSocket = true,
   });
 
   final String email;
@@ -18,6 +21,7 @@ class MsgrBot {
   final String botSecret;
   final String msgrBaseUrl;
   final Duration pollInterval;
+  final bool useWebSocket;
   final Future<String?> Function(BotMessage message) onMessage;
 
   String? accountId;
@@ -28,6 +32,8 @@ class MsgrBot {
   final Map<String, String> channelNames = {};
   final Set<String> _seenMessageIds = {};
   final _client = http.Client();
+  MsgrRealtimeClient? _realtime;
+  bool _wsConnected = false;
 
   Map<String, String> get _headers {
     final h = <String, String>{
@@ -54,8 +60,19 @@ class MsgrBot {
         await _authenticate();
         await _joinTeam();
         await _discoverChannels();
-        print('[Bot] Ready — polling for messages');
-        await _pollLoop();
+
+        if (useWebSocket) {
+          await _connectWebSocket();
+        }
+
+        if (_wsConnected) {
+          print('[Bot] Ready — listening via WebSocket');
+          // Keep alive — WS events handled by callbacks
+          await Completer<void>().future;
+        } else {
+          print('[Bot] Ready — polling for messages (WebSocket unavailable)');
+          await _pollLoop();
+        }
       } catch (e) {
         print('[Bot] Error: $e — reconnecting in ${retryDelay.inSeconds}s');
         await Future.delayed(retryDelay);
@@ -135,6 +152,111 @@ class MsgrBot {
       }
     }
     print('[Bot] Warning: could not find own team profile');
+  }
+
+  Future<void> _connectWebSocket() async {
+    try {
+      final wsUrl = msgrBaseUrl
+          .replaceFirst('https://', 'wss://')
+          .replaceFirst('http://', 'ws://');
+
+      _realtime = MsgrRealtimeClient(
+        wsUrl: '$wsUrl/socket/websocket',
+        accountId: accountId!,
+        profileId: profileId!,
+        token: _accessToken,
+      );
+
+      _realtime!.onEvent = _handleWsEvent;
+      _realtime!.onDisconnect = () {
+        print('[Bot] WebSocket disconnected — will auto-reconnect');
+        _wsConnected = false;
+      };
+      _realtime!.onReconnect = () {
+        print('[Bot] WebSocket reconnected');
+        _wsConnected = true;
+        _rejoinChannels();
+      };
+
+      await _realtime!.connect();
+      _wsConnected = true;
+
+      // Join team and all channels
+      await _realtime!.join('team:$teamSlug', payload: {'team_slug': teamSlug});
+      for (final channelId in channelNames.keys) {
+        await _realtime!.join('channel:$channelId', payload: {'team_slug': teamSlug});
+      }
+
+      print('[Bot] WebSocket connected, joined ${channelNames.length} channels');
+
+      // Periodic token refresh
+      Timer.periodic(const Duration(minutes: 10), (_) async {
+        await _refreshAccessToken();
+        _realtime?.token = _accessToken;
+      });
+    } catch (e) {
+      print('[Bot] WebSocket connect failed: $e — falling back to polling');
+      _wsConnected = false;
+    }
+  }
+
+  void _rejoinChannels() {
+    _realtime?.join('team:$teamSlug', payload: {'team_slug': teamSlug});
+    for (final channelId in channelNames.keys) {
+      _realtime?.join('channel:$channelId', payload: {'team_slug': teamSlug});
+    }
+  }
+
+  void _handleWsEvent(String topic, String event, Map<String, dynamic> payload) {
+    if (!topic.startsWith('channel:')) return;
+    if (event != 'new:message') return;
+
+    final channelId = topic.replaceFirst('channel:', '');
+    final id = payload['id']?.toString() ?? '';
+    if (id.isEmpty || _seenMessageIds.contains(id)) return;
+    _seenMessageIds.add(id);
+
+    final sender = payload['sender_profile'] as Map<String, dynamic>? ?? {};
+    final senderProfileId = payload['sender_profile_id']?.toString() ?? sender['id']?.toString() ?? '';
+    final senderName = sender['display_name']?.toString() ?? 'Ukjent';
+
+    // Skip own messages
+    if (senderProfileId == teamProfileId || senderProfileId == profileId) return;
+
+    final rawContent = payload['content'];
+    final content = rawContent is Map
+        ? (rawContent['text']?.toString() ?? rawContent.toString())
+        : rawContent?.toString() ?? '';
+
+    if (content.isEmpty) return;
+
+    print('[Bot] #${channelNames[channelId]}: $senderName: $content');
+
+    final botMessage = BotMessage(
+      channelId: channelId,
+      channelName: channelNames[channelId] ?? '',
+      senderName: senderName,
+      senderProfileId: senderProfileId,
+      content: content,
+      messageId: id,
+      timestamp: DateTime.tryParse(payload['inserted_at']?.toString() ?? '') ?? DateTime.now(),
+    );
+
+    // Process async — don't block the event handler
+    _processMessage(botMessage);
+  }
+
+  Future<void> _processMessage(BotMessage message) async {
+    try {
+      await _setTyping(message.channelId, true);
+      final reply = await onMessage(message);
+      await _setTyping(message.channelId, false);
+      if (reply != null && reply.isNotEmpty) {
+        await sendMessage(message.channelId, reply);
+      }
+    } catch (e) {
+      print('[Bot] Error processing message: $e');
+    }
   }
 
   Future<void> _discoverChannels() async {

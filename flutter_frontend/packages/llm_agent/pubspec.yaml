@@ -9,3 +9,5 @@ environment:
 dependencies:
   http: ^1.2.1
   args: ^2.4.0
+  libmsgr:
+    path: ../libmsgr
