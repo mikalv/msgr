@@ -76,6 +76,9 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
           slug: c['slug']?.toString() ?? c['name']?.toString() ?? '',
           icon: c['icon'] as String?,
           kind: _parseChannelKind(c['kind'] as String?),
+          visibility: c['visibility'] == 'private'
+              ? ChannelVisibility.private
+              : ChannelVisibility.public,
           teamSlug: teamSlug,
           topic: c['topic'] as String?,
         );

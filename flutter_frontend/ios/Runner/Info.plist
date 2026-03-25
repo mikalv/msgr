@@ -40,10 +40,10 @@
     <key>CFBundleTypeRole</key>
     <string>Editor</string>
     <key>CFBundleURLName</key>
-    <string>dwirandyh.medium.com</string>
+    <string>no.msgr.app</string>
     <key>CFBundleURLSchemes</key>
     <array>
-    <string>msgrteams</string>
+    <string>msgr</string>
     </array>
 	<key>UIBackgroundModes</key>
 	<array>

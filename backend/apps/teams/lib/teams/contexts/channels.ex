@@ -17,6 +17,27 @@ defmodule Teams.Channels do
   end
 
   @doc """
+  Lists channels visible to a profile: all public + private channels where the profile is a member.
+  """
+  def list_channels_for_profile(prefix, profile_id) do
+    # Get IDs of private channels the profile is a member of
+    private_channel_ids =
+      from(cm in ChannelMembership,
+        join: c in Channel, on: cm.channel_id == c.id,
+        where: cm.profile_id == ^profile_id and c.visibility == "private",
+        select: cm.channel_id
+      )
+      |> Teams.Repo.all(prefix: prefix)
+
+    # All public channels + private channels the user is in
+    from(c in Channel,
+      where: c.visibility == "public" or c.id in ^private_channel_ids,
+      order_by: [asc: c.name]
+    )
+    |> Teams.Repo.all(prefix: prefix)
+  end
+
+  @doc """
   Lists public channels in the tenant.
   """
   def list_public_channels(prefix) do
@@ -146,9 +167,17 @@ defmodule Teams.Channels do
   end
 
   @doc """
-  Lists members of a channel.
+  Lists members of a channel with preloaded profiles.
   """
   def list_members(prefix, channel_id) do
     ChannelMembership.members_of(prefix, channel_id)
+  end
+
+  @doc """
+  Removes a member from a channel.
+  Returns `{count, nil}` where count is 0 or 1.
+  """
+  def remove_member(prefix, channel_id, profile_id) do
+    ChannelMembership.leave(prefix, channel_id, profile_id)
   end
 end

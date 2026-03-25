@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:core/providers/auth_state_provider.dart';
+import 'package:core/providers/channel_list_provider.dart';
 import 'package:core/providers/msgr_client_provider.dart';
 import 'package:core/providers/models.dart';
 import 'package:core/providers/team_list_provider.dart';
@@ -34,22 +35,137 @@ final teamMembersProvider =
   return items.map((p) => SlackProfile.fromJson(p)).toList();
 });
 
-/// A 240px wide panel showing team members on the right side of the chat area.
-class MemberPanel extends ConsumerWidget {
+/// A 240px wide panel showing channel members on the right side of the chat area.
+///
+/// Shows channel-specific members with add/remove functionality.
+class MemberPanel extends ConsumerStatefulWidget {
   const MemberPanel({super.key, required this.onClose});
 
   final VoidCallback onClose;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final membersAsync = ref.watch(teamMembersProvider);
+  ConsumerState<MemberPanel> createState() => _MemberPanelState();
+}
+
+class _MemberPanelState extends ConsumerState<MemberPanel> {
+  List<Map<String, dynamic>>? _channelMembers;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMembers();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+  }
+
+  Future<void> _loadMembers() async {
+    final team = ref.read(selectedTeamProvider);
+    final channel = ref.read(selectedChannelProvider);
+    if (team == null || channel == null) return;
+
+    setState(() => _loading = true);
+    try {
+      final client = ref.read(msgrApiProvider);
+      final members = await client.getChannelMembers(team.slug, channel.id);
+      if (mounted) setState(() {
+        _channelMembers = members;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _addMember() async {
+    final team = ref.read(selectedTeamProvider);
+    final channel = ref.read(selectedChannelProvider);
+    if (team == null || channel == null) return;
+
+    // Load all team members to pick from
+    final client = ref.read(msgrApiProvider);
+    final allProfiles = await client.getProfiles(team.slug);
+
+    // Filter out already-in-channel members
+    final currentIds = (_channelMembers ?? [])
+        .map((m) => m['profile_id'] as String?)
+        .whereType<String>()
+        .toSet();
+
+    final available = allProfiles
+        .where((p) => !currentIds.contains(p['id']?.toString()))
+        .toList();
+
+    if (available.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('All team members are already in this channel')),
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+
+    final selected = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => _AddMemberDialog(available: available),
+    );
+
+    if (selected != null && selected.isNotEmpty) {
+      await client.addChannelMembers(team.slug, channel.id, selected);
+      _loadMembers(); // Refresh
+    }
+  }
+
+  Future<void> _removeMember(String profileId, String displayName) async {
+    final team = ref.read(selectedTeamProvider);
+    final channel = ref.read(selectedChannelProvider);
+    if (team == null || channel == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2A2A3E),
+        title: const Text('Remove member', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Remove $displayName from #${channel.name}?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final client = ref.read(msgrApiProvider);
+      await client.removeChannelMember(team.slug, channel.id, profileId);
+      _loadMembers(); // Refresh
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final channel = ref.watch(selectedChannelProvider);
+    final auth = ref.read(simpleAuthProvider);
 
     return Container(
       width: 240,
       decoration: BoxDecoration(
         color: const Color(0xFF2A2A2A),
         border: Border(
-          left: BorderSide(color: Colors.white.withOpacity(0.1)),
+          left: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
       ),
       child: Column(
@@ -59,25 +175,34 @@ class MemberPanel extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               border: Border(
-                bottom: BorderSide(color: Colors.white.withOpacity(0.1)),
+                bottom: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
               ),
             ),
             child: Row(
               children: [
-                const Text(
-                  'Medlemmer',
-                  style: TextStyle(
+                Text(
+                  'Members${_channelMembers != null ? ' (${_channelMembers!.length})' : ''}',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const Spacer(),
+                // Add member button
+                IconButton(
+                  icon: const Icon(Icons.person_add, color: Colors.white54, size: 18),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  tooltip: 'Add member',
+                  onPressed: _addMember,
+                ),
+                const SizedBox(width: 4),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white54, size: 18),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  onPressed: onClose,
+                  onPressed: widget.onClose,
                 ),
               ],
             ),
@@ -85,49 +210,41 @@ class MemberPanel extends ConsumerWidget {
 
           // Member list
           Expanded(
-            child: membersAsync.when(
-              loading: () => const Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-              error: (err, _) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'Kunne ikke laste medlemmer',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
-                      fontSize: 13,
+            child: _loading
+                ? const Center(
+                    child: SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-              data: (members) {
-                if (members.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'Ingen medlemmer',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
-                        fontSize: 13,
+                  )
+                : _channelMembers == null || _channelMembers!.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No members',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: _channelMembers!.length,
+                        itemBuilder: (context, index) {
+                          final m = _channelMembers![index];
+                          final profileId = m['profile_id'] as String? ?? '';
+                          final displayName = m['display_name'] as String? ?? '';
+                          final role = m['role'] as String? ?? 'member';
+                          final avatarUrl = m['avatar_url'] as String?;
+                          final isMe = profileId == auth.profileId;
+
+                          return _ChannelMemberTile(
+                            profileId: profileId,
+                            displayName: displayName,
+                            role: role,
+                            avatarUrl: avatarUrl,
+                            isMe: isMe,
+                            onRemove: isMe ? null : () => _removeMember(profileId, displayName),
+                          );
+                        },
                       ),
-                    ),
-                  );
-                }
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: members.length,
-                  itemBuilder: (context, index) {
-                    final member = members[index];
-                    return _MemberTile(profile: member);
-                  },
-                );
-              },
-            ),
           ),
         ],
       ),
@@ -135,167 +252,168 @@ class MemberPanel extends ConsumerWidget {
   }
 }
 
-class _MemberTile extends ConsumerWidget {
-  const _MemberTile({required this.profile});
+class _ChannelMemberTile extends StatelessWidget {
+  const _ChannelMemberTile({
+    required this.profileId,
+    required this.displayName,
+    required this.role,
+    this.avatarUrl,
+    this.isMe = false,
+    this.onRemove,
+  });
 
-  final SlackProfile profile;
-
-  void _showProfile(BuildContext context, WidgetRef ref) {
-    final auth = ref.read(simpleAuthProvider);
-    final isOwn = auth.profileId == profile.id;
-    showProfileCard(
-      context,
-      profile: profile,
-      isOwnProfile: isOwn,
-    );
-  }
-
-  void _showMemberContextMenu(BuildContext context, Offset globalPosition, WidgetRef ref) async {
-    final result = await showMenu<String>(
-      context: context,
-      position: RelativeRect.fromLTRB(
-        globalPosition.dx,
-        globalPosition.dy,
-        globalPosition.dx + 1,
-        globalPosition.dy + 1,
-      ),
-      color: const Color(0xFF2A2A2A),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      items: [
-        _memberMenuItem('profile', Icons.person_outline, 'Vis profil'),
-        _memberMenuItem('dm', Icons.chat_bubble_outline, 'Send DM'),
-        const PopupMenuDivider(),
-        _memberMenuItem('mention', Icons.alternate_email, 'Nevn i melding'),
-        _memberMenuItem('copy', Icons.copy, 'Kopier brukernavn'),
-      ],
-    );
-
-    if (result == null || !context.mounted) return;
-
-    switch (result) {
-      case 'profile':
-        if (context.mounted) _showProfile(context, ref);
-        break;
-      case 'copy':
-        await Clipboard.setData(ClipboardData(text: profile.displayName));
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Brukernavn kopiert'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-        break;
-      default:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Kommer snart'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-    }
-  }
-
-  static PopupMenuItem<String> _memberMenuItem(
-    String value,
-    IconData icon,
-    String label,
-  ) {
-    return PopupMenuItem<String>(
-      value: value,
-      height: 36,
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: Colors.white70),
-          const SizedBox(width: 10),
-          Text(label, style: const TextStyle(color: Colors.white, fontSize: 13)),
-        ],
-      ),
-    );
-  }
+  final String profileId;
+  final String displayName;
+  final String role;
+  final String? avatarUrl;
+  final bool isMe;
+  final VoidCallback? onRemove;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return GestureDetector(
-      onTap: () => _showProfile(context, ref),
-      onSecondaryTapUp: (details) =>
-          _showMemberContextMenu(context, details.globalPosition, ref),
-      onLongPressStart: (details) =>
-          _showMemberContextMenu(context, details.globalPosition, ref),
-      child: Padding(
+  Widget build(BuildContext context) {
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Row(
         children: [
-          // Avatar with presence dot
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 14,
-                backgroundColor: Colors.blueGrey.shade600,
-                backgroundImage: profile.avatarUrl != null
-                    ? NetworkImage(profile.avatarUrl!)
-                    : null,
-                child: profile.avatarUrl == null
-                    ? Text(
-                        profile.displayName.isNotEmpty
-                            ? profile.displayName[0].toUpperCase()
-                            : '?',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
-                      )
-                    : null,
-              ),
-              // Online presence dot (grey by default since we don't have real presence yet)
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade600,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFF2A2A2A),
-                      width: 1.5,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+          CircleAvatar(
+            radius: 14,
+            backgroundColor: Colors.blueGrey.shade600,
+            backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl!) : null,
+            child: avatarUrl == null
+                ? Text(
+                    displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  )
+                : null,
           ),
           const SizedBox(width: 8),
-          // Name and role
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  profile.displayName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (profile.role != null && profile.role!.isNotEmpty)
-                  Text(
-                    profile.role!,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.4),
-                      fontSize: 11,
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        displayName + (isMe ? ' (you)' : ''),
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                    if (role == 'admin') ...[
+                      const SizedBox(width: 4),
+                      Icon(Icons.star, size: 12, color: Colors.amber.shade600),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),
+          if (onRemove != null)
+            IconButton(
+              icon: Icon(Icons.close, size: 14, color: Colors.white.withValues(alpha: 0.3)),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+              tooltip: 'Remove',
+              onPressed: onRemove,
+            ),
         ],
       ),
+    );
+  }
+}
+
+/// Dialog for selecting team members to add to a channel.
+class _AddMemberDialog extends StatefulWidget {
+  const _AddMemberDialog({required this.available});
+  final List<Map<String, dynamic>> available;
+
+  @override
+  State<_AddMemberDialog> createState() => _AddMemberDialogState();
+}
+
+class _AddMemberDialogState extends State<_AddMemberDialog> {
+  final Set<String> _selected = {};
+  String _search = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.available.where((p) {
+      if (_search.isEmpty) return true;
+      final name = (p['display_name'] ?? '').toString().toLowerCase();
+      return name.contains(_search.toLowerCase());
+    }).toList();
+
+    return AlertDialog(
+      backgroundColor: const Color(0xFF2A2A3E),
+      title: const Text('Add members', style: TextStyle(color: Colors.white)),
+      content: SizedBox(
+        width: 320,
+        height: 400,
+        child: Column(
+          children: [
+            TextField(
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Search...',
+                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                prefixIcon: const Icon(Icons.search, color: Colors.white38, size: 18),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.05),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              onChanged: (v) => setState(() => _search = v),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView.builder(
+                itemCount: filtered.length,
+                itemBuilder: (context, i) {
+                  final p = filtered[i];
+                  final id = p['id']?.toString() ?? '';
+                  final name = p['display_name']?.toString() ?? '';
+                  final isSelected = _selected.contains(id);
+
+                  return ListTile(
+                    dense: true,
+                    leading: CircleAvatar(
+                      radius: 14,
+                      backgroundColor: Colors.blueGrey.shade600,
+                      child: Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    ),
+                    title: Text(name, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle, color: Colors.greenAccent, size: 20)
+                        : const Icon(Icons.circle_outlined, color: Colors.white24, size: 20),
+                    onTap: () => setState(() {
+                      isSelected ? _selected.remove(id) : _selected.add(id);
+                    }),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _selected.isEmpty ? null : () => Navigator.pop(context, _selected.toList()),
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF007A5A)),
+          child: Text('Add (${_selected.length})'),
+        ),
+      ],
     );
   }
 }

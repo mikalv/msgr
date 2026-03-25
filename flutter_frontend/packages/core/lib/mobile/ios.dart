@@ -6,6 +6,7 @@ import 'package:logging/logging.dart';
 import 'package:core/config/theme.dart';
 import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/providers/msgr_client_provider.dart';
+import 'package:core/providers/deep_link_provider.dart';
 import 'package:core/providers/push_provider.dart';
 import 'package:core/providers/web_push_provider.dart';
 import 'package:core/providers/team_list_provider.dart';
@@ -137,6 +138,8 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
     Future.microtask(() => pushManager.init());
     // Initialize web push (no-op on native platforms)
     ref.read(webPushManagerProvider);
+    // Initialize deep link listener (no-op on web)
+    ref.read(deepLinkListenerProvider);
 
     return const AppShell(child: SimpleChatContent());
   }

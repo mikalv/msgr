@@ -6,10 +6,17 @@ defmodule MessngrWeb.TeamChannelController do
 
   action_fallback MessngrWeb.FallbackController
 
-  @doc "GET /api/teams/:slug/channels — list channels"
+  @doc "GET /api/teams/:slug/channels — list channels visible to current user"
   def index(conn, _params) do
     prefix = conn.assigns.tenant_prefix
-    channels = Channels.list_channels(prefix)
+    account = conn.assigns.current_account
+
+    channels =
+      case TeamManagement.get_profile_for_account(prefix, account.id) do
+        nil -> Channels.list_public_channels(prefix)
+        profile -> Channels.list_channels_for_profile(prefix, profile.id)
+      end
+
     json(conn, %{data: Enum.map(channels, &channel_json/1)})
   end
 
@@ -84,6 +91,34 @@ defmodule MessngrWeb.TeamChannelController do
           |> put_status(:unprocessable_entity)
           |> json(%{error: inspect(reason)})
       end
+    end
+  end
+
+  @doc "GET /api/teams/:slug/channels/:channel_id/members — list channel members"
+  def members(conn, %{"channel_id" => channel_id}) do
+    prefix = conn.assigns.tenant_prefix
+    members = Channels.list_members(prefix, channel_id)
+
+    json(conn, %{data: Enum.map(members, fn m ->
+      profile = m.profile
+      %{
+        profile_id: m.profile_id,
+        role: m.role,
+        joined_at: m.joined_at,
+        display_name: profile && profile.display_name,
+        avatar_url: profile && profile.avatar_url,
+        email: profile && profile.email
+      }
+    end)})
+  end
+
+  @doc "DELETE /api/teams/:slug/channels/:channel_id/members/:profile_id — remove a member"
+  def remove_member(conn, %{"channel_id" => channel_id, "profile_id" => profile_id}) do
+    prefix = conn.assigns.tenant_prefix
+
+    case Channels.remove_member(prefix, channel_id, profile_id) do
+      {1, _} -> send_resp(conn, :no_content, "")
+      {0, _} -> {:error, :not_found}
     end
   end
 

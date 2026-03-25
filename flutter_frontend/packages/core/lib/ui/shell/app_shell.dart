@@ -273,7 +273,9 @@ class _AppShellState extends ConsumerState<AppShell> {
         name: c.name,
         slug: c.slug,
         iconEmoji: c.icon ?? '#',
-        kind: ChannelKind.public,
+        kind: c.visibility == ChannelVisibility.private
+            ? ChannelKind.private
+            : ChannelKind.public,
         unreadCount: unreadCounts[c.id] ?? 0,
         hasDraft: drafts[c.id]?.isNotEmpty ?? false,
       );

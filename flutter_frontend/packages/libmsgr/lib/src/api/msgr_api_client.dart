@@ -455,6 +455,28 @@ class MsgrApiClient {
     });
   }
 
+  /// GET /api/teams/:slug/channels/:id/members — list channel members
+  Future<List<Map<String, dynamic>>> getChannelMembers(
+    String teamSlug,
+    String channelId,
+  ) async {
+    final raw = await getRaw('/api/teams/$teamSlug/channels/$channelId/members');
+    if (raw is Map<String, dynamic>) {
+      final data = raw['data'];
+      if (data is List) return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  /// DELETE /api/teams/:slug/channels/:id/members/:profile_id — remove member
+  Future<void> removeChannelMember(
+    String teamSlug,
+    String channelId,
+    String profileId,
+  ) async {
+    await delete('/api/teams/$teamSlug/channels/$channelId/members/$profileId');
+  }
+
   // ---------------------------------------------------------------------------
   // Messages
   // ---------------------------------------------------------------------------
