@@ -402,6 +402,11 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     final auth = _ref.read(simpleAuthProvider);
     final senderProfileId = data['sender_profile_id']?.toString() ?? '';
 
+    // Skip thread replies — they go through _onNewThreadReply instead
+    final threadParentId = data['thread_parent_id'];
+    if (threadParentId != null && threadParentId.toString().isNotEmpty) {
+      return;
+    }
 
     // Skip messages we sent ourselves (already handled by optimistic insert)
     if (senderProfileId == auth.profileId) {
