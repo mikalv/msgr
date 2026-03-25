@@ -48,14 +48,16 @@ defmodule Messngr.Push.Dispatcher do
         )
 
         for {token, platform} <- tokens do
-          case platform do
+          Logger.info("Push sending to platform=#{platform}")
+          result = case platform do
             "apns" -> APNS.push(token, payload)
             "web_push" -> WebPush.push(token, web_payload)
             _ -> Logger.debug("Skipping push for platform: #{platform}")
           end
+          Logger.info("Push result for #{platform}: #{inspect(result)}")
         end
 
-        Logger.debug("Push dispatched to #{length(tokens)} devices for message #{message.id}")
+        Logger.info("Push dispatched to #{length(tokens)} devices for message #{message.id}")
       catch
         :empty_message -> :ok
         :no_tokens -> Logger.debug("Push: no tokens found for channel members")

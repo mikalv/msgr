@@ -131,15 +131,20 @@ defmodule Messngr.Push.WebPush do
     }
 
     private_bytes = url_base64_decode(private_b64)
-    public_bytes = url_base64_decode(public_b64)
 
-    # Build EC JWK from raw keys
-    jwk = JOSE.JWK.from_key({:ECPrivateKey, 1, private_bytes, {:namedCurve, {1, 2, 840, 10045, 3, 1, 7}}, public_bytes})
+    # Build EC JWK from raw private key bytes (P-256 / prime256v1)
+    jwk = JOSE.JWK.from_map(%{
+      "kty" => "EC",
+      "crv" => "P-256",
+      "d" => Base.url_encode64(private_bytes, padding: false),
+      "x" => Base.url_encode64(binary_part(url_base64_decode(public_b64), 1, 32), padding: false),
+      "y" => Base.url_encode64(binary_part(url_base64_decode(public_b64), 33, 32), padding: false)
+    })
 
-    {_, jwt} = JOSE.JWT.sign(jwk, %{"alg" => "ES256"}, claims) |> JOSE.JWS.compact()
+    {_, compact} = JOSE.JWT.sign(jwk, %{"alg" => "ES256"}, claims) |> JOSE.JWS.compact()
 
     %{
-      authorization: "vapid t=#{jwt}, k=#{public_b64}",
+      authorization: "vapid t=#{compact}, k=#{public_b64}",
       crypto_key: "p256ecdsa=#{public_b64}"
     }
   end

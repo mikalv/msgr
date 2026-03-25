@@ -126,7 +126,7 @@ defmodule MessngrWeb.TeamMessageController do
             {:error, :forbidden}
           else
             new_content = params["content"] || %{}
-            case Messages.update_message(prefix, message, %{content: new_content, edited_at: DateTime.utc_now()}) do
+            case Messages.update_message(prefix, message, %{content: new_content, edited_at: DateTime.utc_now() |> DateTime.truncate(:second)}) do
               {:ok, updated} ->
                 updated = Messages.get_message(prefix, updated.id)
 
