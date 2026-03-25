@@ -44,6 +44,8 @@ defmodule Messngr.Application do
         # Start a worker by calling: Messngr.Worker.start_link(arg)
         # {Messngr.Worker, arg}
       ]
+    # Filter out nil children (disabled pruners return nil)
+    children = Enum.reject(children, &is_nil/1)
     Logger.info("✅ Base children list built with #{length(children)} items")
 
     # TODO: Re-enable when Messngr.Transport.Noise.Registry module is implemented

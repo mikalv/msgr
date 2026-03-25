@@ -50,24 +50,27 @@ class MsgrRealtimeClient {
   void Function()? onReconnect;
 
   /// Connect to Phoenix WebSocket.
+  ///
+  /// Creates the socket once. Subsequent calls reconnect the existing socket.
+  /// phoenix_socket handles auto-reconnect internally — this is only needed
+  /// for the initial connection.
   Future<void> connect() async {
-    final params = <String, String>{
-      'account_id': accountId,
-      'profile_id': profileId,
-    };
-    if (token != null) {
-      params['token'] = token!;
-    }
-    if (sessionId != null) {
-      params['session_id'] = sessionId!;
+    // If socket already exists, just reconnect it
+    if (_socket != null) {
+      if (!_socket!.isConnected) {
+        _log.info('Reconnecting existing socket...');
+        await _socket!.connect();
+      }
+      return;
     }
 
+    // First time — create socket with dynamicParams for fresh token on reconnect
     _socket = PhoenixSocket(
       wsUrl,
       socketOptions: PhoenixSocketOptions(
         dynamicParams: () async => {
-          'account_id': accountId ?? '',
-          'profile_id': profileId ?? '',
+          'account_id': accountId,
+          'profile_id': profileId,
           if (token != null) 'token': token!,
           if (sessionId != null) 'session_id': sessionId!,
         },
@@ -158,6 +161,7 @@ class MsgrRealtimeClient {
 
   /// Whether the socket is currently connected.
   bool get isConnected => _socket?.isConnected ?? false;
+  bool get hasSocket => _socket != null;
 
   /// Disconnect and clean up all channels.
   void disconnect() {
@@ -172,7 +176,8 @@ class MsgrRealtimeClient {
     _channels.clear();
 
     _socket?.close();
-    _socket = null;
+    // Don't null _socket — keep it for reconnection via connect()
+    // Only set to null on full dispose (logout)
     _log.info('Disconnected');
   }
 }

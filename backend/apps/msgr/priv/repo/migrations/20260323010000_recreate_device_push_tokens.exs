@@ -1,4 +1,4 @@
-defmodule Messngr.Repo.Migrations.CreateDevicePushTokens do
+defmodule Messngr.Repo.Migrations.RecreateDevicePushTokens do
   use Ecto.Migration
 
   def change do

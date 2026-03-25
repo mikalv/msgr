@@ -88,15 +88,10 @@ class MsgrClient {
       );
     }
 
-    // If already connected, just update token
-    if (_realtime != null && isRealtimeConnected) {
-      _realtime!.token = api.accessToken;
-      return;
-    }
-
-    // If socket exists but disconnected, let phoenix_socket auto-reconnect
+    // Reuse existing realtime client — connect() is idempotent
     if (_realtime != null) {
       _realtime!.token = api.accessToken;
+      await _realtime!.connect(); // no-op if already connected
       return;
     }
 

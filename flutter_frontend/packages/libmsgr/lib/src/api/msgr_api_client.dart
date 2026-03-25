@@ -123,12 +123,16 @@ class MsgrApiClient {
         }
       }
 
-      // Refresh failed -- tokens are invalid
-      accessToken = null;
-      refreshToken = null;
-      onAuthFailure?.call();
+      // Only treat 401/403 as auth failure (invalid tokens)
+      // 502/503 are server restarts — don't logout
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        accessToken = null;
+        refreshToken = null;
+        onAuthFailure?.call();
+      }
       return false;
     } catch (_) {
+      // Network error — don't logout, just fail silently
       return false;
     } finally {
       _isRefreshing = false;
