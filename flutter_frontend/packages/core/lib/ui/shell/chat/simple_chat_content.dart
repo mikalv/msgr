@@ -24,6 +24,7 @@ import 'package:core/providers/thread_provider.dart';
 import 'package:core/providers/typing_provider.dart';
 import 'package:core/features/chat/widgets/chat_composer.dart';
 import 'package:core/ui/shell/channel_header.dart';
+import 'package:core/ui/shell/channel_settings_panel.dart';
 import 'package:core/ui/shell/member_panel.dart';
 import 'package:core/ui/shell/profile_card.dart';
 import 'package:core/ui/shell/thread_panel.dart';
@@ -61,6 +62,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
   Timer? _fallbackPollTimer;
   Timer? _typingDebounce;
   bool _showMembers = false;
+  bool _showSettings = false;
   bool _showThread = false;
   bool _showNewMessagesBanner = false;
   int _previousMessageCount = 0;
@@ -396,7 +398,14 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                   topic: selectedChannel.topic,
                   isPrivate: selectedChannel.visibility == ChannelVisibility.private,
                   onSearchTap: () => _showSearchDialog(context, selectedChannel),
-                  onMembersTap: () => setState(() => _showMembers = !_showMembers),
+                  onMembersTap: () => setState(() {
+                    _showMembers = !_showMembers;
+                    if (_showMembers) _showSettings = false;
+                  }),
+                  onSettingsTap: () => setState(() {
+                    _showSettings = !_showSettings;
+                    if (_showSettings) _showMembers = false;
+                  }),
                 ),
 
                 // Messages list
@@ -534,6 +543,12 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
           if (_showMembers)
             MemberPanel(
               onClose: () => setState(() => _showMembers = false),
+            ),
+
+          // Channel settings panel (conditionally shown)
+          if (_showSettings)
+            ChannelSettingsPanel(
+              onClose: () => setState(() => _showSettings = false),
             ),
         ],
       ),
