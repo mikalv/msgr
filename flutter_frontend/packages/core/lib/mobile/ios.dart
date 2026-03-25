@@ -62,8 +62,7 @@ class _AuthGate extends ConsumerStatefulWidget {
 }
 
 class _AuthGateState extends ConsumerState<_AuthGate> {
-  // Start true if there's a pending invite — prevents flash of AppShell
-  bool _redeemingInvite = _pendingInviteCode != null;
+  bool _redeemingInvite = false;
 
   @override
   void didChangeDependencies() {
