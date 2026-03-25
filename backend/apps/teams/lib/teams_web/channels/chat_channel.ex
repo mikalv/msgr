@@ -100,6 +100,9 @@ defmodule TeamsWeb.ChatChannel do
   # ── Incoming events ──────────────────────────────────────────
 
   @impl true
+  # Accept both "message:create" (Flutter client) and "new:message" (legacy)
+  def handle_in("message:create", payload, socket), do: handle_in("new:message", payload, socket)
+
   def handle_in("new:message", %{"content" => content} = payload, socket) do
     prefix = socket.assigns[:prefix]
     channel_id = socket.assigns[:channel_id]
@@ -120,8 +123,14 @@ defmodule TeamsWeb.ChatChannel do
 
         # Dispatch push notifications to offline members
         team_slug = socket.assigns[:team_slug]
+        Logger.info("Push dispatch: team_slug=#{inspect(team_slug)} prefix=#{inspect(prefix)}")
         if team_slug do
           Messngr.Push.Dispatcher.notify_new_message(team_slug, prefix, message)
+        else
+          # Fallback: resolve slug from prefix
+          resolved = resolve_slug_from_prefix(prefix)
+          Logger.info("Push dispatch fallback: resolved=#{inspect(resolved)}")
+          if resolved, do: Messngr.Push.Dispatcher.notify_new_message(resolved, prefix, message)
         end
 
         {:reply, {:ok, %{id: message.id}}, socket}
