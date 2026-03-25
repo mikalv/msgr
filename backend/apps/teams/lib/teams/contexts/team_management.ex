@@ -175,6 +175,11 @@ defmodule Teams.TeamManagement do
     |> Repo.exists?()
   end
 
+  @doc "Get a membership record for an account in a team."
+  def get_membership(team_id, account_id) do
+    Repo.get_by(TeamMembership, team_id: team_id, account_id: account_id)
+  end
+
   @doc """
   Gets the profile for an account within a team's tenant schema.
   """

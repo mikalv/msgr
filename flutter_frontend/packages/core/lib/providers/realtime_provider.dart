@@ -63,6 +63,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   String? _currentTeamSlug;
   String? _currentChannelId;
   Timer? _reconnectTimer;
+  Timer? _tokenRefreshTimer;
 
   /// Connect the WebSocket using credentials from the MsgrClient.
   Future<void> connect() async {
@@ -106,6 +107,12 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
 
       state = state.copyWith(isConnected: true, isConnecting: false);
 
+      // Periodically refresh JWT to prevent token expiry during long sessions
+      _tokenRefreshTimer?.cancel();
+      _tokenRefreshTimer = Timer.periodic(const Duration(minutes: 10), (_) {
+        _refreshRealtimeToken();
+      });
+
       // Auto-join current team/channel after successful connect
       final selectedTeam = _ref.read(selectedTeamProvider);
       if (selectedTeam != null) {
@@ -128,6 +135,8 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   void disconnect() {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _tokenRefreshTimer?.cancel();
+    _tokenRefreshTimer = null;
 
     try {
       final client = _ref.read(msgrClientProvider);
@@ -626,18 +635,27 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
 
   void _scheduleReconnect() {
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 5), () async {
+    _reconnectTimer = Timer(const Duration(seconds: 3), () async {
       if (mounted && !state.isConnected && !state.isConnecting) {
         _log.info('Attempting reconnect — refreshing token first...');
-        final client = _ref.read(msgrClientProvider);
-        await client.api.refreshAuth();
-        // Update realtime client token so reconnect uses fresh JWT
-        if (client.api.accessToken != null) {
-          client.realtime.token = client.api.accessToken;
-        }
+        await _refreshRealtimeToken();
         if (mounted) connect();
       }
     });
+  }
+
+  /// Refresh JWT and update the realtime client's token.
+  /// Called before reconnect and also periodically to prevent expiry.
+  Future<void> _refreshRealtimeToken() async {
+    try {
+      final client = _ref.read(msgrClientProvider);
+      await client.api.refreshAuth();
+      if (client.api.accessToken != null && client.isRealtimeConnected) {
+        client.realtime.token = client.api.accessToken;
+      }
+    } catch (e) {
+      _log.warning('Token refresh failed: $e');
+    }
   }
 
   void _rejoinTopics() {
@@ -661,6 +679,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   @override
   void dispose() {
     _reconnectTimer?.cancel();
+    _tokenRefreshTimer?.cancel();
     super.dispose();
   }
 }

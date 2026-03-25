@@ -478,6 +478,39 @@ class MsgrApiClient {
   }
 
   // ---------------------------------------------------------------------------
+  // Webhooks
+  // ---------------------------------------------------------------------------
+
+  /// POST /api/teams/:slug/webhooks — create incoming webhook
+  Future<Map<String, dynamic>> createWebhook(
+    String teamSlug, {
+    required String channelId,
+    required String name,
+    String? avatarUrl,
+  }) async {
+    return post('/api/teams/$teamSlug/webhooks', body: {
+      'channel_id': channelId,
+      'name': name,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
+    });
+  }
+
+  /// GET /api/teams/:slug/webhooks — list webhooks
+  Future<List<Map<String, dynamic>>> getWebhooks(String teamSlug) async {
+    final raw = await getRaw('/api/teams/$teamSlug/webhooks');
+    if (raw is Map<String, dynamic>) {
+      final data = raw['data'];
+      if (data is List) return data.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
+
+  /// DELETE /api/teams/:slug/webhooks/:id — delete webhook
+  Future<void> deleteWebhook(String teamSlug, String id) async {
+    await delete('/api/teams/$teamSlug/webhooks/$id');
+  }
+
+  // ---------------------------------------------------------------------------
   // Messages
   // ---------------------------------------------------------------------------
 

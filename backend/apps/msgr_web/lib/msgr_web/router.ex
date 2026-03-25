@@ -34,6 +34,9 @@ defmodule MessngrWeb.Router do
     post "/v1/auth/bot-token", AuthController, :bot_token
     # Noise handshake is now handled by Rust Gateway
     resources "/users", AccountController, only: [:index, :create, :update]
+
+    # Incoming webhooks (public — token in URL is the auth)
+    post "/hooks/:token", WebhookController, :receive
   end
 
   # ── App Platform (public, authenticated) ─────────────────────
@@ -130,6 +133,11 @@ defmodule MessngrWeb.Router do
     post "/invites", InviteLinkController, :create
     get "/invites", InviteLinkController, :index
     delete "/invites/:id", InviteLinkController, :delete
+
+    # Webhook management (owner/admin only)
+    post "/webhooks", WebhookManagementController, :create
+    get "/webhooks", WebhookManagementController, :index
+    delete "/webhooks/:id", WebhookManagementController, :delete
 
     # ── App Platform (team-scoped) ─────────────────────────────
     get "/commands", CommandController, :index
