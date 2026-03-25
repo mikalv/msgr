@@ -14,6 +14,7 @@ import 'package:core/providers/web_push_provider.dart';
 import 'package:core/providers/web_push_stub.dart' if (dart.library.html) 'package:core/providers/web_push_web.dart' as webPushImpl;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:core/ui/auth/profile_setup_screen.dart';
 import 'package:core/ui/settings/settings_page.dart';
 
 import 'package:core/ui/theme/msgr_theme.dart';
@@ -50,26 +51,27 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell> {
   bool _sidebarCollapsed = false;
+  bool _needsProfileSetup = false;
 
   /// Channel navigation history for Cmd+[ / Cmd+] support.
   final List<String> _channelHistory = [];
   int _channelHistoryIndex = -1;
 
-  /// Track which teams we've already shown profile setup for this session.
-  final Set<String> _profileSetupShownFor = {};
+  /// Track which teams we've already checked profile for this session.
+  final Set<String> _profileCheckedFor = {};
 
   @override
   void initState() {
     super.initState();
-    // Check profile on first team load
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkProfileSetup());
   }
 
-  /// Show profile setup dialog if the user's team profile has no display_name.
+  /// Check if user needs to set up profile for current team.
   Future<void> _checkProfileSetup() async {
     final team = ref.read(selectedTeamProvider);
     if (team == null) return;
-    if (_profileSetupShownFor.contains(team.slug)) return;
+    if (_profileCheckedFor.contains(team.slug)) return;
+    _profileCheckedFor.add(team.slug);
 
     try {
       final client = ref.read(msgrApiProvider);
@@ -80,13 +82,11 @@ class _AppShellState extends ConsumerState<AppShell> {
       if (myProfile != null) {
         final displayName = myProfile['display_name']?.toString() ?? '';
         if (displayName.isEmpty || displayName == myProfile['email']) {
-          _profileSetupShownFor.add(team.slug);
-          if (mounted) await _showProfileSetupDialog(team.slug);
+          if (mounted) setState(() => _needsProfileSetup = true);
           return;
         }
       }
     } catch (_) {}
-    if (team.slug.isNotEmpty) _profileSetupShownFor.add(team.slug);
   }
 
   /// Whether the modifier key is Meta (macOS) or Control (other platforms).
@@ -170,6 +170,24 @@ class _AppShellState extends ConsumerState<AppShell> {
         onCreateTeam: () => _showCreateTeamDialog(),
         onJoinTeam: () => _showJoinTeamDialog(),
         onRetry: () => ref.read(teamListProvider.notifier).refresh(),
+      );
+    }
+
+    // Profile setup gate — shown after team join, before chat
+    if (_needsProfileSetup) {
+      final team = ref.read(selectedTeamProvider);
+      return ProfileSetupScreen(
+        onComplete: () {
+          setState(() => _needsProfileSetup = false);
+          // Also update team profile
+          if (team != null) {
+            final auth = ref.read(simpleAuthProvider);
+            final client = ref.read(msgrApiProvider);
+            if (auth.displayName != null) {
+              client.updateMyProfile(team.slug, displayName: auth.displayName);
+            }
+          }
+        },
       );
     }
 

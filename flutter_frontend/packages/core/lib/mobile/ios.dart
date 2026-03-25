@@ -63,7 +63,6 @@ class _AuthGate extends ConsumerStatefulWidget {
 
 class _AuthGateState extends ConsumerState<_AuthGate> {
   bool _redeemingInvite = false;
-  bool _profileSetupDone = false;
 
   @override
   void didChangeDependencies() {
@@ -132,15 +131,6 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
             ],
           ),
         ),
-      );
-    }
-
-    // Profile setup gate — must set display name before entering app
-    final needsProfile = !_profileSetupDone &&
-        (auth.displayName == null || auth.displayName!.isEmpty || auth.displayName == auth.email);
-    if (needsProfile) {
-      return ProfileSetupScreen(
-        onComplete: () => setState(() => _profileSetupDone = true),
       );
     }
 
