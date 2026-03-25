@@ -33,36 +33,31 @@ defmodule Messngr.Push.WebPush do
       {:error, :no_vapid_keys}
     else
       try do
-        result = WebPushElixir.send_notification(
-          subscription,
-          json_payload,
-          %{
-            vapid_public_key: public_key,
-            vapid_private_key: private_key,
-            vapid_subject: subject
-          }
-        )
+        # Configure web_push_elixir via application env (it reads from :web_push_elixir)
+        Application.put_env(:web_push_elixir, :vapid_public_key, public_key)
+        Application.put_env(:web_push_elixir, :vapid_private_key, private_key)
+        Application.put_env(:web_push_elixir, :vapid_subject, subject)
+
+        # web_push_elixir expects subscription as JSON string
+        sub_json = if is_binary(subscription), do: subscription, else: Jason.encode!(subscription)
+        result = WebPushElixir.send_notification(sub_json, json_payload)
 
         case result do
-          {:ok, %{status: status}} when status in 200..299 ->
-            Logger.debug("[WebPush] Sent successfully (#{status})")
+          {:ok, response} ->
+            Logger.info("[WebPush] Sent successfully")
             :ok
 
-          {:ok, %{status: status}} when status in [404, 410] ->
-            Logger.info("[WebPush] Subscription expired (#{status})")
+          {:error, :expired} ->
+            Logger.info("[WebPush] Subscription expired")
             {:error, :subscription_expired}
 
-          {:ok, %{status: status, body: body}} ->
+          {:error, {:http_error, status, body}} ->
             Logger.warning("[WebPush] Failed: #{status} — #{inspect(body)}")
             {:error, {:http_error, status}}
 
           {:error, reason} ->
-            Logger.warning("[WebPush] Request failed: #{inspect(reason)}")
+            Logger.warning("[WebPush] Error: #{inspect(reason)}")
             {:error, reason}
-
-          other ->
-            Logger.warning("[WebPush] Unexpected result: #{inspect(other)}")
-            {:error, :unexpected}
         end
       rescue
         e ->
