@@ -1,7 +1,21 @@
 // Web Push Service Worker for Msgr
+// Registered at /push_sw.js with its own scope to avoid conflict with Flutter's SW.
 // This runs in the background and handles push events even when the tab is closed.
 
+console.log('[push_sw] Service worker loaded');
+
+self.addEventListener('install', function(event) {
+  console.log('[push_sw] Installed');
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', function(event) {
+  console.log('[push_sw] Activated');
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('push', function(event) {
+  console.log('[push_sw] Push event received:', event.data ? event.data.text() : 'no data');
   if (!event.data) return;
 
   let data;

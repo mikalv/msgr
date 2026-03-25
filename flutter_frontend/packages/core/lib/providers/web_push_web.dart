@@ -20,14 +20,19 @@ bool isNotificationGranted() {
 Future<String?> subscribeToPush(String vapidPublicKey) async {
   try {
     print('[WebPush] Registering service worker...');
-    // Register the push service worker
+    // Register push SW — use the returned registration directly for subscription
+    // (don't use navigator.serviceWorker.ready which may return Flutter's SW)
     final registration = await html.window.navigator.serviceWorker!
         .register('/push_sw.js');
-    print('[WebPush] SW registered, waiting for ready...');
+    print('[WebPush] SW registered, waiting for active...');
 
-    // Wait for SW to be ready
-    await html.window.navigator.serviceWorker!.ready;
-    print('[WebPush] SW ready, requesting permission...');
+    // Wait for SW to activate
+    var attempts = 0;
+    while (registration.active == null && attempts < 20) {
+      await Future.delayed(const Duration(milliseconds: 250));
+      attempts++;
+    }
+    print('[WebPush] SW active=${ registration.active != null}, requesting permission...');
 
     // Request notification permission
     final permission = await html.Notification.requestPermission();
