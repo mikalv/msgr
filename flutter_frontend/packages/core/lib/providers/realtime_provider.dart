@@ -416,7 +416,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     final senderProfile =
         data['sender_profile'] as Map<String, dynamic>? ?? {};
 
-    final message = SlackMessage(
+    final message = MsgrMessage(
       id: data['id']?.toString() ?? '',
       channelId: channelId,
       senderProfileId: senderProfileId,
@@ -476,7 +476,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     final senderProfile =
         data['sender_profile'] as Map<String, dynamic>? ?? {};
 
-    final reply = SlackMessage(
+    final reply = MsgrMessage(
       id: data['id']?.toString() ?? '',
       channelId: channelId,
       senderProfileId: senderProfileId,
@@ -583,7 +583,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   // ── Desktop notifications ─────────────────────────────────────
 
   void _showNotificationForMessage(
-    SlackMessage message,
+    MsgrMessage message,
     String channelId,
     Map<String, dynamic> rawData,
   ) {
@@ -722,7 +722,7 @@ final realtimeProvider =
 
   // Auto-join team topic when selected team changes (not fireImmediately —
   // connect() handles initial join).
-  ref.listen<SlackTeam?>(selectedTeamProvider, (prev, next) {
+  ref.listen<MsgrTeam?>(selectedTeamProvider, (prev, next) {
     if (next != null && next.slug != prev?.slug) {
       final client = ref.read(msgrClientProvider);
       if (client.isRealtimeConnected) {
@@ -732,7 +732,7 @@ final realtimeProvider =
   });
 
   // Auto-join channel topic when selected channel changes.
-  ref.listen<SlackChannel?>(selectedChannelProvider, (prev, next) {
+  ref.listen<MsgrChannel?>(selectedChannelProvider, (prev, next) {
     if (next != null && next.id != prev?.id) {
       final client = ref.read(msgrClientProvider);
       if (client.isRealtimeConnected) {

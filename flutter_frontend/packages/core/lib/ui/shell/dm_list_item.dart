@@ -17,7 +17,7 @@ class DmListItem extends StatelessWidget {
     required this.onTap,
   });
 
-  final MockDmContact contact;
+  final DmItem contact;
   final bool isSelected;
   final VoidCallback onTap;
 

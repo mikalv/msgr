@@ -117,7 +117,7 @@ class _ChannelSettingsPanelState extends ConsumerState<ChannelSettingsPanel>
 
 class _OverviewTab extends ConsumerStatefulWidget {
   const _OverviewTab({required this.channel});
-  final SlackChannel channel;
+  final MsgrChannel channel;
 
   @override
   ConsumerState<_OverviewTab> createState() => _OverviewTabState();

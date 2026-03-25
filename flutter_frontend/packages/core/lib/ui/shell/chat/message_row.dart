@@ -14,12 +14,12 @@ class _MessageRow extends ConsumerStatefulWidget {
     this.onDelete,
   });
 
-  final SlackMessage message;
+  final MsgrMessage message;
   final bool isGroupStart;
   final bool isOwn;
-  final void Function(SlackMessage) onOpenThread;
-  final void Function(SlackMessage)? onEdit;
-  final void Function(SlackMessage)? onDelete;
+  final void Function(MsgrMessage) onOpenThread;
+  final void Function(MsgrMessage)? onEdit;
+  final void Function(MsgrMessage)? onDelete;
 
   @override
   ConsumerState<_MessageRow> createState() => _MessageRowState();
@@ -35,7 +35,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
 
     showProfileCard(
       context,
-      profile: SlackProfile(
+      profile: MsgrProfile(
         id: msg.senderProfileId,
         displayName: msg.senderName,
       ),
@@ -125,7 +125,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
     }
   }
 
-  Future<void> _showRemindMenu(BuildContext context, Offset pos, SlackMessage msg) async {
+  Future<void> _showRemindMenu(BuildContext context, Offset pos, MsgrMessage msg) async {
     final now = DateTime.now();
     final position = RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx + 1, pos.dy + 1);
 

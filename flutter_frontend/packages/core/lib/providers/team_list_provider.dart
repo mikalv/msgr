@@ -19,12 +19,12 @@ class TeamListState {
     this.error,
   });
 
-  final List<SlackTeam> teams;
+  final List<MsgrTeam> teams;
   final bool isLoading;
   final Object? error;
 
   TeamListState copyWith({
-    List<SlackTeam>? teams,
+    List<MsgrTeam>? teams,
     bool? isLoading,
     Object? error,
   }) {
@@ -52,7 +52,7 @@ class TeamListNotifier extends StateNotifier<TeamListState> {
       final client = _ref.read(msgrApiProvider);
       final data = await client.getTeams();
       final teams = data.map((t) {
-        return SlackTeam(
+        return MsgrTeam(
           id: t['id']?.toString() ?? '',
           name: t['name']?.toString() ?? '',
           slug: t['slug']?.toString() ?? '',
@@ -76,7 +76,7 @@ class TeamListNotifier extends StateNotifier<TeamListState> {
       final data = raw.containsKey('data') && raw['data'] is Map
           ? raw['data'] as Map<String, dynamic>
           : raw;
-      final team = SlackTeam(
+      final team = MsgrTeam(
         id: data['id']?.toString() ?? 'team-${DateTime.now().millisecondsSinceEpoch}',
         name: data['name']?.toString() ?? name,
         slug: data['slug']?.toString() ?? slug,
@@ -95,7 +95,7 @@ class TeamListNotifier extends StateNotifier<TeamListState> {
       final data = raw.containsKey('data') && raw['data'] is Map
           ? raw['data'] as Map<String, dynamic>
           : raw;
-      final team = SlackTeam(
+      final team = MsgrTeam(
         id: data['id']?.toString() ?? 'team-${DateTime.now().millisecondsSinceEpoch}',
         name: data['name']?.toString() ?? slug,
         slug: data['slug']?.toString() ?? slug,
@@ -116,7 +116,7 @@ final teamListProvider =
 });
 
 /// Convenience provider for just the list of teams.
-final teamsProvider = Provider<List<SlackTeam>>((ref) {
+final teamsProvider = Provider<List<MsgrTeam>>((ref) {
   return ref.watch(teamListProvider).teams;
 });
 
@@ -124,10 +124,10 @@ final teamsProvider = Provider<List<SlackTeam>>((ref) {
 // SelectedTeam -- the team currently being viewed
 // ---------------------------------------------------------------------------
 
-class SelectedTeamNotifier extends StateNotifier<SlackTeam?> {
+class SelectedTeamNotifier extends StateNotifier<MsgrTeam?> {
   SelectedTeamNotifier() : super(null);
 
-  void select(SlackTeam team) {
+  void select(MsgrTeam team) {
     state = team;
     // Persist last selected team
     SharedPreferences.getInstance().then((prefs) {
@@ -139,7 +139,7 @@ class SelectedTeamNotifier extends StateNotifier<SlackTeam?> {
 }
 
 final selectedTeamProvider =
-    StateNotifierProvider<SelectedTeamNotifier, SlackTeam?>((ref) {
+    StateNotifierProvider<SelectedTeamNotifier, MsgrTeam?>((ref) {
   final teams = ref.watch(teamListProvider).teams;
   final notifier = SelectedTeamNotifier();
   if (teams.isNotEmpty) {

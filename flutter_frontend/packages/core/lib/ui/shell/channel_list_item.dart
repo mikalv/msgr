@@ -18,7 +18,7 @@ class ChannelListItem extends StatelessWidget {
     required this.onTap,
   });
 
-  final MockChannel channel;
+  final ChannelItem channel;
   final bool isSelected;
   final VoidCallback onTap;
 

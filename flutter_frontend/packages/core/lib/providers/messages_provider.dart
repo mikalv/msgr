@@ -25,7 +25,7 @@ class ChannelMessagesState {
     this.cursor,
   });
 
-  final List<SlackMessage> messages;
+  final List<MsgrMessage> messages;
   final bool isLoading;
   final bool isLoadingMore;
   final bool hasMore;
@@ -35,7 +35,7 @@ class ChannelMessagesState {
   final String? cursor;
 
   ChannelMessagesState copyWith({
-    List<SlackMessage>? messages,
+    List<MsgrMessage>? messages,
     bool? isLoading,
     bool? isLoadingMore,
     bool? hasMore,
@@ -162,7 +162,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
 
     // Optimistic insert
     final tempId = 'local-${DateTime.now().microsecondsSinceEpoch}';
-    final optimistic = SlackMessage(
+    final optimistic = MsgrMessage(
       id: tempId,
       channelId: channelId,
       senderProfileId: auth.profileId ?? 'me',
@@ -300,7 +300,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
   }
 
   /// Merge an incoming realtime message.
-  void mergeIncoming(SlackMessage message) {
+  void mergeIncoming(MsgrMessage message) {
     // Check for exact ID match first
     final existing = state.messages.indexWhere((m) => m.id == message.id);
     if (existing >= 0) {
@@ -361,7 +361,7 @@ final channelMessagesProvider =
 });
 
 /// Convenience: just the message list.
-final messagesListProvider = Provider<List<SlackMessage>>((ref) {
+final messagesListProvider = Provider<List<MsgrMessage>>((ref) {
   return ref.watch(channelMessagesProvider).messages;
 });
 
@@ -369,8 +369,8 @@ final messagesListProvider = Provider<List<SlackMessage>>((ref) {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Parse a message JSON map into a [SlackMessage], including reactions.
-SlackMessage parseMessageJson(
+/// Parse a message JSON map into a [MsgrMessage], including reactions.
+MsgrMessage parseMessageJson(
   Map<String, dynamic> m,
   String channelId, {
   String? currentProfileId,
@@ -392,7 +392,7 @@ SlackMessage parseMessageJson(
   // Detect system messages: no sender profile, or content has system: true
   final isSystem = _isSystemMessage(m['content'], sender);
 
-  return SlackMessage(
+  return MsgrMessage(
     id: m['id']?.toString() ?? '',
     channelId: channelId,
     senderProfileId: m['profile_id']?.toString() ??

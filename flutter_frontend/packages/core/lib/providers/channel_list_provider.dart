@@ -19,23 +19,23 @@ class ChannelListState {
     this.error,
   });
 
-  final List<SlackChannel> channels;
+  final List<MsgrChannel> channels;
   final bool isLoading;
   final Object? error;
 
   /// Only regular channels (not DMs).
-  List<SlackChannel> get publicChannels =>
+  List<MsgrChannel> get publicChannels =>
       channels.where((c) => c.kind == ChannelKind.channel).toList();
 
   /// Only DM channels.
-  List<SlackChannel> get dmChannels =>
+  List<MsgrChannel> get dmChannels =>
       channels
           .where(
               (c) => c.kind == ChannelKind.dm || c.kind == ChannelKind.groupDm)
           .toList();
 
   ChannelListState copyWith({
-    List<SlackChannel>? channels,
+    List<MsgrChannel>? channels,
     bool? isLoading,
     Object? error,
   }) {
@@ -84,7 +84,7 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
           }
         }
 
-        return SlackChannel(
+        return MsgrChannel(
           id: c['id']?.toString() ?? '',
           name: c['name']?.toString() ?? '',
           slug: c['slug']?.toString() ?? c['name']?.toString() ?? '',
@@ -128,7 +128,7 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
           ? raw['data'] as Map<String, dynamic>
           : raw;
       final responseSlug = data['slug']?.toString() ?? slug;
-      final channel = SlackChannel(
+      final channel = MsgrChannel(
         id: data['id']?.toString() ??
             'ch-${DateTime.now().millisecondsSinceEpoch}',
         name: data['name']?.toString() ?? name,
@@ -162,12 +162,12 @@ final channelListProvider =
 });
 
 /// Just the public channels for the current team.
-final publicChannelsProvider = Provider<List<SlackChannel>>((ref) {
+final publicChannelsProvider = Provider<List<MsgrChannel>>((ref) {
   return ref.watch(channelListProvider).publicChannels;
 });
 
 /// Just the DM channels for the current team.
-final dmChannelsProvider = Provider<List<SlackChannel>>((ref) {
+final dmChannelsProvider = Provider<List<MsgrChannel>>((ref) {
   return ref.watch(channelListProvider).dmChannels;
 });
 
@@ -175,10 +175,10 @@ final dmChannelsProvider = Provider<List<SlackChannel>>((ref) {
 // SelectedChannel -- the channel currently being viewed
 // ---------------------------------------------------------------------------
 
-class SelectedChannelNotifier extends StateNotifier<SlackChannel?> {
+class SelectedChannelNotifier extends StateNotifier<MsgrChannel?> {
   SelectedChannelNotifier() : super(null);
 
-  void select(SlackChannel channel) {
+  void select(MsgrChannel channel) {
     state = channel;
     // Persist last selected channel
     SharedPreferences.getInstance().then((prefs) {
@@ -190,7 +190,7 @@ class SelectedChannelNotifier extends StateNotifier<SlackChannel?> {
 }
 
 final selectedChannelProvider =
-    StateNotifierProvider<SelectedChannelNotifier, SlackChannel?>((ref) {
+    StateNotifierProvider<SelectedChannelNotifier, MsgrChannel?>((ref) {
   final notifier = SelectedChannelNotifier();
 
   // Auto-select saved channel when channel list loads

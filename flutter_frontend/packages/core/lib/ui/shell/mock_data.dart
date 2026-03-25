@@ -1,21 +1,21 @@
 import 'shell_models.dart';
 
-final mockTeams = <MockTeam>[
-  const MockTeam(
+final mockTeams = <TeamItem>[
+  const TeamItem(
     id: 'team-1',
     name: 'Eyr',
     slug: 'eyr',
     iconEmoji: '\u{1F3E5}', // 🏥
     unreadCount: 4,
   ),
-  const MockTeam(
+  const TeamItem(
     id: 'team-2',
     name: 'MadAppGang',
     slug: 'madappgang',
     iconEmoji: '\u{1F680}', // 🚀
     unreadCount: 0,
   ),
-  const MockTeam(
+  const TeamItem(
     id: 'team-3',
     name: 'Family',
     slug: 'family',
@@ -24,8 +24,8 @@ final mockTeams = <MockTeam>[
   ),
 ];
 
-final mockChannels = <MockChannel>[
-  MockChannel(
+final mockChannels = <ChannelItem>[
+  ChannelItem(
     id: 'ch-1',
     name: 'general',
     slug: 'general',
@@ -34,7 +34,7 @@ final mockChannels = <MockChannel>[
     unreadCount: 3,
     lastActivityAt: DateTime.now().subtract(const Duration(minutes: 5)),
   ),
-  MockChannel(
+  ChannelItem(
     id: 'ch-2',
     name: 'dev',
     slug: 'dev',
@@ -43,7 +43,7 @@ final mockChannels = <MockChannel>[
     unreadCount: 0,
     lastActivityAt: DateTime.now().subtract(const Duration(hours: 1)),
   ),
-  MockChannel(
+  ChannelItem(
     id: 'ch-3',
     name: 'announcements',
     slug: 'announcements',
@@ -52,7 +52,7 @@ final mockChannels = <MockChannel>[
     unreadCount: 1,
     lastActivityAt: DateTime.now().subtract(const Duration(minutes: 30)),
   ),
-  MockChannel(
+  ChannelItem(
     id: 'ch-4',
     name: 'random',
     slug: 'random',
@@ -61,7 +61,7 @@ final mockChannels = <MockChannel>[
     unreadCount: 0,
     lastActivityAt: DateTime.now().subtract(const Duration(hours: 3)),
   ),
-  MockChannel(
+  ChannelItem(
     id: 'ch-5',
     name: 'design',
     slug: 'design',
@@ -73,29 +73,29 @@ final mockChannels = <MockChannel>[
   ),
 ];
 
-final mockDmContacts = <MockDmContact>[
-  MockDmContact(
+final mockDmContacts = <DmItem>[
+  DmItem(
     id: 'dm-1',
     name: 'Kari Nordmann',
     isOnline: true,
     unreadCount: 2,
     lastActivityAt: DateTime.now().subtract(const Duration(minutes: 3)),
   ),
-  MockDmContact(
+  DmItem(
     id: 'dm-2',
     name: 'Ola Hansen',
     isOnline: false,
     unreadCount: 0,
     lastActivityAt: DateTime.now().subtract(const Duration(hours: 4)),
   ),
-  MockDmContact(
+  DmItem(
     id: 'dm-3',
     name: 'Ingrid Berg',
     isOnline: true,
     unreadCount: 0,
     lastActivityAt: DateTime.now().subtract(const Duration(hours: 1)),
   ),
-  MockDmContact(
+  DmItem(
     id: 'dm-4',
     name: 'Erik Solheim',
     isOnline: false,

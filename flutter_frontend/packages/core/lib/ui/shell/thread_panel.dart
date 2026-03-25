@@ -244,7 +244,7 @@ class _ThreadMessageTile extends StatelessWidget {
     required this.isParent,
   });
 
-  final SlackMessage message;
+  final MsgrMessage message;
   final bool isOwn;
   final bool isParent;
 

@@ -232,7 +232,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   // Helpers to bridge new providers into the existing shell widgets
   // ---------------------------------------------------------------------------
 
-  List<MockTeam> get _mockTeamsFromProviders {
+  List<TeamItem> get _mockTeamsFromProviders {
     final teams = ref.watch(teamsProvider);
     final unreadCounts = ref.watch(unreadCountsProvider);
     return teams.map((t) {
@@ -244,7 +244,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           teamUnread += unreadCounts[ch.id] ?? 0;
         }
       }
-      return MockTeam(
+      return TeamItem(
         id: t.id,
         name: t.name,
         slug: t.slug,
@@ -262,14 +262,14 @@ class _AppShellState extends ConsumerState<AppShell> {
     return idx >= 0 ? idx : 0;
   }
 
-  SlackTeam? get _activeTeam => ref.watch(selectedTeamProvider);
+  MsgrTeam? get _activeTeam => ref.watch(selectedTeamProvider);
 
-  List<MockChannel> get _mockChannelsFromProviders {
+  List<ChannelItem> get _mockChannelsFromProviders {
     final channelState = ref.watch(channelListProvider);
     final unreadCounts = ref.watch(unreadCountsProvider);
     final drafts = ref.watch(channelDraftsProvider);
     return channelState.publicChannels.map((c) {
-      return MockChannel(
+      return ChannelItem(
         id: c.id,
         name: c.name,
         slug: c.slug,
@@ -283,7 +283,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     }).toList();
   }
 
-  List<MockDmContact> get _mockDmsFromProviders {
+  List<DmItem> get _mockDmsFromProviders {
     final channelState = ref.watch(channelListProvider);
     final unreadCounts = ref.watch(unreadCountsProvider);
     final myProfileId = ref.watch(simpleAuthProvider).profileId;
@@ -303,7 +303,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         }
       }
 
-      return MockDmContact(
+      return DmItem(
         id: c.id,
         name: dmName,
         isOnline: false,

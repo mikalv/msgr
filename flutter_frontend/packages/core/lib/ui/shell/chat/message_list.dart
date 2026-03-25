@@ -14,12 +14,12 @@ class _MessageList extends StatelessWidget {
     this.onDelete,
   });
 
-  final List<SlackMessage> messages;
+  final List<MsgrMessage> messages;
   final ScrollController scrollController;
   final String? currentProfileId;
-  final void Function(SlackMessage) onOpenThread;
-  final void Function(SlackMessage)? onEdit;
-  final void Function(SlackMessage)? onDelete;
+  final void Function(MsgrMessage) onOpenThread;
+  final void Function(MsgrMessage)? onEdit;
+  final void Function(MsgrMessage)? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -109,7 +109,7 @@ class _DateSeparator extends StatelessWidget {
 
 class _SystemMessageRow extends StatelessWidget {
   const _SystemMessageRow({required this.message});
-  final SlackMessage message;
+  final MsgrMessage message;
 
   @override
   Widget build(BuildContext context) {

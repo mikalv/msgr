@@ -11,7 +11,7 @@ import 'package:core/ui/shell/profile_card.dart';
 
 /// Provider that fetches team member profiles from GET /api/teams/:slug/profiles.
 final teamMembersProvider =
-    FutureProvider.autoDispose<List<SlackProfile>>((ref) async {
+    FutureProvider.autoDispose<List<MsgrProfile>>((ref) async {
   final team = ref.watch(selectedTeamProvider);
   if (team == null) return [];
 
@@ -32,7 +32,7 @@ final teamMembersProvider =
     items = [];
   }
 
-  return items.map((p) => SlackProfile.fromJson(p)).toList();
+  return items.map((p) => MsgrProfile.fromJson(p)).toList();
 });
 
 /// A 240px wide panel showing channel members on the right side of the chat area.

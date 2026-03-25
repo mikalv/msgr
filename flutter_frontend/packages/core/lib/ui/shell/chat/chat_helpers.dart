@@ -78,7 +78,7 @@ bool _isDifferentDay(DateTime a, DateTime b) {
 // ---------------------------------------------------------------------------
 
 /// Whether [msg] starts a new visual group compared to [prev].
-bool _startsNewGroup(SlackMessage msg, SlackMessage? prev) {
+bool _startsNewGroup(MsgrMessage msg, MsgrMessage? prev) {
   if (prev == null) return true;
   if (msg.senderProfileId != prev.senderProfileId) return true;
   if (msg.insertedAt.difference(prev.insertedAt).abs() > _groupingThreshold) {

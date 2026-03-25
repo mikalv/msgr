@@ -16,7 +16,7 @@ class FailedMessageBanner extends StatelessWidget {
     this.onDelete,
   });
 
-  final SlackMessage message;
+  final MsgrMessage message;
   final VoidCallback onRetry;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;

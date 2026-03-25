@@ -55,7 +55,7 @@ String _formatDate(DateTime dt) {
 /// Set [isOwnProfile] to true to show edit button instead of send message.
 void showProfileCard(
   BuildContext context, {
-  required SlackProfile profile,
+  required MsgrProfile profile,
   bool isOwnProfile = false,
 }) {
   showDialog(
@@ -86,7 +86,7 @@ void showProfileCardById(
 }
 
 // ---------------------------------------------------------------------------
-// Profile card dialog (when we already have a SlackProfile)
+// Profile card dialog (when we already have a MsgrProfile)
 // ---------------------------------------------------------------------------
 
 class _ProfileCardDialog extends ConsumerStatefulWidget {
@@ -95,7 +95,7 @@ class _ProfileCardDialog extends ConsumerStatefulWidget {
     required this.isOwnProfile,
   });
 
-  final SlackProfile profile;
+  final MsgrProfile profile;
   final bool isOwnProfile;
 
   @override
@@ -103,7 +103,7 @@ class _ProfileCardDialog extends ConsumerStatefulWidget {
 }
 
 class _ProfileCardDialogState extends ConsumerState<_ProfileCardDialog> {
-  SlackProfile? _fullProfile;
+  MsgrProfile? _fullProfile;
   bool _loading = true;
 
   @override
@@ -127,7 +127,7 @@ class _ProfileCardDialogState extends ConsumerState<_ProfileCardDialog> {
       final data = await client.getProfile(team.slug, widget.profile.id);
       if (mounted) {
         setState(() {
-          _fullProfile = SlackProfile.fromJson(data);
+          _fullProfile = MsgrProfile.fromJson(data);
           _loading = false;
         });
       }
@@ -176,7 +176,7 @@ class _ProfileCardByIdDialog extends ConsumerStatefulWidget {
 
 class _ProfileCardByIdDialogState
     extends ConsumerState<_ProfileCardByIdDialog> {
-  SlackProfile? _profile;
+  MsgrProfile? _profile;
   bool _loading = true;
   String? _error;
 
@@ -201,7 +201,7 @@ class _ProfileCardByIdDialogState
       final data = await client.getProfile(team.slug, widget.profileId);
       if (mounted) {
         setState(() {
-          _profile = SlackProfile.fromJson(data);
+          _profile = MsgrProfile.fromJson(data);
           _loading = false;
         });
       }
@@ -253,7 +253,7 @@ class _ProfileCardContent extends ConsumerWidget {
     required this.isOwnProfile,
   });
 
-  final SlackProfile profile;
+  final MsgrProfile profile;
   final bool isOwnProfile;
 
   @override
@@ -522,7 +522,7 @@ class _EditProfileDialogState extends ConsumerState<_EditProfileDialog> {
         final data =
             await client.getProfile(widget.teamSlug, auth.profileId!);
         if (mounted) {
-          final profile = SlackProfile.fromJson(data);
+          final profile = MsgrProfile.fromJson(data);
           _nameController.text = profile.displayName;
           if (profile.email != null) _emailController.text = profile.email!;
           if (profile.phone != null) _phoneController.text = profile.phone!;

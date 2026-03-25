@@ -2,14 +2,14 @@
 ///
 /// These will eventually be replaced by real models from libmsgr or generated
 /// from the backend schema. For now they carry just enough data for the UI to
-/// render the Slack-style shell with mock data.
+/// render the chat shell.
 
 enum ChannelKind { channel, dm, groupDm }
 
 enum ChannelVisibility { public, private }
 
-class SlackTeam {
-  const SlackTeam({
+class MsgrTeam {
+  const MsgrTeam({
     required this.id,
     required this.name,
     required this.slug,
@@ -23,14 +23,14 @@ class SlackTeam {
   final String? iconEmoji;
   final String? domain;
 
-  SlackTeam copyWith({
+  MsgrTeam copyWith({
     String? id,
     String? name,
     String? slug,
     String? iconEmoji,
     String? domain,
   }) {
-    return SlackTeam(
+    return MsgrTeam(
       id: id ?? this.id,
       name: name ?? this.name,
       slug: slug ?? this.slug,
@@ -42,17 +42,17 @@ class SlackTeam {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is SlackTeam && runtimeType == other.runtimeType && id == other.id;
+      other is MsgrTeam && runtimeType == other.runtimeType && id == other.id;
 
   @override
   int get hashCode => id.hashCode;
 
   @override
-  String toString() => 'SlackTeam($slug)';
+  String toString() => 'MsgrTeam($slug)';
 }
 
-class SlackChannel {
-  const SlackChannel({
+class MsgrChannel {
+  const MsgrChannel({
     required this.id,
     required this.name,
     required this.slug,
@@ -78,7 +78,7 @@ class SlackChannel {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is SlackChannel &&
+      other is MsgrChannel &&
           runtimeType == other.runtimeType &&
           id == other.id;
 
@@ -86,7 +86,7 @@ class SlackChannel {
   int get hashCode => id.hashCode;
 
   @override
-  String toString() => 'SlackChannel(#$slug)';
+  String toString() => 'MsgrChannel(#$slug)';
 }
 
 /// Structured mention data stored alongside message content.
@@ -120,8 +120,8 @@ class MentionData {
       };
 }
 
-class SlackMessage {
-  const SlackMessage({
+class MsgrMessage {
+  const MsgrMessage({
     required this.id,
     required this.channelId,
     required this.senderProfileId,
@@ -161,7 +161,7 @@ class SlackMessage {
   bool get hasThreadReplies => threadReplyCount > 0;
   bool get hasMentions => mentions.isNotEmpty;
 
-  SlackMessage copyWith({
+  MsgrMessage copyWith({
     String? id,
     String? channelId,
     String? senderProfileId,
@@ -179,7 +179,7 @@ class SlackMessage {
     String? senderAvatarUrl,
     String? senderEmail,
   }) {
-    return SlackMessage(
+    return MsgrMessage(
       id: id ?? this.id,
       channelId: channelId ?? this.channelId,
       senderProfileId: senderProfileId ?? this.senderProfileId,
@@ -202,7 +202,7 @@ class SlackMessage {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is SlackMessage &&
+      other is MsgrMessage &&
           runtimeType == other.runtimeType &&
           id == other.id;
 
@@ -267,8 +267,8 @@ class PresenceInfo {
 
 enum PresenceStatus { online, away, offline }
 
-class SlackProfile {
-  const SlackProfile({
+class MsgrProfile {
+  const MsgrProfile({
     required this.id,
     required this.displayName,
     this.avatarUrl,
@@ -288,13 +288,13 @@ class SlackProfile {
   final String? accountId;
   final DateTime? insertedAt;
 
-  factory SlackProfile.fromJson(Map<String, dynamic> json) {
+  factory MsgrProfile.fromJson(Map<String, dynamic> json) {
     DateTime? insertedAt;
     final raw = json['inserted_at'];
     if (raw is String) {
       insertedAt = DateTime.tryParse(raw);
     }
-    return SlackProfile(
+    return MsgrProfile(
       id: json['id']?.toString() ?? '',
       displayName: json['display_name']?.toString() ?? json['name']?.toString() ?? '',
       avatarUrl: json['avatar_url'] as String?,
@@ -309,7 +309,7 @@ class SlackProfile {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is SlackProfile &&
+      other is MsgrProfile &&
           runtimeType == other.runtimeType &&
           id == other.id;
 

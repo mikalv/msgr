@@ -18,7 +18,7 @@ class TeamRail extends StatelessWidget {
     this.onAddTeam,
   });
 
-  final List<MockTeam> teams;
+  final List<TeamItem> teams;
   final int selectedIndex;
   final ValueChanged<int> onTeamSelected;
   final VoidCallback? onAddTeam;
@@ -60,7 +60,7 @@ class _TeamIcon extends StatelessWidget {
     required this.onTap,
   });
 
-  final MockTeam team;
+  final TeamItem team;
   final bool isSelected;
   final VoidCallback onTap;
 

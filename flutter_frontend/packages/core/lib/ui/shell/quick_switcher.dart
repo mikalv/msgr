@@ -106,12 +106,12 @@ class _QuickSwitcherState extends ConsumerState<QuickSwitcher> {
   void _handleSelect(_SwitcherItem item) {
     switch (item.kind) {
       case _SwitcherKind.team:
-        final team = item.data as SlackTeam;
+        final team = item.data as MsgrTeam;
         ref.read(selectedTeamProvider.notifier).select(team);
         break;
       case _SwitcherKind.channel:
       case _SwitcherKind.dm:
-        final channel = item.data as SlackChannel;
+        final channel = item.data as MsgrChannel;
         ref.read(selectedChannelProvider.notifier).select(channel);
         break;
     }

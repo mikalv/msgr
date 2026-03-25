@@ -6,22 +6,22 @@ import 'models.dart';
 // ---------------------------------------------------------------------------
 // Teams
 // ---------------------------------------------------------------------------
-final mockSlackTeams = <SlackTeam>[
-  const SlackTeam(
+final mockMsgrTeams = <MsgrTeam>[
+  const MsgrTeam(
     id: 'team-1',
     name: 'Eyr',
     slug: 'eyr',
     iconEmoji: '\u{1F3E5}',
     domain: 'eyr.dev.msgr.no',
   ),
-  const SlackTeam(
+  const MsgrTeam(
     id: 'team-2',
     name: 'MadAppGang',
     slug: 'madappgang',
     iconEmoji: '\u{1F680}',
     domain: 'madappgang.dev.msgr.no',
   ),
-  const SlackTeam(
+  const MsgrTeam(
     id: 'team-3',
     name: 'Family',
     slug: 'family',
@@ -33,9 +33,9 @@ final mockSlackTeams = <SlackTeam>[
 // ---------------------------------------------------------------------------
 // Channels (per team slug)
 // ---------------------------------------------------------------------------
-final mockSlackChannels = <String, List<SlackChannel>>{
+final mockMsgrChannels = <String, List<MsgrChannel>>{
   'eyr': [
-    const SlackChannel(
+    const MsgrChannel(
       id: 'ch-eyr-1',
       name: 'general',
       slug: 'general',
@@ -44,7 +44,7 @@ final mockSlackChannels = <String, List<SlackChannel>>{
       teamSlug: 'eyr',
       topic: 'Alt som angaar Eyr',
     ),
-    const SlackChannel(
+    const MsgrChannel(
       id: 'ch-eyr-2',
       name: 'dev',
       slug: 'dev',
@@ -53,7 +53,7 @@ final mockSlackChannels = <String, List<SlackChannel>>{
       teamSlug: 'eyr',
       topic: 'Development',
     ),
-    const SlackChannel(
+    const MsgrChannel(
       id: 'ch-eyr-3',
       name: 'announcements',
       slug: 'announcements',
@@ -62,7 +62,7 @@ final mockSlackChannels = <String, List<SlackChannel>>{
       visibility: ChannelVisibility.public,
       teamSlug: 'eyr',
     ),
-    const SlackChannel(
+    const MsgrChannel(
       id: 'ch-eyr-4',
       name: 'random',
       slug: 'random',
@@ -70,7 +70,7 @@ final mockSlackChannels = <String, List<SlackChannel>>{
       kind: ChannelKind.channel,
       teamSlug: 'eyr',
     ),
-    const SlackChannel(
+    const MsgrChannel(
       id: 'ch-eyr-5',
       name: 'design',
       slug: 'design',
@@ -78,14 +78,14 @@ final mockSlackChannels = <String, List<SlackChannel>>{
       kind: ChannelKind.channel,
       teamSlug: 'eyr',
     ),
-    const SlackChannel(
+    const MsgrChannel(
       id: 'dm-eyr-1',
       name: 'Kari Nordmann',
       slug: 'kari-nordmann',
       kind: ChannelKind.dm,
       teamSlug: 'eyr',
     ),
-    const SlackChannel(
+    const MsgrChannel(
       id: 'dm-eyr-2',
       name: 'Ola Hansen',
       slug: 'ola-hansen',
@@ -94,7 +94,7 @@ final mockSlackChannels = <String, List<SlackChannel>>{
     ),
   ],
   'madappgang': [
-    const SlackChannel(
+    const MsgrChannel(
       id: 'ch-mag-1',
       name: 'general',
       slug: 'general',
@@ -102,7 +102,7 @@ final mockSlackChannels = <String, List<SlackChannel>>{
       kind: ChannelKind.channel,
       teamSlug: 'madappgang',
     ),
-    const SlackChannel(
+    const MsgrChannel(
       id: 'ch-mag-2',
       name: 'flutter',
       slug: 'flutter',
@@ -110,7 +110,7 @@ final mockSlackChannels = <String, List<SlackChannel>>{
       kind: ChannelKind.channel,
       teamSlug: 'madappgang',
     ),
-    const SlackChannel(
+    const MsgrChannel(
       id: 'ch-mag-3',
       name: 'rust',
       slug: 'rust',
@@ -120,7 +120,7 @@ final mockSlackChannels = <String, List<SlackChannel>>{
     ),
   ],
   'family': [
-    const SlackChannel(
+    const MsgrChannel(
       id: 'ch-fam-1',
       name: 'general',
       slug: 'general',
@@ -128,7 +128,7 @@ final mockSlackChannels = <String, List<SlackChannel>>{
       kind: ChannelKind.channel,
       teamSlug: 'family',
     ),
-    const SlackChannel(
+    const MsgrChannel(
       id: 'ch-fam-2',
       name: 'photos',
       slug: 'photos',
@@ -142,7 +142,7 @@ final mockSlackChannels = <String, List<SlackChannel>>{
 // ---------------------------------------------------------------------------
 // Messages (per channel ID)
 // ---------------------------------------------------------------------------
-SlackMessage _msg(
+MsgrMessage _msg(
   String id,
   String channelId,
   String senderId,
@@ -151,7 +151,7 @@ SlackMessage _msg(
   int minutesAgo, {
   String? threadParentId,
 }) {
-  return SlackMessage(
+  return MsgrMessage(
     id: id,
     channelId: channelId,
     senderProfileId: senderId,
@@ -163,7 +163,7 @@ SlackMessage _msg(
   );
 }
 
-final mockSlackMessages = <String, List<SlackMessage>>{
+final mockMsgrMessages = <String, List<MsgrMessage>>{
   'ch-eyr-1': [
     _msg('m1', 'ch-eyr-1', 'p1', 'Kari Nordmann', 'God morgen alle sammen!', 60),
     _msg('m2', 'ch-eyr-1', 'p2', 'Ola Hansen', 'Morgen! Noen som har sett den nye PRen?', 55),
@@ -188,7 +188,7 @@ final mockSlackMessages = <String, List<SlackMessage>>{
 };
 
 // Thread replies keyed by parent message ID
-final mockThreadReplies = <String, List<SlackMessage>>{
+final mockThreadReplies = <String, List<MsgrMessage>>{
   'm2': [
     _msg('t1', 'ch-eyr-1', 'p3', 'Ingrid Berg', 'Hvilken PR? #140?', 53, threadParentId: 'm2'),
     _msg('t2', 'ch-eyr-1', 'p2', 'Ola Hansen', 'Ja, den med NOISE-handshake fix.', 52, threadParentId: 'm2'),
@@ -222,20 +222,20 @@ final mockPresenceData = <String, Map<String, PresenceInfo>>{
 // ---------------------------------------------------------------------------
 // Profiles (per team slug)
 // ---------------------------------------------------------------------------
-final mockProfiles = <String, List<SlackProfile>>{
+final mockProfiles = <String, List<MsgrProfile>>{
   'eyr': const [
-    SlackProfile(id: 'p1', displayName: 'Kari Nordmann', email: 'kari@eyr.no', role: 'admin'),
-    SlackProfile(id: 'p2', displayName: 'Ola Hansen', email: 'ola@eyr.no', role: 'member'),
-    SlackProfile(id: 'p3', displayName: 'Ingrid Berg', email: 'ingrid@eyr.no', role: 'member'),
-    SlackProfile(id: 'p4', displayName: 'Erik Solheim', email: 'erik@eyr.no', role: 'member'),
+    MsgrProfile(id: 'p1', displayName: 'Kari Nordmann', email: 'kari@eyr.no', role: 'admin'),
+    MsgrProfile(id: 'p2', displayName: 'Ola Hansen', email: 'ola@eyr.no', role: 'member'),
+    MsgrProfile(id: 'p3', displayName: 'Ingrid Berg', email: 'ingrid@eyr.no', role: 'member'),
+    MsgrProfile(id: 'p4', displayName: 'Erik Solheim', email: 'erik@eyr.no', role: 'member'),
   ],
   'madappgang': const [
-    SlackProfile(id: 'p5', displayName: 'Jack R', email: 'jack@mag.com', role: 'owner'),
-    SlackProfile(id: 'p6', displayName: 'Anna K', email: 'anna@mag.com', role: 'member'),
+    MsgrProfile(id: 'p5', displayName: 'Jack R', email: 'jack@mag.com', role: 'owner'),
+    MsgrProfile(id: 'p6', displayName: 'Anna K', email: 'anna@mag.com', role: 'member'),
   ],
   'family': const [
-    SlackProfile(id: 'p7', displayName: 'Mamma', role: 'admin'),
-    SlackProfile(id: 'p8', displayName: 'Pappa', role: 'member'),
+    MsgrProfile(id: 'p7', displayName: 'Mamma', role: 'admin'),
+    MsgrProfile(id: 'p8', displayName: 'Pappa', role: 'member'),
   ],
 };
 

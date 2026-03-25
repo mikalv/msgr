@@ -66,7 +66,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
   bool _showThread = false;
   bool _showNewMessagesBanner = false;
   int _previousMessageCount = 0;
-  SlackMessage? _editingMessage;
+  MsgrMessage? _editingMessage;
   String? _draftBeforeEdit;
   bool _isSending = false;
 
@@ -236,8 +236,8 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
 
   /// Execute a slash command via the server API.
   Future<void> _executeSlashCommand(
-    SlackTeam team,
-    SlackChannel channel,
+    MsgrTeam team,
+    MsgrChannel channel,
     ChatComposerResult result,
   ) async {
     final text = result.text.trim();
@@ -555,7 +555,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     );
   }
 
-  void _showSearchDialog(BuildContext context, SlackChannel channel) {
+  void _showSearchDialog(BuildContext context, MsgrChannel channel) {
     final team = ref.read(selectedTeamProvider);
     if (team == null) return;
 
@@ -565,7 +565,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     );
   }
 
-  void _deleteMessage(SlackMessage message) async {
+  void _deleteMessage(MsgrMessage message) async {
     final team = ref.read(selectedTeamProvider);
     if (team == null) return;
 
@@ -586,7 +586,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     }
   }
 
-  void _openThread(SlackMessage message) {
+  void _openThread(MsgrMessage message) {
     ref.read(threadMessagesProvider.notifier).openThread(message);
     setState(() => _showThread = true);
   }
@@ -599,7 +599,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     final messages = ref.read(channelMessagesProvider).messages;
 
     // Find last own message
-    SlackMessage? lastOwn;
+    MsgrMessage? lastOwn;
     for (var i = messages.length - 1; i >= 0; i--) {
       if (messages[i].senderProfileId == auth.profileId && !messages[i].isSystem) {
         lastOwn = messages[i];
@@ -611,7 +611,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     _startEdit(lastOwn);
   }
 
-  void _startEdit(SlackMessage message) {
+  void _startEdit(MsgrMessage message) {
     setState(() {
       _draftBeforeEdit = _composerController.value.text;
       _editingMessage = message;

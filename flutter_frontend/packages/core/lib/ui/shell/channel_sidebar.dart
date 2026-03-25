@@ -34,12 +34,12 @@ class ChannelSidebar extends StatelessWidget {
   });
 
   final String teamName;
-  final List<MockChannel> channels;
-  final List<MockDmContact> dmContacts;
+  final List<ChannelItem> channels;
+  final List<DmItem> dmContacts;
   final String? selectedChannelId;
   final String? selectedDmId;
-  final ValueChanged<MockChannel>? onChannelSelected;
-  final ValueChanged<MockDmContact>? onDmSelected;
+  final ValueChanged<ChannelItem>? onChannelSelected;
+  final ValueChanged<DmItem>? onDmSelected;
   final VoidCallback? onCreateChannel;
   final VoidCallback? onLogout;
   final VoidCallback? onEditProfile;
@@ -50,8 +50,8 @@ class ChannelSidebar extends StatelessWidget {
   final VoidCallback? onAvatarTap;
   final VoidCallback? onInvitePeople;
 
-  List<MockChannel> get _sortedChannels {
-    final sorted = List<MockChannel>.from(channels);
+  List<ChannelItem> get _sortedChannels {
+    final sorted = List<ChannelItem>.from(channels);
     sorted.sort((a, b) {
       if (a.unreadCount > 0 && b.unreadCount == 0) return -1;
       if (a.unreadCount == 0 && b.unreadCount > 0) return 1;
@@ -62,8 +62,8 @@ class ChannelSidebar extends StatelessWidget {
     return sorted;
   }
 
-  List<MockDmContact> get _sortedDms {
-    final sorted = List<MockDmContact>.from(dmContacts);
+  List<DmItem> get _sortedDms {
+    final sorted = List<DmItem>.from(dmContacts);
     sorted.sort((a, b) {
       if (a.unreadCount > 0 && b.unreadCount == 0) return -1;
       if (a.unreadCount == 0 && b.unreadCount > 0) return 1;

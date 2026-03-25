@@ -6,8 +6,8 @@
 
 enum ChannelKind { public, private, announcement }
 
-class MockTeam {
-  const MockTeam({
+class TeamItem {
+  const TeamItem({
     required this.id,
     required this.name,
     required this.slug,
@@ -22,8 +22,8 @@ class MockTeam {
   final int unreadCount;
 }
 
-class MockChannel {
-  const MockChannel({
+class ChannelItem {
+  const ChannelItem({
     required this.id,
     required this.name,
     required this.slug,
@@ -44,8 +44,8 @@ class MockChannel {
   final DateTime? lastActivityAt;
 }
 
-class MockDmContact {
-  const MockDmContact({
+class DmItem {
+  const DmItem({
     required this.id,
     required this.name,
     this.avatarUrl,

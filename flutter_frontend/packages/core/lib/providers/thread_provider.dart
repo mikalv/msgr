@@ -24,8 +24,8 @@ class ThreadMessagesState {
   });
 
   final String? parentMessageId;
-  final SlackMessage? parentMessage;
-  final List<SlackMessage> replies;
+  final MsgrMessage? parentMessage;
+  final List<MsgrMessage> replies;
   final bool isLoading;
   final Object? error;
 
@@ -33,8 +33,8 @@ class ThreadMessagesState {
 
   ThreadMessagesState copyWith({
     String? parentMessageId,
-    SlackMessage? parentMessage,
-    List<SlackMessage>? replies,
+    MsgrMessage? parentMessage,
+    List<MsgrMessage>? replies,
     bool? isLoading,
     Object? error,
   }) {
@@ -54,7 +54,7 @@ class ThreadMessagesNotifier extends StateNotifier<ThreadMessagesState> {
   final Ref _ref;
 
   /// Open a thread and load its replies from the API.
-  Future<void> openThread(SlackMessage parentMessage) async {
+  Future<void> openThread(MsgrMessage parentMessage) async {
     state = ThreadMessagesState(
       parentMessageId: parentMessage.id,
       parentMessage: parentMessage,
@@ -106,7 +106,7 @@ class ThreadMessagesNotifier extends StateNotifier<ThreadMessagesState> {
 
     final auth = _ref.read(simpleAuthProvider);
     final tempId = 'thread-${DateTime.now().microsecondsSinceEpoch}';
-    final optimistic = SlackMessage(
+    final optimistic = MsgrMessage(
       id: tempId,
       channelId: state.parentMessage?.channelId ?? '',
       senderProfileId: auth.profileId ?? 'me',
@@ -160,7 +160,7 @@ class ThreadMessagesNotifier extends StateNotifier<ThreadMessagesState> {
   }
 
   /// Merge an incoming thread reply from WebSocket.
-  void mergeIncomingReply(SlackMessage reply) {
+  void mergeIncomingReply(MsgrMessage reply) {
     if (reply.threadParentId != state.parentMessageId) return;
 
     // Check for duplicate
