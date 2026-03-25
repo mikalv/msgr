@@ -82,6 +82,15 @@ class MsgrClient {
       );
     }
 
+    // Reuse existing client if it exists (avoid creating duplicate sockets)
+    if (_realtime != null) {
+      _realtime!.token = api.accessToken;
+      if (!isRealtimeConnected) {
+        await _realtime!.connect();
+      }
+      return;
+    }
+
     final wsUrl = baseUrl
         .replaceFirst('https://', 'wss://')
         .replaceFirst('http://', 'ws://');

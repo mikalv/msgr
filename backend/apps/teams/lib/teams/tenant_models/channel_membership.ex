@@ -48,7 +48,7 @@ defmodule Teams.TenantModels.ChannelMembership do
   def join(prefix, attrs) do
     %__MODULE__{}
     |> changeset(Map.put_new(attrs, :joined_at, DateTime.utc_now()))
-    |> Teams.Repo.insert(prefix: prefix)
+    |> Teams.Repo.insert(prefix: prefix, on_conflict: :nothing)
   end
 
   def leave(prefix, channel_id, profile_id) do

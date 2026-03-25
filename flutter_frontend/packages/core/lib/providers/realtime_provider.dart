@@ -635,11 +635,21 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
 
   void _scheduleReconnect() {
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 3), () async {
+    _reconnectTimer = Timer(const Duration(seconds: 5), () async {
       if (mounted && !state.isConnected && !state.isConnecting) {
         _log.info('Attempting reconnect — refreshing token first...');
         await _refreshRealtimeToken();
-        if (mounted) connect();
+
+        // Don't create a new socket — just update state.
+        // Phoenix socket handles auto-reconnect internally.
+        // If the socket is truly dead, then reconnect fully.
+        final client = _ref.read(msgrClientProvider);
+        if (client.isRealtimeConnected) {
+          state = state.copyWith(isConnected: true, isConnecting: false);
+          _rejoinTopics();
+        } else {
+          if (mounted) connect();
+        }
       }
     });
   }

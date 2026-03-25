@@ -101,24 +101,35 @@ defmodule Teams.Channels do
     sorted_ids = Enum.sort(profile_ids)
     dm_slug = "dm-" <> (:crypto.hash(:sha256, Enum.join(sorted_ids, ":")) |> Base.encode16(case: :lower) |> binary_part(0, 12))
 
+    # Try to find existing DM first, then create if not found
     case Channel.get_by_slug(prefix, dm_slug) do
       nil ->
-        with {:ok, channel} <-
-               Channel.create(prefix, %{
-                 name: dm_slug,
-                 slug: dm_slug,
-                 kind: kind,
-                 visibility: "private"
-               }) do
-          # Add all participants
-          Enum.each(profile_ids, fn pid ->
-            ChannelMembership.join(prefix, %{
-              channel_id: channel.id,
-              profile_id: pid
-            })
-          end)
+        case Channel.create(prefix, %{
+               name: dm_slug,
+               slug: dm_slug,
+               kind: kind,
+               visibility: "private"
+             }) do
+          {:ok, channel} ->
+            # Add all participants (on_conflict: :nothing handles duplicates)
+            Enum.each(profile_ids, fn pid ->
+              ChannelMembership.join(prefix, %{
+                channel_id: channel.id,
+                profile_id: pid
+              })
+            end)
 
-          {:ok, channel}
+            {:ok, channel}
+
+          {:error, %Ecto.Changeset{errors: [{:slug, _} | _]}} ->
+            # Race condition: slug was created between check and insert
+            case Channel.get_by_slug(prefix, dm_slug) do
+              nil -> {:error, :dm_creation_failed}
+              existing -> {:ok, existing}
+            end
+
+          {:error, reason} ->
+            {:error, reason}
         end
 
       existing ->
