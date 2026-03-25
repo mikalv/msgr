@@ -5,10 +5,7 @@ import 'package:core/ui/widgets/profile_avatar.dart';
 
 import 'shell_models.dart';
 
-/// A single DM contact row in Slack-style flat list.
-///
-/// Shows an inline presence dot (green = online, gray = offline) followed
-/// by the contact name, and an unread badge pill on the right.
+/// A single DM contact row in flat list with context menu.
 class DmListItem extends StatelessWidget {
   const DmListItem({
     super.key,
@@ -21,6 +18,44 @@ class DmListItem extends StatelessWidget {
   final bool isSelected;
   final VoidCallback onTap;
 
+  void _showContextMenu(BuildContext context, Offset globalPosition) async {
+    final result = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPosition.dx, globalPosition.dy,
+        globalPosition.dx + 1, globalPosition.dy + 1,
+      ),
+      color: const Color(0xFF2A2A2A),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      items: [
+        _menuItem('mute', Icons.notifications_off_outlined, 'Mute conversation'),
+        _menuItem('mark_read', Icons.done_all, 'Mark as read'),
+        const PopupMenuDivider(),
+        _menuItem('close', Icons.close, 'Close conversation'),
+      ],
+    );
+
+    if (result == null || !context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Coming soon'), duration: Duration(seconds: 2)),
+    );
+  }
+
+  static PopupMenuItem<String> _menuItem(String value, IconData icon, String label) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 36,
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.white70),
+          const SizedBox(width: 10),
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = MsgrTheme.of(context);
@@ -29,7 +64,12 @@ class DmListItem extends StatelessWidget {
         hasUnread ? t.sidebarTextBright : t.sidebarText;
     final fontWeight = hasUnread ? FontWeight.w600 : FontWeight.w400;
 
-    return InkWell(
+    return GestureDetector(
+      onSecondaryTapUp: (details) =>
+          _showContextMenu(context, details.globalPosition),
+      onLongPressStart: (details) =>
+          _showContextMenu(context, details.globalPosition),
+      child: InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
       hoverColor: t.sidebarItemHover,
@@ -83,6 +123,7 @@ class DmListItem extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }
