@@ -515,6 +515,24 @@ class MsgrApiClient {
   }
 
   // ---------------------------------------------------------------------------
+  // Reminders
+  // ---------------------------------------------------------------------------
+
+  /// POST /api/teams/:slug/reminders — create a reminder
+  Future<Map<String, dynamic>> createReminder(
+    String teamSlug, {
+    required String messageId,
+    required String remindAt,
+    String? channelId,
+  }) async {
+    return post('/api/teams/$teamSlug/reminders', body: {
+      'message_id': messageId,
+      'remind_at': remindAt,
+      if (channelId != null) 'channel_id': channelId,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Messages
   // ---------------------------------------------------------------------------
 

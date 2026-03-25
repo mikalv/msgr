@@ -21,7 +21,8 @@ defmodule Teams.Application do
       TeamsWeb.Endpoint,
       TeamsWeb.UserPresence,
       TeamsWeb.TeamPresence,
-      {ChannelWatcher, :channels}
+      {ChannelWatcher, :channels},
+      Teams.ReminderScheduler
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

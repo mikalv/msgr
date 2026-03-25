@@ -72,6 +72,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
           _buildContextMenuItem('delete', Icons.delete_outline, S.delete, isDestructive: true),
           const PopupMenuDivider(),
         ],
+        _buildContextMenuItem('remind', Icons.alarm, 'Remind me'),
         _buildContextMenuItem('link', Icons.link, S.copyLink),
       ],
     );
@@ -111,6 +112,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
           );
         }
         break;
+      case 'remind':
+        if (context.mounted) await _showRemindMenu(context, globalPosition, msg);
+        break;
       default:
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -119,6 +123,79 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
           ),
         );
     }
+  }
+
+  Future<void> _showRemindMenu(BuildContext context, Offset pos, SlackMessage msg) async {
+    final now = DateTime.now();
+    final position = RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx + 1, pos.dy + 1);
+
+    final result = await showMenu<Duration?>(
+      context: context,
+      position: position,
+      color: const Color(0xFF2A2A2A),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      items: [
+        _remindItem(const Duration(minutes: 10), '10 minutes'),
+        _remindItem(const Duration(minutes: 20), '20 minutes'),
+        _remindItem(const Duration(minutes: 30), '30 minutes'),
+        _remindItem(const Duration(hours: 1), '1 hour'),
+        _remindItem(Duration(hours: _hoursUntilTomorrow9am(now)), 'Tomorrow 9:00 AM'),
+        _remindItem(Duration(hours: _hoursUntilNextMonday9am(now)), 'Next Monday 9:00 AM'),
+      ],
+    );
+
+    if (result == null || !context.mounted) return;
+
+    final remindAt = now.add(result).toUtc();
+
+    try {
+      final team = ref.read(selectedTeamProvider);
+      if (team == null) return;
+      final client = ref.read(msgrApiProvider);
+      await client.createReminder(
+        team.slug,
+        messageId: msg.id,
+        remindAt: remindAt.toIso8601String(),
+        channelId: msg.channelId,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reminder set!'), duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to set reminder: $e'), duration: Duration(seconds: 3)),
+        );
+      }
+    }
+  }
+
+  PopupMenuItem<Duration> _remindItem(Duration d, String label) {
+    return PopupMenuItem<Duration>(
+      value: d,
+      height: 36,
+      child: Row(
+        children: [
+          const Icon(Icons.schedule, size: 16, color: Colors.white70),
+          const SizedBox(width: 10),
+          Text(label, style: const TextStyle(color: Colors.white, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  int _hoursUntilTomorrow9am(DateTime now) {
+    final tomorrow = DateTime(now.year, now.month, now.day + 1, 9);
+    return tomorrow.difference(now).inHours.clamp(1, 48);
+  }
+
+  int _hoursUntilNextMonday9am(DateTime now) {
+    var daysUntilMonday = (DateTime.monday - now.weekday) % 7;
+    if (daysUntilMonday == 0) daysUntilMonday = 7;
+    final nextMonday = DateTime(now.year, now.month, now.day + daysUntilMonday, 9);
+    return nextMonday.difference(now).inHours.clamp(1, 168);
   }
 
   @override

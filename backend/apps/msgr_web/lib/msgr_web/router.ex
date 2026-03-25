@@ -139,6 +139,10 @@ defmodule MessngrWeb.Router do
     get "/webhooks", WebhookManagementController, :index
     delete "/webhooks/:id", WebhookManagementController, :delete
 
+    # Reminders
+    post "/reminders", ReminderController, :create
+    get "/reminders", ReminderController, :index
+
     # ── App Platform (team-scoped) ─────────────────────────────
     get "/commands", CommandController, :index
     post "/channels/:channel_id/commands", CommandController, :execute
