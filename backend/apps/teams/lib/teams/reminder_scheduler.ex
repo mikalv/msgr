@@ -56,15 +56,34 @@ defmodule Teams.ReminderScheduler do
     profile = reminder.profile
     message = reminder.message
 
-    if profile && message do
+    if profile do
       # Extract message text for notification
-      content = case message.content do
-        %{"text" => text} when is_binary(text) -> text
-        text when is_binary(text) -> text
-        _ -> reminder.message_preview || "Message"
+      content = if message do
+        case message.content do
+          %{"text" => text} when is_binary(text) -> text
+          text when is_binary(text) -> text
+          _ -> reminder.message_preview || "Reminder"
+        end
+      else
+        reminder.message_preview || "Reminder"
       end
 
       preview = String.slice(content, 0, 100)
+
+      # Post reminder to user's self-DM channel (notes to self)
+      try do
+        case Teams.Channels.create_dm(prefix, [profile.id]) do
+          {:ok, self_channel} ->
+            Teams.Messages.create_message(prefix, %{
+              channel_id: self_channel.id,
+              sender_profile_id: profile.id,
+              content: %{"text" => "⏰ **Reminder:** #{preview}", "system" => true}
+            })
+          _ -> :ok
+        end
+      rescue
+        _ -> :ok
+      end
 
       Logger.info("[Reminder] Delivering to #{profile.display_name}: #{preview}")
 

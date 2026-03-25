@@ -148,6 +148,9 @@ defmodule MessngrWeb.CommandController do
   defp executor_for_builtin("poll"), do: Messngr.Apps.Executors.PollExecutor
   defp executor_for_builtin("remind"), do: Messngr.Apps.Executors.RemindExecutor
   defp executor_for_builtin("topic"), do: Messngr.Apps.Executors.TopicExecutor
+  defp executor_for_builtin("who"), do: Messngr.Apps.Executors.WhoExecutor
+  defp executor_for_builtin("invite"), do: Messngr.Apps.Executors.InviteExecutor
+  defp executor_for_builtin("note"), do: Messngr.Apps.Executors.NoteExecutor
   defp executor_for_builtin(_), do: nil
 
   # ── Side effects ───────────────────────────────────────────────

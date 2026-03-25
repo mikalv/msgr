@@ -13,9 +13,12 @@ defmodule Messngr.Apps.BuiltinCommands do
   @builtin_app_slug "msgr-builtin"
 
   @builtin_commands [
-    %{name: "poll", description: "Opprett en avstemning"},
-    %{name: "remind", description: "Sett en påminnelse"},
-    %{name: "topic", description: "Sett kanaltopic"}
+    %{name: "poll", description: "Create a poll — /poll \"Question\" \"Option 1\" \"Option 2\""},
+    %{name: "remind", description: "Set a reminder — /remind 30m Check deploy"},
+    %{name: "topic", description: "Set channel topic — /topic New topic here"},
+    %{name: "who", description: "List members of this channel"},
+    %{name: "invite", description: "Invite a member to this channel — /invite @username"},
+    %{name: "note", description: "Save a note to yourself — /note Remember to review PR"}
   ]
 
   @doc """
