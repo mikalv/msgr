@@ -114,8 +114,10 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
     final auth = ref.watch(simpleAuthProvider);
 
     if (!auth.isLoggedIn) {
+      final hasInvite = _pendingInviteCode != null;
       return SimpleLoginScreen(
         onLoginSuccess: () => _tryRedeemInvite(),
+        subtitle: hasInvite ? 'Log in to join the team' : null,
       );
     }
 

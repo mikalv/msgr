@@ -6,8 +6,9 @@ import 'package:core/providers/msgr_client_provider.dart';
 import 'package:libmsgr/api.dart';
 
 class SimpleLoginScreen extends ConsumerStatefulWidget {
-  const SimpleLoginScreen({super.key, this.onLoginSuccess});
+  const SimpleLoginScreen({super.key, this.onLoginSuccess, this.subtitle});
   final VoidCallback? onLoginSuccess;
+  final String? subtitle;
 
   @override
   ConsumerState<SimpleLoginScreen> createState() => _SimpleLoginScreenState();
@@ -115,10 +116,18 @@ class _SimpleLoginScreenState extends ConsumerState<SimpleLoginScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  'Messngr',
+                  'Msgr',
                   style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
+                if (widget.subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.subtitle!,
+                    style: TextStyle(color: Colors.white.withAlpha(120), fontSize: 13),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Text(
                   _challenge == null
