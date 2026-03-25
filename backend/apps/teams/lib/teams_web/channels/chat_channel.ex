@@ -121,8 +121,20 @@ defmodule TeamsWeb.ChatChannel do
 
         broadcast!(socket, "new:message", serialize_message(message))
 
+        # Broadcast to team topic for sidebar unread counts
+        team_slug = socket.assigns[:team_slug] || resolve_slug_from_prefix(prefix)
+        if team_slug do
+          MessngrWeb.Endpoint.broadcast(
+            "team:#{team_slug}",
+            "channel:new_message",
+            %{
+              channel_id: message.channel_id,
+              sender_profile_id: message.sender_profile_id
+            }
+          )
+        end
+
         # Dispatch push notifications to offline members
-        team_slug = socket.assigns[:team_slug]
         Logger.info("Push dispatch: team_slug=#{inspect(team_slug)} prefix=#{inspect(prefix)}")
         if team_slug do
           Messngr.Push.Dispatcher.notify_new_message(team_slug, prefix, message)
