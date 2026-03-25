@@ -26,9 +26,19 @@ defmodule Teams.TenantModels.Profile do
   def changeset(profile, attrs) do
     profile
     |> cast(attrs, [:account_id, :display_name, :avatar_url, :email, :phone, :role])
-    |> validate_required([:account_id])
-    |> validate_inclusion(:role, ~w(owner admin member))
+    |> validate_required_unless_bot(attrs)
+    |> validate_inclusion(:role, ~w(owner admin member bot))
     |> unique_constraint(:account_id)
+  end
+
+  # Bot profiles don't need account_id
+  defp validate_required_unless_bot(changeset, attrs) do
+    role = Map.get(attrs, :role) || Map.get(attrs, "role")
+    if role == "bot" do
+      changeset
+    else
+      validate_required(changeset, [:account_id])
+    end
   end
 
   # Query helpers

@@ -112,7 +112,7 @@ defmodule MessngrWeb.WebhookController do
            [display_name: bot_name, role: "bot"],
            prefix: prefix) do
       nil ->
-        # Create bot profile
+        # Create bot profile (no account_id needed for bots)
         {:ok, profile} = Teams.TenantModels.Profile.create(prefix, %{
           display_name: bot_name,
           role: "bot",
