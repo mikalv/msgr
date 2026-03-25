@@ -16,11 +16,19 @@ defmodule MessngrWeb.TeamDmController do
     unless profile do
       {:error, :forbidden}
     else
-      profile_ids = params["profile_ids"] || []
+      raw_ids = params["profile_ids"] || []
 
-      # Always include the current user
+      # Filter out any IDs that aren't valid tenant profiles
+      # (client may send account-level profile IDs by mistake)
+      valid_tenant_ids =
+        raw_ids
+        |> Enum.filter(fn id ->
+          id != profile.id and Teams.Repo.get(Teams.TenantModels.Profile, id, prefix: prefix) != nil
+        end)
+
+      # Always include the current user's team profile
       all_ids =
-        [profile.id | profile_ids]
+        [profile.id | valid_tenant_ids]
         |> Enum.uniq()
 
       if length(all_ids) < 2 do
