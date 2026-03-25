@@ -11,6 +11,7 @@ import 'package:core/providers/push_provider.dart';
 import 'package:core/providers/web_push_provider.dart';
 import 'package:core/providers/team_list_provider.dart';
 import 'package:core/providers/unread_provider.dart';
+import 'package:core/ui/auth/profile_setup_screen.dart';
 import 'package:core/ui/auth/simple_login_screen.dart';
 import 'package:core/ui/shell/app_shell.dart';
 import 'package:core/ui/shell/chat/simple_chat_content.dart';
@@ -62,6 +63,7 @@ class _AuthGate extends ConsumerStatefulWidget {
 
 class _AuthGateState extends ConsumerState<_AuthGate> {
   bool _redeemingInvite = false;
+  bool _profileSetupDone = false;
 
   @override
   void didChangeDependencies() {
@@ -130,6 +132,15 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
             ],
           ),
         ),
+      );
+    }
+
+    // Profile setup gate — must set display name before entering app
+    final needsProfile = !_profileSetupDone &&
+        (auth.displayName == null || auth.displayName!.isEmpty || auth.displayName == auth.email);
+    if (needsProfile) {
+      return ProfileSetupScreen(
+        onComplete: () => setState(() => _profileSetupDone = true),
       );
     }
 

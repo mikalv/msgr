@@ -72,19 +72,19 @@ Future<void> handleDeepLink(Ref ref, MsgrDeepLink link) async {
   }
   ref.read(selectedTeamProvider.notifier).select(team);
 
-  // Wait a tick for channels to load
-  await Future.delayed(const Duration(milliseconds: 300));
-
-  // Select channel
+  // Wait for channels to load (retry a few times)
   if (link.channelSlug != null) {
-    final channels = ref.read(channelListProvider).channels;
-    final channel = channels.where((c) => c.slug == link.channelSlug).firstOrNull;
-    if (channel != null) {
-      ref.read(selectedChannelProvider.notifier).select(channel);
-      _log.info('Navigated to #${channel.name}');
-    } else {
-      _log.warning('Channel not found: ${link.channelSlug}');
+    for (var i = 0; i < 10; i++) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      final channels = ref.read(channelListProvider).channels;
+      final channel = channels.where((c) => c.slug == link.channelSlug || c.id == link.channelSlug).firstOrNull;
+      if (channel != null) {
+        ref.read(selectedChannelProvider.notifier).select(channel);
+        _log.info('Navigated to #${channel.name}');
+        return;
+      }
     }
+    _log.warning('Channel not found after retries: ${link.channelSlug}');
   }
 }
 
