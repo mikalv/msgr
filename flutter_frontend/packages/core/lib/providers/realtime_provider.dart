@@ -64,6 +64,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   String? _currentChannelId;
   Timer? _reconnectTimer;
   Timer? _tokenRefreshTimer;
+  bool _intentionalDisconnect = false;
 
   /// Connect the WebSocket using credentials from the MsgrClient.
   Future<void> connect() async {
@@ -88,7 +89,7 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
       client.realtime.onEvent = _handleEvent;
 
       client.realtime.onDisconnect = () {
-        if (mounted) {
+        if (mounted && !_intentionalDisconnect) {
           _log.info('WebSocket disconnected');
           state = state.copyWith(isConnected: false);
           _scheduleReconnect();
@@ -639,16 +640,10 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
       if (mounted && !state.isConnected && !state.isConnecting) {
         _log.info('Attempting reconnect — refreshing token first...');
         await _refreshRealtimeToken();
-
-        // Don't create a new socket — just update state.
-        // Phoenix socket handles auto-reconnect internally.
-        // If the socket is truly dead, then reconnect fully.
-        final client = _ref.read(msgrClientProvider);
-        if (client.isRealtimeConnected) {
-          state = state.copyWith(isConnected: true, isConnecting: false);
-          _rejoinTopics();
-        } else {
-          if (mounted) connect();
+        _intentionalDisconnect = true;
+        if (mounted) {
+          await connect();
+          _intentionalDisconnect = false;
         }
       }
     });

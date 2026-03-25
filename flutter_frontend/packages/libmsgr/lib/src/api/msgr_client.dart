@@ -82,13 +82,10 @@ class MsgrClient {
       );
     }
 
-    // Reuse existing client if it exists (avoid creating duplicate sockets)
+    // Disconnect old socket if exists
     if (_realtime != null) {
-      _realtime!.token = api.accessToken;
-      if (!isRealtimeConnected) {
-        await _realtime!.connect();
-      }
-      return;
+      try { _realtime!.disconnect(); } catch (_) {}
+      _realtime = null;
     }
 
     final wsUrl = baseUrl
