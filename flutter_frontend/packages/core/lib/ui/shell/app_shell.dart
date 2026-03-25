@@ -76,8 +76,11 @@ class _AppShellState extends ConsumerState<AppShell> {
     try {
       final client = ref.read(msgrApiProvider);
       final profiles = await client.getProfiles(team.slug);
-      final myProfileId = ref.read(simpleAuthProvider).profileId;
-      final myProfile = profiles.where((p) => p['id'] == myProfileId).firstOrNull;
+      // Match by account_id (not profile_id — that's account-level, not team-level)
+      final myAccountId = ref.read(simpleAuthProvider).accountId;
+      final myProfile = profiles.where((p) =>
+        p['account_id'] == myAccountId || p['id'] == myAccountId
+      ).firstOrNull;
 
       if (myProfile != null) {
         final displayName = myProfile['display_name']?.toString() ?? '';
