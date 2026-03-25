@@ -47,6 +47,17 @@ defmodule MessngrWeb.CommandController do
           result = apply_side_effects(result, prefix, channel_id)
 
           case result do
+            {:ok, %{content: content, private: true}} ->
+              # Private result — only shown to the user, not posted in channel
+              json(conn, %{
+                data: %{
+                  command: command_name,
+                  app: app.slug,
+                  status: "completed",
+                  result: %{type: "ephemeral", content: content}
+                }
+              })
+
             {:ok, %{content: content}} ->
               # Post result as a system message in the channel
               maybe_post_system_message(prefix, channel_id, content)
@@ -56,10 +67,7 @@ defmodule MessngrWeb.CommandController do
                   command: command_name,
                   app: app.slug,
                   status: "completed",
-                  result: %{
-                    type: "message",
-                    content: content
-                  }
+                  result: %{type: "message", content: content}
                 }
               })
 

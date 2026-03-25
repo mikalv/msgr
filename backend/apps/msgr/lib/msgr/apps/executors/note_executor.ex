@@ -24,7 +24,7 @@ defmodule Messngr.Apps.Executors.NoteExecutor do
             content: %{"text" => "📝 #{text}"}
           })
 
-          {:ok, %{type: :message, content: "📝 Note saved."}}
+          {:ok, %{type: :message, content: "📝 Note saved.", private: true}}
 
         {:error, _} ->
           {:error, "Could not save note."}

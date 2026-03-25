@@ -35,7 +35,7 @@ defmodule Messngr.Apps.Executors.RemindExecutor do
           }) do
             {:ok, _reminder} ->
               content = "⏰ Reminder set: **#{message}** in #{time_str}"
-              {:ok, %{type: :message, content: content}}
+              {:ok, %{type: :message, content: content, private: true}}
 
             {:error, _changeset} ->
               {:error, "Could not create reminder"}
