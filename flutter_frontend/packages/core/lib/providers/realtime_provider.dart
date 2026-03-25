@@ -54,6 +54,21 @@ class RealtimeState {
 ///
 /// Connects on login, disconnects on logout. Subscribes to team and channel
 /// topics automatically when the selected team/channel changes.
+///
+/// ## IMPORTANT: WebSocket reconnect strategy
+///
+/// DO NOT manually disconnect and create new sockets for reconnection.
+/// phoenix_socket has built-in auto-reconnect with exponential backoff.
+/// Creating new sockets on disconnect causes an infinite loop:
+///   disconnect() → closeStream fires → onDisconnect → connect() →
+///   connectRealtime() → disconnect old socket → closeStream fires → loop
+///
+/// Instead:
+///   - Create the socket ONCE in connect()
+///   - Let phoenix_socket handle reconnection automatically
+///   - On disconnect, just refresh the JWT token (via dynamicParams)
+///   - On reconnect (openStream), re-join topics
+///   - Periodically refresh JWT every 10 min to prevent expiry
 class RealtimeNotifier extends StateNotifier<RealtimeState> {
   RealtimeNotifier(this._ref) : super(const RealtimeState());
 
@@ -64,7 +79,6 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   String? _currentChannelId;
   Timer? _reconnectTimer;
   Timer? _tokenRefreshTimer;
-  bool _intentionalDisconnect = false;
 
   /// Connect the WebSocket using credentials from the MsgrClient.
   Future<void> connect() async {
@@ -89,18 +103,18 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
       client.realtime.onEvent = _handleEvent;
 
       client.realtime.onDisconnect = () {
-        if (mounted && !_intentionalDisconnect) {
-          _log.info('WebSocket disconnected');
+        if (mounted) {
+          _log.info('WebSocket disconnected — phoenix_socket will auto-reconnect');
           state = state.copyWith(isConnected: false);
-          _scheduleReconnect();
+          // Don't schedule reconnect — phoenix_socket handles it.
+          // Just ensure token is fresh for when it reconnects.
+          _refreshRealtimeToken();
         }
       };
 
       client.realtime.onReconnect = () {
         if (mounted) {
           _log.info('WebSocket reconnected');
-          _reconnectTimer?.cancel();
-          _reconnectTimer = null;
           state = state.copyWith(isConnected: true);
           _rejoinTopics();
         }
@@ -128,7 +142,14 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
     } catch (e) {
       _log.warning('WebSocket connect failed: $e');
       state = state.copyWith(isConnecting: false, error: e);
-      _scheduleReconnect();
+      // Retry once after 5 seconds if initial connect fails
+      _reconnectTimer?.cancel();
+      _reconnectTimer = Timer(const Duration(seconds: 5), () async {
+        if (mounted && !state.isConnected && !state.isConnecting) {
+          await _refreshRealtimeToken();
+          if (mounted) connect();
+        }
+      });
     }
   }
 
@@ -633,21 +654,6 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
   }
 
   // ── Reconnection ───────────────────────────────────────────────
-
-  void _scheduleReconnect() {
-    _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 5), () async {
-      if (mounted && !state.isConnected && !state.isConnecting) {
-        _log.info('Attempting reconnect — refreshing token first...');
-        await _refreshRealtimeToken();
-        _intentionalDisconnect = true;
-        if (mounted) {
-          await connect();
-          _intentionalDisconnect = false;
-        }
-      }
-    });
-  }
 
   /// Refresh JWT and update the realtime client's token.
   /// Called before reconnect and also periodically to prevent expiry.

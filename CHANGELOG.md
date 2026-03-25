@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.6.0] — 2026-03-25
+
+### Added
+- Incoming webhooks (#119): Slack-compatible POST /api/hooks/:token, bot profiles
+- Channel member management (#120): add/remove members, channel-specific member panel
+- Private channels (#116): filtered channel listing, lock icon in sidebar
+- URI scheme deep links (#124): msgr://team/channel, app_links package
+- Web Push notifications: VAPID keys, push_sw.js service worker, subscription flow
+- Web client loading screen with dark background + spinner
+- Local CanvasKit bundling (no gstatic.com CDN dependency)
+- Profile setup auto-dialog when joining team with empty display_name
+
+### Fixed — WebSocket Stability
+- **Root cause**: duplicate `channel "channel:*"` handler in UserSocket — old ConversationChannel was intercepting all channel topics, breaking joins and preventing push dispatch
+- Removed ConversationChannel from socket routing; ChatChannel is sole handler
+- Added `message:create` alias in ChatChannel (Flutter sends this, server had `new:message`)
+- **Reconnect strategy rewrite**: never disconnect/reconnect manually. phoenix_socket handles auto-reconnect with exponential backoff. Creating new sockets on disconnect caused infinite loop.
+- Periodic JWT refresh every 10 min prevents token expiry during long sessions
+
+### Fixed — Push Notifications
+- Push dispatch now runs from WebSocket path (was only REST before)
+- VAPID JWT signing fixed (JOSE.JWK.from_map with JWK JSON format)
+- Web Push sends to WNS/FCM endpoints (expired subscriptions auto-cleaned)
+
+### Fixed — Other
+- DM creation: filter out account-level profile IDs (use tenant profiles only)
+- Message edit crash: DateTime microseconds truncated for :utc_datetime schema
+- display_name not required at account creation (fallback to full email)
+- ChannelMembership.join uses on_conflict: :nothing (idempotent)
+
 ## [0.5.0] — 2026-03-23
 
 ### Added — Team Invitations (#117)

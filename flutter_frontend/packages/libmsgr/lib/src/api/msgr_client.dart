@@ -74,6 +74,12 @@ class MsgrClient {
   ///
   /// Requires [accountId] and [profileId] to be set (via [setSession] or
   /// [setCredentials]).
+  /// Connect the Phoenix WebSocket for real-time events.
+  ///
+  /// IMPORTANT: This method creates the socket ONCE. On subsequent calls it
+  /// only updates the token. Never disconnect+reconnect — phoenix_socket
+  /// handles auto-reconnect internally. Manually destroying the socket causes
+  /// an infinite reconnect loop (see realtime_provider.dart for details).
   Future<void> connectRealtime({String? sessionId}) async {
     if (api.accountId == null || api.profileId == null) {
       throw StateError(
@@ -82,10 +88,16 @@ class MsgrClient {
       );
     }
 
-    // Disconnect old socket if exists
+    // If already connected, just update token
+    if (_realtime != null && isRealtimeConnected) {
+      _realtime!.token = api.accessToken;
+      return;
+    }
+
+    // If socket exists but disconnected, let phoenix_socket auto-reconnect
     if (_realtime != null) {
-      try { _realtime!.disconnect(); } catch (_) {}
-      _realtime = null;
+      _realtime!.token = api.accessToken;
+      return;
     }
 
     final wsUrl = baseUrl
