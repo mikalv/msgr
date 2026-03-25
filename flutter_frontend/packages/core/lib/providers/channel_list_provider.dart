@@ -70,6 +70,20 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
       final client = _ref.read(msgrApiProvider);
       final data = await client.getChannels(teamSlug);
       final channels = data.map((c) {
+        // Parse DM member names if present
+        Map<String, String>? memberNames;
+        final rawMembers = c['members'];
+        if (rawMembers is List) {
+          memberNames = {};
+          for (final m in rawMembers) {
+            if (m is Map) {
+              final pid = m['profile_id']?.toString() ?? '';
+              final name = m['display_name']?.toString() ?? '';
+              if (pid.isNotEmpty && name.isNotEmpty) memberNames[pid] = name;
+            }
+          }
+        }
+
         return SlackChannel(
           id: c['id']?.toString() ?? '',
           name: c['name']?.toString() ?? '',
@@ -81,6 +95,7 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
               : ChannelVisibility.public,
           teamSlug: teamSlug,
           topic: c['topic'] as String?,
+          memberNames: memberNames,
         );
       }).toList();
       state = state.copyWith(channels: channels, isLoading: false);

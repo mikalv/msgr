@@ -61,6 +61,7 @@ class SlackChannel {
     this.visibility = ChannelVisibility.public,
     this.topic,
     this.teamSlug,
+    this.memberNames,
   });
 
   final String id;
@@ -71,6 +72,8 @@ class SlackChannel {
   final ChannelVisibility visibility;
   final String? topic;
   final String? teamSlug;
+  /// For DMs: map of profile_id → display_name
+  final Map<String, String>? memberNames;
 
   @override
   bool operator ==(Object other) =>

@@ -286,11 +286,27 @@ class _AppShellState extends ConsumerState<AppShell> {
   List<MockDmContact> get _mockDmsFromProviders {
     final channelState = ref.watch(channelListProvider);
     final unreadCounts = ref.watch(unreadCountsProvider);
+    final myProfileId = ref.watch(simpleAuthProvider).profileId;
+
     return channelState.dmChannels.map((c) {
+      // Build DM title from member names (exclude self)
+      String dmName = c.name;
+      final members = c.memberNames;
+      if (members != null && members.isNotEmpty) {
+        final otherNames = members.entries
+            .where((e) => e.key != myProfileId)
+            .map((e) => e.value)
+            .where((n) => n.isNotEmpty)
+            .toList();
+        if (otherNames.isNotEmpty) {
+          dmName = otherNames.join(', ');
+        }
+      }
+
       return MockDmContact(
         id: c.id,
-        name: c.name,
-        isOnline: false, // TODO: wire up presence
+        name: dmName,
+        isOnline: false,
         unreadCount: unreadCounts[c.id] ?? 0,
       );
     }).toList();

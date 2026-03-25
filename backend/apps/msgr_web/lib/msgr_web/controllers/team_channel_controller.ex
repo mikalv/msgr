@@ -17,6 +17,15 @@ defmodule MessngrWeb.TeamChannelController do
         profile -> Channels.list_channels_for_profile(prefix, profile.id)
       end
 
+    # Preload memberships+profiles for DM channels (needed for display names)
+    channels = Enum.map(channels, fn ch ->
+      if ch.kind in ["dm", "group_dm"] do
+        Teams.Repo.preload(ch, [memberships: :profile], prefix: prefix)
+      else
+        ch
+      end
+    end)
+
     json(conn, %{data: Enum.map(channels, &channel_json/1)})
   end
 
@@ -123,7 +132,7 @@ defmodule MessngrWeb.TeamChannelController do
   end
 
   defp channel_json(channel) do
-    %{
+    base = %{
       id: channel.id,
       name: channel.name,
       slug: channel.slug,
@@ -133,5 +142,23 @@ defmodule MessngrWeb.TeamChannelController do
       topic: channel.topic,
       inserted_at: channel.inserted_at
     }
+
+    # For DMs, include member display names so client can show proper titles
+    if channel.kind in ["dm", "group_dm"] do
+      members = case channel.memberships do
+        %Ecto.Association.NotLoaded{} -> []
+        memberships when is_list(memberships) ->
+          Enum.map(memberships, fn m ->
+            case m.profile do
+              %Ecto.Association.NotLoaded{} -> %{profile_id: m.profile_id}
+              nil -> %{profile_id: m.profile_id}
+              p -> %{profile_id: m.profile_id, display_name: p.display_name, avatar_url: p.avatar_url}
+            end
+          end)
+      end
+      Map.put(base, :members, members)
+    else
+      base
+    end
   end
 end
