@@ -61,6 +61,9 @@ defmodule MessngrWeb.Endpoint do
   plug Plug.Head
   plug Plug.Session, @session_options
 
+  # Custom request logger with IP + user
+  plug MessngrWeb.Plugs.RequestLogger
+
   # SPA fallback: serve Flutter web client for non-API routes
   plug MessngrWeb.Plugs.SpaFallback
 
