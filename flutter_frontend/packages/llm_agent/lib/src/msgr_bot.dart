@@ -31,8 +31,9 @@ class MsgrBot {
   String? _refreshToken;
   final Map<String, String> channelNames = {};
   final Set<String> _seenMessageIds = {};
-  /// Track active threads to poll for replies
-  final Set<String> _activeThreads = {};
+  /// Track messages we replied to — poll their threads for follow-ups
+  /// Key: message_id, Value: channel_id
+  final Map<String, String> _repliedMessages = {};
   final _client = http.Client();
   MsgrRealtimeClient? _realtime;
   bool _wsConnected = false;
@@ -389,9 +390,8 @@ class MsgrBot {
           // Skip own messages
           if (senderProfileId == teamProfileId || senderProfileId == profileId) continue;
 
-          // Check if this is a thread reply
-          final threadParentId = m['thread_parent_id']?.toString();
-          final isThreadReply = threadParentId != null && threadParentId.isNotEmpty;
+          // Note: list_messages API filters out thread replies (thread_parent_id IS NULL)
+          // Thread replies are polled separately via _pollThreads()
 
           // Extract content
           final rawContent = m['content'];
@@ -401,8 +401,7 @@ class MsgrBot {
 
           if (content.isEmpty) continue;
 
-          final label = isThreadReply ? 'Thread in' : '';
-          print('[Bot] $label#${channelNames[channelId]}: $senderName: $content');
+          print('[Bot] #${channelNames[channelId]}: $senderName: $content');
 
           final botMessage = BotMessage(
             channelId: channelId,
@@ -412,18 +411,15 @@ class MsgrBot {
             content: content,
             messageId: id,
             timestamp: DateTime.tryParse(m['inserted_at']?.toString() ?? '') ?? DateTime.now(),
-            threadParentId: isThreadReply ? threadParentId : null,
           );
 
           await _setTyping(channelId, true);
           final reply = await onMessage(botMessage);
           await _setTyping(channelId, false);
           if (reply != null && reply.isNotEmpty) {
-            if (isThreadReply) {
-              await sendThreadReply(channelId, threadParentId!, reply);
-            } else {
-              await sendMessage(channelId, reply);
-            }
+            await sendMessage(channelId, reply);
+            // Track this message so we poll its thread for follow-ups
+            _repliedMessages[id] = channelId;
           }
         }
       } catch (e, stack) {
@@ -437,15 +433,10 @@ class MsgrBot {
   }
 
   Future<void> _pollThreads() async {
-    for (final threadId in _activeThreads.toList()) {
+    for (final entry in _repliedMessages.entries) {
+      final threadId = entry.key;
+      final threadChannelId = entry.value;
       try {
-        // Find which channel this thread belongs to
-        String? threadChannelId;
-        for (final cid in channelNames.keys) {
-          threadChannelId = cid;
-          break; // We don't track thread-to-channel mapping perfectly yet
-        }
-        if (threadChannelId == null) continue;
 
         final res = await _client.get(
           Uri.parse('$msgrBaseUrl/api/teams/$teamSlug/channels/$threadChannelId/threads/$threadId'),
