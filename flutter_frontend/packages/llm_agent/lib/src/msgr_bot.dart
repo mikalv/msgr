@@ -389,13 +389,9 @@ class MsgrBot {
           // Skip own messages
           if (senderProfileId == teamProfileId || senderProfileId == profileId) continue;
 
-          // Skip thread replies in channel polling — we poll threads separately
+          // Check if this is a thread reply
           final threadParentId = m['thread_parent_id']?.toString();
-          if (threadParentId != null && threadParentId.isNotEmpty) continue;
-
-          // Track messages that have thread replies so we can poll them
-          final threadCount = m['thread_reply_count'] ?? 0;
-          if (threadCount > 0) _activeThreads.add(id);
+          final isThreadReply = threadParentId != null && threadParentId.isNotEmpty;
 
           // Extract content
           final rawContent = m['content'];
@@ -405,7 +401,8 @@ class MsgrBot {
 
           if (content.isEmpty) continue;
 
-          print('[Bot] #${channelNames[channelId]}: $senderName: $content');
+          final label = isThreadReply ? 'Thread in' : '';
+          print('[Bot] $label#${channelNames[channelId]}: $senderName: $content');
 
           final botMessage = BotMessage(
             channelId: channelId,
@@ -415,13 +412,18 @@ class MsgrBot {
             content: content,
             messageId: id,
             timestamp: DateTime.tryParse(m['inserted_at']?.toString() ?? '') ?? DateTime.now(),
+            threadParentId: isThreadReply ? threadParentId : null,
           );
 
           await _setTyping(channelId, true);
           final reply = await onMessage(botMessage);
           await _setTyping(channelId, false);
           if (reply != null && reply.isNotEmpty) {
-            await sendMessage(channelId, reply);
+            if (isThreadReply) {
+              await sendThreadReply(channelId, threadParentId!, reply);
+            } else {
+              await sendMessage(channelId, reply);
+            }
           }
         }
       } catch (e, stack) {
