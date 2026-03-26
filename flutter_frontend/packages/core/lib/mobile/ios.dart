@@ -90,6 +90,8 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
 
       _log.info('Invite redeemed: team=$teamSlug');
 
+      final alreadyMember = data['already_member'] == true;
+
       // Refresh team list and select the new team
       await ref.read(teamListProvider.notifier).refresh();
       if (teamSlug != null) {
@@ -98,6 +100,11 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
         if (team != null) {
           ref.read(selectedTeamProvider.notifier).select(team);
         }
+      }
+
+      // Trigger profile setup for new joins
+      if (!alreadyMember) {
+        ref.read(needsProfileSetupProvider.notifier).state = true;
       }
 
       // Clear invite URL from browser address bar

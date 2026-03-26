@@ -145,3 +145,7 @@ final simpleAuthProvider =
 final isSimpleAuthLoggedInProvider = Provider<bool>((ref) {
   return ref.watch(simpleAuthProvider).isLoggedIn;
 });
+
+/// Global flag: set to true after joining a new team (e.g. invite redeem)
+/// to force profile setup screen. AppShell reads this and resets after setup.
+final needsProfileSetupProvider = StateProvider<bool>((ref) => false);

@@ -192,6 +192,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     // Check SYNCHRONOUSLY: if account has no display_name, show setup
     final auth = ref.watch(simpleAuthProvider);
     final needsSetup = _needsProfileSetup ||
+        ref.watch(needsProfileSetupProvider) ||
         (auth.displayName == null || auth.displayName!.isEmpty || auth.displayName == auth.email);
     if (needsSetup) {
       final team = ref.read(selectedTeamProvider);
@@ -199,6 +200,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       return ProfileSetupScreen(
         onComplete: () {
           setState(() => _needsProfileSetup = false);
+          ref.read(needsProfileSetupProvider.notifier).state = false;
           // Also update team profile
           if (currentTeam != null) {
             final updatedAuth = ref.read(simpleAuthProvider);
@@ -793,9 +795,16 @@ class _AppShellState extends ConsumerState<AppShell> {
       final data = result['data'] ?? result;
       final teamSlug = data['team']?['slug'] as String?;
 
+      final alreadyMember = data['already_member'] == true;
+
       await ref.read(teamListProvider.notifier).refresh();
 
       if (teamSlug != null && mounted) {
+        // Trigger profile setup for new team joins
+        if (!alreadyMember) {
+          setState(() => _needsProfileSetup = true);
+        }
+
         Future.microtask(() {
           if (!mounted) return;
           final teams = ref.read(teamsProvider);
@@ -807,10 +816,10 @@ class _AppShellState extends ConsumerState<AppShell> {
         });
       }
 
-      if (mounted) {
+      if (mounted && alreadyMember) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(teamSlug != null ? 'Ble med i $teamSlug!' : 'Invite akseptert!'),
+            content: Text('Du er allerede medlem av $teamSlug'),
             duration: const Duration(seconds: 3),
           ),
         );
