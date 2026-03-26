@@ -212,9 +212,17 @@ class MsgrBot {
 
   void _handleWsEvent(String topic, String event, Map<String, dynamic> payload) {
     if (!topic.startsWith('channel:')) return;
-    if (event != 'new:message') return;
 
     final channelId = topic.replaceFirst('channel:', '');
+
+    if (event == 'new:message') {
+      _handleNewMessage(channelId, payload);
+    } else if (event == 'new:thread_reply') {
+      _handleThreadReply(channelId, payload);
+    }
+  }
+
+  void _handleNewMessage(String channelId, Map<String, dynamic> payload) {
     final id = payload['id']?.toString() ?? '';
     if (id.isEmpty || _seenMessageIds.contains(id)) return;
     _seenMessageIds.add(id);
@@ -223,14 +231,12 @@ class MsgrBot {
     final senderProfileId = payload['sender_profile_id']?.toString() ?? sender['id']?.toString() ?? '';
     final senderName = sender['display_name']?.toString() ?? 'Ukjent';
 
-    // Skip own messages
     if (senderProfileId == teamProfileId || senderProfileId == profileId) return;
 
     final rawContent = payload['content'];
     final content = rawContent is Map
         ? (rawContent['text']?.toString() ?? rawContent.toString())
         : rawContent?.toString() ?? '';
-
     if (content.isEmpty) return;
 
     print('[Bot] #${channelNames[channelId]}: $senderName: $content');
@@ -245,7 +251,42 @@ class MsgrBot {
       timestamp: DateTime.tryParse(payload['inserted_at']?.toString() ?? '') ?? DateTime.now(),
     );
 
-    // Process async — don't block the event handler
+    _processMessage(botMessage);
+  }
+
+  void _handleThreadReply(String channelId, Map<String, dynamic> payload) {
+    final threadParentId = payload['thread_parent_id']?.toString();
+    final msg = payload['message'] as Map<String, dynamic>? ?? payload;
+
+    final id = msg['id']?.toString() ?? '';
+    if (id.isEmpty || _seenMessageIds.contains(id)) return;
+    _seenMessageIds.add(id);
+
+    final sender = msg['sender_profile'] as Map<String, dynamic>? ?? {};
+    final senderProfileId = msg['sender_profile_id']?.toString() ?? sender['id']?.toString() ?? '';
+    final senderName = sender['display_name']?.toString() ?? 'Ukjent';
+
+    if (senderProfileId == teamProfileId || senderProfileId == profileId) return;
+
+    final rawContent = msg['content'];
+    final content = rawContent is Map
+        ? (rawContent['text']?.toString() ?? rawContent.toString())
+        : rawContent?.toString() ?? '';
+    if (content.isEmpty) return;
+
+    print('[Bot] Thread reply in #${channelNames[channelId]}: $senderName: $content');
+
+    final botMessage = BotMessage(
+      channelId: channelId,
+      channelName: channelNames[channelId] ?? '',
+      senderName: senderName,
+      senderProfileId: senderProfileId,
+      content: content,
+      messageId: id,
+      timestamp: DateTime.tryParse(msg['inserted_at']?.toString() ?? '') ?? DateTime.now(),
+      threadParentId: threadParentId,
+    );
+
     _processMessage(botMessage);
   }
 
@@ -255,7 +296,14 @@ class MsgrBot {
       final reply = await onMessage(message);
       await _setTyping(message.channelId, false);
       if (reply != null && reply.isNotEmpty) {
-        await sendMessage(message.channelId, reply);
+        if (message.isThreadReply) {
+          await sendThreadReply(message.channelId, message.threadParentId!, reply);
+        } else {
+          final sentId = await sendMessage(message.channelId, reply);
+          // Track for thread polling (fallback for missed WS events)
+          _repliedMessages[message.messageId] = message.channelId;
+          if (sentId != null) _repliedMessages[sentId] = message.channelId;
+        }
       }
     } catch (e) {
       print('[Bot] Error processing message: $e');
