@@ -329,11 +329,16 @@ class _AppShellState extends ConsumerState<AppShell> {
         }
       }
 
+      // Self-DM: no other members (notes to self)
+      final isSelf = members == null || members.isEmpty ||
+          members.entries.every((e) => e.key == myProfileId);
+
       return DmItem(
         id: c.id,
-        name: dmName,
+        name: isSelf ? 'Notes to self' : dmName,
         isOnline: false,
         unreadCount: unreadCounts[c.id] ?? 0,
+        isSelf: isSelf,
       );
     }).toList();
   }
@@ -487,6 +492,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         _onDmSelected(dm.id);
       },
       onCreateChannel: _showCreateChannelDialog,
+      onLeaveChannel: (channel) => _leaveChannel(channel.id),
+      onCloseDm: (dm) => _leaveChannel(dm.id),
       onOpenSettings: () => openSettingsPage(context),
       userDisplayName: ref.watch(simpleAuthProvider).displayName,
       userEmail: ref.watch(simpleAuthProvider).email,
@@ -530,6 +537,19 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   void _onDmSelected(String dmId) {
     _onChannelSelected(dmId);
+  }
+
+  Future<void> _leaveChannel(String channelId) async {
+    // If we're leaving the currently selected channel, clear selection
+    final selected = ref.read(selectedChannelProvider);
+    await ref.read(channelListProvider.notifier).leaveChannel(channelId);
+    if (selected?.id == channelId) {
+      // Select first remaining channel
+      final remaining = ref.read(channelListProvider).channels;
+      if (remaining.isNotEmpty) {
+        ref.read(selectedChannelProvider.notifier).select(remaining.first);
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------

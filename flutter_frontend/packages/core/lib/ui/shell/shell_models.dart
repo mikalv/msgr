@@ -52,6 +52,7 @@ class DmItem {
     this.isOnline = false,
     this.unreadCount = 0,
     this.lastActivityAt,
+    this.isSelf = false,
   });
 
   final String id;
@@ -60,4 +61,5 @@ class DmItem {
   final bool isOnline;
   final int unreadCount;
   final DateTime? lastActivityAt;
+  final bool isSelf;
 }

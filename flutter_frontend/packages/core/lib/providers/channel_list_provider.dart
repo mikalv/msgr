@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'auth_state_provider.dart';
 import 'models.dart';
 import 'msgr_client_provider.dart';
 import 'team_list_provider.dart';
@@ -139,6 +140,36 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
         topic: data['topic'] as String?,
       );
       state = state.copyWith(channels: [...state.channels, channel]);
+    } catch (e) {
+      state = state.copyWith(error: e);
+    }
+  }
+
+  /// Leave a channel (remove self as member) and remove from local state.
+  Future<void> leaveChannel(String channelId) async {
+    try {
+      final team = _ref.read(selectedTeamProvider);
+      if (team == null) return;
+
+      final client = _ref.read(msgrApiProvider);
+      // Get our team profile ID from profiles endpoint
+      final profiles = await client.getProfiles(team.slug);
+      final accountId = _ref.read(simpleAuthProvider).accountId;
+      String? myProfileId;
+      for (final p in profiles) {
+        if (p['account_id']?.toString() == accountId) {
+          myProfileId = p['id']?.toString();
+          break;
+        }
+      }
+      if (myProfileId == null) return;
+
+      await client.removeChannelMember(team.slug, channelId, myProfileId);
+
+      // Remove from local state
+      state = state.copyWith(
+        channels: state.channels.where((c) => c.id != channelId).toList(),
+      );
     } catch (e) {
       state = state.copyWith(error: e);
     }

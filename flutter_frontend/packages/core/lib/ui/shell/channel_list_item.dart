@@ -16,11 +16,13 @@ class ChannelListItem extends StatelessWidget {
     required this.channel,
     required this.isSelected,
     required this.onTap,
+    this.onLeave,
   });
 
   final ChannelItem channel;
   final bool isSelected;
   final VoidCallback onTap;
+  final VoidCallback? onLeave;
 
   void _showChannelContextMenu(BuildContext context, Offset globalPosition) async {
     final result = await showMenu<String>(
@@ -56,6 +58,9 @@ class ChannelListItem extends StatelessWidget {
             ),
           );
         }
+        break;
+      case 'leave':
+        onLeave?.call();
         break;
       default:
         ScaffoldMessenger.of(context).showSnackBar(

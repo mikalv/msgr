@@ -12,13 +12,24 @@ class DmListItem extends StatelessWidget {
     required this.contact,
     required this.isSelected,
     required this.onTap,
+    this.onClose,
   });
 
   final DmItem contact;
   final bool isSelected;
   final VoidCallback onTap;
+  final VoidCallback? onClose;
 
   void _showContextMenu(BuildContext context, Offset globalPosition) async {
+    final items = <PopupMenuEntry<String>>[
+      _menuItem('mute', Icons.notifications_off_outlined, 'Mute conversation'),
+      _menuItem('mark_read', Icons.done_all, 'Mark as read'),
+      if (!contact.isSelf) ...[
+        const PopupMenuDivider(),
+        _menuItem('close', Icons.close, 'Close conversation'),
+      ],
+    ];
+
     final result = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -27,15 +38,15 @@ class DmListItem extends StatelessWidget {
       ),
       color: const Color(0xFF2A2A2A),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      items: [
-        _menuItem('mute', Icons.notifications_off_outlined, 'Mute conversation'),
-        _menuItem('mark_read', Icons.done_all, 'Mark as read'),
-        const PopupMenuDivider(),
-        _menuItem('close', Icons.close, 'Close conversation'),
-      ],
+      items: items,
     );
 
     if (result == null || !context.mounted) return;
+
+    if (result == 'close') {
+      onClose?.call();
+      return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Coming soon'), duration: Duration(seconds: 2)),

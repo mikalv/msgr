@@ -23,6 +23,8 @@ class ChannelSidebar extends StatelessWidget {
     this.onChannelSelected,
     this.onDmSelected,
     this.onCreateChannel,
+    this.onLeaveChannel,
+    this.onCloseDm,
     this.onLogout,
     this.onEditProfile,
     this.onOpenSettings,
@@ -41,6 +43,8 @@ class ChannelSidebar extends StatelessWidget {
   final ValueChanged<ChannelItem>? onChannelSelected;
   final ValueChanged<DmItem>? onDmSelected;
   final VoidCallback? onCreateChannel;
+  final ValueChanged<ChannelItem>? onLeaveChannel;
+  final ValueChanged<DmItem>? onCloseDm;
   final VoidCallback? onLogout;
   final VoidCallback? onEditProfile;
   final VoidCallback? onOpenSettings;
@@ -138,6 +142,7 @@ class ChannelSidebar extends StatelessWidget {
                         channel: channel,
                         isSelected: channel.id == selectedChannelId,
                         onTap: () => onChannelSelected?.call(channel),
+                        onLeave: () => onLeaveChannel?.call(channel),
                       ),
                     ),
                   // + Legg til kanaler
@@ -163,6 +168,7 @@ class ChannelSidebar extends StatelessWidget {
                         contact: dm,
                         isSelected: dm.id == selectedDmId,
                         onTap: () => onDmSelected?.call(dm),
+                        onClose: dm.isSelf ? null : () => onCloseDm?.call(dm),
                       ),
                     ),
                   // + Inviter folk
