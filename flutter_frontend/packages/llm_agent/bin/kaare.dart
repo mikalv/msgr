@@ -19,7 +19,8 @@ import 'package:llm_agent/llm_agent.dart';
 void main(List<String> args) async {
   final parser = ArgParser()
     ..addOption('email', defaultsTo: 'kaare@msgr.no', help: 'Bot email')
-    ..addOption('team', mandatory: true, help: 'Team slug to join')
+    ..addOption('team', help: 'Team slug to join (or use --invite)')
+    ..addOption('invite', help: 'Invite link or code to join a team')
     ..addOption('msgr-url',
         defaultsTo:
             Platform.environment['MSGR_BASE_URL'] ?? 'https://dev.msgr.no',
@@ -72,6 +73,22 @@ void main(List<String> args) async {
     exit(1);
   }
 
+  // Parse invite code from URL or raw code
+  String? inviteCode = results['invite'] as String?;
+  if (inviteCode != null) {
+    // Accept full URLs like https://dev.msgr.no/invite/ABC123
+    final uri = Uri.tryParse(inviteCode);
+    if (uri != null && uri.pathSegments.length >= 2 && uri.pathSegments.contains('invite')) {
+      inviteCode = uri.pathSegments.last;
+    }
+  }
+
+  final teamSlug = results['team'] as String?;
+  if (teamSlug == null && inviteCode == null) {
+    print('[Kåre] Feil: Enten --team eller --invite er påkrevd.');
+    exit(1);
+  }
+
   final llmClient = LlmClient(
     baseUrl: results['llm-url'] as String,
     apiKey: llmKey,
@@ -84,8 +101,9 @@ void main(List<String> args) async {
   late final MsgrBot bot;
   bot = MsgrBot(
     email: results['email'] as String,
-    teamSlug: results['team'] as String,
+    teamSlug: teamSlug ?? 'pending-invite',
     botSecret: botSecret,
+    inviteCode: inviteCode,
     msgrBaseUrl: results['msgr-url'] as String,
     onMessage: (message) async {
       // Don't reply to own messages

@@ -8,17 +8,20 @@ import 'package:libmsgr/libmsgr.dart';
 class MsgrBot {
   MsgrBot({
     required this.email,
-    required this.teamSlug,
+    required String teamSlug,
     required this.onMessage,
     required this.botSecret,
+    this.inviteCode,
     this.msgrBaseUrl = 'https://dev.msgr.no',
     this.pollInterval = const Duration(seconds: 5),
     this.useWebSocket = true,
-  });
+  }) : _teamSlug = teamSlug;
 
   final String email;
-  final String teamSlug;
+  String _teamSlug;
+  String get teamSlug => _teamSlug;
   final String botSecret;
+  final String? inviteCode;
   final String msgrBaseUrl;
   final Duration pollInterval;
   final bool useWebSocket;
@@ -61,6 +64,9 @@ class MsgrBot {
     while (true) {
       try {
         await _authenticate();
+        if (inviteCode != null) {
+          await _redeemInvite(inviteCode!);
+        }
         await _joinTeam();
         await _discoverChannels();
 
@@ -109,6 +115,38 @@ class MsgrBot {
     }
 
     print('[Bot] Authenticated: account=$accountId, profile=$profileId, jwt=${_accessToken != null ? "yes" : "no"}');
+  }
+
+  Future<void> _redeemInvite(String code) async {
+    try {
+      final res = await _client.post(
+        Uri.parse('$msgrBaseUrl/api/invite/$code'),
+        headers: _headers,
+      );
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        final teamData = data['team'] as Map<String, dynamic>? ?? data;
+        final slug = teamData['slug']?.toString();
+        if (slug != null && slug.isNotEmpty) {
+          _teamSlug = slug;
+          print('[Bot] Redeemed invite "$code" — joined team "$slug"');
+        } else {
+          print('[Bot] Invite redeemed but no team slug in response');
+        }
+      } else if (res.statusCode == 409) {
+        // Already a member — extract team slug from response if available
+        print('[Bot] Already a member (invite "$code")');
+        try {
+          final data = jsonDecode(res.body) as Map<String, dynamic>;
+          final slug = data['team']?['slug']?.toString();
+          if (slug != null && slug.isNotEmpty) _teamSlug = slug;
+        } catch (_) {}
+      } else {
+        print('[Bot] Invite redeem failed (${res.statusCode}): ${res.body}');
+      }
+    } catch (e) {
+      print('[Bot] Invite redeem error: $e');
+    }
   }
 
   Future<void> _joinTeam() async {
