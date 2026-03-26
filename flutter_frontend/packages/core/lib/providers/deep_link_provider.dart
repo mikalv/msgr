@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 
+import 'auth_state_provider.dart';
 import 'channel_list_provider.dart';
+import 'msgr_client_provider.dart';
 import 'team_list_provider.dart';
 
 final _log = Logger('DeepLink');
@@ -97,17 +99,60 @@ final deepLinkListenerProvider = Provider<void>((ref) {
 
   // Handle link that opened the app (cold start)
   appLinks.getInitialLink().then((uri) {
-    if (uri != null) {
-      final link = MsgrDeepLink.parse(uri.toString());
-      if (link != null) handleDeepLink(ref, link);
-    }
+    if (uri != null) _handleIncomingUri(ref, uri);
   });
 
   // Handle links while app is running (warm start)
   final sub = appLinks.uriLinkStream.listen((uri) {
-    final link = MsgrDeepLink.parse(uri.toString());
-    if (link != null) handleDeepLink(ref, link);
+    _handleIncomingUri(ref, uri);
   });
 
   ref.onDispose(() => sub.cancel());
 });
+
+/// Handle an incoming URI — could be msgr:// deep link or https://*/invite/* URL.
+Future<void> _handleIncomingUri(Ref ref, Uri uri) async {
+  // Check for invite link: https://dev.msgr.no/invite/CODE
+  if (uri.pathSegments.length >= 2 && uri.pathSegments.contains('invite')) {
+    final idx = uri.pathSegments.indexOf('invite');
+    if (idx + 1 < uri.pathSegments.length) {
+      final code = uri.pathSegments[idx + 1];
+      _log.info('Invite link detected: code=$code');
+      await _redeemInviteFromDeepLink(ref, code);
+      return;
+    }
+  }
+
+  // Standard msgr:// deep link
+  final link = MsgrDeepLink.parse(uri.toString());
+  if (link != null) handleDeepLink(ref, link);
+}
+
+/// Redeem invite code from deep link and navigate to team.
+Future<void> _redeemInviteFromDeepLink(Ref ref, String code) async {
+  final auth = ref.read(simpleAuthProvider);
+  if (!auth.isLoggedIn) {
+    _log.warning('Cannot redeem invite — not logged in');
+    return;
+  }
+
+  try {
+    final client = ref.read(msgrApiProvider);
+    final result = await client.redeemInvite(code);
+    final data = result['data'] ?? result;
+    final teamSlug = data['team']?['slug'] as String?;
+    _log.info('Invite redeemed from deep link: team=$teamSlug');
+
+    await ref.read(teamListProvider.notifier).refresh();
+    if (teamSlug != null) {
+      final teams = ref.read(teamsProvider);
+      final team = teams.where((t) => t.slug == teamSlug).firstOrNull;
+      if (team != null) {
+        ref.read(selectedTeamProvider.notifier).select(team);
+        ref.read(selectedChannelProvider.notifier).clear();
+      }
+    }
+  } catch (e) {
+    _log.warning('Invite redeem from deep link failed: $e');
+  }
+}

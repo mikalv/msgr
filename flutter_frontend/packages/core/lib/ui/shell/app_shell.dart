@@ -687,7 +687,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   }
 
   Future<void> _showJoinTeamDialog() async {
-    final slugController = TextEditingController();
+    final inputController = TextEditingController();
 
     final result = await showDialog<bool>(
       context: context,
@@ -701,13 +701,13 @@ class _AppShellState extends ConsumerState<AppShell> {
           content: SizedBox(
             width: 360,
             child: TextField(
-              controller: slugController,
+              controller: inputController,
               autofocus: true,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                labelText: 'Team-slug',
+                labelText: 'Team-slug eller invite-link',
                 labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
-                hintText: 'F.eks. min-bedrift',
+                hintText: 'min-bedrift eller https://dev.msgr.no/invite/abc123',
                 hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.05),
@@ -736,21 +736,24 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
 
     if (result == true && mounted) {
-      final slug = slugController.text.trim();
-      if (slug.isNotEmpty) {
-        await ref.read(teamListProvider.notifier).joinTeam(slug);
-        // Show profile setup dialog before entering the team
-        if (mounted) {
-          await _showProfileSetupDialog(slug);
-        }
-        // Auto-select the joined team via microtask to avoid
-        // _dependents.isEmpty assertion.
+      final input = inputController.text.trim();
+      if (input.isEmpty) return;
+
+      // Detect if input is an invite link/code
+      String? inviteCode = _extractInviteCodeFromInput(input);
+
+      if (inviteCode != null) {
+        await _redeemInviteCode(inviteCode);
+      } else {
+        // Treat as team slug
+        await ref.read(teamListProvider.notifier).joinTeam(input);
+        if (mounted) await _showProfileSetupDialog(input);
         Future.microtask(() {
           if (!mounted) return;
           final teams = ref.read(teamsProvider);
           if (teams.isNotEmpty) {
             final joinedTeam = teams.lastWhere(
-              (t) => t.slug == slug,
+              (t) => t.slug == input,
               orElse: () => teams.last,
             );
             ref.read(selectedTeamProvider.notifier).select(joinedTeam);
@@ -759,8 +762,70 @@ class _AppShellState extends ConsumerState<AppShell> {
         });
       }
     }
+  }
 
-    slugController.dispose();
+  /// Extract invite code from URL or raw code.
+  String? _extractInviteCodeFromInput(String input) {
+    // Full URL: https://dev.msgr.no/invite/ABC123
+    final uri = Uri.tryParse(input);
+    if (uri != null && uri.hasScheme && uri.pathSegments.length >= 2) {
+      final idx = uri.pathSegments.indexOf('invite');
+      if (idx >= 0 && idx + 1 < uri.pathSegments.length) {
+        return uri.pathSegments[idx + 1];
+      }
+    }
+    // Bare code: starts with no slashes and is short alphanumeric
+    if (!input.contains('/') && !input.contains('.') && input.length <= 16 && input.length >= 6) {
+      // Could be either a slug or an invite code — try invite first
+      // Actually, slugs contain dashes, invite codes don't
+      if (!input.contains('-') && RegExp(r'^[a-zA-Z0-9]+$').hasMatch(input)) {
+        return input;
+      }
+    }
+    return null;
+  }
+
+  /// Redeem an invite code, refresh teams, and select the new team.
+  Future<void> _redeemInviteCode(String code) async {
+    try {
+      final client = ref.read(msgrApiProvider);
+      final result = await client.redeemInvite(code);
+      final data = result['data'] ?? result;
+      final teamSlug = data['team']?['slug'] as String?;
+
+      await ref.read(teamListProvider.notifier).refresh();
+
+      if (teamSlug != null && mounted) {
+        Future.microtask(() {
+          if (!mounted) return;
+          final teams = ref.read(teamsProvider);
+          final team = teams.where((t) => t.slug == teamSlug).firstOrNull;
+          if (team != null) {
+            ref.read(selectedTeamProvider.notifier).select(team);
+            ref.read(selectedChannelProvider.notifier).clear();
+          }
+        });
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(teamSlug != null ? 'Ble med i $teamSlug!' : 'Invite akseptert!'),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Kunne ikke bruke invite: $e'),
+            backgroundColor: Colors.red.shade700,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _showProfileSetupDialog(String teamSlug) async {
