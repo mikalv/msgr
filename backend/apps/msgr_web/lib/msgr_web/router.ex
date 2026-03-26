@@ -169,6 +169,10 @@ defmodule MessngrWeb.Router do
     get "/", TeamController, :index
     post "/", TeamController, :create
     post "/:slug/join", TeamController, :join
+    patch "/:slug", TeamController, :update
+    get "/:slug/members", TeamController, :members
+    put "/:slug/members/:account_id/role", TeamController, :change_role
+    delete "/:slug/members/:account_id", TeamController, :remove_member
   end
 
   scope "/auth/bridge", MessngrWeb do

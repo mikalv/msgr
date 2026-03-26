@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:core/providers/settings_provider.dart';
 import 'package:core/providers/auth_state_provider.dart';
+import 'package:core/providers/msgr_client_provider.dart';
+import 'package:core/providers/team_list_provider.dart';
 import 'package:core/providers/theme_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -47,6 +50,7 @@ enum _Category {
   profile('Profile', Icons.person_outline),
   notifications('Notifications', Icons.notifications_outlined),
   appearance('Appearance', Icons.palette_outlined),
+  teamAdmin('Team Admin', Icons.admin_panel_settings_outlined),
   language('Language & Region', Icons.language),
   privacy('Privacy', Icons.lock_outline),
   connectedAccounts('Connected Accounts', Icons.link),
@@ -156,6 +160,8 @@ class _SettingsLayoutState extends State<_SettingsLayout> {
         return const _NotificationsSection();
       case _Category.appearance:
         return const _AppearanceSection();
+      case _Category.teamAdmin:
+        return const _TeamAdminSection();
       case _Category.language:
         return const _LanguageSection();
       case _Category.privacy:
@@ -755,6 +761,348 @@ class _ThemeSwatch extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Team Admin section
+// ---------------------------------------------------------------------------
+
+class _TeamAdminSection extends ConsumerStatefulWidget {
+  const _TeamAdminSection();
+
+  @override
+  ConsumerState<_TeamAdminSection> createState() => _TeamAdminSectionState();
+}
+
+class _TeamAdminSectionState extends ConsumerState<_TeamAdminSection> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  List<Map<String, dynamic>> _members = [];
+  List<Map<String, dynamic>> _invites = [];
+  bool _loadingMembers = false;
+  bool _loadingInvites = false;
+  String? _myRole;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _loadData();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    final team = ref.read(selectedTeamProvider);
+    if (team == null) return;
+    final client = ref.read(msgrApiProvider);
+    final accountId = ref.read(simpleAuthProvider).accountId;
+
+    setState(() { _loadingMembers = true; _loadingInvites = true; });
+
+    try {
+      final members = await client.getTeamMembers(team.slug);
+      final me = members.where((m) => m['account_id']?.toString() == accountId).firstOrNull;
+      setState(() {
+        _members = members;
+        _myRole = me?['role']?.toString() ?? 'member';
+        _loadingMembers = false;
+      });
+    } catch (_) {
+      setState(() => _loadingMembers = false);
+    }
+
+    try {
+      final invites = await client.getInviteLinks(team.slug);
+      setState(() { _invites = invites; _loadingInvites = false; });
+    } catch (_) {
+      setState(() => _loadingInvites = false);
+    }
+  }
+
+  bool get _isAdmin => _myRole == 'owner' || _myRole == 'admin';
+  bool get _isOwner => _myRole == 'owner';
+
+  @override
+  Widget build(BuildContext context) {
+    final team = ref.watch(selectedTeamProvider);
+    if (team == null) {
+      return const Center(child: Text('No team selected', style: TextStyle(color: Colors.white54)));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle('Team: ${team.name}'),
+        if (_myRole != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: _isOwner ? const Color(0xFFF59E0B).withAlpha(40) : const Color(0xFF6366F1).withAlpha(40),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    _myRole!.toUpperCase(),
+                    style: TextStyle(
+                      color: _isOwner ? const Color(0xFFF59E0B) : const Color(0xFF6366F1),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        TabBar(
+          controller: _tabController,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white54,
+          indicatorColor: ref.watch(themeProvider).colors.accent,
+          tabs: const [
+            Tab(text: 'Overview'),
+            Tab(text: 'Members'),
+            Tab(text: 'Invites'),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 380,
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildOverviewTab(team),
+              _buildMembersTab(),
+              _buildInvitesTab(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOverviewTab(dynamic team) {
+    final nameController = TextEditingController(text: team.name);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SubSectionTitle('TEAM NAME'),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: nameController,
+                enabled: _isAdmin,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white.withAlpha(10),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+            ),
+            if (_isAdmin) ...[
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () async {
+                  final client = ref.read(msgrApiProvider);
+                  await client.updateTeam(team.slug, name: nameController.text.trim());
+                  ref.read(teamListProvider.notifier).refresh();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Team name updated'), duration: Duration(seconds: 2)),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: ref.watch(themeProvider).colors.accent),
+                child: const Text('Save'),
+              ),
+            ],
+          ],
+        ),
+        const _SubSectionTitle('TEAM SLUG'),
+        Text(team.slug, style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 14, fontFamily: 'monospace')),
+        const SizedBox(height: 4),
+        Text('${_members.length} members', style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 12)),
+      ],
+    );
+  }
+
+  Widget _buildMembersTab() {
+    if (_loadingMembers) return const Center(child: CircularProgressIndicator());
+
+    return ListView.builder(
+      itemCount: _members.length,
+      itemBuilder: (context, index) {
+        final m = _members[index];
+        final name = m['display_name']?.toString() ?? 'Unknown';
+        final role = m['role']?.toString() ?? 'member';
+        final accountId = m['account_id']?.toString() ?? '';
+        final myAccountId = ref.read(simpleAuthProvider).accountId;
+        final isSelf = accountId == myAccountId;
+
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundColor: role == 'owner'
+                ? const Color(0xFFF59E0B)
+                : role == 'admin'
+                    ? const Color(0xFF6366F1)
+                    : Colors.blueGrey,
+            radius: 16,
+            child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                style: const TextStyle(color: Colors.white, fontSize: 13)),
+          ),
+          title: Text(name, style: const TextStyle(color: Colors.white, fontSize: 13)),
+          subtitle: Text(role, style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 11)),
+          trailing: _isOwner && !isSelf && role != 'owner'
+              ? PopupMenuButton<String>(
+                  color: const Color(0xFF2A2A2A),
+                  onSelected: (action) => _onMemberAction(action, m),
+                  itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: role == 'admin' ? 'demote' : 'promote',
+                      child: Text(
+                        role == 'admin' ? 'Demote to member' : 'Promote to admin',
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'remove',
+                      child: Text('Remove from team', style: TextStyle(color: Colors.redAccent, fontSize: 13)),
+                    ),
+                  ],
+                )
+              : isSelf
+                  ? const Text('You', style: TextStyle(color: Colors.white38, fontSize: 11))
+                  : null,
+        );
+      },
+    );
+  }
+
+  Future<void> _onMemberAction(String action, Map<String, dynamic> member) async {
+    final team = ref.read(selectedTeamProvider);
+    if (team == null) return;
+    final client = ref.read(msgrApiProvider);
+    final accountId = member['account_id']?.toString() ?? '';
+
+    try {
+      if (action == 'promote') {
+        await client.changeTeamMemberRole(team.slug, accountId, 'admin');
+      } else if (action == 'demote') {
+        await client.changeTeamMemberRole(team.slug, accountId, 'member');
+      } else if (action == 'remove') {
+        await client.removeTeamMember(team.slug, accountId);
+      }
+      _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), duration: const Duration(seconds: 3)),
+        );
+      }
+    }
+  }
+
+  Widget _buildInvitesTab() {
+    if (_loadingInvites) return const Center(child: CircularProgressIndicator());
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_isAdmin)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: ElevatedButton.icon(
+              onPressed: _createInvite,
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('New invite link'),
+              style: ElevatedButton.styleFrom(backgroundColor: ref.watch(themeProvider).colors.accent),
+            ),
+          ),
+        Expanded(
+          child: _invites.isEmpty
+              ? Center(child: Text('No active invite links', style: TextStyle(color: Colors.white.withAlpha(100))))
+              : ListView.builder(
+                  itemCount: _invites.length,
+                  itemBuilder: (context, index) {
+                    final inv = _invites[index];
+                    final code = inv['code']?.toString() ?? '';
+                    final url = inv['url']?.toString() ?? '';
+                    final usedCount = inv['used_count'] ?? 0;
+                    final expiresAt = inv['expires_at']?.toString() ?? '';
+
+                    return ListTile(
+                      leading: const Icon(Icons.link, color: Colors.white54, size: 18),
+                      title: Text(code, style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'monospace')),
+                      subtitle: Text('Used: $usedCount  Expires: ${expiresAt.split('T').first}',
+                          style: TextStyle(color: Colors.white.withAlpha(80), fontSize: 11)),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.copy, size: 16, color: Colors.white54),
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: url.isNotEmpty ? url : 'https://dev.msgr.no/invite/$code'));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Link copied'), duration: Duration(seconds: 2)),
+                              );
+                            },
+                          ),
+                          if (_isAdmin)
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+                              onPressed: () => _revokeInvite(inv['id']?.toString() ?? ''),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _createInvite() async {
+    final team = ref.read(selectedTeamProvider);
+    if (team == null) return;
+    final client = ref.read(msgrApiProvider);
+    try {
+      await client.createInviteLink(team.slug);
+      _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), duration: const Duration(seconds: 3)),
+        );
+      }
+    }
+  }
+
+  Future<void> _revokeInvite(String inviteId) async {
+    final team = ref.read(selectedTeamProvider);
+    if (team == null) return;
+    final client = ref.read(msgrApiProvider);
+    try {
+      await client.revokeInvite(team.slug, inviteId);
+      _loadData();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), duration: const Duration(seconds: 3)),
+        );
+      }
+    }
   }
 }
 

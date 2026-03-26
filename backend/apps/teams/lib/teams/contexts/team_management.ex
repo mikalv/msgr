@@ -187,6 +187,45 @@ defmodule Teams.TeamManagement do
     Profile.get_by_account_id(prefix, account_id)
   end
 
+  @doc "Update team name/settings. Only name and settings are editable."
+  def update_team(team, attrs) do
+    team
+    |> Team.changeset(Map.take(attrs, [:name, :settings]))
+    |> Repo.update()
+  end
+
+  @doc "Change a member's role (owner/admin/member)."
+  def change_role(team_id, account_id, new_role) do
+    case get_membership(team_id, account_id) do
+      nil -> {:error, :not_found}
+      membership ->
+        membership
+        |> TeamMembership.changeset(%{role: new_role})
+        |> Repo.update()
+    end
+  end
+
+  @doc "Remove a member from a team (public membership + tenant profile)."
+  def remove_member(team, account_id) do
+    case get_membership(team.id, account_id) do
+      nil -> {:error, :not_found}
+      membership ->
+        # Delete the public membership
+        Repo.delete(membership)
+        # Soft-remove from tenant: we leave the profile (messages reference it)
+        # but future logins won't list this team
+    end
+  end
+
+  @doc "List all memberships for a team (with account info)."
+  def list_members(team_id) do
+    from(tm in TeamMembership,
+      where: tm.team_id == ^team_id,
+      order_by: [asc: tm.role, asc: tm.joined_at]
+    )
+    |> Repo.all()
+  end
+
   # Resolves a display_name from the global account record.
   # Falls back through display_name -> handle -> email -> "Ukjent".
   defp resolve_account_display_name(account_id) do

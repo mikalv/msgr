@@ -399,6 +399,44 @@ class MsgrApiClient {
     return post('/api/invite/$code');
   }
 
+  /// GET /api/teams/:slug/invites — list active invite links
+  Future<List<Map<String, dynamic>>> getInviteLinks(String teamSlug) async {
+    final res = await get('/api/teams/$teamSlug/invites');
+    final data = res['data'];
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return [];
+  }
+
+  /// DELETE /api/teams/:slug/invites/:id — revoke an invite link
+  Future<void> revokeInvite(String teamSlug, String inviteId) async {
+    await delete('/api/teams/$teamSlug/invites/$inviteId');
+  }
+
+  /// PATCH /api/teams/:slug — update team name/settings
+  Future<Map<String, dynamic>> updateTeam(String teamSlug, {String? name}) async {
+    return patch('/api/teams/$teamSlug', body: {
+      if (name != null) 'name': name,
+    });
+  }
+
+  /// GET /api/teams/:slug/members — list team members with roles
+  Future<List<Map<String, dynamic>>> getTeamMembers(String teamSlug) async {
+    final res = await get('/api/teams/$teamSlug/members');
+    final data = res['data'];
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return [];
+  }
+
+  /// PUT /api/teams/:slug/members/:account_id/role — change member role
+  Future<void> changeTeamMemberRole(String teamSlug, String accountId, String role) async {
+    await put('/api/teams/$teamSlug/members/$accountId/role', body: {'role': role});
+  }
+
+  /// DELETE /api/teams/:slug/members/:account_id — remove team member
+  Future<void> removeTeamMember(String teamSlug, String accountId) async {
+    await delete('/api/teams/$teamSlug/members/$accountId');
+  }
+
   /// PUT /api/account/me — update current account profile
   Future<Map<String, dynamic>> updateAccount({
     String? displayName,
