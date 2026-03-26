@@ -446,48 +446,166 @@ class _WebhooksTabState extends ConsumerState<_WebhooksTab> {
     }
   }
 
+  static const _presets = ['github', 'gitlab', 'sentry', 'grafana', 'generic'];
+
   Future<void> _createWebhook() async {
     final team = ref.read(selectedTeamProvider);
     final channel = ref.read(selectedChannelProvider);
     if (team == null || channel == null) return;
 
     final nameController = TextEditingController();
-    final result = await showDialog<String>(
+    String? selectedPreset;
+
+    final result = await showDialog<Map<String, String?>>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF2A2A3E),
-        title: const Text('Create webhook', style: TextStyle(color: Colors.white)),
-        content: TextField(
-          controller: nameController,
-          autofocus: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            labelText: 'Webhook name',
-            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
-            hintText: 'e.g. GitHub, CI/CD',
-            hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
-            filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.05),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF2A2A3E),
+          title: const Text('Create webhook', style: TextStyle(color: Colors.white)),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    labelText: 'Webhook name',
+                    labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                    hintText: 'e.g. GitHub, CI/CD',
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.3)),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: selectedPreset,
+                  decoration: InputDecoration(
+                    labelText: 'Template preset',
+                    labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                  ),
+                  dropdownColor: const Color(0xFF2A2A3E),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('None (raw payload)', style: TextStyle(color: Colors.white54))),
+                    for (final p in _presets)
+                      DropdownMenuItem(value: p, child: Text(p[0].toUpperCase() + p.substring(1))),
+                  ],
+                  onChanged: (v) => setDialogState(() => selectedPreset = v),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, {'name': nameController.text.trim(), 'preset': selectedPreset}),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF007A5A)),
+              child: const Text('Create'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, nameController.text.trim()),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF007A5A)),
-            child: const Text('Create'),
-          ),
-        ],
       ),
     );
 
     nameController.dispose();
-    if (result == null || result.isEmpty) return;
+    if (result == null || (result['name'] ?? '').isEmpty) return;
 
     try {
       final client = ref.read(msgrApiProvider);
-      await client.createWebhook(team.slug, channelId: channel.id, name: result);
+      await client.createWebhook(team.slug, channelId: channel.id, name: result['name']!, templatePreset: result['preset']);
+      _loadWebhooks();
+    } catch (_) {}
+  }
+
+  Future<void> _editTemplate(Map<String, dynamic> webhook) async {
+    final team = ref.read(selectedTeamProvider);
+    if (team == null) return;
+
+    final id = webhook['id']?.toString() ?? '';
+    final templateController = TextEditingController(text: webhook['template']?.toString() ?? '');
+    String? preset = webhook['template_preset']?.toString();
+
+    final result = await showDialog<Map<String, String?>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF2A2A3E),
+          title: Text('Edit template: ${webhook['name']}', style: const TextStyle(color: Colors.white, fontSize: 15)),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: preset,
+                  decoration: InputDecoration(
+                    labelText: 'Preset',
+                    labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                  ),
+                  dropdownColor: const Color(0xFF2A2A3E),
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  items: [
+                    const DropdownMenuItem(value: null, child: Text('None (custom template)', style: TextStyle(color: Colors.white54))),
+                    for (final p in _presets)
+                      DropdownMenuItem(value: p, child: Text(p[0].toUpperCase() + p.substring(1))),
+                  ],
+                  onChanged: (v) => setDialogState(() => preset = v),
+                ),
+                const SizedBox(height: 12),
+                Text('Custom Liquid template:', style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: templateController,
+                  maxLines: 8,
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontFamily: 'monospace'),
+                  decoration: InputDecoration(
+                    hintText: '{{ action }} PR: **{{ pull_request.title }}**\n{{ pull_request.html_url }}',
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.2)),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.05),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                    contentPadding: const EdgeInsets.all(10),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text('Use Liquid syntax: {{ field.name }}, {% if x %}...{% endif %}',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, {'template': templateController.text, 'preset': preset}),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF007A5A)),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    templateController.dispose();
+    if (result == null) return;
+
+    try {
+      final client = ref.read(msgrApiProvider);
+      await client.put('/api/teams/${team.slug}/webhooks/$id', body: {
+        'template': result['template'],
+        'template_preset': result['preset'],
+      });
       _loadWebhooks();
     } catch (_) {}
   }
@@ -575,6 +693,14 @@ class _WebhooksTabState extends ConsumerState<_WebhooksTab> {
                                       child: Text(name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
                                     ),
                                     IconButton(
+                                      icon: Icon(Icons.edit_outlined, size: 16, color: Colors.white.withValues(alpha: 0.3)),
+                                      onPressed: () => _editTemplate(w),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      tooltip: 'Edit template',
+                                    ),
+                                    const SizedBox(width: 4),
+                                    IconButton(
                                       icon: Icon(Icons.delete_outline, size: 16, color: Colors.white.withValues(alpha: 0.3)),
                                       onPressed: () => _deleteWebhook(id, name),
                                       padding: EdgeInsets.zero,
@@ -602,7 +728,26 @@ class _WebhooksTabState extends ConsumerState<_WebhooksTab> {
                                   ],
                                 ),
                                 const SizedBox(height: 4),
-                                Text('$count messages received', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
+                                Row(
+                                  children: [
+                                    Text('$count messages', style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 10)),
+                                    if (w['template_preset'] != null) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF007A5A).withValues(alpha: 0.3),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(w['template_preset'].toString(), style: const TextStyle(color: Color(0xFF007A5A), fontSize: 9)),
+                                      ),
+                                    ],
+                                    if (w['template'] != null && w['template'].toString().isNotEmpty) ...[
+                                      const SizedBox(width: 4),
+                                      Icon(Icons.code, size: 10, color: Colors.white.withValues(alpha: 0.3)),
+                                    ],
+                                  ],
+                                ),
                               ],
                             ),
                           ),
