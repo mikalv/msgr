@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:core/features/chat/widgets/chat_composer.dart';
 import 'package:core/providers/auth_state_provider.dart';
+import 'package:core/providers/mention_provider.dart';
 import 'package:core/providers/models.dart';
 import 'package:core/providers/thread_provider.dart';
 
@@ -19,24 +21,30 @@ class ThreadPanel extends ConsumerStatefulWidget {
 }
 
 class _ThreadPanelState extends ConsumerState<ThreadPanel> {
-  final _textController = TextEditingController();
+  late final ChatComposerController _composerController;
   final _scrollController = ScrollController();
   double _panelWidth = 350;
   static const _minWidth = 280.0;
   static const _maxWidth = 600.0;
 
   @override
+  void initState() {
+    super.initState();
+    _composerController = ChatComposerController();
+  }
+
+  @override
   void dispose() {
-    _textController.dispose();
+    _composerController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _sendReply() {
-    final text = _textController.text.trim();
+  void _onSubmit(ChatComposerResult result) {
+    final text = result.text.trim();
     if (text.isEmpty) return;
     ref.read(threadMessagesProvider.notifier).reply(text);
-    _textController.clear();
+    _composerController.clear();
   }
 
   @override
@@ -184,49 +192,13 @@ class _ThreadPanelState extends ConsumerState<ThreadPanel> {
                             ),
                 ),
 
-                // Reply composer
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A2A2A),
-                    border: Border(
-                      top: BorderSide(color: Colors.white.withOpacity(0.1)),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _textController,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 13),
-                          decoration: InputDecoration(
-                            hintText: 'Svar i trad...',
-                            hintStyle: TextStyle(
-                                color: Colors.white.withOpacity(0.3),
-                                fontSize: 13),
-                            filled: true,
-                            fillColor: Colors.white.withOpacity(0.05),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                            isDense: true,
-                          ),
-                          onSubmitted: (_) => _sendReply(),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      IconButton(
-                        onPressed: _sendReply,
-                        icon: const Icon(Icons.send,
-                            color: Color(0xFF02ac88), size: 18),
-                        splashRadius: 16,
-                      ),
-                    ],
-                  ),
+                // Reply composer — reuses ChatComposer for @mention + slash commands
+                ChatComposer(
+                  controller: _composerController,
+                  onSubmit: _onSubmit,
+                  isSending: false,
+                  availableMentions: ref.watch(mentionCandidatesProvider),
+                  availableCommands: const [],
                 ),
               ],
             ),

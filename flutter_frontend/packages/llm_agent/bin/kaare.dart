@@ -91,6 +91,15 @@ void main(List<String> args) async {
       // Don't reply to own messages
       if (message.senderProfileId == bot.teamProfileId) return null;
 
+      // In channels: only reply when @mentioned
+      // In threads: always reply (user started a conversation)
+      if (!message.isThreadReply) {
+        final lower = message.content.toLowerCase();
+        if (!lower.contains('@kåre') && !lower.contains('@kaare')) {
+          return null;
+        }
+      }
+
       // Use thread-specific or channel-specific history
       final contextKey = message.threadParentId ?? message.channelId;
       channelHistory.putIfAbsent(contextKey, () => []);
