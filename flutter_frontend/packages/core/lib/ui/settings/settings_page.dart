@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:core/providers/settings_provider.dart';
 import 'package:core/providers/auth_state_provider.dart';
+import 'package:core/providers/theme_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Top-level settings page — fullscreen modal dialog
@@ -596,36 +597,73 @@ class _TimePicker extends StatelessWidget {
 class _AppearanceSection extends ConsumerWidget {
   const _AppearanceSection();
 
+  static const _themeSwatches = <MsgrThemeName, (String, Color)>{
+    MsgrThemeName.neutral: ('Neutral', Color(0xFF6B7280)),
+    MsgrThemeName.teal: ('Teal', Color(0xFF20B2AA)),
+    MsgrThemeName.indigo: ('Indigo', Color(0xFF6366F1)),
+    MsgrThemeName.rose: ('Rose', Color(0xFFF43F5E)),
+    MsgrThemeName.amber: ('Amber', Color(0xFFF59E0B)),
+    MsgrThemeName.emerald: ('Emerald', Color(0xFF10B981)),
+  };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final themeState = ref.watch(themeProvider);
+    final themeNotifier = ref.read(themeProvider.notifier);
     final settings = ref.watch(settingsProvider);
-    final notifier = ref.read(settingsProvider.notifier);
+    final settingsNotifier = ref.read(settingsProvider.notifier);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const _SectionTitle('Appearance'),
 
-        _SettingRow(
-          label: 'Theme',
-          description: 'Choose the app color scheme',
-          trailing: DropdownButton<String>(
-            value: settings.theme,
-            dropdownColor: const Color(0xFF2A2A2A),
-            style: const TextStyle(color: Colors.white, fontSize: 13),
-            underline: const SizedBox.shrink(),
-            items: const [
-              DropdownMenuItem(value: 'dark', child: Text('Dark')),
-              DropdownMenuItem(value: 'light', child: Text('Light')),
-              DropdownMenuItem(value: 'system', child: Text('System')),
-            ],
-            onChanged: (v) {
-              if (v != null) {
-                notifier.updateLocal((s) => s.copyWith(theme: v));
-              }
-            },
-          ),
+        // ── Brightness mode ──
+        const _SubSectionTitle('MODE'),
+        Row(
+          children: [
+            for (final mode in MsgrBrightness.values)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(
+                    mode == MsgrBrightness.light ? 'Light'
+                    : mode == MsgrBrightness.dark ? 'Dark'
+                    : 'System',
+                  ),
+                  selected: themeState.brightness == mode,
+                  selectedColor: themeState.colors.accent,
+                  backgroundColor: Colors.white.withAlpha(15),
+                  labelStyle: TextStyle(
+                    color: themeState.brightness == mode
+                        ? Colors.white
+                        : Colors.white70,
+                    fontSize: 13,
+                  ),
+                  side: BorderSide.none,
+                  onSelected: (_) => themeNotifier.setBrightness(mode),
+                ),
+              ),
+          ],
         ),
+
+        // ── Color theme grid ──
+        const _SubSectionTitle('THEME'),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (final entry in _themeSwatches.entries)
+              _ThemeSwatch(
+                name: entry.value.$1,
+                color: entry.value.$2,
+                isSelected: themeState.theme == entry.key,
+                onTap: () => themeNotifier.setTheme(entry.key),
+              ),
+          ],
+        ),
+
+        const SizedBox(height: 16),
         _SettingRow(
           label: 'Font size',
           description: '${settings.fontSize.round()} px',
@@ -636,9 +674,9 @@ class _AppearanceSection extends ConsumerWidget {
               min: 10,
               max: 22,
               divisions: 12,
-              activeColor: const Color(0xFF02AC88),
+              activeColor: themeState.colors.accent,
               onChanged: (v) {
-                notifier.updateLocal((s) => s.copyWith(fontSize: v));
+                settingsNotifier.updateLocal((s) => s.copyWith(fontSize: v));
               },
             ),
           ),
@@ -648,13 +686,74 @@ class _AppearanceSection extends ConsumerWidget {
           description: 'Reduce spacing between messages',
           trailing: Switch(
             value: settings.compactMode,
-            activeColor: const Color(0xFF02AC88),
+            activeColor: themeState.colors.accent,
             onChanged: (v) {
-              notifier.updateLocal((s) => s.copyWith(compactMode: v));
+              settingsNotifier.updateLocal((s) => s.copyWith(compactMode: v));
             },
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ThemeSwatch extends StatelessWidget {
+  const _ThemeSwatch({
+    required this.name,
+    required this.color,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String name;
+  final Color color;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 80,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? color.withAlpha(30) : Colors.white.withAlpha(8),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isSelected ? color : Colors.white.withAlpha(20),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: isSelected
+                    ? Border.all(color: Colors.white, width: 2)
+                    : null,
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, color: Colors.white, size: 16)
+                  : null,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              name,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white70,
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

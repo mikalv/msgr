@@ -9,6 +9,7 @@ import 'package:core/providers/draft_provider.dart';
 import 'package:core/providers/models.dart' hide ChannelKind;
 import 'package:core/providers/msgr_client_provider.dart';
 import 'package:core/providers/team_list_provider.dart';
+import 'package:core/providers/theme_provider.dart';
 import 'package:core/providers/unread_provider.dart';
 import 'package:core/providers/web_push_provider.dart';
 import 'package:core/providers/web_push_stub.dart' if (dart.library.html) 'package:core/providers/web_push_web.dart' as webPushImpl;
@@ -200,7 +201,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     }
 
     return MsgrTheme(
-      colors: MsgrColorTokens.dark,
+      colors: ref.watch(themeProvider).colors,
       child: CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
         // Cmd+K / Ctrl+K: Quick switcher
