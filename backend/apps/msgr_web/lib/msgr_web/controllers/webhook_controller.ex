@@ -29,8 +29,14 @@ defmodule MessngrWeb.WebhookController do
         team = endpoint.team
         prefix = team.schema_name
 
-        # Extract message content — support Slack format and simple format
-        {text, bot_name} = extract_message(params, endpoint)
+        # Render message via template engine (supports Liquid templates, presets, and fallback)
+        {text, bot_name} = case Messngr.Webhooks.TemplateEngine.render(params, endpoint.template, endpoint.template_preset) do
+          {:ok, rendered} ->
+            name = params["username"] || params["name"] || endpoint.name
+            {rendered, name}
+          _ ->
+            extract_message(params, endpoint)
+        end
 
         if text == nil or text == "" do
           conn

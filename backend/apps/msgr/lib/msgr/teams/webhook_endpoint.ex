@@ -21,6 +21,8 @@ defmodule Messngr.Teams.WebhookEndpoint do
     field :avatar_url, :string
     field :enabled, :boolean, default: true
     field :message_count, :integer, default: 0
+    field :template, :string
+    field :template_preset, :string
 
     belongs_to :team, Messngr.Teams.Team
     belongs_to :created_by_account, Messngr.Accounts.Account, foreign_key: :created_by_account_id
@@ -30,7 +32,7 @@ defmodule Messngr.Teams.WebhookEndpoint do
 
   def changeset(endpoint, attrs) do
     endpoint
-    |> cast(attrs, [:team_id, :channel_id, :token, :name, :avatar_url, :created_by_account_id, :enabled])
+    |> cast(attrs, [:team_id, :channel_id, :token, :name, :avatar_url, :created_by_account_id, :enabled, :template, :template_preset])
     |> validate_required([:team_id, :channel_id, :token, :name, :created_by_account_id])
     |> validate_length(:name, min: 1, max: 100)
     |> unique_constraint(:token)

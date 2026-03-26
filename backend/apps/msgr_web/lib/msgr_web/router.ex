@@ -137,6 +137,8 @@ defmodule MessngrWeb.Router do
     # Webhook management (owner/admin only)
     post "/webhooks", WebhookManagementController, :create
     get "/webhooks", WebhookManagementController, :index
+    get "/webhooks/presets", WebhookManagementController, :presets
+    put "/webhooks/:id", WebhookManagementController, :update
     delete "/webhooks/:id", WebhookManagementController, :delete
 
     # Reminders

@@ -491,11 +491,15 @@ class MsgrApiClient {
     required String channelId,
     required String name,
     String? avatarUrl,
+    String? templatePreset,
+    String? template,
   }) async {
     return post('/api/teams/$teamSlug/webhooks', body: {
       'channel_id': channelId,
       'name': name,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
+      if (templatePreset != null) 'template_preset': templatePreset,
+      if (template != null) 'template': template,
     });
   }
 

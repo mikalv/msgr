@@ -58,7 +58,8 @@ defmodule Messngr.MixProject do
       {:ex_aws_s3, "~> 2.5"},
       {:sweet_xml, "~> 0.7"},
       {:hackney, "~> 1.20"},
-      {:web_push_elixir, "~> 0.5.0"}
+      {:web_push_elixir, "~> 0.5.0"},
+      {:solid, "~> 1.2"}
     ]
   end
 
