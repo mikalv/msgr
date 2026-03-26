@@ -11,6 +11,7 @@ import 'package:core/providers/msgr_client_provider.dart';
 import 'package:core/providers/team_list_provider.dart';
 import 'package:core/providers/theme_provider.dart';
 import 'package:core/providers/unread_provider.dart';
+import 'package:core/services/dock_badge_service.dart';
 import 'package:core/providers/web_push_provider.dart';
 import 'package:core/providers/web_push_stub.dart' if (dart.library.html) 'package:core/providers/web_push_web.dart' as webPushImpl;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -144,6 +145,15 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Sync dock badge with total unread count
+    ref.listen<int>(totalUnreadProvider, (prev, next) {
+      DockBadgeService.instance.setBadge(next);
+      // Bounce dock icon when unread count increases
+      if (next > (prev ?? 0)) {
+        DockBadgeService.instance.bounce();
+      }
+    });
+
     final teamState = ref.watch(teamListProvider);
 
     // Track channel changes for navigation history
