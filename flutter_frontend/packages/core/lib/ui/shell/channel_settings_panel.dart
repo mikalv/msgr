@@ -515,7 +515,6 @@ class _WebhooksTabState extends ConsumerState<_WebhooksTab> {
       ),
     );
 
-    nameController.dispose();
     if (result == null || (result['name'] ?? '').isEmpty) return;
 
     try {
@@ -597,7 +596,6 @@ class _WebhooksTabState extends ConsumerState<_WebhooksTab> {
       ),
     );
 
-    templateController.dispose();
     if (result == null) return;
 
     try {
