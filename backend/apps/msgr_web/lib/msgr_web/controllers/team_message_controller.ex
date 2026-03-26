@@ -43,11 +43,19 @@ defmodule MessngrWeb.TeamMessageController do
           message = Messages.get_message(prefix, message.id)
 
           # Broadcast to channel topic (active viewers get full message)
-          MessngrWeb.Endpoint.broadcast(
-            "channel:#{channel_id}",
-            "new:message",
-            message_json(message)
-          )
+          if message.thread_parent_id do
+            MessngrWeb.Endpoint.broadcast(
+              "channel:#{channel_id}",
+              "new:thread_reply",
+              %{thread_parent_id: message.thread_parent_id, message: message_json(message)}
+            )
+          else
+            MessngrWeb.Endpoint.broadcast(
+              "channel:#{channel_id}",
+              "new:message",
+              message_json(message)
+            )
+          end
 
           # Broadcast to team topic (sidebar unread for everyone)
           slug = conn.path_params["slug"]
