@@ -63,6 +63,7 @@ class _AuthGate extends ConsumerStatefulWidget {
 
 class _AuthGateState extends ConsumerState<_AuthGate> {
   bool _redeemingInvite = false;
+  bool _inviteAttempted = false;
 
   @override
   void didChangeDependencies() {
@@ -72,10 +73,11 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
 
   Future<void> _tryRedeemInvite() async {
     final code = _pendingInviteCode;
-    if (code == null || _redeemingInvite) return;
+    if (code == null || _redeemingInvite || _inviteAttempted) return;
 
     final auth = ref.read(simpleAuthProvider);
     if (!auth.isLoggedIn) return;
+    _inviteAttempted = true;
 
     setState(() => _redeemingInvite = true);
     _pendingInviteCode = null; // Consume
@@ -112,6 +114,11 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(simpleAuthProvider);
+
+    // When auth state changes to logged-in, try to redeem pending invite
+    if (auth.isLoggedIn && _pendingInviteCode != null && !_redeemingInvite && !_inviteAttempted) {
+      Future.microtask(() => _tryRedeemInvite());
+    }
 
     if (!auth.isLoggedIn) {
       final hasInvite = _pendingInviteCode != null || _redeemingInvite;
