@@ -31,6 +31,8 @@ class MsgrBot {
   String? _refreshToken;
   final Map<String, String> channelNames = {};
   final Set<String> _seenMessageIds = {};
+  /// Track active threads to poll for replies
+  final Set<String> _activeThreads = {};
   final _client = http.Client();
   MsgrRealtimeClient? _realtime;
   bool _wsConnected = false;
@@ -387,6 +389,14 @@ class MsgrBot {
           // Skip own messages
           if (senderProfileId == teamProfileId || senderProfileId == profileId) continue;
 
+          // Skip thread replies in channel polling — we poll threads separately
+          final threadParentId = m['thread_parent_id']?.toString();
+          if (threadParentId != null && threadParentId.isNotEmpty) continue;
+
+          // Track messages that have thread replies so we can poll them
+          final threadCount = m['thread_reply_count'] ?? 0;
+          if (threadCount > 0) _activeThreads.add(id);
+
           // Extract content
           final rawContent = m['content'];
           final content = rawContent is Map
@@ -418,6 +428,96 @@ class MsgrBot {
         print('[Bot] Poll error: $e');
         print('[Bot] Stack: $stack');
       }
+    }
+
+    // Poll active threads for new replies
+    await _pollThreads();
+  }
+
+  Future<void> _pollThreads() async {
+    for (final threadId in _activeThreads.toList()) {
+      try {
+        // Find which channel this thread belongs to
+        String? threadChannelId;
+        for (final cid in channelNames.keys) {
+          threadChannelId = cid;
+          break; // We don't track thread-to-channel mapping perfectly yet
+        }
+        if (threadChannelId == null) continue;
+
+        final res = await _client.get(
+          Uri.parse('$msgrBaseUrl/api/teams/$teamSlug/channels/$threadChannelId/threads/$threadId'),
+          headers: _headers,
+        );
+        if (res.statusCode != 200) continue;
+
+        final data = jsonDecode(res.body);
+        final replies = (data is Map && data.containsKey('data'))
+            ? data['data'] as List
+            : data is List ? data : [];
+
+        for (final m in replies) {
+          final id = m['id']?.toString() ?? '';
+          if (id.isEmpty || _seenMessageIds.contains(id)) continue;
+          _seenMessageIds.add(id);
+
+          final sender = m['sender_profile'] as Map<String, dynamic>? ??
+              m['sender'] as Map<String, dynamic>? ?? {};
+          final senderProfileId = m['sender_profile_id']?.toString() ??
+              sender['id']?.toString() ?? '';
+          final senderName = sender['display_name']?.toString() ?? 'Ukjent';
+
+          if (senderProfileId == teamProfileId || senderProfileId == profileId) continue;
+
+          final rawContent = m['content'];
+          final content = rawContent is Map
+              ? (rawContent['text']?.toString() ?? rawContent.toString())
+              : rawContent?.toString() ?? '';
+          if (content.isEmpty) continue;
+
+          print('[Bot] Thread reply in #${channelNames[threadChannelId]}: $senderName: $content');
+
+          final botMessage = BotMessage(
+            channelId: threadChannelId,
+            channelName: channelNames[threadChannelId] ?? '',
+            senderName: senderName,
+            senderProfileId: senderProfileId,
+            content: content,
+            messageId: id,
+            timestamp: DateTime.tryParse(m['inserted_at']?.toString() ?? '') ?? DateTime.now(),
+            threadParentId: threadId,
+          );
+
+          await _setTyping(threadChannelId, true);
+          final reply = await onMessage(botMessage);
+          await _setTyping(threadChannelId, false);
+          if (reply != null && reply.isNotEmpty) {
+            await sendThreadReply(threadChannelId, threadId, reply);
+          }
+        }
+      } catch (e) {
+        print('[Bot] Thread poll error: $e');
+      }
+    }
+  }
+
+  Future<void> sendThreadReply(String channelId, String threadParentId, String text) async {
+    final res = await _client.post(
+      Uri.parse('$msgrBaseUrl/api/teams/$teamSlug/channels/$channelId/messages'),
+      headers: _headers,
+      body: jsonEncode({
+        'content': {'text': text},
+        'thread_parent_id': threadParentId,
+      }),
+    );
+
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      print('[Bot] Failed to send thread reply (${res.statusCode}): ${res.body}');
+    } else {
+      final data = jsonDecode(res.body);
+      final msgData = data is Map && data.containsKey('data') ? data['data'] : data;
+      final id = msgData is Map ? msgData['id']?.toString() : null;
+      if (id != null) _seenMessageIds.add(id);
     }
   }
 
@@ -461,6 +561,7 @@ class BotMessage {
     required this.content,
     required this.messageId,
     required this.timestamp,
+    this.threadParentId,
   });
 
   final String channelId;
@@ -470,6 +571,9 @@ class BotMessage {
   final String content;
   final String messageId;
   final DateTime timestamp;
+  final String? threadParentId;
+
+  bool get isThreadReply => threadParentId != null;
 }
 
 class MsgrBotException implements Exception {

@@ -91,21 +91,22 @@ void main(List<String> args) async {
       // Don't reply to own messages
       if (message.senderProfileId == bot.teamProfileId) return null;
 
-      // Add to history
-      channelHistory.putIfAbsent(message.channelId, () => []);
-      channelHistory[message.channelId]!.add(message);
+      // Use thread-specific or channel-specific history
+      final contextKey = message.threadParentId ?? message.channelId;
+      channelHistory.putIfAbsent(contextKey, () => []);
+      channelHistory[contextKey]!.add(message);
 
-      // Keep last 20 messages per channel
-      if (channelHistory[message.channelId]!.length > 20) {
-        channelHistory[message.channelId] =
-            channelHistory[message.channelId]!.sublist(
-          channelHistory[message.channelId]!.length - 20,
+      // Keep last 20 messages per context
+      if (channelHistory[contextKey]!.length > 20) {
+        channelHistory[contextKey] =
+            channelHistory[contextKey]!.sublist(
+          channelHistory[contextKey]!.length - 20,
         );
       }
 
       // Build context and get LLM response
       final messages = KaarePersona.buildMessages(
-        channelHistory[message.channelId]!,
+        channelHistory[contextKey]!,
         message,
       );
 
@@ -113,7 +114,7 @@ void main(List<String> args) async {
         final reply = await llmClient.chat(messages);
 
         // Add own reply to history so future context includes it
-        channelHistory[message.channelId]!.add(BotMessage(
+        channelHistory[contextKey]!.add(BotMessage(
           channelId: message.channelId,
           channelName: message.channelName,
           senderName: 'kaare',
