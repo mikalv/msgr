@@ -287,7 +287,7 @@ class _LinkedText extends ConsumerWidget {
     }
 
     if (resolved.isEmpty) {
-      return Text(content, style: baseStyle);
+      return SelectableText(content, style: baseStyle);
     }
 
     final spans = <InlineSpan>[];
