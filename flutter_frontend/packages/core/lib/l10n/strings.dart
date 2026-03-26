@@ -10,6 +10,7 @@ class S {
   static bool get isNorwegian => _locale.startsWith('nb') || _locale.startsWith('no');
 
   // Sidebar
+  static String get starred => isNorwegian ? 'Favoritter' : 'Starred';
   static String get channels => isNorwegian ? 'Kanaler' : 'Channels';
   static String get directMessages => isNorwegian ? 'Direktemeldinger' : 'Direct messages';
   static String get addChannels => isNorwegian ? 'Legg til kanaler' : 'Add channels';

@@ -25,6 +25,8 @@ class ChannelSidebar extends StatelessWidget {
     this.onCreateChannel,
     this.onLeaveChannel,
     this.onCloseDm,
+    this.favorites = const {},
+    this.onToggleFavorite,
     this.onLogout,
     this.onEditProfile,
     this.onOpenSettings,
@@ -45,6 +47,8 @@ class ChannelSidebar extends StatelessWidget {
   final VoidCallback? onCreateChannel;
   final ValueChanged<ChannelItem>? onLeaveChannel;
   final ValueChanged<DmItem>? onCloseDm;
+  final Set<String> favorites;
+  final ValueChanged<String>? onToggleFavorite;
   final VoidCallback? onLogout;
   final VoidCallback? onEditProfile;
   final VoidCallback? onOpenSettings;
@@ -53,6 +57,14 @@ class ChannelSidebar extends StatelessWidget {
   final String? userProfileId;
   final VoidCallback? onAvatarTap;
   final VoidCallback? onInvitePeople;
+
+  List<ChannelItem> get _starredChannels {
+    return _sortedChannels.where((c) => favorites.contains(c.id)).toList();
+  }
+
+  List<DmItem> get _starredDms {
+    return _sortedDms.where((d) => favorites.contains(d.id)).toList();
+  }
 
   List<ChannelItem> get _sortedChannels {
     final sorted = List<ChannelItem>.from(channels);
@@ -129,6 +141,42 @@ class ChannelSidebar extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 children: [
+                  // --- Starred / Favorites section ---
+                  if (_starredChannels.isNotEmpty || _starredDms.isNotEmpty) ...[
+                    _SectionHeader(
+                      icon: Icons.star_rounded,
+                      title: S.starred,
+                    ),
+                    const SizedBox(height: 2),
+                    for (final channel in _starredChannels)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: ChannelListItem(
+                          channel: channel,
+                          isSelected: channel.id == selectedChannelId,
+                          onTap: () => onChannelSelected?.call(channel),
+                          onLeave: () => onLeaveChannel?.call(channel),
+                          onToggleStar: () => onToggleFavorite?.call(channel.id),
+                          isStarred: true,
+                        ),
+                      ),
+                    for (final dm in _starredDms)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: DmListItem(
+                          contact: dm,
+                          isSelected: dm.id == selectedDmId,
+                          onTap: () => onDmSelected?.call(dm),
+                          onClose: dm.isSelf ? null : () => onCloseDm?.call(dm),
+                          onToggleStar: () => onToggleFavorite?.call(dm.id),
+                          isStarred: true,
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    _buildDivider(),
+                    const SizedBox(height: 4),
+                  ],
+
                   // --- Channels section ---
                   _SectionHeader(
                     icon: Icons.grid_view_rounded,
@@ -143,6 +191,8 @@ class ChannelSidebar extends StatelessWidget {
                         isSelected: channel.id == selectedChannelId,
                         onTap: () => onChannelSelected?.call(channel),
                         onLeave: () => onLeaveChannel?.call(channel),
+                        onToggleStar: () => onToggleFavorite?.call(channel.id),
+                        isStarred: favorites.contains(channel.id),
                       ),
                     ),
                   // + Legg til kanaler
@@ -169,6 +219,8 @@ class ChannelSidebar extends StatelessWidget {
                         isSelected: dm.id == selectedDmId,
                         onTap: () => onDmSelected?.call(dm),
                         onClose: dm.isSelf ? null : () => onCloseDm?.call(dm),
+                        onToggleStar: () => onToggleFavorite?.call(dm.id),
+                        isStarred: favorites.contains(dm.id),
                       ),
                     ),
                   // + Inviter folk

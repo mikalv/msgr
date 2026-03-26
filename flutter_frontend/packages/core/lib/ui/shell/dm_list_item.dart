@@ -13,15 +13,20 @@ class DmListItem extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
     this.onClose,
+    this.onToggleStar,
+    this.isStarred = false,
   });
 
   final DmItem contact;
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback? onClose;
+  final VoidCallback? onToggleStar;
+  final bool isStarred;
 
   void _showContextMenu(BuildContext context, Offset globalPosition) async {
     final items = <PopupMenuEntry<String>>[
+      _menuItem('star', isStarred ? Icons.star : Icons.star_outline, isStarred ? 'Unstar' : 'Star'),
       _menuItem('mute', Icons.notifications_off_outlined, 'Mute conversation'),
       _menuItem('mark_read', Icons.done_all, 'Mark as read'),
       if (!contact.isSelf) ...[
@@ -43,6 +48,10 @@ class DmListItem extends StatelessWidget {
 
     if (result == null || !context.mounted) return;
 
+    if (result == 'star') {
+      onToggleStar?.call();
+      return;
+    }
     if (result == 'close') {
       onClose?.call();
       return;

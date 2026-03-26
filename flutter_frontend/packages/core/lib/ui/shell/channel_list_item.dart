@@ -17,12 +17,16 @@ class ChannelListItem extends StatelessWidget {
     required this.isSelected,
     required this.onTap,
     this.onLeave,
+    this.onToggleStar,
+    this.isStarred = false,
   });
 
   final ChannelItem channel;
   final bool isSelected;
   final VoidCallback onTap;
   final VoidCallback? onLeave;
+  final VoidCallback? onToggleStar;
+  final bool isStarred;
 
   void _showChannelContextMenu(BuildContext context, Offset globalPosition) async {
     final result = await showMenu<String>(
@@ -36,6 +40,7 @@ class ChannelListItem extends StatelessWidget {
       color: const Color(0xFF2A2A2A),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       items: [
+        _channelMenuItem('star', isStarred ? Icons.star : Icons.star_outline, isStarred ? 'Unstar' : 'Star'),
         _channelMenuItem('mute', Icons.notifications_off_outlined, S.muteChannel),
         _channelMenuItem('leave', Icons.logout, S.leaveChannel),
         const PopupMenuDivider(),
@@ -58,6 +63,9 @@ class ChannelListItem extends StatelessWidget {
             ),
           );
         }
+        break;
+      case 'star':
+        onToggleStar?.call();
         break;
       case 'leave':
         onLeave?.call();

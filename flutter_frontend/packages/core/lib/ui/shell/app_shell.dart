@@ -9,6 +9,7 @@ import 'package:core/providers/draft_provider.dart';
 import 'package:core/providers/models.dart' hide ChannelKind;
 import 'package:core/providers/msgr_client_provider.dart';
 import 'package:core/providers/team_list_provider.dart';
+import 'package:core/providers/favorites_provider.dart';
 import 'package:core/providers/theme_provider.dart';
 import 'package:core/providers/unread_provider.dart';
 import 'package:core/services/dock_badge_service.dart';
@@ -505,6 +506,8 @@ class _AppShellState extends ConsumerState<AppShell> {
       onCreateChannel: _showCreateChannelDialog,
       onLeaveChannel: (channel) => _leaveChannel(channel.id),
       onCloseDm: (dm) => _leaveChannel(dm.id),
+      favorites: ref.watch(favoritesProvider),
+      onToggleFavorite: (id) => ref.read(favoritesProvider.notifier).toggle(id),
       onOpenSettings: () => openSettingsPage(context),
       userDisplayName: ref.watch(simpleAuthProvider).displayName,
       userEmail: ref.watch(simpleAuthProvider).email,
