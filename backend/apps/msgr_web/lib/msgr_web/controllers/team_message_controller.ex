@@ -35,6 +35,7 @@ defmodule MessngrWeb.TeamMessageController do
         sender_profile_id: profile.id,
         content: params["content"] || %{},
         thread_parent_id: params["thread_parent_id"],
+        reply_to_id: params["reply_to_id"],
         media_refs: params["media_refs"] || []
       }
 
@@ -206,19 +207,33 @@ defmodule MessngrWeb.TeamMessageController do
   end
 
   defp message_json(message) do
-    %{
+    base = %{
       id: message.id,
       channel_id: message.channel_id,
       sender_profile_id: message.sender_profile_id,
       sender_profile: profile_json(message.sender_profile),
       thread_parent_id: message.thread_parent_id,
       thread_reply_count: thread_reply_count(message),
+      reply_to_id: message.reply_to_id,
       content: message.content,
       media_refs: message.media_refs,
       edited_at: message.edited_at,
       inserted_at: message.inserted_at,
       reactions: reactions_json(message.reactions)
     }
+
+    # Include the quoted message snippet if reply_to is loaded
+    case message do
+      %{reply_to: %{id: _} = replied} ->
+        Map.put(base, :reply_to, %{
+          id: replied.id,
+          sender_profile_id: replied.sender_profile_id,
+          sender_profile: profile_json(replied.sender_profile),
+          content: replied.content
+        })
+      _ ->
+        base
+    end
   end
 
   defp thread_reply_count(%{thread_replies: replies}) when is_list(replies),

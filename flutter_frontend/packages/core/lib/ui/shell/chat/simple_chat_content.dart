@@ -67,6 +67,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
   bool _showNewMessagesBanner = false;
   int _previousMessageCount = 0;
   MsgrMessage? _editingMessage;
+  MsgrMessage? _replyingTo;
   String? _draftBeforeEdit;
   bool _isSending = false;
 
@@ -213,11 +214,29 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
         }
       }
 
+      // Build reply snippet if replying to a message
+      final replyMsg = _replyingTo;
+      ReplyToSnippet? replySnippet;
+      String? replyToId;
+      if (replyMsg != null) {
+        replyToId = replyMsg.id;
+        replySnippet = ReplyToSnippet(
+          id: replyMsg.id,
+          senderName: replyMsg.senderName,
+          content: replyMsg.content.length > 120
+              ? '${replyMsg.content.substring(0, 120)}...'
+              : replyMsg.content,
+        );
+        setState(() => _replyingTo = null);
+      }
+
       ref.read(channelMessagesProvider.notifier).sendMessage(
         channel.id,
         text.isNotEmpty ? text : (mediaRefs.isNotEmpty ? '[vedlegg]' : ''),
         mediaRefs: mediaRefs.isNotEmpty ? mediaRefs : null,
         mentions: mentionDataList.isNotEmpty ? mentionDataList : null,
+        replyToId: replyToId,
+        replyTo: replySnippet,
       );
     } catch (e) {
       if (mounted) {
@@ -461,6 +480,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                                       onOpenThread: _openThread,
                                       onEdit: _startEdit,
                                       onDelete: _deleteMessage,
+                                      onReply: _startReply,
                                     ),
                                     // "New messages" banner
                                     if (_showNewMessagesBanner)
@@ -515,13 +535,53 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                     ),
                   ),
 
+                // Reply mode banner
+                if (_replyingTo != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2E3035),
+                      border: Border(left: BorderSide(color: MsgrTheme.of(context).accent, width: 3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.reply, size: 14, color: MsgrTheme.of(context).accent),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _replyingTo!.senderName,
+                                style: TextStyle(color: MsgrTheme.of(context).accent, fontSize: 12, fontWeight: FontWeight.w600),
+                              ),
+                              Text(
+                                _replyingTo!.content.length > 80
+                                    ? '${_replyingTo!.content.substring(0, 80)}...'
+                                    : _replyingTo!.content,
+                                style: TextStyle(color: Colors.white.withAlpha(120), fontSize: 12),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _cancelReply,
+                          child: const Icon(Icons.close, size: 16, color: Color(0xFFD1D2D3)),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Rich composer
                 ChatComposer(
                   controller: _composerController,
                   isSending: _isSending,
                   onSubmit: _editingMessage != null ? _onEditSubmit : _onComposerSubmit,
                   onArrowUp: _onArrowUp,
-                  onEscape: _editingMessage != null ? _cancelEdit : null,
+                  onEscape: _editingMessage != null ? _cancelEdit : (_replyingTo != null ? _cancelReply : null),
                   availableCommands: slashCommands.when(
                     data: (commands) => commands,
                     loading: () => SlashCommand.defaults,
@@ -625,6 +685,17 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     });
     _composerController.setText(_draftBeforeEdit ?? '');
     _draftBeforeEdit = null;
+  }
+
+  void _startReply(MsgrMessage message) {
+    setState(() {
+      _replyingTo = message;
+      _editingMessage = null;
+    });
+  }
+
+  void _cancelReply() {
+    setState(() => _replyingTo = null);
   }
 
   void _onEditSubmit(ChatComposerResult result) async {

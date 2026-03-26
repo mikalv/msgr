@@ -120,6 +120,32 @@ class MentionData {
       };
 }
 
+/// Lightweight snippet of a quoted/replied-to message.
+class ReplyToSnippet {
+  const ReplyToSnippet({
+    required this.id,
+    required this.senderName,
+    required this.content,
+  });
+
+  final String id;
+  final String senderName;
+  final String content;
+
+  factory ReplyToSnippet.fromJson(Map<String, dynamic> json) {
+    final sender = json['sender_profile'] as Map<String, dynamic>? ?? {};
+    final rawContent = json['content'];
+    final text = rawContent is Map
+        ? rawContent['text']?.toString() ?? ''
+        : rawContent?.toString() ?? '';
+    return ReplyToSnippet(
+      id: json['id']?.toString() ?? '',
+      senderName: sender['display_name']?.toString() ?? 'Unknown',
+      content: text.length > 120 ? '${text.substring(0, 120)}...' : text,
+    );
+  }
+}
+
 class MsgrMessage {
   const MsgrMessage({
     required this.id,
@@ -130,6 +156,8 @@ class MsgrMessage {
     required this.insertedAt,
     this.threadParentId,
     this.threadReplyCount = 0,
+    this.replyToId,
+    this.replyTo,
     this.mediaRefs = const [],
     this.editedAt,
     this.status = MessageStatus.sent,
@@ -148,6 +176,8 @@ class MsgrMessage {
   final DateTime insertedAt;
   final String? threadParentId;
   final int threadReplyCount;
+  final String? replyToId;
+  final ReplyToSnippet? replyTo;
   final List<String> mediaRefs;
   final DateTime? editedAt;
   final MessageStatus status;
@@ -160,6 +190,7 @@ class MsgrMessage {
   bool get isThreadReply => threadParentId != null;
   bool get hasThreadReplies => threadReplyCount > 0;
   bool get hasMentions => mentions.isNotEmpty;
+  bool get isReply => replyToId != null;
 
   MsgrMessage copyWith({
     String? id,
@@ -170,6 +201,8 @@ class MsgrMessage {
     DateTime? insertedAt,
     String? threadParentId,
     int? threadReplyCount,
+    String? replyToId,
+    ReplyToSnippet? replyTo,
     List<String>? mediaRefs,
     DateTime? editedAt,
     MessageStatus? status,
@@ -188,6 +221,8 @@ class MsgrMessage {
       insertedAt: insertedAt ?? this.insertedAt,
       threadParentId: threadParentId ?? this.threadParentId,
       threadReplyCount: threadReplyCount ?? this.threadReplyCount,
+      replyToId: replyToId ?? this.replyToId,
+      replyTo: replyTo ?? this.replyTo,
       mediaRefs: mediaRefs ?? this.mediaRefs,
       editedAt: editedAt ?? this.editedAt,
       status: status ?? this.status,

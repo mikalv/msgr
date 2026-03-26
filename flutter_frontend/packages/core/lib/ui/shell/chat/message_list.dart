@@ -12,6 +12,7 @@ class _MessageList extends StatelessWidget {
     required this.onOpenThread,
     this.onEdit,
     this.onDelete,
+    this.onReply,
   });
 
   final List<MsgrMessage> messages;
@@ -20,6 +21,7 @@ class _MessageList extends StatelessWidget {
   final void Function(MsgrMessage) onOpenThread;
   final void Function(MsgrMessage)? onEdit;
   final void Function(MsgrMessage)? onDelete;
+  final void Function(MsgrMessage)? onReply;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +56,7 @@ class _MessageList extends StatelessWidget {
         onOpenThread: onOpenThread,
         onEdit: isOwn ? onEdit : null,
         onDelete: isOwn ? onDelete : null,
+        onReply: onReply,
       ));
     }
 

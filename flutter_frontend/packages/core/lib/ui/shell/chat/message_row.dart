@@ -12,6 +12,7 @@ class _MessageRow extends ConsumerStatefulWidget {
     required this.onOpenThread,
     this.onEdit,
     this.onDelete,
+    this.onReply,
   });
 
   final MsgrMessage message;
@@ -20,6 +21,7 @@ class _MessageRow extends ConsumerStatefulWidget {
   final void Function(MsgrMessage) onOpenThread;
   final void Function(MsgrMessage)? onEdit;
   final void Function(MsgrMessage)? onDelete;
+  final void Function(MsgrMessage)? onReply;
 
   @override
   ConsumerState<_MessageRow> createState() => _MessageRowState();
@@ -63,7 +65,8 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       items: [
         _buildContextMenuItem('copy', Icons.copy, S.copyText),
-        _buildContextMenuItem('thread', Icons.reply, S.replyInThread),
+        _buildContextMenuItem('reply', Icons.reply_outlined, 'Reply'),
+        _buildContextMenuItem('thread', Icons.forum_outlined, S.replyInThread),
         _buildContextMenuItem('reaction', Icons.emoji_emotions_outlined, S.addReaction),
         _buildContextMenuItem('pin', Icons.push_pin_outlined, S.pinMessage),
         const PopupMenuDivider(),
@@ -90,6 +93,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
             ),
           );
         }
+        break;
+      case 'reply':
+        widget.onReply?.call(msg);
         break;
       case 'thread':
         widget.onOpenThread(msg);
@@ -315,6 +321,44 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                             const Icon(Icons.error_outline,
                                 size: 14, color: Colors.redAccent),
                           ],
+                        ],
+                      ),
+                    ),
+
+                  // Quote block for reply-to messages
+                  if (msg.replyTo != null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        border: Border(left: BorderSide(color: t.accent, width: 3)),
+                        color: t.accent.withAlpha(15),
+                        borderRadius: const BorderRadius.only(
+                          topRight: Radius.circular(6),
+                          bottomRight: Radius.circular(6),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            msg.replyTo!.senderName,
+                            style: TextStyle(
+                              color: t.accent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 1),
+                          Text(
+                            msg.replyTo!.content,
+                            style: TextStyle(
+                              color: t.messageText.withAlpha(150),
+                              fontSize: 12,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ],
                       ),
                     ),

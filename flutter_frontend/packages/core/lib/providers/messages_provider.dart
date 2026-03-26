@@ -157,6 +157,8 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
     String content, {
     List<String>? mediaRefs,
     List<MentionData>? mentions,
+    String? replyToId,
+    ReplyToSnippet? replyTo,
   }) async {
     final auth = _ref.read(simpleAuthProvider);
 
@@ -172,6 +174,8 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
       mediaRefs: mediaRefs ?? [],
       status: MessageStatus.sending,
       mentions: mentions ?? [],
+      replyToId: replyToId,
+      replyTo: replyTo,
     );
 
     state = state.copyWith(messages: [...state.messages, optimistic]);
@@ -195,7 +199,7 @@ class ChannelMessagesNotifier extends StateNotifier<ChannelMessagesState> {
       if (!pushed) {
         // REST fallback
         final client = _ref.read(msgrApiProvider);
-        final raw = await client.sendMessageRich(team.slug, channelId, contentPayload);
+        final raw = await client.sendMessageRich(team.slug, channelId, contentPayload, replyToId: replyToId);
         final data = raw.containsKey('data') && raw['data'] is Map
             ? raw['data'] as Map<String, dynamic>
             : raw;
@@ -411,6 +415,10 @@ MsgrMessage parseMessageJson(
     mediaRefs:
         (m['media_refs'] as List?)?.map((r) => r.toString()).toList() ?? [],
     threadReplyCount: (m['thread_reply_count'] as num?)?.toInt() ?? 0,
+    replyToId: m['reply_to_id'] as String?,
+    replyTo: m['reply_to'] is Map<String, dynamic>
+        ? ReplyToSnippet.fromJson(m['reply_to'] as Map<String, dynamic>)
+        : null,
     status: MessageStatus.sent,
     reactions: reactions,
     mentions: _extractMentions(m['content']),

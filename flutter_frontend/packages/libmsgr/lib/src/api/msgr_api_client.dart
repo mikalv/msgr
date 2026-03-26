@@ -621,11 +621,13 @@ class MsgrApiClient {
     String channelId,
     dynamic content, {
     List<String>? mediaRefs,
+    String? replyToId,
   }) async {
     final contentValue = content is String ? {'text': content} : content;
     return post('/api/teams/$teamSlug/channels/$channelId/messages', body: {
       'content': contentValue,
       if (mediaRefs != null && mediaRefs.isNotEmpty) 'media_refs': mediaRefs,
+      if (replyToId != null) 'reply_to_id': replyToId,
     });
   }
 
