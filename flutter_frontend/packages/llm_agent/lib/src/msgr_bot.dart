@@ -417,9 +417,10 @@ class MsgrBot {
           final reply = await onMessage(botMessage);
           await _setTyping(channelId, false);
           if (reply != null && reply.isNotEmpty) {
-            await sendMessage(channelId, reply);
-            // Track this message so we poll its thread for follow-ups
+            final sentId = await sendMessage(channelId, reply);
+            // Track both user's message AND our reply — user might thread on either
             _repliedMessages[id] = channelId;
+            if (sentId != null) _repliedMessages[sentId] = channelId;
           }
         }
       } catch (e, stack) {
@@ -526,7 +527,7 @@ class MsgrBot {
     }
   }
 
-  Future<void> sendMessage(String channelId, String text) async {
+  Future<String?> sendMessage(String channelId, String text) async {
     final res = await _client.post(
       Uri.parse('$msgrBaseUrl/api/teams/$teamSlug/channels/$channelId/messages'),
       headers: _headers,
@@ -535,12 +536,14 @@ class MsgrBot {
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
       print('[Bot] Failed to send message (${res.statusCode}): ${res.body}');
+      return null;
     } else {
       // Mark our own message as seen
       final data = jsonDecode(res.body);
       final msgData = data is Map && data.containsKey('data') ? data['data'] : data;
       final id = msgData is Map ? msgData['id']?.toString() : null;
       if (id != null) _seenMessageIds.add(id);
+      return id;
     }
   }
 }
