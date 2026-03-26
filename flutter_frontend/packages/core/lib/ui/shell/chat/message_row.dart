@@ -233,8 +233,10 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
               child: widget.isGroupStart
                   ? Padding(
                       padding: const EdgeInsets.only(top: 2),
-                      child: GestureDetector(
-                        onTap: () => _showSenderProfile(context),
+                      child: ProfileHoverCard(
+                        profileId: msg.senderProfileId,
+                        displayName: msg.senderName,
+                        avatarUrl: msg.senderAvatarUrl,
                         child: MouseRegion(
                           cursor: SystemMouseCursors.click,
                           child: ProfileAvatar(
@@ -274,8 +276,10 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                       padding: const EdgeInsets.only(bottom: 2),
                       child: Row(
                         children: [
-                          GestureDetector(
-                            onTap: () => _showSenderProfile(context),
+                          ProfileHoverCard(
+                            profileId: msg.senderProfileId,
+                            displayName: msg.senderName,
+                            avatarUrl: msg.senderAvatarUrl,
                             child: MouseRegion(
                               cursor: SystemMouseCursors.click,
                               child: Text(

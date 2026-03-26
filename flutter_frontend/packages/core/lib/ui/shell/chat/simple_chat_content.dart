@@ -29,6 +29,7 @@ import 'package:core/ui/shell/member_panel.dart';
 import 'package:core/ui/shell/profile_card.dart';
 import 'package:core/ui/shell/thread_panel.dart';
 import 'package:core/ui/widgets/profile_avatar.dart';
+import 'package:core/ui/widgets/profile_hover_card.dart';
 import 'package:core/ui/theme/msgr_theme.dart';
 import 'package:core/providers/unread_provider.dart';
 
