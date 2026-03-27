@@ -208,7 +208,7 @@ defmodule Teams.Channels do
       preload: [:sender_profile]
     )
 
-    Repo.all(query, prefix: prefix)
+    Teams.Repo.all(query, prefix: prefix)
     |> Enum.into(%{}, fn m ->
       text = case m.content do
         %{"text" => t} when is_binary(t) -> if(String.length(t) > 100, do: String.slice(t, 0, 100) <> "...", else: t)
