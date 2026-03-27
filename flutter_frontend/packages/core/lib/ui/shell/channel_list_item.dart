@@ -117,7 +117,7 @@ class ChannelListItem extends StatelessWidget {
       borderRadius: BorderRadius.circular(6),
       hoverColor: t.sidebarItemHover,
       child: Container(
-        height: 28,
+        height: channel.lastMessageText != null ? 42 : 28,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
           color: isSelected ? t.sidebarItemActive : null,
@@ -136,14 +136,30 @@ class ChannelListItem extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Expanded(
-              child: Text(
-                channel.name,
-                style: TextStyle(
-                  color: textColor,
-                  fontWeight: fontWeight,
-                  fontSize: 14,
-                ),
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    channel.name,
+                    style: TextStyle(
+                      color: textColor,
+                      fontWeight: fontWeight,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (channel.lastMessageText != null && channel.lastMessageText!.isNotEmpty)
+                    Text(
+                      '${channel.lastMessageSender ?? ''}: ${channel.lastMessageText}',
+                      style: TextStyle(
+                        color: t.sidebarText.withAlpha(120),
+                        fontSize: 11,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
               ),
             ),
             if (hasUnread)

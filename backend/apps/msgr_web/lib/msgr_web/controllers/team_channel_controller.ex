@@ -26,7 +26,13 @@ defmodule MessngrWeb.TeamChannelController do
       end
     end)
 
-    json(conn, %{data: Enum.map(channels, &channel_json/1)})
+    # Fetch last message per channel in one query
+    channel_ids = Enum.map(channels, & &1.id)
+    last_messages = Channels.last_messages_for_channels(prefix, channel_ids)
+
+    json(conn, %{data: Enum.map(channels, fn ch ->
+      channel_json(ch) |> Map.put(:last_message, last_messages[ch.id])
+    end)})
   end
 
   @doc "POST /api/teams/:slug/channels — create a channel"

@@ -94,7 +94,7 @@ class DmListItem extends StatelessWidget {
       borderRadius: BorderRadius.circular(6),
       hoverColor: t.sidebarItemHover,
       child: Container(
-        height: 28,
+        height: contact.lastMessageText != null ? 42 : 28,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
           color: isSelected ? t.sidebarItemActive : null,
@@ -112,14 +112,30 @@ class DmListItem extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: Text(
-                contact.name,
-                style: TextStyle(
-                  color: textColor,
-                  fontWeight: fontWeight,
-                  fontSize: 14,
-                ),
-                overflow: TextOverflow.ellipsis,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    contact.name,
+                    style: TextStyle(
+                      color: textColor,
+                      fontWeight: fontWeight,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (contact.lastMessageText != null && contact.lastMessageText!.isNotEmpty)
+                    Text(
+                      contact.lastMessageText!,
+                      style: TextStyle(
+                        color: t.sidebarText.withAlpha(120),
+                        fontSize: 11,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
               ),
             ),
             if (hasUnread)

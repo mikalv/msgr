@@ -191,4 +191,40 @@ defmodule Teams.Channels do
   def remove_member(prefix, channel_id, profile_id) do
     ChannelMembership.leave(prefix, channel_id, profile_id)
   end
+
+  @doc """
+  Fetch the last message for each channel ID.
+  Returns a map of channel_id => %{sender_name, text, inserted_at}.
+  """
+  def last_messages_for_channels(_prefix, []), do: %{}
+  def last_messages_for_channels(prefix, channel_ids) do
+    alias Teams.TenantModels.Message
+
+    # Use a lateral join / window function to get one message per channel
+    query = from(m in Message,
+      where: m.channel_id in ^channel_ids and is_nil(m.deleted_at) and is_nil(m.thread_parent_id),
+      distinct: m.channel_id,
+      order_by: [asc: m.channel_id, desc: m.inserted_at],
+      preload: [:sender_profile]
+    )
+
+    Repo.all(query, prefix: prefix)
+    |> Enum.into(%{}, fn m ->
+      text = case m.content do
+        %{"text" => t} when is_binary(t) -> if(String.length(t) > 100, do: String.slice(t, 0, 100) <> "...", else: t)
+        _ -> ""
+      end
+
+      sender_name = case m.sender_profile do
+        nil -> "Unknown"
+        p -> p.display_name || "Unknown"
+      end
+
+      {m.channel_id, %{
+        sender_name: sender_name,
+        text: text,
+        inserted_at: m.inserted_at
+      }}
+    end)
+  end
 end

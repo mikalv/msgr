@@ -32,6 +32,8 @@ class ChannelItem {
     this.unreadCount = 0,
     this.hasDraft = false,
     this.lastActivityAt,
+    this.lastMessageSender,
+    this.lastMessageText,
   });
 
   final String id;
@@ -42,6 +44,8 @@ class ChannelItem {
   final int unreadCount;
   final bool hasDraft;
   final DateTime? lastActivityAt;
+  final String? lastMessageSender;
+  final String? lastMessageText;
 }
 
 class DmItem {
@@ -53,6 +57,7 @@ class DmItem {
     this.unreadCount = 0,
     this.lastActivityAt,
     this.isSelf = false,
+    this.lastMessageText,
   });
 
   final String id;
@@ -62,4 +67,5 @@ class DmItem {
   final int unreadCount;
   final DateTime? lastActivityAt;
   final bool isSelf;
+  final String? lastMessageText;
 }

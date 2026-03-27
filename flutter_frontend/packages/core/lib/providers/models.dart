@@ -51,6 +51,19 @@ class MsgrTeam {
   String toString() => 'MsgrTeam($slug)';
 }
 
+/// Preview of the last message in a channel (for sidebar display).
+class LastMessagePreview {
+  const LastMessagePreview({
+    required this.senderName,
+    required this.text,
+    required this.insertedAt,
+  });
+
+  final String senderName;
+  final String text;
+  final DateTime insertedAt;
+}
+
 class MsgrChannel {
   const MsgrChannel({
     required this.id,
@@ -62,6 +75,7 @@ class MsgrChannel {
     this.topic,
     this.teamSlug,
     this.memberNames,
+    this.lastMessage,
   });
 
   final String id;
@@ -74,6 +88,7 @@ class MsgrChannel {
   final String? teamSlug;
   /// For DMs: map of profile_id → display_name
   final Map<String, String>? memberNames;
+  final LastMessagePreview? lastMessage;
 
   @override
   bool operator ==(Object other) =>

@@ -319,6 +319,9 @@ class _AppShellState extends ConsumerState<AppShell> {
             : ChannelKind.public,
         unreadCount: unreadCounts[c.id] ?? 0,
         hasDraft: drafts[c.id]?.isNotEmpty ?? false,
+        lastActivityAt: c.lastMessage?.insertedAt,
+        lastMessageSender: c.lastMessage?.senderName,
+        lastMessageText: c.lastMessage?.text,
       );
     }).toList();
   }
@@ -353,6 +356,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         isOnline: false,
         unreadCount: unreadCounts[c.id] ?? 0,
         isSelf: isSelf,
+        lastActivityAt: c.lastMessage?.insertedAt,
+        lastMessageText: c.lastMessage?.text,
       );
     }).toList();
   }

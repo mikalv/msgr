@@ -85,6 +85,17 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
           }
         }
 
+        // Parse last message preview
+        LastMessagePreview? lastMsg;
+        final rawLastMsg = c['last_message'];
+        if (rawLastMsg is Map) {
+          lastMsg = LastMessagePreview(
+            senderName: rawLastMsg['sender_name']?.toString() ?? '',
+            text: rawLastMsg['text']?.toString() ?? '',
+            insertedAt: DateTime.tryParse(rawLastMsg['inserted_at']?.toString() ?? '') ?? DateTime.now(),
+          );
+        }
+
         return MsgrChannel(
           id: c['id']?.toString() ?? '',
           name: c['name']?.toString() ?? '',
@@ -97,6 +108,7 @@ class ChannelListNotifier extends StateNotifier<ChannelListState> {
           teamSlug: teamSlug,
           topic: c['topic'] as String?,
           memberNames: memberNames,
+          lastMessage: lastMsg,
         );
       }).toList();
       state = state.copyWith(channels: channels, isLoading: false);
