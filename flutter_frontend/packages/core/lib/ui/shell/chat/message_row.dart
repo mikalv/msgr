@@ -307,7 +307,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                           ),
                           if (msg.pinned) ...[
                             const SizedBox(width: 6),
-                            Icon(Icons.push_pin, size: 12, color: t.accent.withAlpha(180)),
+                            Icon(Icons.push_pin, size: 12, color: MsgrTheme.of(context).accent.withAlpha(180)),
                           ],
                           if (msg.editedAt != null) ...[
                             const SizedBox(width: 6),
@@ -340,41 +340,44 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
 
                   // Quote block for reply-to messages
                   if (msg.replyTo != null)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 4),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        border: Border(left: BorderSide(color: t.accent, width: 3)),
-                        color: t.accent.withAlpha(15),
-                        borderRadius: const BorderRadius.only(
-                          topRight: Radius.circular(6),
-                          bottomRight: Radius.circular(6),
+                    Builder(builder: (context) {
+                      final theme = MsgrTheme.of(context);
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          border: Border(left: BorderSide(color: theme.accent, width: 3)),
+                          color: theme.accent.withAlpha(15),
+                          borderRadius: const BorderRadius.only(
+                            topRight: Radius.circular(6),
+                            bottomRight: Radius.circular(6),
+                          ),
                         ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            msg.replyTo!.senderName,
-                            style: TextStyle(
-                              color: t.accent,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              msg.replyTo!.senderName,
+                              style: TextStyle(
+                                color: theme.accent,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            msg.replyTo!.content,
-                            style: TextStyle(
-                              color: t.messageText.withAlpha(150),
-                              fontSize: 12,
+                            const SizedBox(height: 1),
+                            Text(
+                              msg.replyTo!.content,
+                              style: TextStyle(
+                                color: theme.messageText.withAlpha(150),
+                                fontSize: 12,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
+                          ],
+                        ),
+                      );
+                    }),
 
                   // Message content (markdown or plain text with links + mentions)
                   if (msg.content.isNotEmpty)
