@@ -80,9 +80,10 @@ class DmListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = MsgrTheme.of(context);
     final hasUnread = contact.unreadCount > 0;
-    final textColor =
-        hasUnread ? t.sidebarTextBright : t.sidebarText;
-    final fontWeight = hasUnread ? FontWeight.w600 : FontWeight.w400;
+    final textColor = isSelected
+        ? Colors.white
+        : hasUnread ? t.sidebarTextBright : t.sidebarText;
+    final fontWeight = (hasUnread || isSelected) ? FontWeight.w600 : FontWeight.w400;
 
     return GestureDetector(
       onSecondaryTapUp: (details) =>

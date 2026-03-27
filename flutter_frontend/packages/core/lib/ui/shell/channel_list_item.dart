@@ -102,9 +102,10 @@ class ChannelListItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = MsgrTheme.of(context);
     final hasUnread = channel.unreadCount > 0;
-    final textColor =
-        hasUnread ? t.sidebarTextBright : t.sidebarText;
-    final fontWeight = hasUnread ? FontWeight.w600 : FontWeight.w400;
+    final textColor = isSelected
+        ? (t.isDark ? Colors.white : Colors.white)
+        : hasUnread ? t.sidebarTextBright : t.sidebarText;
+    final fontWeight = (hasUnread || isSelected) ? FontWeight.w600 : FontWeight.w400;
     final isPrivate = channel.kind == ChannelKind.private;
 
     return GestureDetector(
