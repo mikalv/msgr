@@ -382,8 +382,12 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                       );
                     }),
 
-                  // Message content (markdown or plain text with links + mentions)
-                  if (msg.content.isNotEmpty)
+                  // Rich content types (location, contact) or regular text
+                  if (msg.contentType == 'location' && msg.contentData != null)
+                    _LocationCard(data: msg.contentData!)
+                  else if (msg.contentType == 'contact' && msg.contentData != null)
+                    _ContactCard(data: msg.contentData!)
+                  else if (msg.content.isNotEmpty)
                     _MessageContent(
                       content: msg.content,
                       status: msg.status,
@@ -505,6 +509,146 @@ class _ToolbarButton extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(6),
           child: Icon(icon, size: 16, color: Colors.white60),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rich content cards
+// ---------------------------------------------------------------------------
+
+/// Location card with static map thumbnail from OpenStreetMap.
+class _LocationCard extends StatelessWidget {
+  const _LocationCard({required this.data});
+  final Map<String, dynamic> data;
+
+  @override
+  Widget build(BuildContext context) {
+    final lat = (data['lat'] as num?)?.toDouble() ?? 0;
+    final lng = (data['lng'] as num?)?.toDouble() ?? 0;
+    final label = data['label']?.toString() ?? '$lat, $lng';
+    final zoom = (data['zoom'] as num?)?.toInt() ?? 15;
+
+    // OpenStreetMap static tile URL (no API key needed)
+    final tileUrl = 'https://staticmap.openstreetmap.de/staticmap.php'
+        '?center=$lat,$lng&zoom=$zoom&size=300x180&markers=$lat,$lng,red-pushpin';
+
+    return GestureDetector(
+      onTap: () => launchUrl(Uri.parse('https://www.openstreetmap.org/?mlat=$lat&mlon=$lng#map=$zoom/$lat/$lng')),
+      child: Container(
+        width: 300,
+        margin: const EdgeInsets.only(top: 4),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.white.withAlpha(20)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Image.network(
+              tileUrl,
+              width: 300,
+              height: 180,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 300,
+                height: 180,
+                color: Colors.white.withAlpha(10),
+                child: const Center(child: Icon(Icons.map, color: Colors.white38, size: 40)),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on, size: 16, color: Colors.redAccent),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 13), overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Contact card showing name, phone, email with action buttons.
+class _ContactCard extends StatelessWidget {
+  const _ContactCard({required this.data});
+  final Map<String, dynamic> data;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = data['name']?.toString() ?? 'Unknown';
+    final phone = data['phone']?.toString();
+    final email = data['email']?.toString();
+    final org = data['organization']?.toString();
+
+    return Container(
+      width: 280,
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withAlpha(20)),
+        color: Colors.white.withAlpha(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: Colors.blueGrey.withAlpha(60),
+                child: Text(name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                    if (org != null)
+                      Text(org, style: TextStyle(color: Colors.white.withAlpha(120), fontSize: 11)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.contact_page_outlined, size: 18, color: Colors.white38),
+            ],
+          ),
+          if (phone != null || email != null) ...[
+            const SizedBox(height: 8),
+            Divider(color: Colors.white.withAlpha(15), height: 1),
+            const SizedBox(height: 8),
+            if (phone != null)
+              _contactRow(Icons.phone_outlined, phone, () => launchUrl(Uri.parse('tel:$phone'))),
+            if (email != null)
+              _contactRow(Icons.email_outlined, email, () => launchUrl(Uri.parse('mailto:$email'))),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _contactRow(IconData icon, String text, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          children: [
+            Icon(icon, size: 14, color: Colors.white38),
+            const SizedBox(width: 8),
+            Text(text, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          ],
         ),
       ),
     );

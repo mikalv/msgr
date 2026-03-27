@@ -182,6 +182,8 @@ class MsgrMessage {
     this.senderAvatarUrl,
     this.senderEmail,
     this.pinned = false,
+    this.contentType,
+    this.contentData,
   });
 
   final String id;
@@ -203,6 +205,10 @@ class MsgrMessage {
   final String? senderAvatarUrl;
   final String? senderEmail;
   final bool pinned;
+  /// Rich content type: "location", "contact", or null for regular text.
+  final String? contentType;
+  /// Raw content data map for rich types (lat/lng, phone, etc.)
+  final Map<String, dynamic>? contentData;
 
   bool get isThreadReply => threadParentId != null;
   bool get hasThreadReplies => threadReplyCount > 0;
@@ -229,6 +235,8 @@ class MsgrMessage {
     String? senderAvatarUrl,
     String? senderEmail,
     bool? pinned,
+    String? contentType,
+    Map<String, dynamic>? contentData,
   }) {
     return MsgrMessage(
       id: id ?? this.id,
@@ -250,6 +258,8 @@ class MsgrMessage {
       senderAvatarUrl: senderAvatarUrl ?? this.senderAvatarUrl,
       senderEmail: senderEmail ?? this.senderEmail,
       pinned: pinned ?? this.pinned,
+      contentType: contentType ?? this.contentType,
+      contentData: contentData ?? this.contentData,
     );
   }
 

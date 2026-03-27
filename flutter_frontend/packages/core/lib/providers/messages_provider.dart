@@ -409,6 +409,8 @@ MsgrMessage parseMessageJson(
             sender['name']?.toString() ??
             'Ukjent'),
     content: _extractContent(m['content']),
+    contentType: m['content'] is Map ? m['content']['type'] as String? : null,
+    contentData: m['content'] is Map && m['content']['type'] != null ? (m['content'] as Map<String, dynamic>) : null,
     insertedAt:
         DateTime.tryParse(m['inserted_at']?.toString() ?? '') ?? DateTime.now(),
     threadParentId: m['thread_parent_id'] as String?,
