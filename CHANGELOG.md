@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.8.0] — 2026-03-27
+## [0.8.0] — 2026-03-26 to 2026-03-27
 
 ### Added — App Platform & Marketplace (#96, #97, #98)
 - **App marketplace** in Team Settings > Apps: browse, search, category filter, install with scope review + config form + channel binding
@@ -54,7 +54,7 @@
 
 ---
 
-## [0.7.0] — 2026-03-26
+## [0.7.0] — 2026-03-25 to 2026-03-26
 
 ### Added — Webhook Templates (#159)
 - Liquid template engine with presets: GitHub, GitLab, Sentry, Grafana, Generic
