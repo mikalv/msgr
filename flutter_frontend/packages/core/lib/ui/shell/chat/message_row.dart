@@ -368,11 +368,12 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                     ),
 
                   // Message content (markdown or plain text with links + mentions)
-                  _MessageContent(
-                    content: msg.content,
-                    status: msg.status,
-                    mentions: msg.mentions,
-                  ),
+                  if (msg.content.isNotEmpty)
+                    _MessageContent(
+                      content: msg.content,
+                      status: msg.status,
+                      mentions: msg.mentions,
+                    ),
 
                   // Media attachments (images and files)
                   if (msg.mediaRefs.isNotEmpty)

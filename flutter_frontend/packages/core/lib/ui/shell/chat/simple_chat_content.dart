@@ -233,7 +233,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
 
       ref.read(channelMessagesProvider.notifier).sendMessage(
         channel.id,
-        text.isNotEmpty ? text : (mediaRefs.isNotEmpty ? '[vedlegg]' : ''),
+        text.isNotEmpty ? text : '',
         mediaRefs: mediaRefs.isNotEmpty ? mediaRefs : null,
         mentions: mentionDataList.isNotEmpty ? mentionDataList : null,
         replyToId: replyToId,
