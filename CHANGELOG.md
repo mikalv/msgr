@@ -1,5 +1,83 @@
 # Changelog
 
+## [0.8.0] — 2026-03-27
+
+### Added — App Platform & Marketplace (#96, #97, #98)
+- **App marketplace** in Team Settings > Apps: browse, search, category filter, install with scope review + config form + channel binding
+- **Bot token management**: list/create/revoke tokens via API and UI
+- **Webhook dispatch**: HMAC-SHA256 signed outgoing webhooks with exponential backoff retry (5 attempts)
+- **Channel app config**: per-channel JSONB metadata for app-specific settings
+- App directory endpoint with search and category filter
+- Seed apps: GitHub, Calendar/JMAP, Jira, RSS, Sentry, Grafana
+- Channel Settings > Apps tab for per-channel app configuration
+
+### Added — UI/UX Features
+- **Message hover toolbar** (#134): floating action bar on hover with React, Reply, Thread, Pin, More buttons
+- **Reply-to messages** (#147): quote block with accent border, reply mode in composer, Esc to cancel
+- **Pinned messages** (#148): pin/unpin via context menu, pin icon on messages, dropdown panel in channel header with badge count
+- **Profile hover cards** (#131): hover 400ms over sender name/avatar shows mini card with Message/Profile buttons
+- **Favorite channels/DMs** (#125): star via context menu, dedicated "Starred" section at top of sidebar
+- **Last message preview** (#145): sidebar shows sender + text preview below channel/DM name
+- **6 color themes** (#149): Neutral, Teal, Indigo, Rose, Amber, Emerald — each with light/dark/system mode
+- **Location sharing** (#151): GPS + reverse geocoding, OpenStreetMap map cards, location button in composer
+- **Contact sharing** (#151): native contact picker, contact cards with tap-to-call/email
+- **Leave channel / close DM**: context menu actions, self-DM ("Notes to self") cannot be closed
+- **macOS dock badge**: unread count on dock icon + bounce on new messages
+
+### Added — Team Admin (#129)
+- Team admin settings panel with 3 tabs: Overview, Members, Invites
+- Edit team name (admin/owner only)
+- Member list with role badges, promote/demote/remove (owner)
+- Invite link management: list, create, copy URL, revoke
+
+### Added — Bot Improvements (#135)
+- Bot handles `new:thread_reply` WebSocket events (was only listening to `new:message`)
+- Bot replies in threads via `sendThreadReply` (not to channel)
+- Bot requires @mention in channels, always replies in threads
+- Bot can join teams via `--invite` flag (URL or raw code)
+- Thread composer uses full ChatComposer with @mention popup
+
+### Fixed
+- **Invite links for existing users**: web flow now works when already logged in (auth state race fix)
+- **Profile setup after invite-join**: `needsProfileSetupProvider` triggers setup for new team joins
+- **REST thread broadcast**: thread replies via REST API now broadcast as `new:thread_reply` (was `new:message`)
+- **Clipboard paste on macOS**: added TIFF format support for screenshots, fixed paste race condition
+- **Image-only messages**: no longer show `[vedlegg]` text, empty content hidden gracefully
+- **Webhook dialog Esc crash**: removed manual TextEditingController dispose (GC handles it)
+- **Selected channel readability**: text now always white + bold on active background
+- Webhook template engine: Liquid preset rendering for GitHub, GitLab, Sentry, Grafana
+
+### Infrastructure
+- 14 bridge issues created: IRC, XMPP, Matrix, Slack, Discord, Messenger, WhatsApp, Signal, Telegram, iMessage, Google Chat, MS Teams, LinkedIn, Email
+- Rebrand decision: Msgr → Relay (relay.dm) — issue #166 tracks phased rollout
+- Issues created: Linux build (#164), App Store distribution (#165), invite landing page (#163), developer portal (#182), activity feed (#181)
+
+---
+
+## [0.7.0] — 2026-03-26
+
+### Added — Webhook Templates (#159)
+- Liquid template engine with presets: GitHub, GitLab, Sentry, Grafana, Generic
+- Webhook creation dialog with preset dropdown
+- Edit template dialog with monospace Liquid syntax editor
+- Webhook cards show preset badge and custom template indicator
+
+### Added — Slash Commands (#92)
+- Built-in commands: /poll, /remind, /topic, /who, /invite, /note
+- /remind integrates with ReminderScheduler (30s check interval, delivers to self-DM + push)
+- /note sends to self-DM channel
+- /poll with emoji voting
+- Command execution via REST and WebSocket
+
+### Added — Other
+- Text selection in messages (#162)
+- Bot auto-reconnect with exponential backoff on server restarts
+- Request logger with IP + user ID
+- Rename: Slack* → Msgr* classes (#136)
+- DM channel names show person names instead of hash slugs
+
+---
+
 ## [0.6.0] — 2026-03-25
 
 ### Added
