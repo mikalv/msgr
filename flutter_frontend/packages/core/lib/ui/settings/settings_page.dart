@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:core/providers/channel_list_provider.dart';
 import 'package:core/providers/settings_provider.dart';
 import 'package:core/providers/auth_state_provider.dart';
 import 'package:core/providers/msgr_client_provider.dart';
@@ -786,7 +787,7 @@ class _TeamAdminSectionState extends ConsumerState<_TeamAdminSection> with Singl
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadData();
   }
 
@@ -870,6 +871,7 @@ class _TeamAdminSectionState extends ConsumerState<_TeamAdminSection> with Singl
             Tab(text: 'Overview'),
             Tab(text: 'Members'),
             Tab(text: 'Invites'),
+            Tab(text: 'Apps'),
           ],
         ),
         const SizedBox(height: 12),
@@ -881,6 +883,7 @@ class _TeamAdminSectionState extends ConsumerState<_TeamAdminSection> with Singl
               _buildOverviewTab(team),
               _buildMembersTab(),
               _buildInvitesTab(),
+              _AppMarketplaceTab(teamSlug: team.slug),
             ],
           ),
         ),
@@ -1103,6 +1106,469 @@ class _TeamAdminSectionState extends ConsumerState<_TeamAdminSection> with Singl
         );
       }
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// App Marketplace tab (inside Team Admin)
+// ---------------------------------------------------------------------------
+
+class _AppMarketplaceTab extends ConsumerStatefulWidget {
+  const _AppMarketplaceTab({required this.teamSlug});
+  final String teamSlug;
+
+  @override
+  ConsumerState<_AppMarketplaceTab> createState() => _AppMarketplaceTabState();
+}
+
+class _AppMarketplaceTabState extends ConsumerState<_AppMarketplaceTab> {
+  bool _showInstalled = false;
+  String? _categoryFilter;
+  String _searchQuery = '';
+  List<Map<String, dynamic>> _directoryApps = [];
+  List<Map<String, dynamic>> _installedApps = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final client = ref.read(msgrApiProvider);
+    setState(() => _loading = true);
+    try {
+      final results = await Future.wait([
+        client.getAppDirectory(category: _categoryFilter, query: _searchQuery.isEmpty ? null : _searchQuery),
+        client.getInstalledApps(widget.teamSlug),
+      ]);
+      if (mounted) {
+        setState(() {
+          _directoryApps = results[0] as List<Map<String, dynamic>>;
+          final rawInstalled = results[1] as List<Map<String, dynamic>>;
+          _installedApps = rawInstalled;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Set<String> get _installedSlugs {
+    return _installedApps
+        .map((i) => (i['app'] as Map?)?['slug']?.toString() ?? '')
+        .where((s) => s.isNotEmpty)
+        .toSet();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = ref.watch(themeProvider).colors.accent;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Toggle: Browse / Installed
+        Row(
+          children: [
+            ChoiceChip(
+              label: const Text('Browse'),
+              selected: !_showInstalled,
+              selectedColor: accent,
+              backgroundColor: Colors.white.withAlpha(15),
+              labelStyle: TextStyle(color: !_showInstalled ? Colors.white : Colors.white70, fontSize: 12),
+              side: BorderSide.none,
+              onSelected: (_) => setState(() => _showInstalled = false),
+            ),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: Text('Installed (${_installedApps.length})'),
+              selected: _showInstalled,
+              selectedColor: accent,
+              backgroundColor: Colors.white.withAlpha(15),
+              labelStyle: TextStyle(color: _showInstalled ? Colors.white : Colors.white70, fontSize: 12),
+              side: BorderSide.none,
+              onSelected: (_) => setState(() => _showInstalled = true),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        if (_showInstalled)
+          _buildInstalledView()
+        else
+          _buildBrowseView(),
+      ],
+    );
+  }
+
+  Widget _buildBrowseView() {
+    return Expanded(
+      child: Column(
+        children: [
+          // Search
+          TextField(
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'Search apps...',
+              hintStyle: TextStyle(color: Colors.white.withAlpha(80)),
+              prefixIcon: const Icon(Icons.search, size: 18, color: Colors.white38),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              filled: true,
+              fillColor: Colors.white.withAlpha(10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+            ),
+            onChanged: (v) {
+              _searchQuery = v;
+              _loadData();
+            },
+          ),
+          const SizedBox(height: 8),
+
+          // Category chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                for (final cat in [null, 'developer-tools', 'productivity', 'communication', 'calendar'])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: FilterChip(
+                      label: Text(cat == null ? 'All' : _categoryLabel(cat), style: const TextStyle(fontSize: 11)),
+                      selected: _categoryFilter == cat,
+                      selectedColor: ref.watch(themeProvider).colors.accent.withAlpha(60),
+                      backgroundColor: Colors.white.withAlpha(10),
+                      labelStyle: TextStyle(color: _categoryFilter == cat ? Colors.white : Colors.white54),
+                      side: BorderSide.none,
+                      onSelected: (_) {
+                        setState(() => _categoryFilter = cat);
+                        _loadData();
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // App grid
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _directoryApps.isEmpty
+                    ? Center(child: Text('No apps found', style: TextStyle(color: Colors.white.withAlpha(100))))
+                    : ListView.builder(
+                        itemCount: _directoryApps.length,
+                        itemBuilder: (context, index) {
+                          final app = _directoryApps[index];
+                          final slug = app['slug']?.toString() ?? '';
+                          final isInstalled = _installedSlugs.contains(slug);
+                          return _AppListTile(
+                            app: app,
+                            isInstalled: isInstalled,
+                            onTap: () => _showAppDetailDialog(app, isInstalled),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstalledView() {
+    if (_installedApps.isEmpty) {
+      return Expanded(
+        child: Center(child: Text('No apps installed', style: TextStyle(color: Colors.white.withAlpha(100)))),
+      );
+    }
+
+    return Expanded(
+      child: ListView.builder(
+        itemCount: _installedApps.length,
+        itemBuilder: (context, index) {
+          final inst = _installedApps[index];
+          final app = inst['app'] as Map<String, dynamic>? ?? {};
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor: ref.watch(themeProvider).colors.accent.withAlpha(40),
+              radius: 18,
+              child: Text(
+                (app['name']?.toString() ?? '?')[0].toUpperCase(),
+                style: TextStyle(color: ref.watch(themeProvider).colors.accent, fontWeight: FontWeight.w700),
+              ),
+            ),
+            title: Text(app['name']?.toString() ?? 'Unknown', style: const TextStyle(color: Colors.white, fontSize: 13)),
+            subtitle: Text(
+              inst['status']?.toString() ?? 'active',
+              style: TextStyle(color: Colors.white.withAlpha(80), fontSize: 11),
+            ),
+            trailing: PopupMenuButton<String>(
+              color: const Color(0xFF2A2A2A),
+              onSelected: (action) => _onInstalledAction(action, inst),
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'config', child: Text('Edit config', style: TextStyle(color: Colors.white, fontSize: 13))),
+                const PopupMenuItem(value: 'uninstall', child: Text('Uninstall', style: TextStyle(color: Colors.redAccent, fontSize: 13))),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _onInstalledAction(String action, Map<String, dynamic> inst) async {
+    final app = inst['app'] as Map<String, dynamic>? ?? {};
+    final appSlug = app['slug']?.toString() ?? '';
+
+    if (action == 'uninstall') {
+      final client = ref.read(msgrApiProvider);
+      await client.uninstallApp(widget.teamSlug, appSlug);
+      _loadData();
+    }
+  }
+
+  Future<void> _showAppDetailDialog(Map<String, dynamic> app, bool isInstalled) async {
+    final slug = app['slug']?.toString() ?? '';
+    final name = app['name']?.toString() ?? 'App';
+    final description = app['description']?.toString() ?? '';
+    final scopes = (app['required_scopes'] as List?)?.cast<String>() ?? [];
+    final configSchema = app['config_schema'] as Map<String, dynamic>? ?? {};
+    final config = <String, dynamic>{};
+    final channels = ref.read(channelListProvider).channels;
+    final selectedChannels = <String>{};
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF2A2A3E),
+          title: Text(name, style: const TextStyle(color: Colors.white, fontSize: 16)),
+          content: SizedBox(
+            width: 400,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (description.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(description, style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 13)),
+                    ),
+
+                  // Scopes
+                  if (scopes.isNotEmpty) ...[
+                    Text('Permissions', style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 11, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    for (final scope in scopes)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: Row(
+                          children: [
+                            Icon(
+                              scope.contains('write') ? Icons.edit_outlined : Icons.visibility_outlined,
+                              size: 14,
+                              color: scope.contains('write') ? Colors.orange.shade300 : Colors.green.shade300,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(scope, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Config form
+                  if (configSchema.isNotEmpty) ...[
+                    Text('Configuration', style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 11, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    for (final entry in configSchema.entries)
+                      _buildConfigField(entry.key, entry.value as Map<String, dynamic>, config, (k, v) {
+                        setDialogState(() => config[k] = v);
+                      }),
+                  ],
+
+                  // Channel binding
+                  const SizedBox(height: 12),
+                  Text('Channels', style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 11, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      for (final ch in channels)
+                        FilterChip(
+                          label: Text('# ${ch.name}', style: const TextStyle(fontSize: 11)),
+                          selected: selectedChannels.contains(ch.id),
+                          selectedColor: ref.watch(themeProvider).colors.accent.withAlpha(60),
+                          backgroundColor: Colors.white.withAlpha(10),
+                          labelStyle: TextStyle(color: selectedChannels.contains(ch.id) ? Colors.white : Colors.white54),
+                          side: BorderSide.none,
+                          onSelected: (sel) {
+                            setDialogState(() {
+                              if (sel) selectedChannels.add(ch.id);
+                              else selectedChannels.remove(ch.id);
+                            });
+                          },
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            if (!isInstalled)
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(backgroundColor: ref.watch(themeProvider).colors.accent),
+                child: const Text('Install'),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      final client = ref.read(msgrApiProvider);
+      try {
+        await client.installApp(widget.teamSlug, slug, config: config, channelIds: selectedChannels.toList());
+        _loadData();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$name installed!'), duration: const Duration(seconds: 2)),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Install failed: $e'), backgroundColor: Colors.red.shade700),
+          );
+        }
+      }
+    }
+  }
+
+  Widget _buildConfigField(String key, Map<String, dynamic> field, Map<String, dynamic> values, void Function(String, dynamic) onChanged) {
+    final type = field['type']?.toString() ?? 'string';
+    final label = field['label']?.toString() ?? key;
+    final placeholder = field['placeholder']?.toString();
+
+    switch (type) {
+      case 'boolean':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            children: [
+              Expanded(child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13))),
+              Switch(
+                value: values[key] == true,
+                activeColor: ref.watch(themeProvider).colors.accent,
+                onChanged: (v) => onChanged(key, v),
+              ),
+            ],
+          ),
+        );
+      case 'select':
+        final options = (field['options'] as List?)?.cast<String>() ?? [];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: DropdownButtonFormField<String>(
+            value: values[key] as String? ?? field['default'] as String?,
+            decoration: InputDecoration(
+              labelText: label,
+              labelStyle: TextStyle(color: Colors.white.withAlpha(120)),
+              filled: true,
+              fillColor: Colors.white.withAlpha(10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+              isDense: true,
+            ),
+            dropdownColor: const Color(0xFF2A2A3E),
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+            items: options.map((o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
+            onChanged: (v) => onChanged(key, v),
+          ),
+        );
+      default: // string, secret, url
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: TextField(
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+            obscureText: type == 'secret',
+            keyboardType: type == 'url' ? TextInputType.url : TextInputType.text,
+            decoration: InputDecoration(
+              labelText: label,
+              labelStyle: TextStyle(color: Colors.white.withAlpha(120)),
+              hintText: placeholder,
+              hintStyle: TextStyle(color: Colors.white.withAlpha(40)),
+              filled: true,
+              fillColor: Colors.white.withAlpha(10),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+            onChanged: (v) => onChanged(key, v),
+          ),
+        );
+    }
+  }
+
+  String _categoryLabel(String cat) {
+    switch (cat) {
+      case 'developer-tools': return 'Developer Tools';
+      case 'productivity': return 'Productivity';
+      case 'communication': return 'Communication';
+      case 'calendar': return 'Calendar';
+      default: return cat;
+    }
+  }
+}
+
+class _AppListTile extends StatelessWidget {
+  const _AppListTile({required this.app, required this.isInstalled, required this.onTap});
+  final Map<String, dynamic> app;
+  final bool isInstalled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = app['name']?.toString() ?? 'Unknown';
+    final desc = app['description']?.toString() ?? '';
+    final count = app['install_count'] ?? 0;
+    final featured = app['featured'] == true;
+
+    return ListTile(
+      onTap: onTap,
+      leading: CircleAvatar(
+        backgroundColor: Colors.white.withAlpha(15),
+        radius: 20,
+        child: Text(name[0].toUpperCase(), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 16)),
+      ),
+      title: Row(
+        children: [
+          Text(name, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+          if (featured) ...[
+            const SizedBox(width: 6),
+            Icon(Icons.star, size: 14, color: Colors.amber.shade400),
+          ],
+          if (isInstalled) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(color: Colors.green.withAlpha(40), borderRadius: BorderRadius.circular(4)),
+              child: const Text('Installed', style: TextStyle(color: Colors.green, fontSize: 10)),
+            ),
+          ],
+        ],
+      ),
+      subtitle: Text(desc, style: TextStyle(color: Colors.white.withAlpha(80), fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: Text('$count installs', style: TextStyle(color: Colors.white.withAlpha(60), fontSize: 10)),
+    );
   }
 }
 

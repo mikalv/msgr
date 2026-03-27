@@ -205,4 +205,32 @@ defmodule Messngr.Apps do
         |> Repo.update()
     end
   end
+
+  # ── Directory ───────────────────────────────────────────────
+
+  @doc "Browse public apps for the marketplace directory."
+  def list_directory(opts \\ []) do
+    query = from(a in App,
+      where: a.visibility == "public" and a.status == "active",
+      order_by: [desc: a.featured, desc: a.install_count, asc: a.name]
+    )
+
+    query = case Keyword.get(opts, :category) do
+      nil -> query
+      cat -> from(a in query, where: a.category == ^cat)
+    end
+
+    query = case Keyword.get(opts, :q) do
+      nil -> query
+      q -> from(a in query, where: ilike(a.name, ^"%#{q}%") or ilike(a.description, ^"%#{q}%"))
+    end
+
+    Repo.all(query)
+  end
+
+  @doc "Increment install count for an app."
+  def increment_install_count(app_id) do
+    from(a in App, where: a.id == ^app_id)
+    |> Repo.update_all(inc: [install_count: 1])
+  end
 end

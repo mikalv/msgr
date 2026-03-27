@@ -137,6 +137,41 @@ defmodule MessngrWeb.TeamChannelController do
     end
   end
 
+  @doc "GET /api/teams/:slug/channels/:channel_id/apps/:app_slug/config"
+  def get_app_config(conn, %{"channel_id" => channel_id, "app_slug" => app_slug}) do
+    prefix = conn.assigns.tenant_prefix
+
+    case Channels.get_channel(prefix, channel_id) do
+      nil ->
+        {:error, :not_found}
+
+      channel ->
+        config = get_in(channel.metadata || %{}, ["apps", app_slug]) || %{}
+        json(conn, %{data: config})
+    end
+  end
+
+  @doc "PUT /api/teams/:slug/channels/:channel_id/apps/:app_slug/config"
+  def update_app_config(conn, %{"channel_id" => channel_id, "app_slug" => app_slug} = params) do
+    prefix = conn.assigns.tenant_prefix
+
+    case Channels.get_channel(prefix, channel_id) do
+      nil ->
+        {:error, :not_found}
+
+      channel ->
+        metadata = channel.metadata || %{}
+        apps = Map.get(metadata, "apps", %{})
+        updated_apps = Map.put(apps, app_slug, params["config"] || %{})
+        updated_metadata = Map.put(metadata, "apps", updated_apps)
+
+        case Channels.update_channel(prefix, channel, %{metadata: updated_metadata}) do
+          {:ok, ch} -> json(conn, %{data: get_in(ch.metadata, ["apps", app_slug])})
+          {:error, changeset} -> {:error, changeset}
+        end
+    end
+  end
+
   defp channel_json(channel) do
     base = %{
       id: channel.id,

@@ -14,6 +14,23 @@ defmodule MessngrWeb.AppController do
     json(conn, %{data: Enum.map(apps, &app_json/1)})
   end
 
+  @doc "GET /api/apps/directory — browse public apps"
+  def directory(conn, params) do
+    apps = Apps.list_directory(
+      category: params["category"],
+      q: params["q"]
+    )
+    json(conn, %{data: Enum.map(apps, &app_detail_json/1)})
+  end
+
+  @doc "GET /api/apps/directory/:slug — app detail"
+  def show(conn, %{"slug" => slug}) do
+    case Apps.get_app_by_slug(slug) do
+      nil -> {:error, :not_found}
+      app -> json(conn, %{data: app_detail_json(app)})
+    end
+  end
+
   @doc "POST /api/apps — create an app (developer)"
   def create(conn, params) do
     account = conn.assigns.current_account
@@ -79,6 +96,7 @@ defmodule MessngrWeb.AppController do
 
         case Apps.install_app(app.id, team.id, config) do
           {:ok, installation} ->
+            Apps.increment_install_count(app.id)
             conn
             |> put_status(:created)
             |> json(%{
@@ -188,6 +206,18 @@ defmodule MessngrWeb.AppController do
       status: app.status,
       inserted_at: app.inserted_at
     }
+  end
+
+  defp app_detail_json(%App{} = app) do
+    app_json(app)
+    |> Map.merge(%{
+      category: app.category,
+      featured: app.featured,
+      install_count: app.install_count,
+      config_schema: app.config_schema,
+      channel_config_schema: app.channel_config_schema,
+      required_scopes: app.required_scopes
+    })
   end
 
   defp register_commands_from_params(_app, nil), do: :ok

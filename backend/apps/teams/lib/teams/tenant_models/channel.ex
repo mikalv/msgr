@@ -15,6 +15,7 @@ defmodule Teams.TenantModels.Channel do
     field :kind, :string, default: "channel"
     field :visibility, :string, default: "public"
     field :topic, :string
+    field :metadata, :map, default: %{}
 
     belongs_to :creator, Teams.TenantModels.Profile, foreign_key: :created_by
 
@@ -27,7 +28,7 @@ defmodule Teams.TenantModels.Channel do
   @doc false
   def changeset(channel, attrs) do
     channel
-    |> cast(attrs, [:name, :slug, :icon, :kind, :visibility, :topic, :created_by])
+    |> cast(attrs, [:name, :slug, :icon, :kind, :visibility, :topic, :created_by, :metadata])
     |> validate_required([:name, :slug])
     |> validate_inclusion(:kind, ~w(channel dm group_dm))
     |> validate_inclusion(:visibility, ~w(public private))

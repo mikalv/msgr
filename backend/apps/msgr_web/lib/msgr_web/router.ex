@@ -45,6 +45,8 @@ defmodule MessngrWeb.Router do
 
     get "/", AppController, :index
     post "/", AppController, :create
+    get "/directory", AppController, :directory
+    get "/directory/:slug", AppController, :show
   end
 
   scope "/api", MessngrWeb do
@@ -112,6 +114,8 @@ defmodule MessngrWeb.Router do
     post "/channels/:channel_id/members", TeamChannelController, :add_members
     get "/channels/:channel_id/members", TeamChannelController, :members
     delete "/channels/:channel_id/members/:profile_id", TeamChannelController, :remove_member
+    get "/channels/:channel_id/apps/:app_slug/config", TeamChannelController, :get_app_config
+    put "/channels/:channel_id/apps/:app_slug/config", TeamChannelController, :update_app_config
     get "/channels/:channel_id/messages", TeamMessageController, :index
     post "/channels/:channel_id/messages", TeamMessageController, :create
     patch "/channels/:channel_id/messages/:message_id", TeamMessageController, :update

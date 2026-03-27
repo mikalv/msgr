@@ -62,6 +62,13 @@ defmodule Teams.Channels do
   end
 
   @doc """
+  Updates a channel.
+  """
+  def update_channel(prefix, %Channel{} = channel, attrs) do
+    Channel.update(prefix, channel, attrs)
+  end
+
+  @doc """
   Creates a new channel with optional icon.
 
   ## Attrs

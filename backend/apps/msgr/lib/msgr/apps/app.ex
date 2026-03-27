@@ -21,6 +21,12 @@ defmodule Messngr.Apps.App do
     field :webhook_url, :string
     field :webhook_secret, :string
     field :status, :string, default: "active"
+    field :category, :string, default: "custom"
+    field :featured, :boolean, default: false
+    field :install_count, :integer, default: 0
+    field :config_schema, :map, default: %{}
+    field :channel_config_schema, :map, default: %{}
+    field :required_scopes, {:array, :string}, default: []
 
     belongs_to :developer, Messngr.Accounts.Account, foreign_key: :developer_id
     belongs_to :bot_account, Messngr.Accounts.Account, foreign_key: :bot_account_id
@@ -33,7 +39,9 @@ defmodule Messngr.Apps.App do
 
   @required_fields ~w(slug name executor_type)a
   @optional_fields ~w(description icon_url developer_id manifest visibility
-                      webhook_url webhook_secret bot_account_id status)a
+                      webhook_url webhook_secret bot_account_id status
+                      category featured install_count config_schema
+                      channel_config_schema required_scopes)a
 
   def changeset(app, attrs) do
     app

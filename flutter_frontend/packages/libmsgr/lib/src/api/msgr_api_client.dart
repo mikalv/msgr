@@ -631,6 +631,50 @@ class MsgrApiClient {
     });
   }
 
+  // ── App Marketplace ──────────────────────────────────────────
+
+  /// GET /api/apps/directory — browse public apps
+  Future<List<Map<String, dynamic>>> getAppDirectory({String? category, String? query}) async {
+    final params = <String, String>{};
+    if (category != null) params['category'] = category;
+    if (query != null) params['q'] = query;
+    final qs = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+    final res = await get('/api/apps/directory${qs.isNotEmpty ? '?$qs' : ''}');
+    final data = res['data'];
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return [];
+  }
+
+  /// GET /api/apps/directory/:slug — app detail
+  Future<Map<String, dynamic>> getAppDetail(String slug) async {
+    final res = await get('/api/apps/directory/$slug');
+    return res['data'] as Map<String, dynamic>? ?? res;
+  }
+
+  /// POST /api/teams/:slug/apps/:app_slug/install — install app with config
+  Future<Map<String, dynamic>> installApp(String teamSlug, String appSlug, {Map<String, dynamic>? config, List<String>? channelIds}) async {
+    return post('/api/teams/$teamSlug/apps/$appSlug/install', body: {
+      if (config != null) 'config': config,
+      if (channelIds != null) 'channels': channelIds,
+    });
+  }
+
+  /// DELETE /api/teams/:slug/apps/:app_slug — uninstall
+  Future<void> uninstallApp(String teamSlug, String appSlug) async {
+    await delete('/api/teams/$teamSlug/apps/$appSlug');
+  }
+
+  /// GET /api/teams/:slug/channels/:id/apps/:app_slug/config
+  Future<Map<String, dynamic>> getChannelAppConfig(String teamSlug, String channelId, String appSlug) async {
+    final res = await get('/api/teams/$teamSlug/channels/$channelId/apps/$appSlug/config');
+    return res['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  /// PUT /api/teams/:slug/channels/:id/apps/:app_slug/config
+  Future<void> updateChannelAppConfig(String teamSlug, String channelId, String appSlug, Map<String, dynamic> config) async {
+    await put('/api/teams/$teamSlug/channels/$channelId/apps/$appSlug/config', body: {'config': config});
+  }
+
   /// POST /api/teams/:slug/channels/:id/messages/:mid/pin — pin a message
   Future<Map<String, dynamic>> pinMessage(String teamSlug, String channelId, String messageId) async {
     return post('/api/teams/$teamSlug/channels/$channelId/messages/$messageId/pin');
