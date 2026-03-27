@@ -79,6 +79,23 @@ defmodule MessngrWeb.TeamMessageController do
           # Send push notifications to offline members (best-effort, async)
           if slug, do: Messngr.Push.Dispatcher.notify_new_message(slug, prefix, message)
 
+          # Unfurl link previews async — updates message content + broadcasts update
+          Task.Supervisor.start_child(Messngr.TaskSupervisor, fn ->
+            text = case message.content do
+              %{"text" => t} when is_binary(t) -> t
+              _ -> ""
+            end
+            previews = Messngr.LinkUnfurl.unfurl_all(text)
+            if previews != [] do
+              updated_content = Map.put(message.content, "link_previews", previews)
+              Messages.update_message(prefix, message, %{content: updated_content})
+              MessngrWeb.Endpoint.broadcast("channel:#{channel_id}", "message:updated", %{
+                id: message.id,
+                content: updated_content
+              })
+            end
+          end)
+
           # Dispatch to subscribed app webhooks (best-effort, async)
           team = conn.assigns.current_team
           if team do

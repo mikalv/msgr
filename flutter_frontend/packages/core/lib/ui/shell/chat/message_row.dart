@@ -394,6 +394,10 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                       mentions: msg.mentions,
                     ),
 
+                  // Link previews (Open Graph cards)
+                  for (final preview in msg.linkPreviews)
+                    _LinkPreviewCard(preview: preview),
+
                   // Media attachments (images and files)
                   if (msg.mediaRefs.isNotEmpty)
                     _MediaAttachments(mediaRefs: msg.mediaRefs),
@@ -518,6 +522,87 @@ class _ToolbarButton extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Rich content cards
 // ---------------------------------------------------------------------------
+
+/// Open Graph link preview card.
+class _LinkPreviewCard extends StatelessWidget {
+  const _LinkPreviewCard({required this.preview});
+  final LinkPreview preview;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => launchUrl(Uri.parse(preview.url)),
+      child: Container(
+        width: 400,
+        margin: const EdgeInsets.only(top: 4, bottom: 2),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white.withAlpha(15)),
+          color: Colors.white.withAlpha(6),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Accent left border
+            Container(width: 3, height: 80, color: MsgrTheme.of(context).accent),
+            // Content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (preview.siteName != null)
+                      Text(
+                        preview.siteName!,
+                        style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 10, fontWeight: FontWeight.w600),
+                      ),
+                    if (preview.title != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          preview.title!,
+                          style: TextStyle(color: MsgrTheme.of(context).accent, fontSize: 13, fontWeight: FontWeight.w600),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    if (preview.description != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Text(
+                          preview.description!,
+                          style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 12),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            // Thumbnail image
+            if (preview.imageUrl != null)
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(8),
+                  bottomRight: Radius.circular(8),
+                ),
+                child: Image.network(
+                  preview.imageUrl!,
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 /// Location card with static map thumbnail from OpenStreetMap.
 class _LocationCard extends StatelessWidget {

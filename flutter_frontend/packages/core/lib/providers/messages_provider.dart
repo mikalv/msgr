@@ -411,6 +411,7 @@ MsgrMessage parseMessageJson(
     content: _extractContent(m['content']),
     contentType: m['content'] is Map ? m['content']['type'] as String? : null,
     contentData: m['content'] is Map && m['content']['type'] != null ? (m['content'] as Map<String, dynamic>) : null,
+    linkPreviews: _extractLinkPreviews(m['content']),
     insertedAt:
         DateTime.tryParse(m['inserted_at']?.toString() ?? '') ?? DateTime.now(),
     threadParentId: m['thread_parent_id'] as String?,
@@ -436,6 +437,17 @@ bool _isSystemMessage(dynamic content, Map<String, dynamic> sender) {
   if (sender.isEmpty || sender['id'] == null) return true;
   if (content is Map && content['system'] == true) return true;
   return false;
+}
+
+/// Extract link previews from content JSONB.
+List<LinkPreview> _extractLinkPreviews(dynamic content) {
+  if (content is! Map) return const [];
+  final raw = content['link_previews'];
+  if (raw is! List) return const [];
+  return raw
+      .whereType<Map<String, dynamic>>()
+      .map((p) => LinkPreview.fromJson(p))
+      .toList();
 }
 
 /// Extract text from content field -- handles both String and Map (JSONB).

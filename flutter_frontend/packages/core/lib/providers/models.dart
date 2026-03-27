@@ -135,6 +135,33 @@ class MentionData {
       };
 }
 
+/// Open Graph link preview data.
+class LinkPreview {
+  const LinkPreview({
+    required this.url,
+    this.title,
+    this.description,
+    this.imageUrl,
+    this.siteName,
+  });
+
+  final String url;
+  final String? title;
+  final String? description;
+  final String? imageUrl;
+  final String? siteName;
+
+  factory LinkPreview.fromJson(Map<String, dynamic> json) {
+    return LinkPreview(
+      url: json['url']?.toString() ?? '',
+      title: json['title'] as String?,
+      description: json['description'] as String?,
+      imageUrl: json['image_url'] as String?,
+      siteName: json['site_name'] as String?,
+    );
+  }
+}
+
 /// Lightweight snippet of a quoted/replied-to message.
 class ReplyToSnippet {
   const ReplyToSnippet({
@@ -184,6 +211,7 @@ class MsgrMessage {
     this.pinned = false,
     this.contentType,
     this.contentData,
+    this.linkPreviews = const [],
   });
 
   final String id;
@@ -209,6 +237,8 @@ class MsgrMessage {
   final String? contentType;
   /// Raw content data map for rich types (lat/lng, phone, etc.)
   final Map<String, dynamic>? contentData;
+  /// Link previews extracted from URLs in the message.
+  final List<LinkPreview> linkPreviews;
 
   bool get isThreadReply => threadParentId != null;
   bool get hasThreadReplies => threadReplyCount > 0;
@@ -237,6 +267,7 @@ class MsgrMessage {
     bool? pinned,
     String? contentType,
     Map<String, dynamic>? contentData,
+    List<LinkPreview>? linkPreviews,
   }) {
     return MsgrMessage(
       id: id ?? this.id,
@@ -260,6 +291,7 @@ class MsgrMessage {
       pinned: pinned ?? this.pinned,
       contentType: contentType ?? this.contentType,
       contentData: contentData ?? this.contentData,
+      linkPreviews: linkPreviews ?? this.linkPreviews,
     );
   }
 

@@ -31,6 +31,7 @@ defmodule Messngr.Application do
         Messngr.Metrics.Pipeline,
         Messngr.Repo,
         {Task.Supervisor, name: Messngr.TaskSupervisor},
+        Messngr.LinkUnfurl,
         {DNSCluster, query: Application.get_env(:msgr, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: Messngr.PubSub},
         Messngr.Calls.CallRegistry,
