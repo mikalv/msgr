@@ -438,6 +438,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         ),
       ],
       ),
+      ),
     );
   }
 }
