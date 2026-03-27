@@ -13,6 +13,7 @@ class _MessageRow extends ConsumerStatefulWidget {
     this.onEdit,
     this.onDelete,
     this.onReply,
+    this.onTogglePin,
   });
 
   final MsgrMessage message;
@@ -22,6 +23,7 @@ class _MessageRow extends ConsumerStatefulWidget {
   final void Function(MsgrMessage)? onEdit;
   final void Function(MsgrMessage)? onDelete;
   final void Function(MsgrMessage)? onReply;
+  final void Function(MsgrMessage)? onTogglePin;
 
   @override
   ConsumerState<_MessageRow> createState() => _MessageRowState();
@@ -68,7 +70,7 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
         _buildContextMenuItem('reply', Icons.reply_outlined, 'Reply'),
         _buildContextMenuItem('thread', Icons.forum_outlined, S.replyInThread),
         _buildContextMenuItem('reaction', Icons.emoji_emotions_outlined, S.addReaction),
-        _buildContextMenuItem('pin', Icons.push_pin_outlined, S.pinMessage),
+        _buildContextMenuItem('pin', msg.pinned ? Icons.push_pin : Icons.push_pin_outlined, msg.pinned ? 'Unpin' : 'Pin message'),
         const PopupMenuDivider(),
         if (widget.isOwn) ...[
           _buildContextMenuItem('edit', Icons.edit_outlined, S.edit),
@@ -117,6 +119,9 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
             ),
           );
         }
+        break;
+      case 'pin':
+        widget.onTogglePin?.call(msg);
         break;
       case 'remind':
         if (context.mounted) await _showRemindMenu(context, globalPosition, msg);
@@ -300,6 +305,10 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
                               fontSize: 11,
                             ),
                           ),
+                          if (msg.pinned) ...[
+                            const SizedBox(width: 6),
+                            Icon(Icons.push_pin, size: 12, color: t.accent.withAlpha(180)),
+                          ],
                           if (msg.editedAt != null) ...[
                             const SizedBox(width: 6),
                             Text(

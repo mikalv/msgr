@@ -631,6 +631,24 @@ class MsgrApiClient {
     });
   }
 
+  /// POST /api/teams/:slug/channels/:id/messages/:mid/pin — pin a message
+  Future<Map<String, dynamic>> pinMessage(String teamSlug, String channelId, String messageId) async {
+    return post('/api/teams/$teamSlug/channels/$channelId/messages/$messageId/pin');
+  }
+
+  /// DELETE /api/teams/:slug/channels/:id/messages/:mid/pin — unpin
+  Future<void> unpinMessage(String teamSlug, String channelId, String messageId) async {
+    await delete('/api/teams/$teamSlug/channels/$channelId/messages/$messageId/pin');
+  }
+
+  /// GET /api/teams/:slug/channels/:id/pins — list pinned messages
+  Future<List<Map<String, dynamic>>> getPinnedMessages(String teamSlug, String channelId) async {
+    final res = await get('/api/teams/$teamSlug/channels/$channelId/pins');
+    final data = res['data'];
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return [];
+  }
+
   /// GET /api/teams/:slug/unread_counts
   Future<Map<String, int>> getUnreadCounts(String teamSlug) async {
     final raw = await get('/api/teams/$teamSlug/unread_counts');

@@ -18,6 +18,9 @@ defmodule Teams.TenantModels.Message do
     field :media_refs, {:array, :string}, default: []
     field :edited_at, :utc_datetime
     field :deleted_at, :utc_datetime
+    field :pinned, :boolean, default: false
+    field :pinned_at, :utc_datetime
+    field :pinned_by_profile_id, :binary_id
 
     has_many :thread_replies, __MODULE__, foreign_key: :thread_parent_id
     has_many :reactions, Teams.TenantModels.Reaction, foreign_key: :message_id
@@ -28,7 +31,7 @@ defmodule Teams.TenantModels.Message do
   @doc false
   def changeset(message, attrs) do
     message
-    |> cast(attrs, [:channel_id, :sender_profile_id, :thread_parent_id, :reply_to_id, :content, :media_refs, :edited_at, :deleted_at])
+    |> cast(attrs, [:channel_id, :sender_profile_id, :thread_parent_id, :reply_to_id, :content, :media_refs, :edited_at, :deleted_at, :pinned, :pinned_at, :pinned_by_profile_id])
     |> validate_required([:channel_id, :content])
     |> foreign_key_constraint(:channel_id)
     |> foreign_key_constraint(:sender_profile_id)
@@ -88,5 +91,26 @@ defmodule Teams.TenantModels.Message do
     message
     |> changeset(%{deleted_at: DateTime.truncate(DateTime.utc_now(), :second)})
     |> Teams.Repo.update(prefix: prefix)
+  end
+
+  def pin(prefix, %__MODULE__{} = message, profile_id) do
+    message
+    |> changeset(%{pinned: true, pinned_at: DateTime.truncate(DateTime.utc_now(), :second), pinned_by_profile_id: profile_id})
+    |> Teams.Repo.update(prefix: prefix)
+  end
+
+  def unpin(prefix, %__MODULE__{} = message) do
+    message
+    |> changeset(%{pinned: false, pinned_at: nil, pinned_by_profile_id: nil})
+    |> Teams.Repo.update(prefix: prefix)
+  end
+
+  def pinned_for_channel(prefix, channel_id) do
+    from(m in __MODULE__,
+      where: m.channel_id == ^channel_id and m.pinned == true and is_nil(m.deleted_at),
+      order_by: [desc: m.pinned_at],
+      preload: [:sender_profile]
+    )
+    |> Teams.Repo.all(prefix: prefix)
   end
 end

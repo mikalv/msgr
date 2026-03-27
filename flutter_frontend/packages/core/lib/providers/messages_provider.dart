@@ -419,6 +419,7 @@ MsgrMessage parseMessageJson(
     replyTo: m['reply_to'] is Map<String, dynamic>
         ? ReplyToSnippet.fromJson(m['reply_to'] as Map<String, dynamic>)
         : null,
+    pinned: m['pinned'] == true,
     status: MessageStatus.sent,
     reactions: reactions,
     mentions: _extractMentions(m['content']),

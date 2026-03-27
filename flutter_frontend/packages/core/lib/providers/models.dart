@@ -181,6 +181,7 @@ class MsgrMessage {
     this.isSystem = false,
     this.senderAvatarUrl,
     this.senderEmail,
+    this.pinned = false,
   });
 
   final String id;
@@ -201,6 +202,7 @@ class MsgrMessage {
   final bool isSystem;
   final String? senderAvatarUrl;
   final String? senderEmail;
+  final bool pinned;
 
   bool get isThreadReply => threadParentId != null;
   bool get hasThreadReplies => threadReplyCount > 0;
@@ -226,6 +228,7 @@ class MsgrMessage {
     bool? isSystem,
     String? senderAvatarUrl,
     String? senderEmail,
+    bool? pinned,
   }) {
     return MsgrMessage(
       id: id ?? this.id,
@@ -246,6 +249,7 @@ class MsgrMessage {
       isSystem: isSystem ?? this.isSystem,
       senderAvatarUrl: senderAvatarUrl ?? this.senderAvatarUrl,
       senderEmail: senderEmail ?? this.senderEmail,
+      pinned: pinned ?? this.pinned,
     );
   }
 

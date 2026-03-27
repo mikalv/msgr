@@ -482,6 +482,7 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                                       onEdit: _startEdit,
                                       onDelete: _deleteMessage,
                                       onReply: _startReply,
+                                      onTogglePin: _togglePin,
                                     ),
                                     // "New messages" banner
                                     if (_showNewMessagesBanner)
@@ -697,6 +698,31 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
 
   void _cancelReply() {
     setState(() => _replyingTo = null);
+  }
+
+  Future<void> _togglePin(MsgrMessage message) async {
+    final team = ref.read(selectedTeamProvider);
+    if (team == null) return;
+    final client = ref.read(msgrApiProvider);
+
+    try {
+      if (message.pinned) {
+        await client.unpinMessage(team.slug, message.channelId, message.id);
+      } else {
+        await client.pinMessage(team.slug, message.channelId, message.id);
+      }
+      // Refresh messages to reflect pin state
+      final channel = ref.read(selectedChannelProvider);
+      if (channel != null) {
+        ref.read(channelMessagesProvider.notifier).loadMessages(channel.id);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Pin failed: $e'), duration: const Duration(seconds: 2)),
+        );
+      }
+    }
   }
 
   void _onEditSubmit(ChatComposerResult result) async {

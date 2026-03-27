@@ -206,6 +206,56 @@ defmodule MessngrWeb.TeamMessageController do
     end
   end
 
+  @doc "POST /api/teams/:slug/channels/:channel_id/messages/:message_id/pin — pin a message"
+  def pin(conn, %{"channel_id" => _channel_id, "message_id" => message_id}) do
+    prefix = conn.assigns.tenant_prefix
+    account = conn.assigns.current_account
+    profile = TeamManagement.get_profile_for_account(prefix, account.id)
+
+    unless profile do
+      {:error, :forbidden}
+    else
+      case Messages.get_message(prefix, message_id) do
+        nil -> {:error, :not_found}
+        message ->
+          alias Teams.TenantModels.Message
+          case Message.pin(prefix, message, profile.id) do
+            {:ok, pinned} ->
+              pinned = Messages.get_message(prefix, pinned.id)
+              slug = conn.path_params["slug"]
+              MessngrWeb.Endpoint.broadcast("channel:#{pinned.channel_id}", "message:pinned", message_json(pinned))
+              json(conn, %{data: message_json(pinned)})
+            {:error, changeset} -> {:error, changeset}
+          end
+      end
+    end
+  end
+
+  @doc "DELETE /api/teams/:slug/channels/:channel_id/messages/:message_id/pin — unpin a message"
+  def unpin(conn, %{"channel_id" => _channel_id, "message_id" => message_id}) do
+    prefix = conn.assigns.tenant_prefix
+
+    case Messages.get_message(prefix, message_id) do
+      nil -> {:error, :not_found}
+      message ->
+        alias Teams.TenantModels.Message
+        case Message.unpin(prefix, message) do
+          {:ok, _} ->
+            MessngrWeb.Endpoint.broadcast("channel:#{message.channel_id}", "message:unpinned", %{id: message_id})
+            json(conn, %{ok: true})
+          {:error, changeset} -> {:error, changeset}
+        end
+    end
+  end
+
+  @doc "GET /api/teams/:slug/channels/:channel_id/pins — list pinned messages"
+  def pins(conn, %{"channel_id" => channel_id}) do
+    prefix = conn.assigns.tenant_prefix
+    alias Teams.TenantModels.Message
+    messages = Message.pinned_for_channel(prefix, channel_id)
+    json(conn, %{data: Enum.map(messages, &message_json/1)})
+  end
+
   defp message_json(message) do
     base = %{
       id: message.id,
@@ -217,6 +267,8 @@ defmodule MessngrWeb.TeamMessageController do
       reply_to_id: message.reply_to_id,
       content: message.content,
       media_refs: message.media_refs,
+      pinned: message.pinned || false,
+      pinned_at: message.pinned_at,
       edited_at: message.edited_at,
       inserted_at: message.inserted_at,
       reactions: reactions_json(message.reactions)
