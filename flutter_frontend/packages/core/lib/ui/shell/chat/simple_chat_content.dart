@@ -70,6 +70,10 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
   MsgrMessage? _editingMessage;
   MsgrMessage? _replyingTo;
   String? _draftBeforeEdit;
+  bool _showPinned = false;
+  List<MsgrMessage> _pinnedMessages = [];
+  int _pinnedCount = 0;
+  String? _lastPinnedChannelId;
   bool _isSending = false;
 
   @override
@@ -362,6 +366,15 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     final realtimeState = ref.watch(realtimeProvider);
     _syncFallbackPolling(realtimeState.isConnected);
 
+    // Load pinned count when channel changes
+    if (selectedChannel != null && selectedChannel.id != _lastPinnedChannelId) {
+      _lastPinnedChannelId = selectedChannel.id;
+      _showPinned = false;
+      _pinnedMessages = [];
+      _pinnedCount = 0;
+      Future.microtask(() => _loadPinnedMessages());
+    }
+
     // Mark channel as read when viewing it (deferred to avoid modifying provider during build)
     if (selectedChannel != null && messagesState.messages.isNotEmpty) {
       final chId = selectedChannel.id;
@@ -417,7 +430,12 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                   channelName: selectedChannel.name,
                   topic: selectedChannel.topic,
                   isPrivate: selectedChannel.visibility == ChannelVisibility.private,
+                  pinnedCount: _pinnedCount,
                   onSearchTap: () => _showSearchDialog(context, selectedChannel),
+                  onPinTap: () {
+                    if (!_showPinned) _loadPinnedMessages();
+                    setState(() => _showPinned = !_showPinned);
+                  },
                   onMembersTap: () => setState(() {
                     _showMembers = !_showMembers;
                     if (_showMembers) _showSettings = false;
@@ -427,6 +445,60 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
                     if (_showSettings) _showMembers = false;
                   }),
                 ),
+
+                // Pinned messages dropdown
+                if (_showPinned && _pinnedMessages.isNotEmpty)
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 200),
+                    decoration: BoxDecoration(
+                      color: MsgrTheme.of(context).headerBg,
+                      border: Border(
+                        bottom: BorderSide(color: MsgrTheme.of(context).headerBorder),
+                      ),
+                    ),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      itemCount: _pinnedMessages.length,
+                      itemBuilder: (context, index) {
+                        final pm = _pinnedMessages[index];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.push_pin, size: 14, color: MsgrTheme.of(context).accent),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      pm.senderName,
+                                      style: TextStyle(
+                                        color: MsgrTheme.of(context).messageAuthorName,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    Text(
+                                      pm.content,
+                                      style: TextStyle(
+                                        color: MsgrTheme.of(context).messageText,
+                                        fontSize: 13,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
 
                 // Messages list
                 Expanded(
@@ -700,6 +772,40 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
     setState(() => _replyingTo = null);
   }
 
+  Future<void> _loadPinnedMessages() async {
+    final team = ref.read(selectedTeamProvider);
+    final channel = ref.read(selectedChannelProvider);
+    if (team == null || channel == null) return;
+    try {
+      final client = ref.read(msgrApiProvider);
+      final raw = await client.getPinnedMessages(team.slug, channel.id);
+      if (mounted) {
+        setState(() {
+          _pinnedMessages = raw.map((m) => _parseMessage(m, channel.id)).toList();
+          _pinnedCount = _pinnedMessages.length;
+        });
+      }
+    } catch (_) {}
+  }
+
+  MsgrMessage _parseMessage(Map<String, dynamic> m, String channelId) {
+    final sender = m['sender_profile'] as Map<String, dynamic>? ?? {};
+    final rawContent = m['content'];
+    final text = rawContent is Map
+        ? rawContent['text']?.toString() ?? ''
+        : rawContent?.toString() ?? '';
+    return MsgrMessage(
+      id: m['id']?.toString() ?? '',
+      channelId: channelId,
+      senderProfileId: sender['id']?.toString() ?? '',
+      senderName: sender['display_name']?.toString() ?? 'Unknown',
+      content: text,
+      insertedAt: DateTime.tryParse(m['inserted_at']?.toString() ?? '') ?? DateTime.now(),
+      pinned: true,
+      senderAvatarUrl: sender['avatar_url'] as String?,
+    );
+  }
+
   Future<void> _togglePin(MsgrMessage message) async {
     final team = ref.read(selectedTeamProvider);
     if (team == null) return;
@@ -711,11 +817,12 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
       } else {
         await client.pinMessage(team.slug, message.channelId, message.id);
       }
-      // Refresh messages to reflect pin state
+      // Refresh messages and pinned list
       final channel = ref.read(selectedChannelProvider);
       if (channel != null) {
         ref.read(channelMessagesProvider.notifier).loadMessages(channel.id);
       }
+      _loadPinnedMessages();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -7,6 +7,7 @@ class ChannelHeader extends StatelessWidget {
     required this.channelName,
     this.topic,
     this.isPrivate = false,
+    this.pinnedCount = 0,
     this.onSearchTap,
     this.onMembersTap,
     this.onPinTap,
@@ -16,6 +17,7 @@ class ChannelHeader extends StatelessWidget {
   final String channelName;
   final String? topic;
   final bool isPrivate;
+  final int pinnedCount;
   final VoidCallback? onSearchTap;
   final VoidCallback? onMembersTap;
   final VoidCallback? onPinTap;
@@ -58,10 +60,35 @@ class ChannelHeader extends StatelessWidget {
           ] else
             const Spacer(),
           _HeaderIcon(Icons.search, onTap: onSearchTap),
+          if (pinnedCount > 0)
+            _PinHeaderIcon(count: pinnedCount, onTap: onPinTap)
+          else
+            _HeaderIcon(Icons.push_pin_outlined, onTap: onPinTap),
           _HeaderIcon(Icons.people_outline, onTap: onMembersTap),
           _HeaderIcon(Icons.settings_outlined, onTap: onSettingsTap),
         ],
       ),
+    );
+  }
+}
+
+class _PinHeaderIcon extends StatelessWidget {
+  const _PinHeaderIcon({required this.count, this.onTap});
+  final int count;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = MsgrTheme.of(context);
+    return IconButton(
+      icon: Badge(
+        label: Text('$count', style: const TextStyle(fontSize: 9)),
+        backgroundColor: t.accent,
+        child: Icon(Icons.push_pin, size: 18, color: t.accent),
+      ),
+      onPressed: onTap,
+      padding: const EdgeInsets.all(6),
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
     );
   }
 }
