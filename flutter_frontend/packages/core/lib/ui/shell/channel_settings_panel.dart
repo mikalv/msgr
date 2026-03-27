@@ -26,7 +26,7 @@ class _ChannelSettingsPanelState extends ConsumerState<ChannelSettingsPanel>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -91,6 +91,7 @@ class _ChannelSettingsPanelState extends ConsumerState<ChannelSettingsPanel>
               Tab(text: 'Overview'),
               Tab(text: 'Members'),
               Tab(text: 'Webhooks'),
+              Tab(text: 'Apps'),
             ],
           ),
 
@@ -102,6 +103,7 @@ class _ChannelSettingsPanelState extends ConsumerState<ChannelSettingsPanel>
                 _OverviewTab(channel: channel),
                 _MembersTab(),
                 _WebhooksTab(),
+                _ChannelAppsTab(channel: channel),
               ],
             ),
           ),
@@ -755,5 +757,226 @@ class _WebhooksTabState extends ConsumerState<_WebhooksTab> {
         ),
       ],
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Channel Apps tab — per-channel app configuration
+// ---------------------------------------------------------------------------
+
+class _ChannelAppsTab extends ConsumerStatefulWidget {
+  const _ChannelAppsTab({required this.channel});
+  final MsgrChannel channel;
+
+  @override
+  ConsumerState<_ChannelAppsTab> createState() => _ChannelAppsTabState();
+}
+
+class _ChannelAppsTabState extends ConsumerState<_ChannelAppsTab> {
+  List<Map<String, dynamic>> _installedApps = [];
+  final Map<String, Map<String, dynamic>> _configs = {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadApps();
+  }
+
+  Future<void> _loadApps() async {
+    final team = ref.read(selectedTeamProvider);
+    if (team == null) return;
+    final client = ref.read(msgrApiProvider);
+
+    try {
+      final installed = await client.getInstalledApps(team.slug);
+      // Filter to apps that have channel_config_schema
+      final withSchema = installed.where((inst) {
+        final app = inst['app'] as Map<String, dynamic>? ?? {};
+        final schema = app['channel_config_schema'] as Map?;
+        return schema != null && schema.isNotEmpty;
+      }).toList();
+
+      // Load current config for each app
+      for (final inst in withSchema) {
+        final app = inst['app'] as Map<String, dynamic>? ?? {};
+        final slug = app['slug']?.toString() ?? '';
+        if (slug.isEmpty) continue;
+        try {
+          final config = await client.getChannelAppConfig(team.slug, widget.channel.id, slug);
+          _configs[slug] = config;
+        } catch (_) {
+          _configs[slug] = {};
+        }
+      }
+
+      if (mounted) setState(() { _installedApps = withSchema; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+
+    if (_installedApps.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Text(
+            'No installed apps with channel settings.\nInstall apps from Team Settings > Apps.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        for (final inst in _installedApps)
+          _buildAppSection(inst),
+      ],
+    );
+  }
+
+  Widget _buildAppSection(Map<String, dynamic> inst) {
+    final app = inst['app'] as Map<String, dynamic>? ?? {};
+    final slug = app['slug']?.toString() ?? '';
+    final name = app['name']?.toString() ?? 'App';
+    final schema = app['channel_config_schema'] as Map<String, dynamic>? ?? {};
+    final values = _configs[slug] ?? {};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // App header
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 14,
+                backgroundColor: const Color(0xFF007A5A).withValues(alpha: 0.3),
+                child: Text(name[0].toUpperCase(), style: const TextStyle(color: Color(0xFF007A5A), fontSize: 12, fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(width: 8),
+              Text(name, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+
+        // Config fields
+        for (final entry in schema.entries)
+          _buildField(slug, entry.key, entry.value as Map<String, dynamic>, values),
+
+        const SizedBox(height: 4),
+        Align(
+          alignment: Alignment.centerRight,
+          child: ElevatedButton(
+            onPressed: () => _saveConfig(slug),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF007A5A),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+            child: const Text('Save'),
+          ),
+        ),
+        Divider(color: Colors.white.withValues(alpha: 0.1)),
+      ],
+    );
+  }
+
+  Widget _buildField(String appSlug, String key, Map<String, dynamic> field, Map<String, dynamic> values) {
+    final type = field['type']?.toString() ?? 'string';
+    final label = field['label']?.toString() ?? key;
+
+    switch (type) {
+      case 'boolean':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            children: [
+              Expanded(child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 12))),
+              Switch(
+                value: values[key] == true || (values[key] == null && field['default'] == true),
+                activeColor: const Color(0xFF007A5A),
+                onChanged: (v) => setState(() {
+                  _configs.putIfAbsent(appSlug, () => {});
+                  _configs[appSlug]![key] = v;
+                }),
+              ),
+            ],
+          ),
+        );
+      case 'select':
+        final options = (field['options'] as List?)?.cast<String>() ?? [];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: DropdownButtonFormField<String>(
+            value: values[key] as String? ?? field['default'] as String?,
+            decoration: InputDecoration(
+              labelText: label,
+              labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.05),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+              isDense: true,
+            ),
+            dropdownColor: const Color(0xFF2A2A2A),
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+            items: options.map((o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
+            onChanged: (v) => setState(() {
+              _configs.putIfAbsent(appSlug, () => {});
+              _configs[appSlug]![key] = v;
+            }),
+          ),
+        );
+      default:
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: TextField(
+            controller: TextEditingController(text: values[key]?.toString() ?? ''),
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+            decoration: InputDecoration(
+              labelText: label,
+              labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.05),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
+            onChanged: (v) {
+              _configs.putIfAbsent(appSlug, () => {});
+              _configs[appSlug]![key] = v;
+            },
+          ),
+        );
+    }
+  }
+
+  Future<void> _saveConfig(String appSlug) async {
+    final team = ref.read(selectedTeamProvider);
+    if (team == null) return;
+    final client = ref.read(msgrApiProvider);
+
+    try {
+      await client.updateChannelAppConfig(team.slug, widget.channel.id, appSlug, _configs[appSlug] ?? {});
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Config saved'), duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: $e'), duration: const Duration(seconds: 3)),
+        );
+      }
+    }
   }
 }
