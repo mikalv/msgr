@@ -221,7 +221,10 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
             _showContextMenu(context, details.globalPosition),
         onLongPressStart: (details) =>
             _showContextMenu(context, details.globalPosition),
-        child: Container(
+        child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+        Container(
         color: _hovered ? Colors.white.withOpacity(0.03) : Colors.transparent,
         padding: EdgeInsets.only(
           top: widget.isGroupStart ? 8 : 1,
@@ -418,6 +421,90 @@ class _MessageRowState extends ConsumerState<_MessageRow> {
           ],
         ),
       ),
+
+      // Hover toolbar — positioned top-right
+      if (_hovered)
+        Positioned(
+          top: -4,
+          right: 8,
+          child: _HoverToolbar(
+            onReact: () {},
+            onThread: () => widget.onOpenThread(msg),
+            onReply: () => widget.onReply?.call(msg),
+            onPin: () => widget.onTogglePin?.call(msg),
+            isPinned: msg.pinned,
+            onMore: (pos) => _showContextMenu(context, pos),
+          ),
+        ),
+      ],
+      ),
+    );
+  }
+}
+
+/// Floating toolbar shown on message hover (Slack-style).
+class _HoverToolbar extends StatelessWidget {
+  const _HoverToolbar({
+    required this.onReact,
+    required this.onThread,
+    required this.onReply,
+    required this.onPin,
+    required this.isPinned,
+    required this.onMore,
+  });
+
+  final VoidCallback onReact;
+  final VoidCallback onThread;
+  final VoidCallback onReply;
+  final VoidCallback onPin;
+  final bool isPinned;
+  final void Function(Offset) onMore;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      elevation: 4,
+      borderRadius: BorderRadius.circular(6),
+      color: const Color(0xFF2A2D30),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ToolbarButton(icon: Icons.emoji_emotions_outlined, tooltip: 'React', onTap: onReact),
+            _ToolbarButton(icon: Icons.reply_outlined, tooltip: 'Reply', onTap: onReply),
+            _ToolbarButton(icon: Icons.forum_outlined, tooltip: 'Thread', onTap: onThread),
+            _ToolbarButton(icon: isPinned ? Icons.push_pin : Icons.push_pin_outlined, tooltip: isPinned ? 'Unpin' : 'Pin', onTap: onPin),
+            _ToolbarButton(icon: Icons.more_horiz, tooltip: 'More', onTapWithPosition: onMore),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ToolbarButton extends StatelessWidget {
+  const _ToolbarButton({required this.icon, required this.tooltip, this.onTap, this.onTapWithPosition});
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+  final void Function(Offset)? onTapWithPosition;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      preferBelow: false,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(4),
+        onTapDown: onTapWithPosition != null ? (d) => onTapWithPosition!(d.globalPosition) : null,
+        onTap: onTapWithPosition == null ? onTap : null,
+        hoverColor: Colors.white.withAlpha(15),
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(icon, size: 16, color: Colors.white60),
+        ),
       ),
     );
   }
