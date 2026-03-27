@@ -481,7 +481,10 @@ class _ChatComposerState extends State<ChatComposer>
         (HardwareKeyboard.instance.isMetaPressed ||
          HardwareKeyboard.instance.isControlPressed);
     if (isPaste) {
+      // Consume the event to prevent default text paste from racing with
+      // our async image paste. _handlePaste will insert text if no image found.
       unawaited(_handlePaste());
+      return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
   }
@@ -494,10 +497,17 @@ class _ChatComposerState extends State<ChatComposer>
     try {
       final reader = await clipboard.read();
 
-      for (final format in <FileFormat>[Formats.png, Formats.jpeg]) {
-        if (reader.canProvide(format)) {
+      // Check image formats in priority order (png, jpeg, tiff for macOS screenshots)
+      final imageFormats = <FileFormat, (String, String)>{
+        Formats.png: ('png', 'image/png'),
+        Formats.jpeg: ('jpg', 'image/jpeg'),
+        Formats.tiff: ('png', 'image/png'), // Convert TIFF to PNG naming — Flutter handles it
+      };
+
+      for (final entry in imageFormats.entries) {
+        if (reader.canProvide(entry.key)) {
           final completer = Completer<Uint8List?>();
-          reader.getFile(format, (file) async {
+          reader.getFile(entry.key, (file) async {
             try {
               final data = await file.readAll();
               completer.complete(data);
@@ -511,9 +521,7 @@ class _ChatComposerState extends State<ChatComposer>
           final data = await completer.future;
           if (data == null || data.isEmpty) continue;
 
-          final ext = format == Formats.png ? 'png' : 'jpg';
-          final mimeType =
-              format == Formats.png ? 'image/png' : 'image/jpeg';
+          final (ext, mimeType) = entry.value;
           final name =
               'pasted-image-${DateTime.now().millisecondsSinceEpoch}.$ext';
 
@@ -530,10 +538,30 @@ class _ChatComposerState extends State<ChatComposer>
           return;
         }
       }
-      // No image found — fall through so the default text paste works.
+      // No image found — paste text manually since we consumed the key event
+      await _pasteTextFallback();
     } catch (_) {
-      // Clipboard read failed; ignore and let default paste handle it.
+      // Clipboard read failed — try text paste as fallback
+      await _pasteTextFallback();
     }
+  }
+
+  Future<void> _pasteTextFallback() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      if (data?.text != null && data!.text!.isNotEmpty && mounted) {
+        final sel = _textController.selection;
+        final text = _textController.text;
+        final start = sel.isValid ? sel.start : text.length;
+        final end = sel.isValid ? sel.end : text.length;
+        final newText = text.replaceRange(start, end, data.text!);
+        _textController.value = TextEditingValue(
+          text: newText,
+          selection: TextSelection.collapsed(offset: start + data.text!.length),
+        );
+        widget.controller.setText(newText);
+      }
+    } catch (_) {}
   }
 
   Future<void> _startRecording() async {
