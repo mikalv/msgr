@@ -183,6 +183,16 @@ defmodule Messngr.Apps do
     end
   end
 
+  @doc "List bot tokens for an app installation (excludes revoked)."
+  def list_bot_tokens(installation_id) do
+    import Ecto.Query
+    from(t in BotToken,
+      where: t.app_installation_id == ^installation_id and is_nil(t.revoked_at),
+      order_by: [desc: t.inserted_at]
+    )
+    |> Repo.all()
+  end
+
   @doc "Revoke a bot token by ID."
   def revoke_bot_token(token_id) do
     case Repo.get(BotToken, token_id) do

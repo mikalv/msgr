@@ -649,6 +649,27 @@ class MsgrApiClient {
     return [];
   }
 
+  /// GET /api/teams/:slug/apps/:app_slug/tokens — list bot tokens
+  Future<List<Map<String, dynamic>>> listBotTokens(String teamSlug, String appSlug) async {
+    final res = await get('/api/teams/$teamSlug/apps/$appSlug/tokens');
+    final data = res['data'];
+    if (data is List) return data.cast<Map<String, dynamic>>();
+    return [];
+  }
+
+  /// POST /api/teams/:slug/apps/:app_slug/tokens — create bot token
+  Future<Map<String, dynamic>> createBotToken(String teamSlug, String appSlug, {String? label, List<String>? scopes}) async {
+    return post('/api/teams/$teamSlug/apps/$appSlug/tokens', body: {
+      if (label != null) 'label': label,
+      if (scopes != null) 'scopes': scopes,
+    });
+  }
+
+  /// DELETE /api/teams/:slug/apps/:app_slug/tokens/:token_id — revoke
+  Future<void> revokeBotToken(String teamSlug, String appSlug, String tokenId) async {
+    await delete('/api/teams/$teamSlug/apps/$appSlug/tokens/$tokenId');
+  }
+
   /// GET /api/teams/:slug/unread_counts
   Future<Map<String, int>> getUnreadCounts(String teamSlug) async {
     final raw = await get('/api/teams/$teamSlug/unread_counts');

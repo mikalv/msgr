@@ -79,6 +79,18 @@ defmodule MessngrWeb.TeamMessageController do
           # Send push notifications to offline members (best-effort, async)
           if slug, do: Messngr.Push.Dispatcher.notify_new_message(slug, prefix, message)
 
+          # Dispatch to subscribed app webhooks (best-effort, async)
+          team = conn.assigns.current_team
+          if team do
+            Messngr.Apps.WebhookDispatch.dispatch(team.id, "message:created", %{
+              channel_id: channel_id,
+              message_id: message.id,
+              sender_profile_id: message.sender_profile_id,
+              content: message.content,
+              inserted_at: message.inserted_at
+            })
+          end
+
           conn
           |> put_status(:created)
           |> json(%{data: message_json(message)})

@@ -154,6 +154,7 @@ defmodule MessngrWeb.Router do
     get "/apps", AppController, :team_index
     post "/apps/:app_slug/install", AppController, :install
     delete "/apps/:app_slug", AppController, :uninstall
+    get "/apps/:app_slug/tokens", AppController, :list_tokens
     post "/apps/:app_slug/tokens", AppController, :create_token
     delete "/apps/:app_slug/tokens/:token_id", AppController, :revoke_token
   end

@@ -144,6 +144,27 @@ defmodule MessngrWeb.AppController do
     end
   end
 
+  @doc "GET /api/teams/:slug/apps/:app_slug/tokens — list tokens"
+  def list_tokens(conn, %{"app_slug" => app_slug}) do
+    team = conn.assigns.current_team
+
+    case Apps.get_installation_by_app_slug(app_slug, team.id) do
+      nil -> {:error, :not_found}
+      installation ->
+        tokens = Apps.list_bot_tokens(installation.id)
+        json(conn, %{data: Enum.map(tokens, fn t ->
+          %{
+            id: t.id,
+            label: t.label,
+            scopes: t.scopes,
+            last_used_at: t.last_used_at,
+            expires_at: t.expires_at,
+            inserted_at: t.inserted_at
+          }
+        end)})
+    end
+  end
+
   @doc "DELETE /api/teams/:slug/apps/:app_slug/tokens/:token_id — revoke token"
   def revoke_token(conn, %{"token_id" => token_id}) do
     case Apps.revoke_bot_token(token_id) do
