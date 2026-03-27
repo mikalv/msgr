@@ -30,6 +30,11 @@
 	<string>NSApplication</string>
 
 
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Relay needs your location to share it in messages.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>Relay needs access to your contacts to share them in messages.</string>
+
     <key>CFBundleTypeRole</key>
     <string>Editor</string>
     <key>CFBundleURLName</key>

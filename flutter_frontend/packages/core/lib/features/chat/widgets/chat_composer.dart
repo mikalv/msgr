@@ -12,6 +12,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mime/mime.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import 'package:core/features/chat/widgets/chat_theme.dart';
+import 'package:core/services/location_service.dart';
+import 'package:core/services/contact_share_service.dart';
 
 part 'chat_composer/composer_widget.dart';
 part 'chat_composer/composer_toolbar.dart';

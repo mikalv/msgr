@@ -107,10 +107,11 @@ class ChatComposerValue {
 class ChatComposerResult {
   const ChatComposerResult({
     required this.text,
-    required this.attachments,
+    this.attachments = const [],
     this.voiceNote,
     this.command,
-    required this.mentions,
+    this.mentions = const [],
+    this.richContent,
   });
 
   final String text;
@@ -118,9 +119,12 @@ class ChatComposerResult {
   final ComposerVoiceNote? voiceNote;
   final SlashCommand? command;
   final List<ComposerMention> mentions;
+  /// Rich content map for location/contact shares (bypasses text content).
+  final Map<String, dynamic>? richContent;
 
   bool get hasCommand => command != null;
   bool get hasMentions => mentions.isNotEmpty;
+  bool get hasRichContent => richContent != null;
 }
 
 class ComposerAttachment {

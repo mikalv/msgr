@@ -147,12 +147,30 @@ class _SimpleChatContentState extends ConsumerState<SimpleChatContent> {
   void _onComposerSubmit(ChatComposerResult result) async {
     final hasText = result.text.trim().isNotEmpty;
     final hasAttachments = result.attachments.isNotEmpty;
-    if (!hasText && !hasAttachments) return;
 
     final channel = ref.read(selectedChannelProvider);
     if (channel == null) return;
     final team = ref.read(selectedTeamProvider);
     if (team == null) return;
+
+    // Handle rich content (location, contact) — send directly via REST
+    if (result.hasRichContent) {
+      _composerController.clear();
+      try {
+        final client = ref.read(msgrApiProvider);
+        await client.sendMessageRich(team.slug, channel.id, result.richContent!);
+        ref.read(channelMessagesProvider.notifier).loadMessages(channel.id);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to share: $e'), backgroundColor: Colors.red.shade700),
+          );
+        }
+      }
+      return;
+    }
+
+    if (!hasText && !hasAttachments) return;
 
     // Check if this is a slash command submission
     if (result.hasCommand || result.text.trim().startsWith('/')) {

@@ -260,6 +260,18 @@ class _ChatComposerState extends State<ChatComposer>
                               onTap: isBusy ? null : _capturePhoto,
                             ),
                             const SizedBox(width: 8),
+                            _ComposerIconButton(
+                              icon: Icons.location_on_outlined,
+                              tooltip: 'Del lokasjon',
+                              onTap: isBusy ? null : _shareLocation,
+                            ),
+                            const SizedBox(width: 8),
+                            _ComposerIconButton(
+                              icon: Icons.contact_page_outlined,
+                              tooltip: 'Del kontakt',
+                              onTap: isBusy ? null : _shareContact,
+                            ),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: _ComposerTextField(
                                 controller: _textController,
@@ -432,6 +444,27 @@ class _ChatComposerState extends State<ChatComposer>
     } on PlatformException catch (error) {
       widget.controller.setError('Kunne ikke hente filer: ${error.message}');
     }
+  }
+
+  Future<void> _shareLocation() async {
+    if (_isComposerBusy) return;
+    final result = await LocationService.instance.getCurrentLocation();
+    if (result == null || !mounted) return;
+    // Submit as a rich content message
+    widget.onSubmit?.call(ChatComposerResult(
+      text: '',
+      richContent: result.toContentMap(),
+    ));
+  }
+
+  Future<void> _shareContact() async {
+    if (_isComposerBusy) return;
+    final result = await ContactShareService.instance.pickContact();
+    if (result == null || !mounted) return;
+    widget.onSubmit?.call(ChatComposerResult(
+      text: '',
+      richContent: result.toContentMap(),
+    ));
   }
 
   Future<void> _handleDrop(DropDoneDetails details) async {
