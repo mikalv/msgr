@@ -12,6 +12,9 @@ class ChannelHeader extends StatelessWidget {
     this.onMembersTap,
     this.onPinTap,
     this.onSettingsTap,
+    this.onVoiceCall,
+    this.onVideoCall,
+    this.isDm = false,
   });
 
   final String channelName;
@@ -22,6 +25,9 @@ class ChannelHeader extends StatelessWidget {
   final VoidCallback? onMembersTap;
   final VoidCallback? onPinTap;
   final VoidCallback? onSettingsTap;
+  final VoidCallback? onVoiceCall;
+  final VoidCallback? onVideoCall;
+  final bool isDm;
 
   @override
   Widget build(BuildContext context) {
@@ -59,6 +65,10 @@ class ChannelHeader extends StatelessWidget {
             ),
           ] else
             const Spacer(),
+          if (isDm) ...[
+            _HeaderIcon(Icons.phone_outlined, onTap: onVoiceCall),
+            _HeaderIcon(Icons.videocam_outlined, onTap: onVideoCall),
+          ],
           _HeaderIcon(Icons.search, onTap: onSearchTap),
           if (pinnedCount > 0)
             _PinHeaderIcon(count: pinnedCount, onTap: onPinTap)

@@ -146,7 +146,9 @@ class MsgrApiClient {
     final response = await request();
 
     // If 401 and we have a refresh token, try refreshing and retry once
-    if (response.statusCode == 401 && accessToken != null && refreshToken != null) {
+    if (response.statusCode == 401 &&
+        accessToken != null &&
+        refreshToken != null) {
       final refreshed = await refreshAuth();
       if (refreshed) {
         return request();
@@ -413,7 +415,8 @@ class MsgrApiClient {
   }
 
   /// PATCH /api/teams/:slug — update team name/settings
-  Future<Map<String, dynamic>> updateTeam(String teamSlug, {String? name}) async {
+  Future<Map<String, dynamic>> updateTeam(String teamSlug,
+      {String? name}) async {
     return patch('/api/teams/$teamSlug', body: {
       if (name != null) 'name': name,
     });
@@ -428,8 +431,10 @@ class MsgrApiClient {
   }
 
   /// PUT /api/teams/:slug/members/:account_id/role — change member role
-  Future<void> changeTeamMemberRole(String teamSlug, String accountId, String role) async {
-    await put('/api/teams/$teamSlug/members/$accountId/role', body: {'role': role});
+  Future<void> changeTeamMemberRole(
+      String teamSlug, String accountId, String role) async {
+    await put('/api/teams/$teamSlug/members/$accountId/role',
+        body: {'role': role});
   }
 
   /// DELETE /api/teams/:slug/members/:account_id — remove team member
@@ -502,7 +507,8 @@ class MsgrApiClient {
     String teamSlug,
     String channelId,
   ) async {
-    final raw = await getRaw('/api/teams/$teamSlug/channels/$channelId/members');
+    final raw =
+        await getRaw('/api/teams/$teamSlug/channels/$channelId/members');
     if (raw is Map<String, dynamic>) {
       final data = raw['data'];
       if (data is List) return data.cast<Map<String, dynamic>>();
@@ -631,14 +637,24 @@ class MsgrApiClient {
     });
   }
 
+  // ── WebRTC Calls ────────────────────────────────────────────
+
+  /// GET /api/turn-credentials — ephemeral TURN credentials for WebRTC
+  Future<Map<String, dynamic>> getTurnCredentials() async {
+    return get('/api/turn-credentials');
+  }
+
   // ── App Marketplace ──────────────────────────────────────────
 
   /// GET /api/apps/directory — browse public apps
-  Future<List<Map<String, dynamic>>> getAppDirectory({String? category, String? query}) async {
+  Future<List<Map<String, dynamic>>> getAppDirectory(
+      {String? category, String? query}) async {
     final params = <String, String>{};
     if (category != null) params['category'] = category;
     if (query != null) params['q'] = query;
-    final qs = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+    final qs = params.entries
+        .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+        .join('&');
     final res = await get('/api/apps/directory${qs.isNotEmpty ? '?$qs' : ''}');
     final data = res['data'];
     if (data is List) return data.cast<Map<String, dynamic>>();
@@ -652,7 +668,8 @@ class MsgrApiClient {
   }
 
   /// POST /api/teams/:slug/apps/:app_slug/install — install app with config
-  Future<Map<String, dynamic>> installApp(String teamSlug, String appSlug, {Map<String, dynamic>? config, List<String>? channelIds}) async {
+  Future<Map<String, dynamic>> installApp(String teamSlug, String appSlug,
+      {Map<String, dynamic>? config, List<String>? channelIds}) async {
     return post('/api/teams/$teamSlug/apps/$appSlug/install', body: {
       if (config != null) 'config': config,
       if (channelIds != null) 'channels': channelIds,
@@ -665,28 +682,37 @@ class MsgrApiClient {
   }
 
   /// GET /api/teams/:slug/channels/:id/apps/:app_slug/config
-  Future<Map<String, dynamic>> getChannelAppConfig(String teamSlug, String channelId, String appSlug) async {
-    final res = await get('/api/teams/$teamSlug/channels/$channelId/apps/$appSlug/config');
+  Future<Map<String, dynamic>> getChannelAppConfig(
+      String teamSlug, String channelId, String appSlug) async {
+    final res = await get(
+        '/api/teams/$teamSlug/channels/$channelId/apps/$appSlug/config');
     return res['data'] as Map<String, dynamic>? ?? {};
   }
 
   /// PUT /api/teams/:slug/channels/:id/apps/:app_slug/config
-  Future<void> updateChannelAppConfig(String teamSlug, String channelId, String appSlug, Map<String, dynamic> config) async {
-    await put('/api/teams/$teamSlug/channels/$channelId/apps/$appSlug/config', body: {'config': config});
+  Future<void> updateChannelAppConfig(String teamSlug, String channelId,
+      String appSlug, Map<String, dynamic> config) async {
+    await put('/api/teams/$teamSlug/channels/$channelId/apps/$appSlug/config',
+        body: {'config': config});
   }
 
   /// POST /api/teams/:slug/channels/:id/messages/:mid/pin — pin a message
-  Future<Map<String, dynamic>> pinMessage(String teamSlug, String channelId, String messageId) async {
-    return post('/api/teams/$teamSlug/channels/$channelId/messages/$messageId/pin');
+  Future<Map<String, dynamic>> pinMessage(
+      String teamSlug, String channelId, String messageId) async {
+    return post(
+        '/api/teams/$teamSlug/channels/$channelId/messages/$messageId/pin');
   }
 
   /// DELETE /api/teams/:slug/channels/:id/messages/:mid/pin — unpin
-  Future<void> unpinMessage(String teamSlug, String channelId, String messageId) async {
-    await delete('/api/teams/$teamSlug/channels/$channelId/messages/$messageId/pin');
+  Future<void> unpinMessage(
+      String teamSlug, String channelId, String messageId) async {
+    await delete(
+        '/api/teams/$teamSlug/channels/$channelId/messages/$messageId/pin');
   }
 
   /// GET /api/teams/:slug/channels/:id/pins — list pinned messages
-  Future<List<Map<String, dynamic>>> getPinnedMessages(String teamSlug, String channelId) async {
+  Future<List<Map<String, dynamic>>> getPinnedMessages(
+      String teamSlug, String channelId) async {
     final res = await get('/api/teams/$teamSlug/channels/$channelId/pins');
     final data = res['data'];
     if (data is List) return data.cast<Map<String, dynamic>>();
@@ -694,7 +720,8 @@ class MsgrApiClient {
   }
 
   /// GET /api/teams/:slug/apps/:app_slug/tokens — list bot tokens
-  Future<List<Map<String, dynamic>>> listBotTokens(String teamSlug, String appSlug) async {
+  Future<List<Map<String, dynamic>>> listBotTokens(
+      String teamSlug, String appSlug) async {
     final res = await get('/api/teams/$teamSlug/apps/$appSlug/tokens');
     final data = res['data'];
     if (data is List) return data.cast<Map<String, dynamic>>();
@@ -702,7 +729,8 @@ class MsgrApiClient {
   }
 
   /// POST /api/teams/:slug/apps/:app_slug/tokens — create bot token
-  Future<Map<String, dynamic>> createBotToken(String teamSlug, String appSlug, {String? label, List<String>? scopes}) async {
+  Future<Map<String, dynamic>> createBotToken(String teamSlug, String appSlug,
+      {String? label, List<String>? scopes}) async {
     return post('/api/teams/$teamSlug/apps/$appSlug/tokens', body: {
       if (label != null) 'label': label,
       if (scopes != null) 'scopes': scopes,
@@ -710,7 +738,8 @@ class MsgrApiClient {
   }
 
   /// DELETE /api/teams/:slug/apps/:app_slug/tokens/:token_id — revoke
-  Future<void> revokeBotToken(String teamSlug, String appSlug, String tokenId) async {
+  Future<void> revokeBotToken(
+      String teamSlug, String appSlug, String tokenId) async {
     await delete('/api/teams/$teamSlug/apps/$appSlug/tokens/$tokenId');
   }
 
@@ -722,7 +751,8 @@ class MsgrApiClient {
   }
 
   /// PUT /api/teams/:slug/channels/:channelId/read_cursor
-  Future<void> markChannelRead(String teamSlug, String channelId, String lastMessageId) async {
+  Future<void> markChannelRead(
+      String teamSlug, String channelId, String lastMessageId) async {
     await put('/api/teams/$teamSlug/channels/$channelId/read_cursor', body: {
       'last_read_message_id': lastMessageId,
     });
@@ -755,9 +785,10 @@ class MsgrApiClient {
     String messageId,
     String newText,
   ) async {
-    return patch('/api/teams/$teamSlug/channels/$channelId/messages/$messageId', body: {
-      'content': {'text': newText},
-    });
+    return patch('/api/teams/$teamSlug/channels/$channelId/messages/$messageId',
+        body: {
+          'content': {'text': newText},
+        });
   }
 
   /// DELETE /api/teams/:slug/channels/:channelId/messages/:messageId
@@ -766,7 +797,8 @@ class MsgrApiClient {
     String channelId,
     String messageId,
   ) async {
-    return delete('/api/teams/$teamSlug/channels/$channelId/messages/$messageId');
+    return delete(
+        '/api/teams/$teamSlug/channels/$channelId/messages/$messageId');
   }
 
   /// GET /api/teams/:slug/channels/:channelId/threads/:messageId
@@ -835,7 +867,8 @@ class MsgrApiClient {
     String profileId,
   ) async {
     final raw = await get('/api/teams/$teamSlug/profiles/$profileId');
-    final data = raw.containsKey('data') ? raw['data'] as Map<String, dynamic> : raw;
+    final data =
+        raw.containsKey('data') ? raw['data'] as Map<String, dynamic> : raw;
     return data;
   }
 
@@ -932,9 +965,12 @@ class MsgrApiClient {
     return PresignedUpload(
       uploadId: data['upload_id']?.toString() ?? '',
       objectKey: data['object_key']?.toString() ?? '',
-      uploadUrl: data['upload_url']?.toString() ?? data['presigned_url']?.toString() ?? '',
+      uploadUrl: data['upload_url']?.toString() ??
+          data['presigned_url']?.toString() ??
+          '',
       uploadMethod: data['upload_method']?.toString() ?? 'PUT',
-      uploadHeaders: (data['upload_headers'] as Map?)?.cast<String, String>() ?? {},
+      uploadHeaders:
+          (data['upload_headers'] as Map?)?.cast<String, String>() ?? {},
       expiresAt: data['expires_at']?.toString(),
     );
   }

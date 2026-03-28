@@ -52,6 +52,7 @@ defmodule MessngrWeb.Router do
   scope "/api", MessngrWeb do
     pipe_through [:api, :actor]
 
+    get "/turn-credentials", TurnController, :credentials
     post "/push/register", PushTokenController, :register
     get "/push/vapid_key", PushTokenController, :vapid_key
 

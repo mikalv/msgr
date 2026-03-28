@@ -9,13 +9,19 @@ import 'package:core/providers/draft_provider.dart';
 import 'package:core/providers/models.dart' hide ChannelKind;
 import 'package:core/providers/msgr_client_provider.dart';
 import 'package:core/providers/team_list_provider.dart';
+import 'package:core/providers/call_provider.dart';
 import 'package:core/providers/favorites_provider.dart';
+import 'package:core/ui/call/incoming_call_overlay.dart';
+import 'package:core/ui/call/outgoing_call_screen.dart';
+import 'package:core/ui/call/active_call_screen.dart';
 import 'package:core/providers/presence_provider.dart';
 import 'package:core/providers/theme_provider.dart';
 import 'package:core/providers/unread_provider.dart';
 import 'package:core/services/dock_badge_service.dart';
 import 'package:core/providers/web_push_provider.dart';
-import 'package:core/providers/web_push_stub.dart' if (dart.library.html) 'package:core/providers/web_push_web.dart' as webPushImpl;
+import 'package:core/providers/web_push_stub.dart'
+    if (dart.library.html) 'package:core/providers/web_push_web.dart'
+    as webPushImpl;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:core/ui/auth/profile_setup_screen.dart';
@@ -82,9 +88,10 @@ class _AppShellState extends ConsumerState<AppShell> {
       final profiles = await client.getProfiles(team.slug);
       // Match by account_id (not profile_id — that's account-level, not team-level)
       final myAccountId = ref.read(simpleAuthProvider).accountId;
-      final myProfile = profiles.where((p) =>
-        p['account_id'] == myAccountId || p['id'] == myAccountId
-      ).firstOrNull;
+      final myProfile = profiles
+          .where(
+              (p) => p['account_id'] == myAccountId || p['id'] == myAccountId)
+          .firstOrNull;
 
       if (myProfile != null) {
         final displayName = myProfile['display_name']?.toString() ?? '';
@@ -194,7 +201,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     final auth = ref.watch(simpleAuthProvider);
     final needsSetup = _needsProfileSetup ||
         ref.watch(needsProfileSetupProvider) ||
-        (auth.displayName == null || auth.displayName!.isEmpty || auth.displayName == auth.email);
+        (auth.displayName == null ||
+            auth.displayName!.isEmpty ||
+            auth.displayName == auth.email);
     if (needsSetup) {
       final team = ref.read(selectedTeamProvider);
       final currentTeam = ref.read(selectedTeamProvider);
@@ -207,65 +216,88 @@ class _AppShellState extends ConsumerState<AppShell> {
             final updatedAuth = ref.read(simpleAuthProvider);
             final client = ref.read(msgrApiProvider);
             if (updatedAuth.displayName != null) {
-              client.updateMyProfile(currentTeam.slug, displayName: updatedAuth.displayName);
+              client.updateMyProfile(currentTeam.slug,
+                  displayName: updatedAuth.displayName);
             }
           }
         },
       );
     }
 
+    // Show call screens as fullscreen overlays
+    final callState = ref.watch(callProvider);
+    if (callState.status == CallStatus.incoming) {
+      return MsgrTheme(
+          colors: ref.watch(themeProvider).colors,
+          child: const IncomingCallOverlay());
+    }
+    if (callState.status == CallStatus.outgoing) {
+      return MsgrTheme(
+          colors: ref.watch(themeProvider).colors,
+          child: const OutgoingCallScreen());
+    }
+    if (callState.status == CallStatus.active ||
+        callState.status == CallStatus.connecting) {
+      return MsgrTheme(
+          colors: ref.watch(themeProvider).colors,
+          child: const ActiveCallScreen());
+    }
+
     return MsgrTheme(
       colors: ref.watch(themeProvider).colors,
       child: CallbackShortcuts(
-      bindings: <ShortcutActivator, VoidCallback>{
-        // Cmd+K / Ctrl+K: Quick switcher
-        SingleActivator(LogicalKeyboardKey.keyK, meta: _useMeta, control: !_useMeta):
-            () => showQuickSwitcher(context),
+        bindings: <ShortcutActivator, VoidCallback>{
+          // Cmd+K / Ctrl+K: Quick switcher
+          SingleActivator(LogicalKeyboardKey.keyK,
+              meta: _useMeta,
+              control: !_useMeta): () => showQuickSwitcher(context),
 
-        // Cmd+[ / Ctrl+[: Navigate back
-        SingleActivator(LogicalKeyboardKey.bracketLeft, meta: _useMeta, control: !_useMeta):
-            _navigateBack,
+          // Cmd+[ / Ctrl+[: Navigate back
+          SingleActivator(LogicalKeyboardKey.bracketLeft,
+              meta: _useMeta, control: !_useMeta): _navigateBack,
 
-        // Cmd+] / Ctrl+]: Navigate forward
-        SingleActivator(LogicalKeyboardKey.bracketRight, meta: _useMeta, control: !_useMeta):
-            _navigateForward,
+          // Cmd+] / Ctrl+]: Navigate forward
+          SingleActivator(LogicalKeyboardKey.bracketRight,
+              meta: _useMeta, control: !_useMeta): _navigateForward,
 
-        // Cmd+Shift+N / Ctrl+Shift+N: Create channel
-        SingleActivator(LogicalKeyboardKey.keyN, meta: _useMeta, control: !_useMeta, shift: true):
-            () => _showCreateChannelDialog(),
+          // Cmd+Shift+N / Ctrl+Shift+N: Create channel
+          SingleActivator(LogicalKeyboardKey.keyN,
+              meta: _useMeta,
+              control: !_useMeta,
+              shift: true): () => _showCreateChannelDialog(),
 
-        // Cmd+1 through Cmd+9: Switch team by index
-        for (var i = 0; i < 9; i++)
-          SingleActivator(
-            LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + i),
-            meta: _useMeta,
-            control: !_useMeta,
-          ): () => _switchToTeamByIndex(i),
+          // Cmd+1 through Cmd+9: Switch team by index
+          for (var i = 0; i < 9; i++)
+            SingleActivator(
+              LogicalKeyboardKey(LogicalKeyboardKey.digit1.keyId + i),
+              meta: _useMeta,
+              control: !_useMeta,
+            ): () => _switchToTeamByIndex(i),
 
-        // Escape: Toggle sidebar collapsed (close panels)
-        const SingleActivator(LogicalKeyboardKey.escape): () {
-          setState(() => _sidebarCollapsed = !_sidebarCollapsed);
-        },
-      },
-      child: Focus(
-        autofocus: true,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isDesktop = constraints.maxWidth > 1024;
-            final isTablet =
-                constraints.maxWidth >= 600 && constraints.maxWidth <= 1024;
-
-            if (isDesktop) {
-              return _buildDesktop();
-            } else if (isTablet) {
-              return _buildTablet();
-            } else {
-              return _buildMobile();
-            }
+          // Escape: Toggle sidebar collapsed (close panels)
+          const SingleActivator(LogicalKeyboardKey.escape): () {
+            setState(() => _sidebarCollapsed = !_sidebarCollapsed);
           },
+        },
+        child: Focus(
+          autofocus: true,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isDesktop = constraints.maxWidth > 1024;
+              final isTablet =
+                  constraints.maxWidth >= 600 && constraints.maxWidth <= 1024;
+
+              if (isDesktop) {
+                return _buildDesktop();
+              } else if (isTablet) {
+                return _buildTablet();
+              } else {
+                return _buildMobile();
+              }
+            },
+          ),
         ),
       ),
-    ),
     );
   }
 
@@ -349,7 +381,8 @@ class _AppShellState extends ConsumerState<AppShell> {
       }
 
       // Self-DM: no other members (notes to self)
-      final isSelf = members == null || members.isEmpty ||
+      final isSelf = members == null ||
+          members.isEmpty ||
           members.entries.every((e) => e.key == myProfileId);
 
       // Check if the other DM member is online
@@ -396,9 +429,8 @@ class _AppShellState extends ConsumerState<AppShell> {
             curve: Curves.easeInOut,
             clipBehavior: Clip.hardEdge,
             decoration: const BoxDecoration(),
-            child: _sidebarCollapsed
-                ? const SizedBox.shrink()
-                : _buildSidebar(),
+            child:
+                _sidebarCollapsed ? const SizedBox.shrink() : _buildSidebar(),
           ),
           Container(width: 1, color: MsgrTheme.of(context).contentBorder),
           Expanded(
@@ -532,7 +564,8 @@ class _AppShellState extends ConsumerState<AppShell> {
       onAvatarTap: () {
         final team = ref.read(selectedTeamProvider);
         if (team != null) {
-          showAvatarUploadDialog(context, teamSlug: team.slug, currentAvatarUrl: null);
+          showAvatarUploadDialog(context,
+              teamSlug: team.slug, currentAvatarUrl: null);
         }
       },
       onEditProfile: () {
@@ -614,9 +647,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Teamnavn',
-                        labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                        labelStyle:
+                            TextStyle(color: Colors.white.withOpacity(0.6)),
                         hintText: 'F.eks. Min bedrift',
-                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                        hintStyle:
+                            TextStyle(color: Colors.white.withOpacity(0.3)),
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.05),
                         border: OutlineInputBorder(
@@ -637,9 +672,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Slug (URL-vennlig)',
-                        labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                        labelStyle:
+                            TextStyle(color: Colors.white.withOpacity(0.6)),
                         hintText: 'min-bedrift',
-                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                        hintStyle:
+                            TextStyle(color: Colors.white.withOpacity(0.3)),
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.05),
                         border: OutlineInputBorder(
@@ -657,7 +694,8 @@ class _AppShellState extends ConsumerState<AppShell> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Avbryt', style: TextStyle(color: Colors.white54)),
+                  child: const Text('Avbryt',
+                      style: TextStyle(color: Colors.white54)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -738,7 +776,8 @@ class _AppShellState extends ConsumerState<AppShell> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Avbryt', style: TextStyle(color: Colors.white54)),
+              child:
+                  const Text('Avbryt', style: TextStyle(color: Colors.white54)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -792,7 +831,10 @@ class _AppShellState extends ConsumerState<AppShell> {
       }
     }
     // Bare code: starts with no slashes and is short alphanumeric
-    if (!input.contains('/') && !input.contains('.') && input.length <= 16 && input.length >= 6) {
+    if (!input.contains('/') &&
+        !input.contains('.') &&
+        input.length <= 16 &&
+        input.length >= 6) {
       // Could be either a slug or an invite code — try invite first
       // Actually, slugs contain dashes, invite codes don't
       if (!input.contains('-') && RegExp(r'^[a-zA-Z0-9]+$').hasMatch(input)) {
@@ -882,7 +924,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Visningsnavn',
-                        labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                        labelStyle:
+                            TextStyle(color: Colors.white.withOpacity(0.6)),
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.05),
                         border: OutlineInputBorder(
@@ -897,7 +940,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'E-post (valgfri)',
-                        labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                        labelStyle:
+                            TextStyle(color: Colors.white.withOpacity(0.6)),
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.05),
                         border: OutlineInputBorder(
@@ -913,7 +957,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'Telefon (valgfri)',
-                        labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                        labelStyle:
+                            TextStyle(color: Colors.white.withOpacity(0.6)),
                         filled: true,
                         fillColor: Colors.white.withOpacity(0.05),
                         border: OutlineInputBorder(
@@ -942,7 +987,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                             final phone = phoneController.text.trim();
                             await client.updateMyProfile(
                               teamSlug,
-                              displayName: displayName.isNotEmpty ? displayName : null,
+                              displayName:
+                                  displayName.isNotEmpty ? displayName : null,
                               email: email.isNotEmpty ? email : null,
                               phone: phone.isNotEmpty ? phone : null,
                             );
@@ -1017,11 +1063,14 @@ class _AppShellState extends ConsumerState<AppShell> {
               children: [
                 Text(
                   'Share this link to invite people to ${team.name}:',
-                  style: TextStyle(color: Colors.white.withAlpha(180), fontSize: 13),
+                  style: TextStyle(
+                      color: Colors.white.withAlpha(180), fontSize: 13),
                 ),
                 const SizedBox(height: 12),
                 if (error != null)
-                  Text(error, style: const TextStyle(color: Colors.redAccent, fontSize: 13))
+                  Text(error,
+                      style: const TextStyle(
+                          color: Colors.redAccent, fontSize: 13))
                 else if (inviteUrl != null)
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -1049,7 +1098,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                 const SizedBox(height: 8),
                 Text(
                   'Link expires in 7 days.',
-                  style: TextStyle(color: Colors.white.withAlpha(100), fontSize: 11),
+                  style: TextStyle(
+                      color: Colors.white.withAlpha(100), fontSize: 11),
                 ),
               ],
             ),
@@ -1097,7 +1147,9 @@ class _AppShellState extends ConsumerState<AppShell> {
           builder: (context, setDialogState) {
             final filteredProfiles = allProfiles.where((p) {
               if (searchQuery.isEmpty) return true;
-              final name = (p['display_name'] ?? p['email'] ?? '').toString().toLowerCase();
+              final name = (p['display_name'] ?? p['email'] ?? '')
+                  .toString()
+                  .toLowerCase();
               return name.contains(searchQuery.toLowerCase());
             }).toList();
 
@@ -1121,9 +1173,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           labelText: 'Kanalnavn',
-                          labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                          labelStyle:
+                              TextStyle(color: Colors.white.withOpacity(0.6)),
                           hintText: 'F.eks. general',
-                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                          hintStyle:
+                              TextStyle(color: Colors.white.withOpacity(0.3)),
                           filled: true,
                           fillColor: Colors.white.withOpacity(0.05),
                           border: OutlineInputBorder(
@@ -1140,9 +1194,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           labelText: 'Ikon (emoji, valgfritt)',
-                          labelStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
+                          labelStyle:
+                              TextStyle(color: Colors.white.withOpacity(0.6)),
                           hintText: '#',
-                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                          hintStyle:
+                              TextStyle(color: Colors.white.withOpacity(0.3)),
                           filled: true,
                           fillColor: Colors.white.withOpacity(0.05),
                           border: OutlineInputBorder(
@@ -1167,9 +1223,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                         children: [
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => setDialogState(() => isPrivate = false),
+                              onTap: () =>
+                                  setDialogState(() => isPrivate = false),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
                                 decoration: BoxDecoration(
                                   color: !isPrivate
                                       ? const Color(0xFF02ac88).withOpacity(0.2)
@@ -1194,7 +1252,9 @@ class _AppShellState extends ConsumerState<AppShell> {
                                     Text(
                                       'Offentlig',
                                       style: TextStyle(
-                                        color: !isPrivate ? Colors.white : Colors.white54,
+                                        color: !isPrivate
+                                            ? Colors.white
+                                            : Colors.white54,
                                         fontSize: 12,
                                       ),
                                     ),
@@ -1206,9 +1266,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: GestureDetector(
-                              onTap: () => setDialogState(() => isPrivate = true),
+                              onTap: () =>
+                                  setDialogState(() => isPrivate = true),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
                                 decoration: BoxDecoration(
                                   color: isPrivate
                                       ? const Color(0xFF02ac88).withOpacity(0.2)
@@ -1233,7 +1295,9 @@ class _AppShellState extends ConsumerState<AppShell> {
                                     Text(
                                       'Privat',
                                       style: TextStyle(
-                                        color: isPrivate ? Colors.white : Colors.white54,
+                                        color: isPrivate
+                                            ? Colors.white
+                                            : Colors.white54,
                                         fontSize: 12,
                                       ),
                                     ),
@@ -1258,7 +1322,8 @@ class _AppShellState extends ConsumerState<AppShell> {
                       const SizedBox(height: 8),
 
                       // Selected members chips
-                      if (selectedMemberIds.isNotEmpty || currentProfileId != null)
+                      if (selectedMemberIds.isNotEmpty ||
+                          currentProfileId != null)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Wrap(
@@ -1291,14 +1356,19 @@ class _AppShellState extends ConsumerState<AppShell> {
                       // Search field
                       TextField(
                         controller: searchController,
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        style:
+                            const TextStyle(color: Colors.white, fontSize: 13),
                         decoration: InputDecoration(
                           hintText: 'Sok etter medlemmer...',
-                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 13),
-                          prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.3), size: 18),
+                          hintStyle: TextStyle(
+                              color: Colors.white.withOpacity(0.3),
+                              fontSize: 13),
+                          prefixIcon: Icon(Icons.search,
+                              color: Colors.white.withOpacity(0.3), size: 18),
                           filled: true,
                           fillColor: Colors.white.withOpacity(0.05),
-                          contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                          contentPadding: const EdgeInsets.symmetric(
+                              vertical: 8, horizontal: 12),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide.none,
@@ -1328,8 +1398,13 @@ class _AppShellState extends ConsumerState<AppShell> {
                               final profile = filteredProfiles[index];
                               final profileId = profile['id']?.toString() ?? '';
                               final isCreator = profileId == currentProfileId;
-                              final isSelected = selectedMemberIds.contains(profileId) || isCreator;
-                              final displayName = profile['display_name']?.toString() ?? profile['email']?.toString() ?? 'Ukjent';
+                              final isSelected =
+                                  selectedMemberIds.contains(profileId) ||
+                                      isCreator;
+                              final displayName =
+                                  profile['display_name']?.toString() ??
+                                      profile['email']?.toString() ??
+                                      'Ukjent';
 
                               return ListTile(
                                 dense: true,
@@ -1338,30 +1413,45 @@ class _AppShellState extends ConsumerState<AppShell> {
                                   radius: 14,
                                   backgroundColor: const Color(0xFF3A3A5E),
                                   child: Text(
-                                    displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-                                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                                    displayName.isNotEmpty
+                                        ? displayName[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                        color: Colors.white, fontSize: 12),
                                   ),
                                 ),
                                 title: Text(
                                   displayName,
-                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 13),
                                 ),
                                 subtitle: isCreator
                                     ? Text(
                                         'Oppretter',
-                                        style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                                        style: TextStyle(
+                                            color:
+                                                Colors.white.withOpacity(0.4),
+                                            fontSize: 11),
                                       )
                                     : null,
                                 trailing: isCreator
-                                    ? Icon(Icons.check_circle, color: const Color(0xFF02ac88).withOpacity(0.5), size: 18)
+                                    ? Icon(Icons.check_circle,
+                                        color: const Color(0xFF02ac88)
+                                            .withOpacity(0.5),
+                                        size: 18)
                                     : isSelected
-                                        ? const Icon(Icons.check_circle, color: Color(0xFF02ac88), size: 18)
-                                        : Icon(Icons.circle_outlined, color: Colors.white.withOpacity(0.2), size: 18),
+                                        ? const Icon(Icons.check_circle,
+                                            color: Color(0xFF02ac88), size: 18)
+                                        : Icon(Icons.circle_outlined,
+                                            color:
+                                                Colors.white.withOpacity(0.2),
+                                            size: 18),
                                 onTap: isCreator
                                     ? null
                                     : () {
                                         setDialogState(() {
-                                          if (selectedMemberIds.contains(profileId)) {
+                                          if (selectedMemberIds
+                                              .contains(profileId)) {
                                             selectedMemberIds.remove(profileId);
                                           } else {
                                             selectedMemberIds.add(profileId);
@@ -1379,7 +1469,8 @@ class _AppShellState extends ConsumerState<AppShell> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Avbryt', style: TextStyle(color: Colors.white54)),
+                  child: const Text('Avbryt',
+                      style: TextStyle(color: Colors.white54)),
                 ),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -1400,9 +1491,8 @@ class _AppShellState extends ConsumerState<AppShell> {
       if (name.isNotEmpty) {
         final icon = iconController.text.trim();
         final visibility = isPrivate ? 'private' : 'public';
-        final memberIds = selectedMemberIds.isNotEmpty
-            ? selectedMemberIds.toList()
-            : null;
+        final memberIds =
+            selectedMemberIds.isNotEmpty ? selectedMemberIds.toList() : null;
         await ref.read(channelListProvider.notifier).createChannel(
               teamSlug: team.slug,
               name: name,
@@ -1438,8 +1528,11 @@ class _AppShellState extends ConsumerState<AppShell> {
     required bool isCreator,
     VoidCallback? onRemove,
   }) {
-    final profile = profiles.where((p) => p['id']?.toString() == profileId).firstOrNull;
-    final name = profile?['display_name']?.toString() ?? profile?['email']?.toString() ?? 'Ukjent';
+    final profile =
+        profiles.where((p) => p['id']?.toString() == profileId).firstOrNull;
+    final name = profile?['display_name']?.toString() ??
+        profile?['email']?.toString() ??
+        'Ukjent';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1461,13 +1554,15 @@ class _AppShellState extends ConsumerState<AppShell> {
           ),
           if (isCreator) ...[
             const SizedBox(width: 4),
-            Icon(Icons.star, size: 12, color: const Color(0xFF02ac88).withOpacity(0.7)),
+            Icon(Icons.star,
+                size: 12, color: const Color(0xFF02ac88).withOpacity(0.7)),
           ],
           if (onRemove != null) ...[
             const SizedBox(width: 4),
             GestureDetector(
               onTap: onRemove,
-              child: Icon(Icons.close, size: 14, color: Colors.white.withOpacity(0.5)),
+              child: Icon(Icons.close,
+                  size: 14, color: Colors.white.withOpacity(0.5)),
             ),
           ],
         ],
@@ -1549,12 +1644,14 @@ class _WelcomeScreen extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.redAccent, size: 18),
+                      const Icon(Icons.error_outline,
+                          color: Colors.redAccent, size: 18),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           error.toString(),
-                          style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                          style: const TextStyle(
+                              color: Colors.redAccent, fontSize: 12),
                         ),
                       ),
                     ],
@@ -1692,7 +1789,8 @@ class _WebPushBannerState extends ConsumerState<_WebPushBanner> {
       color: const Color(0xFF1D4E3E),
       child: Row(
         children: [
-          const Icon(Icons.notifications_active, color: Colors.white70, size: 18),
+          const Icon(Icons.notifications_active,
+              color: Colors.white70, size: 18),
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
@@ -1713,10 +1811,14 @@ class _WebPushBannerState extends ConsumerState<_WebPushBanner> {
                   },
             child: _subscribing
                 ? const SizedBox(
-                    width: 16, height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
                   )
-                : const Text('Enable', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                : const Text('Enable',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w600)),
           ),
           IconButton(
             icon: const Icon(Icons.close, color: Colors.white38, size: 16),

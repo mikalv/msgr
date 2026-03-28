@@ -40,7 +40,7 @@ if git diff --cached --name-only | grep -q '\.dart$'; then
 
   if [ -n "$DART_FILES" ]; then
     # dart analyze on changed packages
-    PACKAGES=$(echo "$DART_FILES" | grep -oP 'flutter_frontend/packages/\w+' | sort -u)
+    PACKAGES=$(echo "$DART_FILES" | grep -o 'flutter_frontend/packages/[a-z_]*' | sort -u)
     for pkg in $PACKAGES; do
       if dart analyze "$pkg" 2>/dev/null | grep -q "error •"; then
         echo -e "${RED}  ✗ dart analyze $pkg — has errors${NC}"
