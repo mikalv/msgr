@@ -47,7 +47,8 @@ defmodule MessngrWeb.FamilyTodoListController do
 
     attrs = Map.new(list_params)
 
-    with {:ok, list} <- FamilySpace.update_todo_list(family_id, list_id, current_profile.id, attrs) do
+    with {:ok, list} <-
+           FamilySpace.update_todo_list(family_id, list_id, current_profile.id, attrs) do
       render(conn, :show, list: list)
     end
   rescue

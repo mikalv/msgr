@@ -5,11 +5,13 @@ defmodule Messngr.Apps.Executors.RemindExecutorTest do
 
   describe "parse_remind_args/1" do
     test "parses minutes" do
-      assert {:ok, "30 minutter", "Check deployment"} = RemindExecutor.parse_remind_args("30m Check deployment")
+      assert {:ok, "30 minutter", "Check deployment"} =
+               RemindExecutor.parse_remind_args("30m Check deployment")
     end
 
     test "parses hours" do
-      assert {:ok, "2 timer", "Team standup"} = RemindExecutor.parse_remind_args("2h Team standup")
+      assert {:ok, "2 timer", "Team standup"} =
+               RemindExecutor.parse_remind_args("2h Team standup")
     end
 
     test "parses seconds" do

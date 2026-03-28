@@ -20,10 +20,7 @@ defmodule Messngr.Media.RetentionPrunerTest do
       Application.put_env(:msgr, Storage, original_storage_config)
     end)
 
-    {:ok,
-     profile: profile,
-     conversation: conversation,
-     storage_config: original_storage_config}
+    {:ok, profile: profile, conversation: conversation, storage_config: original_storage_config}
   end
 
   test "prune_expired_uploads removes expired uploads and storage objects", %{
@@ -96,7 +93,11 @@ defmodule Messngr.Media.RetentionPrunerTest do
     conversation: conversation,
     storage_config: storage_config
   } do
-    Application.put_env(:msgr, Storage, Keyword.put(storage_config, :http_client, fn _ -> {:error, :timeout} end))
+    Application.put_env(
+      :msgr,
+      Storage,
+      Keyword.put(storage_config, :http_client, fn _ -> {:error, :timeout} end)
+    )
 
     {:ok, upload, _} =
       Media.create_upload(conversation.id, profile.id, %{

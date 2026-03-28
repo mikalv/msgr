@@ -4,7 +4,8 @@ defmodule TeamsWeb.Subdomain.InvitationController do
   import Plug.Conn
   alias Teams.TenantModels.{Invitation, Profile}
 
-  def filter_invitation_for_json(inv), do: Map.drop(Map.from_struct(inv), [:__meta__, :updated_at, :inserted_at, :metadata])
+  def filter_invitation_for_json(inv),
+    do: Map.drop(Map.from_struct(inv), [:__meta__, :updated_at, :inserted_at, :metadata])
 
   defp get_authed_context(conn) do
     tenant = conn.private[:subdomain]
@@ -26,23 +27,31 @@ defmodule TeamsWeb.Subdomain.InvitationController do
 
   def create(conn, params) do
     {tenant, profile} = get_authed_context(conn)
+
     if Profile.can?(tenant, profile, "can_invite_user") do
       case params["invitation_mode"] do
         "email" ->
-          Logger.info "Requesting invite per email"
+          Logger.info("Requesting invite per email")
           # TODO: Validate email correctly
           {:ok, invitation} = Invitation.create_email_invitation(tenant, profile, params["email"])
           conn |> send_resp(200, Jason.encode!(filter_invitation_for_json(invitation)))
 
         "phone" ->
-          Logger.info "Requesting invite per phone"
+          Logger.info("Requesting invite per phone")
           # TODO: Validate msisdn correctly
-          {:ok, invitation} = Invitation.create_msisdn_invitation(tenant, profile, params["msisdn"])
+          {:ok, invitation} =
+            Invitation.create_msisdn_invitation(tenant, profile, params["msisdn"])
+
           conn |> send_resp(200, Jason.encode!(filter_invitation_for_json(invitation)))
       end
     else
       conn
-      |> send_resp(401, Jason.encode!(%{error: "You don't have the roles or permission to create a new invitation!"}))
+      |> send_resp(
+        401,
+        Jason.encode!(%{
+          error: "You don't have the roles or permission to create a new invitation!"
+        })
+      )
     end
   end
 

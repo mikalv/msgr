@@ -7,12 +7,12 @@ defmodule Noise.V1.NoiseBackend.Service do
 
   use GRPC.Service, name: "noise.v1.NoiseBackend"
 
-  rpc :NotifyNewSession, Noise.V1.SessionNotification, Noise.V1.SessionAck
-  rpc :VerifyToken, Noise.V1.VerifyTokenRequest, Noise.V1.VerifyTokenResponse
-  rpc :ValidateDevice, Noise.V1.ValidateDeviceRequest, Noise.V1.ValidateDeviceResponse
-  rpc :BindAccount, Noise.V1.BindAccountRequest, Noise.V1.BindAccountResponse
-  rpc :DeleteSession, Noise.V1.DeleteSessionRequest, Noise.V1.DeleteSessionResponse
-  rpc :Health, Noise.V1.HealthRequest, Noise.V1.HealthResponse
+  rpc(:NotifyNewSession, Noise.V1.SessionNotification, Noise.V1.SessionAck)
+  rpc(:VerifyToken, Noise.V1.VerifyTokenRequest, Noise.V1.VerifyTokenResponse)
+  rpc(:ValidateDevice, Noise.V1.ValidateDeviceRequest, Noise.V1.ValidateDeviceResponse)
+  rpc(:BindAccount, Noise.V1.BindAccountRequest, Noise.V1.BindAccountResponse)
+  rpc(:DeleteSession, Noise.V1.DeleteSessionRequest, Noise.V1.DeleteSessionResponse)
+  rpc(:Health, Noise.V1.HealthRequest, Noise.V1.HealthResponse)
 end
 
 defmodule Noise.V1.NoiseBackend.Stub do

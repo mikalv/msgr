@@ -27,6 +27,7 @@ defmodule TeamsWeb.ChatChannel do
       case socket.assigns[:tenant] do
         nil ->
           team_slug = Map.get(payload || %{}, "team_slug")
+
           if team_slug do
             case TeamManagement.get_team_by_slug(team_slug) do
               nil -> nil
@@ -35,7 +36,9 @@ defmodule TeamsWeb.ChatChannel do
           else
             nil
           end
-        t -> t
+
+        t ->
+          t
       end
 
     if is_nil(prefix) do
@@ -48,17 +51,20 @@ defmodule TeamsWeb.ChatChannel do
         channel ->
           # Resolve the tenant profile for this account
           account_id = socket.assigns[:uid] || socket.assigns[:account_id]
-          tenant_profile = if account_id do
-            TeamManagement.get_profile_for_account(prefix, account_id)
-          end
+
+          tenant_profile =
+            if account_id do
+              TeamManagement.get_profile_for_account(prefix, account_id)
+            end
+
           tenant_profile_id = if tenant_profile, do: tenant_profile.id, else: profile_id
 
           if has_access?(prefix, channel, tenant_profile_id) do
             # Resolve team_slug for push notifications
             team_slug =
               Map.get(payload || %{}, "team_slug") ||
-              socket.assigns[:team_slug] ||
-              resolve_slug_from_prefix(prefix)
+                socket.assigns[:team_slug] ||
+                resolve_slug_from_prefix(prefix)
 
             socket =
               socket
@@ -85,7 +91,9 @@ defmodule TeamsWeb.ChatChannel do
     profile_id = socket.assigns[:profile_id]
 
     case ReadCursor.get(prefix, channel_id, profile_id) do
-      nil -> :ok
+      nil ->
+        :ok
+
       cursor ->
         push(socket, "read_cursor:updated", %{
           channel_id: channel_id,
@@ -123,6 +131,7 @@ defmodule TeamsWeb.ChatChannel do
 
         # Broadcast to team topic for sidebar unread counts
         team_slug = socket.assigns[:team_slug] || resolve_slug_from_prefix(prefix)
+
         if team_slug do
           MessngrWeb.Endpoint.broadcast(
             "team:#{team_slug}",
@@ -136,6 +145,7 @@ defmodule TeamsWeb.ChatChannel do
 
         # Dispatch push notifications to offline members
         Logger.info("Push dispatch: team_slug=#{inspect(team_slug)} prefix=#{inspect(prefix)}")
+
         if team_slug do
           Messngr.Push.Dispatcher.notify_new_message(team_slug, prefix, message)
         else
@@ -153,7 +163,11 @@ defmodule TeamsWeb.ChatChannel do
     end
   end
 
-  def handle_in("new:thread_reply", %{"thread_parent_id" => parent_id, "content" => content} = payload, socket) do
+  def handle_in(
+        "new:thread_reply",
+        %{"thread_parent_id" => parent_id, "content" => content} = payload,
+        socket
+      ) do
     prefix = socket.assigns[:prefix]
     channel_id = socket.assigns[:channel_id]
     profile_id = socket.assigns[:profile_id]
@@ -177,6 +191,7 @@ defmodule TeamsWeb.ChatChannel do
 
         # Dispatch push notifications for thread replies too
         team_slug = socket.assigns[:team_slug]
+
         if team_slug do
           Messngr.Push.Dispatcher.notify_new_message(team_slug, prefix, message)
         end

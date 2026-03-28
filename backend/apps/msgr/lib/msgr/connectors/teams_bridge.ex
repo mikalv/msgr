@@ -47,7 +47,15 @@ defmodule Msgr.Connectors.TeamsBridge do
   def send_message(bridge, params, opts \\ []) do
     payload =
       params
-      |> Map.take([:chat_id, :conversation_id, :message, :attachments, :mentions, :reply_to, :metadata])
+      |> Map.take([
+        :chat_id,
+        :conversation_id,
+        :message,
+        :attachments,
+        :mentions,
+        :reply_to,
+        :metadata
+      ])
       |> Map.put_new(:attachments, List.wrap(Map.get(params, :attachments, [])))
       |> Map.put_new(:mentions, List.wrap(Map.get(params, :mentions, [])))
       |> Map.put_new(:metadata, Map.get(params, :metadata, %{}))
@@ -79,7 +87,8 @@ defmodule Msgr.Connectors.TeamsBridge do
     with :linked <- normalise_status(status),
          {:ok, account_id} <- fetch_account_id(params),
          {:ok, attrs} <- build_sync_attrs(response, bridge.service, account_id, instance),
-         {:ok, _record} <- Bridges.sync_linked_identity(account_id, bridge.service, attrs, instance: instance) do
+         {:ok, _record} <-
+           Bridges.sync_linked_identity(account_id, bridge.service, attrs, instance: instance) do
       :ok
     else
       :skip -> :ok
@@ -92,12 +101,13 @@ defmodule Msgr.Connectors.TeamsBridge do
 
   defp fetch_account_id(params) when is_map(params) do
     params
-    |> Map.get(:user_id) || Map.get(params, "user_id")
-    |> case do
-      nil -> {:error, :missing_account_id}
-      value when is_binary(value) and value != "" -> {:ok, value}
-      value -> {:error, {:invalid_account_id, value}}
-    end
+    |> Map.get(:user_id) ||
+      Map.get(params, "user_id")
+      |> case do
+        nil -> {:error, :missing_account_id}
+        value when is_binary(value) and value != "" -> {:ok, value}
+        value -> {:error, {:invalid_account_id, value}}
+      end
   end
 
   defp resolve_instance(params, response) do
@@ -108,7 +118,9 @@ defmodule Msgr.Connectors.TeamsBridge do
 
     candidate
     |> case do
-      nil -> Bridges.default_instance()
+      nil ->
+        Bridges.default_instance()
+
       value ->
         value
         |> to_string()
@@ -126,7 +138,8 @@ defmodule Msgr.Connectors.TeamsBridge do
     session = fetch_map(response, :session)
     capabilities = fetch_map(response, :capabilities)
 
-    with {:ok, session_map} <- SessionVault.scrub_and_store(service, account_id, instance, session) do
+    with {:ok, session_map} <-
+           SessionVault.scrub_and_store(service, account_id, instance, session) do
       contacts =
         response
         |> fetch_list([:members, :contacts])
@@ -176,11 +189,12 @@ defmodule Msgr.Connectors.TeamsBridge do
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
   defp extract_user_id(user) when is_map(user) do
-    fetch_field(user, :id) || fetch_field(user, :user_id)
-    |> case do
-      nil -> nil
-      value -> to_string(value)
-    end
+    fetch_field(user, :id) ||
+      fetch_field(user, :user_id)
+      |> case do
+        nil -> nil
+        value -> to_string(value)
+      end
   end
 
   defp extract_user_id(_), do: nil
@@ -188,8 +202,10 @@ defmodule Msgr.Connectors.TeamsBridge do
   defp extract_display_name(user) when is_map(user) do
     fetch_field(user, :display_name) ||
       fetch_field(user, :displayName) ||
-      build_name(fetch_field(user, :given_name) || fetch_field(user, :givenName),
-        fetch_field(user, :surname) || fetch_field(user, :family_name)) ||
+      build_name(
+        fetch_field(user, :given_name) || fetch_field(user, :givenName),
+        fetch_field(user, :surname) || fetch_field(user, :family_name)
+      ) ||
       fetch_field(user, :mail) ||
       extract_user_id(user)
   end
@@ -197,15 +213,18 @@ defmodule Msgr.Connectors.TeamsBridge do
   defp extract_display_name(_), do: nil
 
   defp extract_tenant_id(tenant) when is_map(tenant) do
-    fetch_field(tenant, :id) || fetch_field(tenant, :tenant_id) || fetch_field(tenant, :azure_ad_id)
-    |> case do
-      nil -> nil
-      value -> to_string(value)
-    end
+    fetch_field(tenant, :id) || fetch_field(tenant, :tenant_id) ||
+      fetch_field(tenant, :azure_ad_id)
+      |> case do
+        nil -> nil
+        value -> to_string(value)
+      end
   end
 
   defp extract_tenant_id(value) when is_binary(value) do
-    value |> String.trim() |> case do
+    value
+    |> String.trim()
+    |> case do
       "" -> nil
       trimmed -> trimmed
     end

@@ -23,8 +23,11 @@ defmodule Messngr.Apps.Executors.PollExecutor do
   end
 
   @doc false
-  def parse_poll_args(nil), do: {:error, "Bruk: /poll \"Spørsmål\" \"Alternativ 1\" \"Alternativ 2\""}
-  def parse_poll_args(""), do: {:error, "Bruk: /poll \"Spørsmål\" \"Alternativ 1\" \"Alternativ 2\""}
+  def parse_poll_args(nil),
+    do: {:error, "Bruk: /poll \"Spørsmål\" \"Alternativ 1\" \"Alternativ 2\""}
+
+  def parse_poll_args(""),
+    do: {:error, "Bruk: /poll \"Spørsmål\" \"Alternativ 1\" \"Alternativ 2\""}
 
   def parse_poll_args(args) when is_binary(args) do
     parts = extract_quoted_parts(args)
@@ -36,11 +39,13 @@ defmodule Messngr.Apps.Executors.PollExecutor do
       [_question | options] when length(options) < 2 ->
         # Try splitting by whitespace if no quotes were used
         words = String.split(args)
+
         if length(words) >= 3 do
           [question | options] = words
           {:ok, question, options}
         else
-          {:error, "En poll trenger minst 2 alternativer. Bruk: /poll \"Spørsmål\" \"Alt 1\" \"Alt 2\""}
+          {:error,
+           "En poll trenger minst 2 alternativer. Bruk: /poll \"Spørsmål\" \"Alt 1\" \"Alt 2\""}
         end
 
       _ ->
@@ -51,6 +56,7 @@ defmodule Messngr.Apps.Executors.PollExecutor do
   defp extract_quoted_parts(text) do
     # Match quoted strings, or fall back to whitespace-split
     regex = ~r/"([^"]+)"/
+
     case Regex.scan(regex, text) do
       [] ->
         # No quoted parts found -- split by whitespace

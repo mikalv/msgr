@@ -24,8 +24,15 @@ defmodule AuthProvider.Idp.Session do
   By default the session is renewed which protects against session fixation
   attacks. This can be overridden by passing `renew: false` in `opts`.
   """
-  @spec sign_in(Plug.Conn.t(), Tenant.t(), User.t(), IdentityProvider.t(), keyword()) :: Plug.Conn.t()
-  def sign_in(conn, %Tenant{} = tenant, %User{} = user, %IdentityProvider{} = provider, opts \\ []) do
+  @spec sign_in(Plug.Conn.t(), Tenant.t(), User.t(), IdentityProvider.t(), keyword()) ::
+          Plug.Conn.t()
+  def sign_in(
+        conn,
+        %Tenant{} = tenant,
+        %User{} = user,
+        %IdentityProvider{} = provider,
+        opts \\ []
+      ) do
     conn
     |> configure_session(renew: Keyword.get(opts, :renew, true))
     |> put_session(@tenant_session_key, tenant.id)
@@ -46,7 +53,9 @@ defmodule AuthProvider.Idp.Session do
   Hydrates the currently authenticated session, returning the tenant,
   provider and user if present.
   """
-  @spec fetch_current(Plug.Conn.t()) :: {Plug.Conn.t(), {:ok, %{tenant: Tenant.t(), provider: IdentityProvider.t(), user: User.t()}} | :error}
+  @spec fetch_current(Plug.Conn.t()) ::
+          {Plug.Conn.t(),
+           {:ok, %{tenant: Tenant.t(), provider: IdentityProvider.t(), user: User.t()}} | :error}
   def fetch_current(conn) do
     with tenant_id when not is_nil(tenant_id) <- get_session(conn, @tenant_session_key),
          user_id when not is_nil(user_id) <- get_session(conn, @user_session_key),
@@ -75,4 +84,3 @@ defmodule AuthProvider.Idp.Session do
     end
   end
 end
-

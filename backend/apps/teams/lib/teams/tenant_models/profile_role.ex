@@ -54,9 +54,12 @@ defmodule Teams.TenantModels.ProfileRole do
       |> Multi.delete_all(
         :profile_role_deleted,
         __MODULE__
-        |> where([profile_role], profile_role.profile_id == ^profile_id), prefix: Triplex.to_prefix(tenant)
+        |> where([profile_role], profile_role.profile_id == ^profile_id),
+        prefix: Triplex.to_prefix(tenant)
       )
-      |> Multi.insert_all(:profile_role_inserted, __MODULE__, profile_roles, prefix: Triplex.to_prefix(tenant))
+      |> Multi.insert_all(:profile_role_inserted, __MODULE__, profile_roles,
+        prefix: Triplex.to_prefix(tenant)
+      )
 
     case Repo.transaction(multi, prefix: Triplex.to_prefix(tenant)) do
       {:ok, _multi_result} ->

@@ -71,15 +71,18 @@ defmodule MessngrWeb.Router do
 
       resources "/shopping_lists", FamilyShoppingListController,
         only: [:index, :create, :show, :update, :delete] do
-        resources "/items", FamilyShoppingItemController, only: [:index, :create, :update, :delete]
+        resources "/items", FamilyShoppingItemController,
+          only: [:index, :create, :update, :delete]
       end
 
-      resources "/todo_lists", FamilyTodoListController, only: [:index, :create, :show, :update, :delete] do
+      resources "/todo_lists", FamilyTodoListController,
+        only: [:index, :create, :show, :update, :delete] do
         resources "/items", FamilyTodoItemController, only: [:index, :create, :update, :delete]
       end
 
       resources "/notes", FamilyNoteController, only: [:index, :create, :show, :update, :delete]
     end
+
     post "/conversations/:id/assistant", AIController, :conversation_reply
     post "/contacts/import", ContactController, :import
     post "/contacts/lookup", ContactController, :lookup
@@ -89,7 +92,11 @@ defmodule MessngrWeb.Router do
     get "/bridges/catalog", BridgeCatalogController, :index
     post "/bridges/:bridge_id/sessions", BridgeAuthSessionController, :create
     get "/bridges/sessions/:id", BridgeAuthSessionController, :show
-    post "/bridges/:bridge_id/sessions/:id/credentials", BridgeAuthSessionController, :submit_credentials
+
+    post "/bridges/:bridge_id/sessions/:id/credentials",
+         BridgeAuthSessionController,
+         :submit_credentials
+
     delete "/bridges/:bridge_id", BridgeAccountController, :delete
     get "/account/me", AccountController, :me
     put "/account/me", AccountController, :update_me

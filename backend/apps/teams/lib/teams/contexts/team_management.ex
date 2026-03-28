@@ -139,7 +139,9 @@ defmodule Teams.TeamManagement do
 
       # 3. Add to #general channel
       case Channel.get_by_slug(prefix, "general") do
-        nil -> :ok
+        nil ->
+          :ok
+
         general ->
           ChannelMembership.join(prefix, %{
             channel_id: general.id,
@@ -197,7 +199,9 @@ defmodule Teams.TeamManagement do
   @doc "Change a member's role (owner/admin/member)."
   def change_role(team_id, account_id, new_role) do
     case get_membership(team_id, account_id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       membership ->
         membership
         |> TeamMembership.changeset(%{role: new_role})
@@ -208,7 +212,9 @@ defmodule Teams.TeamManagement do
   @doc "Remove a member from a team (public membership + tenant profile)."
   def remove_member(team, account_id) do
     case get_membership(team.id, account_id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       membership ->
         # Delete the public membership
         Repo.delete(membership)

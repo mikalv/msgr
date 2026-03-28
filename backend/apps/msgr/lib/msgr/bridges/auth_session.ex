@@ -104,7 +104,9 @@ defmodule Messngr.Bridges.AuthSession do
 
   defp validate_optional_state(%Ecto.Changeset{} = changeset) do
     case get_change(changeset, :state) do
-      nil -> changeset
+      nil ->
+        changeset
+
       _state ->
         changeset
         |> validate_required([:state])

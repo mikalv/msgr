@@ -18,6 +18,7 @@ defmodule MessngrWeb.Endpoint do
   socket "/socket", MessngrWeb.UserSocket,
     websocket: [check_origin: false],
     longpoll: true
+
   # Serve at "/" the static files from "priv/static" directory.
   #
   # You should set gzip to true if you are running phx.digest
@@ -34,7 +35,8 @@ defmodule MessngrWeb.Endpoint do
     at: "/",
     from: "/app/web_client",
     gzip: true,
-    only_matching: ~w(main.dart.js flutter_bootstrap.js flutter_service_worker.js push_sw.js manifest.json favicon.png version.json index.html assets icons canvaskit)
+    only_matching:
+      ~w(main.dart.js flutter_bootstrap.js flutter_service_worker.js push_sw.js manifest.json favicon.png version.json index.html assets icons canvaskit)
 
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.

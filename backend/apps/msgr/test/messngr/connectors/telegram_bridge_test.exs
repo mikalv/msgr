@@ -19,17 +19,27 @@ defmodule Messngr.Connectors.TelegramBridgeTest do
 
   test "link_account/3 builds MTProto handshake request", %{agent: agent} do
     bridge = TelegramBridge.new(queue: QueueRecorder, queue_opts: [agent: agent])
-    params = %{user_id: "u-1", phone_number: "+4712345678", session: %{dc: 2}, two_factor: :enabled}
-    assert {:ok, %{status: :accepted}} = TelegramBridge.link_account(bridge, params, trace_id: "link")
+
+    params = %{
+      user_id: "u-1",
+      phone_number: "+4712345678",
+      session: %{dc: 2},
+      two_factor: :enabled
+    }
+
+    assert {:ok, %{status: :accepted}} =
+             TelegramBridge.link_account(bridge, params, trace_id: "link")
 
     assert [request] = QueueRecorder.requests(agent)
     assert request.topic == "bridge/telegram/link_account"
+
     assert request.payload.payload == %{
              user_id: "u-1",
              phone_number: "+4712345678",
              session: %{dc: 2},
              two_factor: :enabled
            }
+
     assert request.payload.trace_id == "link"
   end
 
@@ -72,10 +82,10 @@ defmodule Messngr.Connectors.TelegramBridgeTest do
       "session" => %{"blob" => "deadbeef"},
       "capabilities" => %{"messaging" => %{"text" => true, "media_types" => ["image"]}},
       "contacts" => [
-        %{ "id" => "200", "username" => "bob", "first_name" => "Bob", "last_name" => "Builder" }
+        %{"id" => "200", "username" => "bob", "first_name" => "Bob", "last_name" => "Builder"}
       ],
       "chats" => [
-        %{ "id" => 300, "name" => "Team", "type" => "supergroup", "muted" => true }
+        %{"id" => 300, "name" => "Team", "type" => "supergroup", "muted" => true}
       ]
     }
 

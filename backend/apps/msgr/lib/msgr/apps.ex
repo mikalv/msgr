@@ -186,6 +186,7 @@ defmodule Messngr.Apps do
   @doc "List bot tokens for an app installation (excludes revoked)."
   def list_bot_tokens(installation_id) do
     import Ecto.Query
+
     from(t in BotToken,
       where: t.app_installation_id == ^installation_id and is_nil(t.revoked_at),
       order_by: [desc: t.inserted_at]
@@ -210,20 +211,23 @@ defmodule Messngr.Apps do
 
   @doc "Browse public apps for the marketplace directory."
   def list_directory(opts \\ []) do
-    query = from(a in App,
-      where: a.visibility == "public" and a.status == "active",
-      order_by: [desc: a.featured, desc: a.install_count, asc: a.name]
-    )
+    query =
+      from(a in App,
+        where: a.visibility == "public" and a.status == "active",
+        order_by: [desc: a.featured, desc: a.install_count, asc: a.name]
+      )
 
-    query = case Keyword.get(opts, :category) do
-      nil -> query
-      cat -> from(a in query, where: a.category == ^cat)
-    end
+    query =
+      case Keyword.get(opts, :category) do
+        nil -> query
+        cat -> from(a in query, where: a.category == ^cat)
+      end
 
-    query = case Keyword.get(opts, :q) do
-      nil -> query
-      q -> from(a in query, where: ilike(a.name, ^"%#{q}%") or ilike(a.description, ^"%#{q}%"))
-    end
+    query =
+      case Keyword.get(opts, :q) do
+        nil -> query
+        q -> from(a in query, where: ilike(a.name, ^"%#{q}%") or ilike(a.description, ^"%#{q}%"))
+      end
 
     Repo.all(query)
   end

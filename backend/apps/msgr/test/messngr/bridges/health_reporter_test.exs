@@ -38,7 +38,10 @@ defmodule Messngr.Bridges.HealthReporterTest do
           %{
             name: :slack,
             connector: SlackBridge,
-            connector_opts: [queue: QueueRecorder, queue_opts: [agent: agent, responder: responder]],
+            connector_opts: [
+              queue: QueueRecorder,
+              queue_opts: [agent: agent, responder: responder]
+            ],
             metadata: %{env: :test}
           }
         ]
@@ -48,19 +51,31 @@ defmodule Messngr.Bridges.HealthReporterTest do
     events = [[:messngr, :bridges, :slack, :health], [:messngr, :bridges, :slack, :client_health]]
     parent = self()
 
-    :telemetry.attach_many(handler_id, events, fn event, measurements, metadata, _config ->
-      send(parent, {:telemetry_event, event, measurements, metadata})
-    end, %{})
+    :telemetry.attach_many(
+      handler_id,
+      events,
+      fn event, measurements, metadata, _config ->
+        send(parent, {:telemetry_event, event, measurements, metadata})
+      end,
+      %{}
+    )
+
     on_exit(fn -> :telemetry.detach(handler_id) end)
 
-    assert_receive {:telemetry_event, [:messngr, :bridges, :slack, :health], measurements, metadata}, 200
+    assert_receive {:telemetry_event, [:messngr, :bridges, :slack, :health], measurements,
+                    metadata},
+                   200
+
     assert measurements.total_clients == 1
     assert measurements.connected_clients == 1
     assert measurements.pending_events == 2
     assert metadata.bridge == :slack
     assert metadata.env == :test
 
-    assert_receive {:telemetry_event, [:messngr, :bridges, :slack, :client_health], client_measurements, client_meta}, 50
+    assert_receive {:telemetry_event, [:messngr, :bridges, :slack, :client_health],
+                    client_measurements, client_meta},
+                   50
+
     assert client_measurements.pending_events == 2
     assert client_measurements.connected == 1
     assert client_meta.instance == "T123"

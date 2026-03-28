@@ -14,7 +14,10 @@ defmodule Messngr.Apps.Executors.RemindExecutor do
   alias Teams.TenantModels.MessageReminder
 
   @impl true
-  def execute(%{args: args, channel_id: channel_id, triggered_by: account_id} = _command, %{tenant_prefix: prefix} = _context) do
+  def execute(
+        %{args: args, channel_id: channel_id, triggered_by: account_id} = _command,
+        %{tenant_prefix: prefix} = _context
+      ) do
     case parse_remind_args(args) do
       {:ok, duration_seconds, time_str, message} ->
         # Find profile for this account
@@ -27,12 +30,12 @@ defmodule Messngr.Apps.Executors.RemindExecutor do
             |> DateTime.truncate(:second)
 
           case MessageReminder.create(prefix, %{
-            message_id: nil_safe_message_id(channel_id),
-            channel_id: channel_id,
-            profile_id: profile.id,
-            remind_at: remind_at,
-            message_preview: message
-          }) do
+                 message_id: nil_safe_message_id(channel_id),
+                 channel_id: channel_id,
+                 profile_id: profile.id,
+                 remind_at: remind_at,
+                 message_preview: message
+               }) do
             {:ok, _reminder} ->
               content = "⏰ Reminder set: **#{message}** in #{time_str}"
               {:ok, %{type: :message, content: content, private: true}}
@@ -54,6 +57,7 @@ defmodule Messngr.Apps.Executors.RemindExecutor do
       {:ok, _seconds, time_str, message} ->
         content = "⏰ Reminder set: **#{message}** in #{time_str}"
         {:ok, %{type: :message, content: content}}
+
       {:error, reason} ->
         {:error, reason}
     end
@@ -69,6 +73,7 @@ defmodule Messngr.Apps.Executors.RemindExecutor do
         case parse_duration(time_str) do
           {:ok, seconds} ->
             {:ok, seconds, humanize_time(time_str), message}
+
           :error ->
             {:error, "Invalid time '#{time_str}'. Use e.g. 30m, 2h, 1d"}
         end
@@ -83,6 +88,7 @@ defmodule Messngr.Apps.Executors.RemindExecutor do
       [_, amount, unit] ->
         seconds = String.to_integer(amount) * unit_multiplier(String.downcase(unit))
         {:ok, seconds}
+
       _ ->
         :error
     end
@@ -96,13 +102,16 @@ defmodule Messngr.Apps.Executors.RemindExecutor do
   defp humanize_time(time_str) do
     {amount, unit} = String.split_at(time_str, -1)
     amount_int = String.to_integer(amount)
-    unit_name = case String.downcase(unit) do
-      "s" -> if(amount_int == 1, do: "second", else: "seconds")
-      "m" -> if(amount_int == 1, do: "minute", else: "minutes")
-      "h" -> if(amount_int == 1, do: "hour", else: "hours")
-      "d" -> if(amount_int == 1, do: "day", else: "days")
-      _ -> unit
-    end
+
+    unit_name =
+      case String.downcase(unit) do
+        "s" -> if(amount_int == 1, do: "second", else: "seconds")
+        "m" -> if(amount_int == 1, do: "minute", else: "minutes")
+        "h" -> if(amount_int == 1, do: "hour", else: "hours")
+        "d" -> if(amount_int == 1, do: "day", else: "days")
+        _ -> unit
+      end
+
     "#{amount_int} #{unit_name}"
   end
 

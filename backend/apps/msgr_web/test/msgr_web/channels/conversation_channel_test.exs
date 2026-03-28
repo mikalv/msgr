@@ -21,13 +21,18 @@ defmodule MessngrWeb.ConversationChannelTest do
      conversation: conversation}
   end
 
-  test "join authorizes valid participants", %{account: account, profile: profile, conversation: conversation} do
+  test "join authorizes valid participants", %{
+    account: account,
+    profile: profile,
+    conversation: conversation
+  } do
     {socket, _session} =
       UserSocket
       |> socket("user_id", %{})
       |> attach_noise_socket(account, profile)
 
-    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
+    {:ok, _, socket} =
+      subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
 
     assert socket.assigns.conversation_id == conversation.id
     assert socket.assigns.current_profile.id == profile.id
@@ -43,16 +48,26 @@ defmodule MessngrWeb.ConversationChannelTest do
       |> attach_noise_socket(outsider, outsider_profile)
 
     assert {:error, %{reason: "forbidden"}} =
-             subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
+             subscribe_and_join(
+               socket,
+               ConversationChannel,
+               "conversation:#{conversation.id}",
+               %{}
+             )
   end
 
-  test "push message:create persists and replies", %{account: account, profile: profile, conversation: conversation} do
+  test "push message:create persists and replies", %{
+    account: account,
+    profile: profile,
+    conversation: conversation
+  } do
     {socket, _session} =
       UserSocket
       |> socket("user_id", %{})
       |> attach_noise_socket(account, profile)
 
-    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
+    {:ok, _, socket} =
+      subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
 
     ref = push(socket, "message:create", %{"body" => "Hei på deg"})
 
@@ -60,13 +75,18 @@ defmodule MessngrWeb.ConversationChannelTest do
     assert_push "message_created", %{"data" => %{"body" => "Hei på deg", "id" => ^message_id}}
   end
 
-  test "message:create rejects oversize payloads", %{account: account, profile: profile, conversation: conversation} do
+  test "message:create rejects oversize payloads", %{
+    account: account,
+    profile: profile,
+    conversation: conversation
+  } do
     {socket, _session} =
       UserSocket
       |> socket("user_id", %{})
       |> attach_noise_socket(account, profile)
 
-    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
+    {:ok, _, socket} =
+      subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
 
     long_body = String.duplicate("a", 4_001)
     ref = push(socket, "message:create", %{"body" => long_body})
@@ -74,9 +94,16 @@ defmodule MessngrWeb.ConversationChannelTest do
     assert_reply ref, :error, %{"errors" => ["body is too long (max 4000 characters)"]}
   end
 
-  test "message:create enforces per-profile rate limits", %{account: account, profile: profile, conversation: conversation} do
+  test "message:create enforces per-profile rate limits", %{
+    account: account,
+    profile: profile,
+    conversation: conversation
+  } do
     original_limits = Application.get_env(:msgr, :rate_limits)
-    updated_limits = Keyword.put(original_limits || [], :conversation_message_event, [limit: 1, period: 60_000])
+
+    updated_limits =
+      Keyword.put(original_limits || [], :conversation_message_event, limit: 1, period: 60_000)
+
     Application.put_env(:msgr, :rate_limits, updated_limits)
 
     on_exit(fn -> Application.put_env(:msgr, :rate_limits, original_limits) end)
@@ -86,7 +113,8 @@ defmodule MessngrWeb.ConversationChannelTest do
       |> socket("user_id", %{})
       |> attach_noise_socket(account, profile)
 
-    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
+    {:ok, _, socket} =
+      subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
 
     ref1 = push(socket, "message:create", %{"body" => "Hei"})
     assert_reply ref1, :ok, %{"data" => %{"body" => "Hei"}}
@@ -95,13 +123,19 @@ defmodule MessngrWeb.ConversationChannelTest do
     assert_reply ref2, :error, %{"errors" => ["rate limit exceeded"]}
   end
 
-  test "peer messages are broadcast to subscribers", %{account: account, profile: profile, peer_profile: peer_profile, conversation: conversation} do
+  test "peer messages are broadcast to subscribers", %{
+    account: account,
+    profile: profile,
+    peer_profile: peer_profile,
+    conversation: conversation
+  } do
     {socket, _session} =
       UserSocket
       |> socket("user_id", %{})
       |> attach_noise_socket(account, profile)
 
-    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
+    {:ok, _, socket} =
+      subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
 
     {:ok, message} = Chat.send_message(conversation.id, peer_profile.id, %{"body" => "Hei"})
 
@@ -109,7 +143,13 @@ defmodule MessngrWeb.ConversationChannelTest do
   end
 
   describe "events" do
-    setup %{account: account, profile: profile, peer_account: peer_account, peer_profile: peer_profile, conversation: conversation} do
+    setup %{
+      account: account,
+      profile: profile,
+      peer_account: peer_account,
+      peer_profile: peer_profile,
+      conversation: conversation
+    } do
       socket = join_conversation(account, profile, conversation)
       assert_push socket, "presence_state", state
       assert is_map(state)
@@ -124,7 +164,14 @@ defmodule MessngrWeb.ConversationChannelTest do
       assert_push socket, "message_created", _
       assert_push peer_socket, "message_created", _
 
-      {:ok, %{socket: socket, peer_socket: peer_socket, message: message, conversation: conversation, profile: profile}}
+      {:ok,
+       %{
+         socket: socket,
+         peer_socket: peer_socket,
+         message: message,
+         conversation: conversation,
+         profile: profile
+       }}
     end
 
     test "typing events broadcast to peers", %{socket: socket, peer_socket: peer_socket} do
@@ -141,14 +188,20 @@ defmodule MessngrWeb.ConversationChannelTest do
     test "emits telemetry for send and ack", %{socket: socket} do
       parent = self()
       handler_id = "conversation-telemetry-" <> inspect(parent)
+
       events = [
         [:messngr, :socket, :message, :sent],
         [:messngr, :socket, :message, :acknowledged]
       ]
 
-      :telemetry.attach_many(handler_id, events, fn event, measurements, metadata, _ ->
-        send(parent, {:telemetry_event, event, measurements, metadata})
-      end, %{})
+      :telemetry.attach_many(
+        handler_id,
+        events,
+        fn event, measurements, metadata, _ ->
+          send(parent, {:telemetry_event, event, measurements, metadata})
+        end,
+        %{}
+      )
 
       on_exit(fn -> :telemetry.detach(handler_id) end)
 
@@ -183,14 +236,20 @@ defmodule MessngrWeb.ConversationChannelTest do
     test "emits telemetry for typing events", %{socket: socket} do
       parent = self()
       handler_id = "conversation-typing-" <> inspect(parent)
+
       events = [
         [:messngr, :socket, :typing, :started],
         [:messngr, :socket, :typing, :stopped]
       ]
 
-      :telemetry.attach_many(handler_id, events, fn event, measurements, metadata, _ ->
-        send(parent, {:telemetry_event, event, measurements, metadata})
-      end, %{})
+      :telemetry.attach_many(
+        handler_id,
+        events,
+        fn event, measurements, metadata, _ ->
+          send(parent, {:telemetry_event, event, measurements, metadata})
+        end,
+        %{}
+      )
 
       on_exit(fn -> :telemetry.detach(handler_id) end)
 
@@ -219,7 +278,13 @@ defmodule MessngrWeb.ConversationChannelTest do
       assert stop_meta[:conversation_id] == socket.assigns.conversation_id
     end
 
-    test "reaction add/remove reply and broadcast", %{socket: socket, peer_socket: peer_socket, message: message, conversation: conversation, profile: profile} do
+    test "reaction add/remove reply and broadcast", %{
+      socket: socket,
+      peer_socket: peer_socket,
+      message: message,
+      conversation: conversation,
+      profile: profile
+    } do
       ref = push(socket, "reaction:add", %{"message_id" => message.id, "emoji" => "🔥"})
       assert_reply ref, :ok, %{"reaction" => %{"emoji" => "🔥"}}
       assert_push peer_socket, "reaction_added", payload
@@ -232,53 +297,97 @@ defmodule MessngrWeb.ConversationChannelTest do
       assert removed_payload[:emoji] == "🔥"
     end
 
-    test "message update broadcasts change", %{socket: socket, peer_socket: peer_socket, message: message} do
+    test "message update broadcasts change", %{
+      socket: socket,
+      peer_socket: peer_socket,
+      message: message
+    } do
       ref = push(socket, "message:update", %{"message_id" => message.id, "body" => "Oppdatert"})
       assert_reply ref, :ok, %{"data" => %{"body" => "Oppdatert"}}
       assert_push peer_socket, "message_updated", %{"data" => %{"body" => "Oppdatert"}}
     end
 
-    test "message delete broadcasts deletion", %{socket: socket, peer_socket: peer_socket, message: message} do
+    test "message delete broadcasts deletion", %{
+      socket: socket,
+      peer_socket: peer_socket,
+      message: message
+    } do
       ref = push(socket, "message:delete", %{"message_id" => message.id})
       assert_reply ref, :ok, %{"data" => %{"id" => message.id}}
-      assert_push peer_socket, "message_deleted", %{:message_id => ^message.id, :deleted_at => deleted_at}
+
+      assert_push peer_socket, "message_deleted", %{
+        :message_id => ^message.id,
+        :deleted_at => deleted_at
+      }
+
       assert is_binary(deleted_at)
     end
 
-    test "message read acknowledges and notifies peers", %{peer_socket: peer_socket, socket: socket, message: message, conversation: conversation, profile: profile} do
+    test "message read acknowledges and notifies peers", %{
+      peer_socket: peer_socket,
+      socket: socket,
+      message: message,
+      conversation: conversation,
+      profile: profile
+    } do
       # Send a message from the peer so the main socket can mark it as read
-      {:ok, inbound} = Chat.send_message(conversation.id, peer_socket.assigns.current_profile.id, %{"body" => "Ny"})
+      {:ok, inbound} =
+        Chat.send_message(conversation.id, peer_socket.assigns.current_profile.id, %{
+          "body" => "Ny"
+        })
+
       assert_push socket, "message_created", _
       assert_push peer_socket, "message_created", _
 
       ref = push(socket, "message:read", %{"message_id" => inbound.id})
       assert_reply ref, :ok, %{"status" => "read"}
-      assert_push peer_socket, "message_read", %{:profile_id => ^profile.id, :message_id => ^inbound.id, :read_at => read_at}
+
+      assert_push peer_socket, "message_read", %{
+        :profile_id => ^profile.id,
+        :message_id => ^inbound.id,
+        :read_at => read_at
+      }
+
       assert is_binary(read_at)
     end
 
     test "pin and unpin broadcast", %{socket: socket, peer_socket: peer_socket, message: message} do
-      ref = push(socket, "message:pin", %{"message_id" => message.id, "metadata" => %{"section" => "top"}})
+      ref =
+        push(socket, "message:pin", %{
+          "message_id" => message.id,
+          "metadata" => %{"section" => "top"}
+        })
+
       assert_reply ref, :ok, %{"pinned" => %{"metadata" => %{"section" => "top"}}}
-      assert_push peer_socket, "message_pinned", %{:message_id => ^message.id, :metadata => %{"section" => "top"}}
+
+      assert_push peer_socket, "message_pinned", %{
+        :message_id => ^message.id,
+        :metadata => %{"section" => "top"}
+      }
 
       ref_unpin = push(socket, "message:unpin", %{"message_id" => message.id})
       assert_reply ref_unpin, :ok, %{"status" => "unpinned"}
       assert_push peer_socket, "message_unpinned", %{:message_id => ^message.id}
-end
+    end
 
-  defp join_conversation(account, profile, conversation) do
-    {socket, _session} =
-      UserSocket
-      |> socket("user_id", %{})
-      |> attach_noise_socket(account, profile)
+    defp join_conversation(account, profile, conversation) do
+      {socket, _session} =
+        UserSocket
+        |> socket("user_id", %{})
+        |> attach_noise_socket(account, profile)
 
-    {:ok, _, socket} = subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
-    socket
+      {:ok, _, socket} =
+        subscribe_and_join(socket, ConversationChannel, "conversation:#{conversation.id}", %{})
+
+      socket
+    end
   end
-end
 
-  test "message:sync replies with cursor data", %{account: account, profile: profile, conversation: conversation} do
+  test "message:sync replies with cursor data", %{
+    account: account,
+    profile: profile,
+    conversation: conversation
+  } do
     {:ok, _, socket} =
       UserSocket
       |> socket("user_id", %{})
@@ -299,7 +408,11 @@ end
     assert_push "message_backlog", %{"data" => [%{"body" => "Hei"}]}
   end
 
-  test "conversation watcher events broadcast", %{account: account, profile: profile, conversation: conversation} do
+  test "conversation watcher events broadcast", %{
+    account: account,
+    profile: profile,
+    conversation: conversation
+  } do
     {:ok, _, socket} =
       UserSocket
       |> socket("user_id", %{})

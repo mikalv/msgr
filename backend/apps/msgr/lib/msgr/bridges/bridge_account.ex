@@ -62,9 +62,14 @@ defmodule Messngr.Bridges.BridgeAccount do
     trimmed = String.trim(value)
 
     cond do
-      trimmed == "" -> [{:instance, {"can't be blank", [validation: :required]}}]
-      String.contains?(trimmed, "/") -> [{:instance, {"has invalid format", [validation: :format]}}]
-      true -> []
+      trimmed == "" ->
+        [{:instance, {"can't be blank", [validation: :required]}}]
+
+      String.contains?(trimmed, "/") ->
+        [{:instance, {"has invalid format", [validation: :format]}}]
+
+      true ->
+        []
     end
   end
 

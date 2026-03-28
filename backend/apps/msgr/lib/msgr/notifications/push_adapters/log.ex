@@ -12,11 +12,16 @@ defmodule Messngr.Notifications.PushAdapters.Log do
   def push(%DevicePushToken{} = token, payload, context) do
     Logger.debug(fn ->
       [
-        "push token=", token.id,
-        " platform=", Atom.to_string(token.platform),
-        " mode=", Atom.to_string(token.mode),
-        " payload=", inspect(payload),
-        " context=", inspect(context)
+        "push token=",
+        token.id,
+        " platform=",
+        Atom.to_string(token.platform),
+        " mode=",
+        Atom.to_string(token.mode),
+        " payload=",
+        inspect(payload),
+        " context=",
+        inspect(context)
       ]
       |> IO.iodata_to_binary()
     end)

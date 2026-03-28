@@ -29,7 +29,9 @@ defmodule Messngr.Teams.Team do
     team
     |> cast(attrs, [:name, :slug, :schema_name, :domain, :owner_account_id, :settings])
     |> validate_required([:name, :slug, :schema_name])
-    |> validate_format(:slug, ~r/^[a-z0-9\-]+$/, message: "must be lowercase alphanumeric with dashes")
+    |> validate_format(:slug, ~r/^[a-z0-9\-]+$/,
+      message: "must be lowercase alphanumeric with dashes"
+    )
     |> validate_length(:slug, min: 2, max: 48)
     |> unique_constraint(:slug)
     |> unique_constraint(:schema_name)

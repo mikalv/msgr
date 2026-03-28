@@ -21,7 +21,8 @@ defmodule Messngr.Connectors.SnapchatBridgeTest do
       cookies: nil
     }
 
-    assert {:ok, %{status: :accepted}} = SnapchatBridge.link_account(bridge, params, trace_id: "link")
+    assert {:ok, %{status: :accepted}} =
+             SnapchatBridge.link_account(bridge, params, trace_id: "link")
 
     assert [request] = QueueRecorder.requests(agent)
     assert request.topic == "bridge/snapchat/link_account"
@@ -41,10 +42,12 @@ defmodule Messngr.Connectors.SnapchatBridgeTest do
   test "refresh_session/3 requests renewed chat cookies", %{bridge: bridge, agent: agent} do
     params = %{session_id: "sess", client_id: "web-calling-corp--prod", web_client_auth: "auth"}
 
-    assert {:ok, %{status: :accepted}} = SnapchatBridge.refresh_session(bridge, params, trace_id: "refresh")
+    assert {:ok, %{status: :accepted}} =
+             SnapchatBridge.refresh_session(bridge, params, trace_id: "refresh")
 
     assert [request] = QueueRecorder.requests(agent)
     assert request.topic == "bridge/snapchat/refresh_session"
+
     assert request.payload.payload == %{
              session_id: "sess",
              client_id: "web-calling-corp--prod",
@@ -54,7 +57,10 @@ defmodule Messngr.Connectors.SnapchatBridgeTest do
     assert request.payload.trace_id == "refresh"
   end
 
-  test "send_message/3 publishes outbound envelope with default metadata", %{bridge: bridge, agent: agent} do
+  test "send_message/3 publishes outbound envelope with default metadata", %{
+    bridge: bridge,
+    agent: agent
+  } do
     params = %{conversation_id: "conv", message: %{text: "hei"}, client_context: %{uuid: "1"}}
 
     assert :ok = SnapchatBridge.send_message(bridge, params, trace_id: "out")

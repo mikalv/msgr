@@ -9,7 +9,9 @@ defmodule MessngrWeb.TeamDmControllerTest do
     other_profile = hd(other_account.profiles)
     other_conn = build_conn() |> attach_jwt_session(other_account, other_profile)
     Phoenix.ConnTest.post(other_conn, "/api/teams/#{ctx.slug}/join")
-    other_team_profile = Teams.TeamManagement.get_profile_for_account(ctx.prefix, other_account.id)
+
+    other_team_profile =
+      Teams.TeamManagement.get_profile_for_account(ctx.prefix, other_account.id)
 
     %{
       conn: ctx.conn,

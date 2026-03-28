@@ -13,7 +13,13 @@ defmodule TeamsWeb.Endpoint do
 
   socket "/ws/:tenant", TeamsWeb.UserSocket,
     websocket: [
-      connect_info: [:peer_data, :trace_context_headers, :x_headers, :uri, session: @session_options]
+      connect_info: [
+        :peer_data,
+        :trace_context_headers,
+        :x_headers,
+        :uri,
+        session: @session_options
+      ]
     ],
     longpoll: false
 
@@ -32,12 +38,9 @@ defmodule TeamsWeb.Endpoint do
     gzip: false,
     only: TeamsWeb.static_paths()
 
-
-
-  #if Mix.env() == :dev do
+  # if Mix.env() == :dev do
   #  plug Plug.Debugger
-  #end
-
+  # end
 
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
@@ -64,6 +67,6 @@ defmodule TeamsWeb.Endpoint do
   plug Plug.MethodOverride
   plug Plug.Head
   plug Plug.Session, @session_options
-  plug TeamsWeb.Plugs.Subdomain, %{ subdomain_router: TeamsWeb.SubdomainRouter }
+  plug TeamsWeb.Plugs.Subdomain, %{subdomain_router: TeamsWeb.SubdomainRouter}
   plug TeamsWeb.Router
 end

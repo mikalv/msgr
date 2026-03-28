@@ -39,8 +39,12 @@ defmodule Messngr.Accounts.Contact do
 
   defp normalize_email(changeset) do
     case get_change(changeset, :email) || get_field(changeset, :email) do
-      nil -> changeset
-      "" -> put_change(changeset, :email, nil)
+      nil ->
+        changeset
+
+      "" ->
+        put_change(changeset, :email, nil)
+
       email ->
         normalized = email |> String.trim() |> String.downcase()
         put_change(changeset, :email, normalized)
@@ -49,8 +53,12 @@ defmodule Messngr.Accounts.Contact do
 
   defp normalize_phone_number(changeset) do
     case get_change(changeset, :phone_number) || get_field(changeset, :phone_number) do
-      nil -> changeset
-      "" -> put_change(changeset, :phone_number, nil)
+      nil ->
+        changeset
+
+      "" ->
+        put_change(changeset, :phone_number, nil)
+
       phone ->
         normalized = phone |> String.replace(~r/\D+/, "")
         put_change(changeset, :phone_number, normalized)

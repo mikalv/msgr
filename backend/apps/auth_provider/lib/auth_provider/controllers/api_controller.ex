@@ -9,13 +9,15 @@ defmodule AuthProvider.ApiController do
   ]
 
   def device_register(conn, %{"from" => from, "payload" => payload} = _params) do
-    Logger.info "Payload: #{inspect payload}"
+    Logger.info("Payload: #{inspect(payload)}")
+
     if AuthProvider.DeviceHelper.validate_device_signature(payload) do
       {:ok, device} = AuthProvider.DeviceHelper.find_or_register_device(payload)
-      Logger.info "Device #{inspect device}"
+      Logger.info("Device #{inspect(device)}")
       json(conn, %{"deviceId" => from})
     else
-      conn |> send_resp(401, Jason.encode!(%{"status" => "error", "error" => "Invalid signature"}))
+      conn
+      |> send_resp(401, Jason.encode!(%{"status" => "error", "error" => "Invalid signature"}))
     end
   end
 
@@ -44,13 +46,13 @@ defmodule AuthProvider.ApiController do
   end
 
   def login_code(conn, %{"from" => from, "code" => code, "msisdn" => msisdn} = _params) do
-    Logger.info "Login code (#{code}) from #{msisdn} via deviceId #{from}"
+    Logger.info("Login code (#{code}) from #{msisdn} via deviceId #{from}")
     {:ok, user} = AuthProvider.UserHelper.find_or_register_user_by_msisdn(msisdn, from)
     actual_login_code(conn, msisdn, code, user)
   end
 
   def login_code(conn, %{"from" => from, "code" => code, "email" => email} = _params) do
-    Logger.info "Login code (#{code}) from #{email} via deviceId #{from}"
+    Logger.info("Login code (#{code}) from #{email} via deviceId #{from}")
     {:ok, user} = AuthProvider.UserHelper.find_or_register_user_by_email(email, from)
     actual_login_code(conn, email, code, user)
   end
@@ -59,8 +61,14 @@ defmodule AuthProvider.ApiController do
     case AuthProvider.UserHelper.validate_login_code_for_user(code, user) do
       {:ok, :valid_code} ->
         {:ok, token, claims} = AuthProvider.Guardian.encode_and_sign(user)
-        {:ok, refresh_token, _claims} = AuthProvider.Guardian.encode_and_sign(user, %{}, @refresh_opts)
-        Logger.info "Issued out token=#{token}, claims=#{inspect claims} refresh=#{refresh_token}"
+
+        {:ok, refresh_token, _claims} =
+          AuthProvider.Guardian.encode_and_sign(user, %{}, @refresh_opts)
+
+        Logger.info(
+          "Issued out token=#{token}, claims=#{inspect(claims)} refresh=#{refresh_token}"
+        )
+
         json(conn, %{
           "status" => "ok",
           "claims" => claims,
@@ -71,29 +79,33 @@ defmodule AuthProvider.ApiController do
             "refreshToken" => refresh_token
           }
         })
+
       {:error, :invalid_code} ->
-        conn |> send_resp(401, Jason.encode!(%{"status" => "error", "error" => "Wrong code", "uid" => user.id}))
+        conn
+        |> send_resp(
+          401,
+          Jason.encode!(%{"status" => "error", "error" => "Wrong code", "uid" => user.id})
+        )
     end
   end
 
-
   def login(conn, %{"from" => from, "email" => email} = _params) do
-    Logger.info "Login request from #{email} via deviceId #{from}"
+    Logger.info("Login request from #{email} via deviceId #{from}")
     {:ok, user} = AuthProvider.UserHelper.find_or_register_user_by_email(email, from)
     :ok = AuthProvider.UserHelper.create_login_code_for_user(user)
     json(conn, %{"status" => "ok", "next" => "code", "uid" => user.id})
   end
 
-
   def login(conn, %{"from" => from, "msisdn" => msisdn} = _params) do
-    Logger.info "Login request from #{msisdn} via deviceId #{from}"
+    Logger.info("Login request from #{msisdn} via deviceId #{from}")
     {:ok, user} = AuthProvider.UserHelper.find_or_register_user_by_msisdn(msisdn, from)
     :ok = AuthProvider.UserHelper.create_login_code_for_user(user)
     json(conn, %{"status" => "ok", "next" => "code", "uid" => user.id})
   end
 
   def login(conn, _params) do
-    conn |> send_resp(400, Jason.encode!(%{"status" => "error", "error" => "Invalid parameters!"}))
+    conn
+    |> send_resp(400, Jason.encode!(%{"status" => "error", "error" => "Invalid parameters!"}))
   end
 
   def refresh_token(conn, %{"from" => from, "token" => token} = _params) do
@@ -103,7 +115,8 @@ defmodule AuthProvider.ApiController do
          {:ok, new_refresh_token, _} <-
            AuthProvider.Guardian.encode_and_sign(user, %{}, @refresh_opts),
          {:ok, _} <- AuthProvider.DeviceHelper.upsert_device_context(from, %{}, %{}) do
-      Logger.info "Refresh token. Old claims: #{inspect claims}"
+      Logger.info("Refresh token. Old claims: #{inspect(claims)}")
+
       json(conn, %{
         "status" => "ok",
         "token" => new_token,
@@ -117,7 +130,8 @@ defmodule AuthProvider.ApiController do
         |> send_resp(404, Jason.encode!(%{"status" => "error", "error" => "device_not_found"}))
 
       {:error, reason} ->
-        Logger.warning "Failed to refresh token: #{inspect reason}"
+        Logger.warning("Failed to refresh token: #{inspect(reason)}")
+
         conn
         |> send_resp(401, Jason.encode!(%{"status" => "error", "error" => "invalid_token"}))
     end
@@ -139,8 +153,9 @@ defmodule AuthProvider.ApiController do
     case AuthProvider.Guardian.resource_from_token(token) do
       {:ok, _user, _claims} ->
         conn |> send_resp(200, "true")
+
       {:error, msg} ->
-        Logger.warning "check_password warning: #{inspect msg}"
+        Logger.warning("check_password warning: #{inspect(msg)}")
         conn |> send_resp(200, "false")
     end
   end

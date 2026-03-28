@@ -13,7 +13,7 @@ defmodule AuthProvider.ErrorJSON do
   end
 
   def render("400.json", details) do
-    %{errors: %{detail: "Client Error: #{inspect details}"}}
+    %{errors: %{detail: "Client Error: #{inspect(details)}"}}
   end
 
   # By default, Phoenix returns the status message from

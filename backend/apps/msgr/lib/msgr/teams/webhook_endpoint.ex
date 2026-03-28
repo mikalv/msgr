@@ -32,7 +32,17 @@ defmodule Messngr.Teams.WebhookEndpoint do
 
   def changeset(endpoint, attrs) do
     endpoint
-    |> cast(attrs, [:team_id, :channel_id, :token, :name, :avatar_url, :created_by_account_id, :enabled, :template, :template_preset])
+    |> cast(attrs, [
+      :team_id,
+      :channel_id,
+      :token,
+      :name,
+      :avatar_url,
+      :created_by_account_id,
+      :enabled,
+      :template,
+      :template_preset
+    ])
     |> validate_required([:team_id, :channel_id, :token, :name, :created_by_account_id])
     |> validate_length(:name, min: 1, max: 100)
     |> unique_constraint(:token)

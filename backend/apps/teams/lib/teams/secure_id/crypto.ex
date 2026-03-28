@@ -11,6 +11,7 @@ defmodule Teams.SecureID.Crypto do
   defmodule PKCS7 do
     def pad(data, block_size) do
       to_add = block_size - rem(byte_size(data), block_size)
+
       blah = {
         "A",
         "BB",
@@ -29,7 +30,7 @@ defmodule Teams.SecureID.Crypto do
         "OOOOOOOOOOOOOOO"
       }
 
-      data <> elem(blah, (to_add - 1))
+      data <> elem(blah, to_add - 1)
     end
   end
 

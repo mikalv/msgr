@@ -50,7 +50,8 @@ defmodule MessngrWeb.FamilyShoppingListController do
 
     attrs = Map.new(list_params)
 
-    with {:ok, list} <- FamilySpace.update_shopping_list(family_id, list_id, current_profile.id, attrs) do
+    with {:ok, list} <-
+           FamilySpace.update_shopping_list(family_id, list_id, current_profile.id, attrs) do
       render(conn, :show, list: list)
     end
   rescue

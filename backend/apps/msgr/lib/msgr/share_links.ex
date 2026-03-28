@@ -57,6 +57,7 @@ defmodule Messngr.ShareLinks do
   @spec create_bridge_link(BridgeAccount.t(), atom() | String.t(), map()) ::
           {:ok, ShareLink.t()} | {:error, term()}
   def create_bridge_link(bridge_account, kind, attrs \\ %{})
+
   def create_bridge_link(%BridgeAccount{} = bridge_account, kind, attrs) do
     params =
       attrs
@@ -75,14 +76,18 @@ defmodule Messngr.ShareLinks do
   defp maybe_attach_profile(params, %BridgeAccount{} = bridge_account, attrs) do
     attrs = normalise_attrs(attrs)
     profile_id = Map.get(attrs, :profile_id)
+
     account_profile_id =
       bridge_account
       |> Map.from_struct()
       |> Map.get(:profile_id)
 
     cond do
-      is_binary(profile_id) -> Map.put(params, :profile_id, profile_id)
-      is_binary(account_profile_id) -> Map.put(params, :profile_id, account_profile_id)
+      is_binary(profile_id) ->
+        Map.put(params, :profile_id, profile_id)
+
+      is_binary(account_profile_id) ->
+        Map.put(params, :profile_id, account_profile_id)
 
       true ->
         params
@@ -110,11 +115,17 @@ defmodule Messngr.ShareLinks do
       query = from link in ShareLink, where: link.token == ^token, lock: "FOR UPDATE"
 
       case Repo.one(query) do
-        nil -> Repo.rollback(:not_found)
+        nil ->
+          Repo.rollback(:not_found)
+
         %ShareLink{} = link ->
           cond do
-            ShareLink.expired?(link) -> Repo.rollback(:expired)
-            ShareLink.maxed_out?(link) -> Repo.rollback(:view_limit_reached)
+            ShareLink.expired?(link) ->
+              Repo.rollback(:expired)
+
+            ShareLink.maxed_out?(link) ->
+              Repo.rollback(:view_limit_reached)
+
             true ->
               if track_view? do
                 link
@@ -165,7 +176,7 @@ defmodule Messngr.ShareLinks do
       |> Enum.map(&URI.encode_www_form/1)
 
     path =
-      encoded_segments ++ [URI.encode_www_form(to_string(kind)), URI.encode_www_form(token)]
+      (encoded_segments ++ [URI.encode_www_form(to_string(kind)), URI.encode_www_form(token)])
       |> Enum.join("/")
 
     "#{scheme}://#{host}/#{path}"
@@ -223,14 +234,17 @@ defmodule Messngr.ShareLinks do
 
   defp normalise_attrs(attrs) when is_map(attrs) do
     Enum.reduce(attrs, %{}, fn
-      {key, value}, acc when key in @permitted_attrs -> Map.put(acc, key, value)
+      {key, value}, acc when key in @permitted_attrs ->
+        Map.put(acc, key, value)
+
       {key, value}, acc when is_binary(key) ->
         case Map.get(@string_key_map, key) do
           nil -> acc
           attr_key -> Map.put(acc, attr_key, value)
         end
 
-      {_key, _value}, acc -> acc
+      {_key, _value}, acc ->
+        acc
     end)
   end
 

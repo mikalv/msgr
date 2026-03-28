@@ -33,15 +33,19 @@ defmodule Messngr.Secrets.Aws do
 
   defp credentials(opts) do
     access_key_id = Keyword.get(opts, :access_key_id) || System.get_env("AWS_ACCESS_KEY_ID")
+
     secret_access_key =
       Keyword.get(opts, :secret_access_key) || System.get_env("AWS_SECRET_ACCESS_KEY")
 
     session_token = Keyword.get(opts, :session_token) || System.get_env("AWS_SESSION_TOKEN")
 
     cond do
-      is_nil(access_key_id) or access_key_id == "" -> {:error, :missing_access_key_id}
+      is_nil(access_key_id) or access_key_id == "" ->
+        {:error, :missing_access_key_id}
+
       is_nil(secret_access_key) or secret_access_key == "" ->
         {:error, :missing_secret_access_key}
+
       true ->
         {:ok,
          %{
@@ -123,10 +127,18 @@ defmodule Messngr.Secrets.Aws do
 
   defp canonical_headers(host, amz_date, session_token, content_type, target) do
     base = [
-      "content-type:", content_type, "\n",
-      "host:", host, "\n",
-      "x-amz-date:", amz_date, "\n",
-      "x-amz-target:", target, "\n"
+      "content-type:",
+      content_type,
+      "\n",
+      "host:",
+      host,
+      "\n",
+      "x-amz-date:",
+      amz_date,
+      "\n",
+      "x-amz-target:",
+      target,
+      "\n"
     ]
 
     case session_token do

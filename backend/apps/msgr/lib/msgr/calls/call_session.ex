@@ -8,7 +8,15 @@ defmodule Messngr.Calls.CallSession do
   alias Messngr.Calls.Participant
 
   @enforce_keys [:id, :conversation_id, :kind, :media, :host_profile_id]
-  defstruct [:id, :conversation_id, :kind, :media, :host_profile_id, metadata: %{}, participants: %{}]
+  defstruct [
+    :id,
+    :conversation_id,
+    :kind,
+    :media,
+    :host_profile_id,
+    metadata: %{},
+    participants: %{}
+  ]
 
   @type id :: String.t()
   @type conversation_id :: String.t()
@@ -44,12 +52,16 @@ defmodule Messngr.Calls.CallSession do
       participants: %{}
     }
 
-    {_status, session, _participant} = add_participant(base_session, host_profile_id, role: :host, status: :connected)
+    {_status, session, _participant} =
+      add_participant(base_session, host_profile_id, role: :host, status: :connected)
+
     session
   end
 
-  @spec add_participant(t(), String.t(), keyword()) :: {:ok, t(), Participant.t()} | {:error, term()}
-  def add_participant(%__MODULE__{} = session, profile_id, opts \\ []) when is_binary(profile_id) do
+  @spec add_participant(t(), String.t(), keyword()) ::
+          {:ok, t(), Participant.t()} | {:error, term()}
+  def add_participant(%__MODULE__{} = session, profile_id, opts \\ [])
+      when is_binary(profile_id) do
     case Map.fetch(session.participants, profile_id) do
       {:ok, participant} ->
         {:ok, session, participant}

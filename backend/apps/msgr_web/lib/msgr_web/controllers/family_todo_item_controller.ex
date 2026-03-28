@@ -28,7 +28,12 @@ defmodule MessngrWeb.FamilyTodoItemController do
     Ecto.NoResultsError -> {:error, :forbidden}
   end
 
-  def update(conn, %{"family_id" => family_id, "todo_list_id" => list_id, "id" => item_id, "item" => params}) do
+  def update(conn, %{
+        "family_id" => family_id,
+        "todo_list_id" => list_id,
+        "id" => item_id,
+        "item" => params
+      }) do
     current_profile = conn.assigns.current_profile
 
     with {:ok, item} <-

@@ -39,6 +39,7 @@ defmodule Teams.ReminderScheduler do
 
     for team <- teams do
       prefix = team.schema_name
+
       try do
         due = MessageReminder.find_due(prefix)
 
@@ -58,15 +59,16 @@ defmodule Teams.ReminderScheduler do
 
     if profile do
       # Extract message text for notification
-      content = if message do
-        case message.content do
-          %{"text" => text} when is_binary(text) -> text
-          text when is_binary(text) -> text
-          _ -> reminder.message_preview || "Reminder"
+      content =
+        if message do
+          case message.content do
+            %{"text" => text} when is_binary(text) -> text
+            text when is_binary(text) -> text
+            _ -> reminder.message_preview || "Reminder"
+          end
+        else
+          reminder.message_preview || "Reminder"
         end
-      else
-        reminder.message_preview || "Reminder"
-      end
 
       preview = String.slice(content, 0, 100)
 
@@ -79,7 +81,9 @@ defmodule Teams.ReminderScheduler do
               sender_profile_id: profile.id,
               content: %{"text" => "⏰ **Reminder:** #{preview}", "system" => true}
             })
-          _ -> :ok
+
+          _ ->
+            :ok
         end
       rescue
         _ -> :ok
@@ -104,17 +108,21 @@ defmodule Teams.ReminderScheduler do
       # Also dispatch push notification
       if profile.account_id do
         tokens = get_push_tokens(profile.account_id)
-        apns_payload = Messngr.Push.APNS.message_payload(
-          "Reminder",
-          preview,
-          channel_id: reminder.channel_id,
-          message_id: reminder.message_id,
-          team_slug: team.slug
-        )
+
+        apns_payload =
+          Messngr.Push.APNS.message_payload(
+            "Reminder",
+            preview,
+            channel_id: reminder.channel_id,
+            message_id: reminder.message_id,
+            team_slug: team.slug
+          )
 
         for {token, platform} <- tokens do
           case platform do
-            "apns" -> Messngr.Push.APNS.push(token, apns_payload)
+            "apns" ->
+              Messngr.Push.APNS.push(token, apns_payload)
+
             "web_push" ->
               web_payload = %{
                 title: "Reminder",
@@ -128,8 +136,11 @@ defmodule Teams.ReminderScheduler do
                   type: "reminder"
                 }
               }
+
               Messngr.Push.WebPush.push(token, web_payload)
-            _ -> :ok
+
+            _ ->
+              :ok
           end
         end
       end

@@ -22,6 +22,7 @@ defmodule Messngr.ShareLinks.ShareLink do
 
   schema "share_links" do
     field :token, :string
+
     field :kind, Ecto.Enum,
       values: [:image, :video, :audio, :file, :location, :invite, :document, :other],
       default: :other
@@ -128,7 +129,7 @@ defmodule Messngr.ShareLinks.ShareLink do
   def remaining_views(%__MODULE__{max_views: nil}), do: :infinite
 
   def remaining_views(%__MODULE__{view_count: count, max_views: max}) when is_integer(max) do
-    max - count |> max(0)
+    (max - count) |> max(0)
   end
 
   @doc """
@@ -177,7 +178,9 @@ defmodule Messngr.ShareLinks.ShareLink do
     current = get_field(changeset, :capabilities)
 
     cond do
-      is_map(current) and map_size(current) > 0 -> changeset
+      is_map(current) and map_size(current) > 0 ->
+        changeset
+
       true ->
         kind = get_field(changeset, :kind)
         put_change(changeset, :capabilities, default_capabilities(kind))
@@ -280,8 +283,14 @@ defmodule Messngr.ShareLinks.ShareLink do
     %{
       "targets" => %{
         "irc" => %{"mode" => "link_only", "payload_keys" => ["public_url", "geo_uri"]},
-        "xmpp" => %{"mode" => "native_location", "payload_keys" => ["latitude", "longitude", "label"]},
-        "telegram" => %{"mode" => "native_location", "payload_keys" => ["latitude", "longitude", "accuracy"]},
+        "xmpp" => %{
+          "mode" => "native_location",
+          "payload_keys" => ["latitude", "longitude", "label"]
+        },
+        "telegram" => %{
+          "mode" => "native_location",
+          "payload_keys" => ["latitude", "longitude", "accuracy"]
+        },
         "signal" => %{"mode" => "native_forward", "payload_keys" => ["latitude", "longitude"]}
       },
       "supports" => ["live", "accuracy"],
@@ -313,8 +322,9 @@ defmodule Messngr.ShareLinks.ShareLink do
 
   defp capability_profiles(_), do: capability_profiles(:other)
 
-  defp normalise_kind(kind) when kind in [:image, :video, :audio, :file, :location, :invite, :document, :other],
-    do: kind
+  defp normalise_kind(kind)
+       when kind in [:image, :video, :audio, :file, :location, :invite, :document, :other],
+       do: kind
 
   defp normalise_kind(kind) when is_binary(kind) do
     kind
@@ -326,4 +336,3 @@ defmodule Messngr.ShareLinks.ShareLink do
 
   defp normalise_kind(_), do: :other
 end
-

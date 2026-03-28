@@ -8,7 +8,8 @@ defmodule Messngr.Push.APNS do
 
   @apns_prod "https://api.push.apple.com"
   @apns_dev "https://api.sandbox.push.apple.com"
-  @token_ttl_seconds 3500  # Refresh before 1-hour expiry
+  # Refresh before 1-hour expiry
+  @token_ttl_seconds 3500
 
   defstruct [:key_id, :team_id, :key, :bundle_id, :environment, :token, :token_issued_at]
 
@@ -17,8 +18,12 @@ defmodule Messngr.Push.APNS do
       key_id: opts[:key_id] || Application.get_env(:msgr, __MODULE__, [])[:key_id],
       team_id: opts[:team_id] || Application.get_env(:msgr, __MODULE__, [])[:team_id],
       key: opts[:key] || load_key(),
-      bundle_id: opts[:bundle_id] || Application.get_env(:msgr, __MODULE__, [])[:bundle_id] || "no.msgr.app",
-      environment: opts[:environment] || Application.get_env(:msgr, __MODULE__, [])[:environment] || :production
+      bundle_id:
+        opts[:bundle_id] || Application.get_env(:msgr, __MODULE__, [])[:bundle_id] ||
+          "no.msgr.app",
+      environment:
+        opts[:environment] || Application.get_env(:msgr, __MODULE__, [])[:environment] ||
+          :production
     }
   end
 

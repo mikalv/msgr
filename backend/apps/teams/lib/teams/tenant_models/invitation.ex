@@ -21,13 +21,13 @@ defmodule Teams.TenantModels.Invitation do
 
   def create_email_invitation(tenant, %Profile{} = profile, email) do
     metadata = %{"creator_profile_id" => profile.id}
-    params = %{ "email" => email, "metadata" => metadata }
+    params = %{"email" => email, "metadata" => metadata}
     create(tenant, params)
   end
 
   def create_msisdn_invitation(tenant, %Profile{} = profile, msisdn) do
     metadata = %{"creator_profile_id" => profile.id}
-    params = %{ "msisdn" => msisdn, "metadata" => metadata }
+    params = %{"msisdn" => msisdn, "metadata" => metadata}
     create(tenant, params)
   end
 
@@ -39,8 +39,8 @@ defmodule Teams.TenantModels.Invitation do
 
   def create(tenant, attrs \\ %{}) do
     %__MODULE__{}
-      |> changeset(attrs)
-      |> Teams.Repo.insert(prefix: Triplex.to_prefix(tenant))
+    |> changeset(attrs)
+    |> Teams.Repo.insert(prefix: Triplex.to_prefix(tenant))
   end
 
   def update(tenant, obj, attrs) do

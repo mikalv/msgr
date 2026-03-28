@@ -88,7 +88,10 @@ defmodule Messngr.AccountsTest do
     setup do
       {:ok, account} = Accounts.create_account(%{"display_name" => "Liv"})
       profile = List.first(account.profiles)
-      {:ok, other} = Accounts.create_profile(%{"name" => "Jobb", "mode" => :work, "account_id" => account.id})
+
+      {:ok, other} =
+        Accounts.create_profile(%{"name" => "Jobb", "mode" => :work, "account_id" => account.id})
+
       {:ok, account: account, profile: profile, other: other}
     end
 
@@ -145,7 +148,11 @@ defmodule Messngr.AccountsTest do
 
     test "links additional oidc identity to an existing account" do
       {:ok, email_identity} =
-        Accounts.ensure_identity(%{kind: :email, value: "mikal@example.com", display_name: "Mikal"})
+        Accounts.ensure_identity(%{
+          kind: :email,
+          value: "mikal@example.com",
+          display_name: "Mikal"
+        })
 
       {:ok, oidc_identity} =
         Accounts.ensure_identity(%{
@@ -171,7 +178,11 @@ defmodule Messngr.AccountsTest do
         })
 
       {:ok, other_identity} =
-        Accounts.ensure_identity(%{kind: :email, value: "other@example.com", display_name: "Other"})
+        Accounts.ensure_identity(%{
+          kind: :email,
+          value: "other@example.com",
+          display_name: "Other"
+        })
 
       assert {:error, :identity_already_linked} =
                Accounts.ensure_identity(%{
@@ -204,7 +215,9 @@ defmodule Messngr.AccountsTest do
       assert contact.name == "Eva N."
 
       {:ok, [updated]} =
-        Accounts.import_contacts(account.id, [%{email: "eva.n@example.com", phone_number: "+47 900 00 000"}])
+        Accounts.import_contacts(account.id, [
+          %{email: "eva.n@example.com", phone_number: "+47 900 00 000"}
+        ])
 
       assert updated.id == contact.id
       assert updated.phone_number == "4790000000"
@@ -214,7 +227,11 @@ defmodule Messngr.AccountsTest do
   describe "lookup_known_contacts/1" do
     test "returns match for known email" do
       {:ok, identity} =
-        Accounts.ensure_identity(%{kind: :email, value: "known@example.com", display_name: "Known"})
+        Accounts.ensure_identity(%{
+          kind: :email,
+          value: "known@example.com",
+          display_name: "Known"
+        })
 
       {:ok, [%{query: %{email: "known@example.com"}, match: match}]} =
         Accounts.lookup_known_contacts([%{email: "KNOWN@example.com"}])

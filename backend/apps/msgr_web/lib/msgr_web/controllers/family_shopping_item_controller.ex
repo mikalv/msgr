@@ -19,7 +19,8 @@ defmodule MessngrWeb.FamilyShoppingItemController do
   def create(conn, %{"family_id" => family_id, "shopping_list_id" => list_id, "item" => params}) do
     current_profile = conn.assigns.current_profile
 
-    with {:ok, item} <- FamilySpace.add_shopping_item(family_id, list_id, current_profile.id, params) do
+    with {:ok, item} <-
+           FamilySpace.add_shopping_item(family_id, list_id, current_profile.id, params) do
       conn
       |> put_status(:created)
       |> render(:show, item: item)
@@ -28,11 +29,22 @@ defmodule MessngrWeb.FamilyShoppingItemController do
     Ecto.NoResultsError -> {:error, :forbidden}
   end
 
-  def update(conn, %{"family_id" => family_id, "shopping_list_id" => list_id, "id" => item_id, "item" => params}) do
+  def update(conn, %{
+        "family_id" => family_id,
+        "shopping_list_id" => list_id,
+        "id" => item_id,
+        "item" => params
+      }) do
     current_profile = conn.assigns.current_profile
 
     with {:ok, item} <-
-           FamilySpace.update_shopping_item(family_id, list_id, item_id, current_profile.id, params) do
+           FamilySpace.update_shopping_item(
+             family_id,
+             list_id,
+             item_id,
+             current_profile.id,
+             params
+           ) do
       render(conn, :show, item: item)
     end
   rescue
@@ -42,7 +54,8 @@ defmodule MessngrWeb.FamilyShoppingItemController do
   def delete(conn, %{"family_id" => family_id, "shopping_list_id" => list_id, "id" => item_id}) do
     current_profile = conn.assigns.current_profile
 
-    with {:ok, _} <- FamilySpace.delete_shopping_item(family_id, list_id, item_id, current_profile.id) do
+    with {:ok, _} <-
+           FamilySpace.delete_shopping_item(family_id, list_id, item_id, current_profile.id) do
       send_resp(conn, :no_content, "")
     end
   rescue

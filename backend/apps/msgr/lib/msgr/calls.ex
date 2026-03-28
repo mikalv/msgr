@@ -12,7 +12,8 @@ defmodule Messngr.Calls do
   @type profile_id :: String.t()
   @type join_result :: {:ok, CallSession.t(), Participant.t()} | {:error, term()}
 
-  @spec start_call(conversation_id(), profile_id(), keyword()) :: {:ok, CallSession.t()} | {:error, term()}
+  @spec start_call(conversation_id(), profile_id(), keyword()) ::
+          {:ok, CallSession.t()} | {:error, term()}
   def start_call(conversation_id, host_profile_id, opts \\ []) do
     opts =
       opts
@@ -25,7 +26,8 @@ defmodule Messngr.Calls do
   @spec fetch_call(call_id()) :: {:ok, CallSession.t()} | {:error, term()}
   def fetch_call(call_id), do: CallRegistry.fetch_call(call_id)
 
-  @spec fetch_call_for_conversation(conversation_id()) :: {:ok, CallSession.t()} | {:error, term()}
+  @spec fetch_call_for_conversation(conversation_id()) ::
+          {:ok, CallSession.t()} | {:error, term()}
   def fetch_call_for_conversation(conversation_id),
     do: CallRegistry.fetch_call_for_conversation(conversation_id)
 

@@ -9,10 +9,11 @@ defmodule TeamsWeb.Plugs.PartOfTeam do
     subdomain = conn.private[:subdomain]
     claims = Guardian.Plug.current_claims(conn)
     profile = Teams.TenantModels.Profile.get_by_uid(subdomain, claims["sub"])
+
     if is_nil(profile) do
       conn
-        |> send_resp(401, Jason.encode!(%{"error" => "you're not part of this team!"}))
-        |> halt()
+      |> send_resp(401, Jason.encode!(%{"error" => "you're not part of this team!"}))
+      |> halt()
     else
       conn
     end

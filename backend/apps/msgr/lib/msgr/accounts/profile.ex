@@ -62,7 +62,16 @@ defmodule Messngr.Accounts.Profile do
   @doc false
   def changeset(profile, attrs) do
     profile
-    |> cast(attrs, [:name, :slug, :mode, :theme, :notification_policy, :security_policy, :account_id, :avatar_url])
+    |> cast(attrs, [
+      :name,
+      :slug,
+      :mode,
+      :theme,
+      :notification_policy,
+      :security_policy,
+      :account_id,
+      :avatar_url
+    ])
     |> validate_required([:name, :account_id])
     |> validate_length(:name, min: 2, max: 80)
     |> normalize_preferences()
@@ -74,7 +83,8 @@ defmodule Messngr.Accounts.Profile do
     changeset
   end
 
-  defp put_default_slug(%{changes: %{name: name}, data: %{id: id}} = changeset) when not is_nil(id) do
+  defp put_default_slug(%{changes: %{name: name}, data: %{id: id}} = changeset)
+       when not is_nil(id) do
     slug =
       name
       |> String.downcase()
@@ -116,7 +126,8 @@ defmodule Messngr.Accounts.Profile do
   end
 
   defp normalize_notification_policy(%Ecto.Changeset{} = changeset) do
-    with {:ok, policy} <- resolve_map(changeset, :notification_policy, @default_notification_policy),
+    with {:ok, policy} <-
+           resolve_map(changeset, :notification_policy, @default_notification_policy),
          {:ok, normalized} <- validate_notification_policy(policy) do
       put_change(changeset, :notification_policy, normalized)
     else
@@ -145,13 +156,17 @@ defmodule Messngr.Accounts.Profile do
         |> deep_merge(default)
         |> then(&{:ok, &1})
 
-      nil -> {:ok, default}
-      _ -> :invalid
+      nil ->
+        {:ok, default}
+
+      _ ->
+        :invalid
     end
   end
 
   defp validate_theme(theme) do
     theme = Map.take(theme, MapSet.to_list(@theme_keys))
+
     theme =
       case Map.fetch(theme, "mode") do
         {:ok, value} when is_binary(value) -> Map.put(theme, "mode", String.downcase(value))
@@ -202,7 +217,8 @@ defmodule Messngr.Accounts.Profile do
             |> Enum.reject(&(&1 |> String.trim() == ""))
             |> Enum.uniq()
 
-          true -> []
+          true ->
+            []
         end
       end)
 
@@ -222,6 +238,7 @@ defmodule Messngr.Accounts.Profile do
 
   defp validate_security_policy(policy) do
     policy = Map.take(policy, MapSet.to_list(@security_keys))
+
     policy =
       case Map.fetch(policy, "lock_after_minutes") do
         {:ok, value} when is_binary(value) ->
@@ -230,13 +247,17 @@ defmodule Messngr.Accounts.Profile do
             _ -> policy
           end
 
-        _ -> policy
+        _ ->
+          policy
       end
 
     policy =
       case Map.fetch(policy, "sensitive_notifications") do
-        {:ok, value} when is_binary(value) -> Map.put(policy, "sensitive_notifications", String.downcase(value))
-        _ -> policy
+        {:ok, value} when is_binary(value) ->
+          Map.put(policy, "sensitive_notifications", String.downcase(value))
+
+        _ ->
+          policy
       end
 
     errors =
@@ -277,15 +298,20 @@ defmodule Messngr.Accounts.Profile do
 
   defp validate_integer_range(errors, map, key, min, max) do
     case Map.fetch(map, key) do
-      {:ok, value} when is_integer(value) and value >= min and value <= max -> errors
+      {:ok, value} when is_integer(value) and value >= min and value <= max ->
+        errors
+
       {:ok, value} when is_binary(value) ->
         case Integer.parse(value) do
           {int, _} when int >= min and int <= max -> errors
           _ -> [{String.to_atom(key), "must be between #{min} and #{max}"} | errors]
         end
 
-      {:ok, _} -> [{String.to_atom(key), "must be between #{min} and #{max}"} | errors]
-      :error -> errors
+      {:ok, _} ->
+        [{String.to_atom(key), "must be between #{min} and #{max}"} | errors]
+
+      :error ->
+        errors
     end
   end
 

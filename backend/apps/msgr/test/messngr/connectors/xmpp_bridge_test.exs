@@ -13,11 +13,18 @@ defmodule Messngr.Connectors.XMPPBridgeTest do
 
   test "link_account/3 publishes credentials request", %{bridge: bridge, agent: agent} do
     params = %{user_id: "u-xmpp", jid: "msgr@example.com", password: "secret"}
-    assert {:ok, %{status: :accepted}} = XMPPBridge.link_account(bridge, params, trace_id: "xmpp-link")
+
+    assert {:ok, %{status: :accepted}} =
+             XMPPBridge.link_account(bridge, params, trace_id: "xmpp-link")
 
     assert [request] = QueueRecorder.requests(agent)
     assert request.topic == "bridge/xmpp/link_account"
-    assert request.payload.payload == %{user_id: "u-xmpp", jid: "msgr@example.com", password: "secret"}
+
+    assert request.payload.payload == %{
+             user_id: "u-xmpp",
+             jid: "msgr@example.com",
+             password: "secret"
+           }
   end
 
   test "send_stanza/3 publishes outbound stanza", %{bridge: bridge, agent: agent} do
@@ -26,12 +33,14 @@ defmodule Messngr.Connectors.XMPPBridgeTest do
 
     assert [message] = QueueRecorder.published(agent)
     assert message.topic == "bridge/xmpp/outbound_stanza"
+
     assert message.payload.payload == %{
              stanza: "<message/>",
              format: :xml,
              routing: %{to: "user@example.com"},
              metadata: %{}
            }
+
     assert message.payload.trace_id == "stanza"
   end
 

@@ -53,7 +53,12 @@ defmodule AuthProvider.ApiControllerDeviceTest do
     assert %{"error" => "device_not_found"} = json_response(conn, 404)
   end
 
-  test "refresh_token issues new tokens", %{conn: conn, device: device, refresh_token: refresh_token, user: user} do
+  test "refresh_token issues new tokens", %{
+    conn: conn,
+    device: device,
+    refresh_token: refresh_token,
+    user: user
+  } do
     conn =
       post(conn, ~p"/api/v1/refresh_token", %{
         "from" => device.device_id,

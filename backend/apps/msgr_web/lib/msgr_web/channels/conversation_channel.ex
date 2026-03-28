@@ -27,9 +27,12 @@ defmodule MessngrWeb.ConversationChannel do
     authorized =
       if team_slug do
         case Teams.TeamManagement.get_team_by_slug(team_slug) do
-          nil -> {:error, %{reason: "team_not_found"}}
+          nil ->
+            {:error, %{reason: "team_not_found"}}
+
           team ->
             account_id = assigns[:uid] || (profile && profile.account_id)
+
             if account_id && Teams.TeamManagement.member?(team.id, account_id) do
               :ok
             else
@@ -64,7 +67,8 @@ defmodule MessngrWeb.ConversationChannel do
 
         {:ok, socket}
 
-      {:error, reason} -> {:error, reason}
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -81,15 +85,17 @@ defmodule MessngrWeb.ConversationChannel do
 
     if prefix do
       # Teams context
-      profile = Teams.TeamManagement.get_profile_for_account(
-        prefix,
-        socket.assigns[:uid] || socket.assigns.current_profile.account_id
-      )
+      profile =
+        Teams.TeamManagement.get_profile_for_account(
+          prefix,
+          socket.assigns[:uid] || socket.assigns.current_profile.account_id
+        )
 
       unless profile do
         {:reply, {:error, %{errors: ["not a member"]}}, socket}
       else
         content = payload["content"] || %{}
+
         attrs = %{
           channel_id: channel_id,
           sender_profile_id: profile.id,
@@ -100,6 +106,7 @@ defmodule MessngrWeb.ConversationChannel do
         case Teams.Messages.create_message(prefix, attrs) do
           {:ok, message} ->
             message = Teams.Messages.get_message(prefix, message.id)
+
             msg_json = %{
               id: message.id,
               channel_id: channel_id,
@@ -123,7 +130,12 @@ defmodule MessngrWeb.ConversationChannel do
               MessngrWeb.Endpoint.broadcast(
                 "team:#{team_slug}",
                 "channel:new_message",
-                %{channel_id: channel_id, message_id: message.id, sender_profile_id: profile.id, inserted_at: message.inserted_at}
+                %{
+                  channel_id: channel_id,
+                  message_id: message.id,
+                  sender_profile_id: profile.id,
+                  inserted_at: message.inserted_at
+                }
               )
             end
 
@@ -138,10 +150,13 @@ defmodule MessngrWeb.ConversationChannel do
       with :ok <- enforce_rate_limit(socket, :conversation_message_event),
            {:ok, body} <- extract_body(payload),
            {:ok, message} <-
-           Messngr.send_message(channel_id, socket.assigns.current_profile.id, %{
-             "body" => body
-            }) do
-        SocketTelemetry.message_sent(channel_id, socket.assigns.current_profile.id, %{message_id: message.id})
+             Messngr.send_message(channel_id, socket.assigns.current_profile.id, %{
+               "body" => body
+             }) do
+        SocketTelemetry.message_sent(channel_id, socket.assigns.current_profile.id, %{
+          message_id: message.id
+        })
+
         {:reply, {:ok, MessageJSON.show(%{message: message})}, socket}
       else
         {:error, %Changeset{} = changeset} -> reply_changeset_error(socket, changeset)
@@ -214,12 +229,12 @@ defmodule MessngrWeb.ConversationChannel do
 
     with {:ok, message_id} <- require_message_id(payload),
          {:ok, _receipt} <-
-          Messngr.acknowledge_message_delivery(
-            socket.assigns.conversation_id,
-            socket.assigns.current_profile.id,
-            message_id,
-            %{device: socket.assigns[:current_device]}
-          ) do
+           Messngr.acknowledge_message_delivery(
+             socket.assigns.conversation_id,
+             socket.assigns.current_profile.id,
+             message_id,
+             %{device: socket.assigns[:current_device]}
+           ) do
       SocketTelemetry.message_acknowledged(
         socket.assigns.conversation_id,
         socket.assigns.current_profile.id,
@@ -327,7 +342,10 @@ defmodule MessngrWeb.ConversationChannel do
   def handle_in("channel:watch", _payload, socket) do
     socket = touch_activity(socket)
 
-    case Messngr.watch_conversation(socket.assigns.conversation_id, socket.assigns.current_profile.id) do
+    case Messngr.watch_conversation(
+           socket.assigns.conversation_id,
+           socket.assigns.current_profile.id
+         ) do
       {:ok, payload} ->
         {:reply, {:ok, ConversationJSON.watchers(%{payload: payload})}, socket}
 
@@ -341,7 +359,10 @@ defmodule MessngrWeb.ConversationChannel do
   def handle_in("channel:unwatch", _payload, socket) do
     socket = touch_activity(socket)
 
-    case Messngr.unwatch_conversation(socket.assigns.conversation_id, socket.assigns.current_profile.id) do
+    case Messngr.unwatch_conversation(
+           socket.assigns.conversation_id,
+           socket.assigns.current_profile.id
+         ) do
       {:ok, payload} ->
         {:reply, {:ok, ConversationJSON.watchers(%{payload: payload})}, socket}
 
@@ -366,7 +387,11 @@ defmodule MessngrWeb.ConversationChannel do
       %{thread_id: thread_id}
     )
 
-    broadcast_typing(socket, "typing_started", typing_payload(socket, thread_id, include_expiry: true))
+    broadcast_typing(
+      socket,
+      "typing_started",
+      typing_payload(socket, thread_id, include_expiry: true)
+    )
 
     {:noreply, socket}
   end
@@ -418,6 +443,7 @@ defmodule MessngrWeb.ConversationChannel do
     if removed? do
       update_presence_typing(socket, key, false)
       thread_id = thread_id_from_key(key)
+
       SocketTelemetry.typing_stopped(
         socket.assigns.conversation_id,
         socket.assigns.current_profile.id,
@@ -553,7 +579,9 @@ defmodule MessngrWeb.ConversationChannel do
         else
           {:ok, emoji}
         end
-      _ -> {:error, "emoji is required"}
+
+      _ ->
+        {:error, "emoji is required"}
     end
   end
 
@@ -569,7 +597,8 @@ defmodule MessngrWeb.ConversationChannel do
     {:reply, {:error, %{errors: translate_errors(changeset)}}, socket}
   end
 
-  defp reply_reason_error(socket, %Changeset{} = changeset), do: reply_changeset_error(socket, changeset)
+  defp reply_reason_error(socket, %Changeset{} = changeset),
+    do: reply_changeset_error(socket, changeset)
 
   defp reply_reason_error(socket, %{reason: reason}) when is_binary(reason) do
     {:reply, {:error, %{errors: [reason]}}, socket}
@@ -598,6 +627,7 @@ defmodule MessngrWeb.ConversationChannel do
       {:error, reason} -> {:error, reason}
     end
   end
+
   defp build_sync_opts(params) do
     []
     |> maybe_put(:limit, params["limit"])

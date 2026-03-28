@@ -44,7 +44,12 @@ defmodule Messngr.Calls.Participant do
   end
 
   def host(profile_id) when is_binary(profile_id) do
-    %__MODULE__{profile_id: profile_id, role: :host, status: :connected, metadata: %{"kind" => "host"}}
+    %__MODULE__{
+      profile_id: profile_id,
+      role: :host,
+      status: :connected,
+      metadata: %{"kind" => "host"}
+    }
   end
 
   def connect(%__MODULE__{} = participant) do

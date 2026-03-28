@@ -19,8 +19,12 @@ blank_to_nil = fn
 end
 
 port_env = fn
-  nil, default, _env_name -> default
-  "", default, _env_name -> default
+  nil, default, _env_name ->
+    default
+
+  "", default, _env_name ->
+    default
+
   value, _default, env_name ->
     case Integer.parse(value) do
       {port, ""} -> port
@@ -29,8 +33,12 @@ port_env = fn
 end
 
 int_env = fn
-  nil, default, _env_name -> default
-  "", default, _env_name -> default
+  nil, default, _env_name ->
+    default
+
+  "", default, _env_name ->
+    default
+
   value, _default, env_name ->
     case Integer.parse(value) do
       {int, ""} -> int
@@ -76,6 +84,7 @@ listen_ip =
       |> String.split(".")
       |> Enum.map(&String.to_integer/1)
       |> List.to_tuple()
+
     _ ->
       {127, 0, 0, 1}
   end
@@ -161,7 +170,9 @@ if tls_enabled do
     force_ssl: force_ssl_opts
 else
   if tls_force_ssl do
-    Logger.warning("MSGR_FORCE_SSL=true but MSGR_TLS_ENABLED=false; skipping force_ssl configuration")
+    Logger.warning(
+      "MSGR_FORCE_SSL=true but MSGR_TLS_ENABLED=false; skipping force_ssl configuration"
+    )
   end
 end
 
@@ -183,10 +194,11 @@ prometheus_port =
     "PROMETHEUS_PORT"
   )
 
-config :msgr_web, :prometheus,
-  prometheus_config
-  |> Keyword.put(:enabled, prometheus_enabled)
-  |> Keyword.put(:port, prometheus_port)
+config :msgr_web,
+       :prometheus,
+       prometheus_config
+       |> Keyword.put(:enabled, prometheus_enabled)
+       |> Keyword.put(:port, prometheus_port)
 
 media_storage_config = Application.get_env(:msgr, Messngr.Media.Storage, [])
 
@@ -195,7 +207,10 @@ minio_host = System.get_env("MINIO_HOST", "localhost")
 minio_port = port_env.(System.get_env("MINIO_PORT"), 9000, "MINIO_PORT")
 minio_scheme = System.get_env("MINIO_SCHEME", "http://")
 minio_public_host = System.get_env("MINIO_PUBLIC_HOST", "localhost")
-minio_public_port = port_env.(System.get_env("MINIO_PUBLIC_PORT"), minio_port, "MINIO_PUBLIC_PORT")
+
+minio_public_port =
+  port_env.(System.get_env("MINIO_PUBLIC_PORT"), minio_port, "MINIO_PUBLIC_PORT")
+
 minio_public_scheme = System.get_env("MINIO_PUBLIC_SCHEME", minio_scheme)
 
 config :ex_aws,
@@ -210,16 +225,22 @@ config :ex_aws, :s3,
   port: minio_port,
   force_path_style: true
 
-config :msgr, Messngr.Media.Storage,
-  media_storage_config
-  |> Keyword.put(:bucket, System.get_env("MINIO_BUCKET", Keyword.get(media_storage_config, :bucket, "msgr-media")))
-  |> Keyword.put(:public_endpoint,
-    case {minio_public_scheme, minio_public_port} do
-      {"https://", 443} -> "https://#{minio_public_host}"
-      {"http://", 80} -> "http://#{minio_public_host}"
-      _ -> "#{minio_public_scheme}#{minio_public_host}:#{minio_public_port}"
-    end)
-  |> Keyword.put(:internal_endpoint, "#{minio_scheme}#{minio_host}:#{minio_port}")
+config :msgr,
+       Messngr.Media.Storage,
+       media_storage_config
+       |> Keyword.put(
+         :bucket,
+         System.get_env("MINIO_BUCKET", Keyword.get(media_storage_config, :bucket, "msgr-media"))
+       )
+       |> Keyword.put(
+         :public_endpoint,
+         case {minio_public_scheme, minio_public_port} do
+           {"https://", 443} -> "https://#{minio_public_host}"
+           {"http://", 80} -> "http://#{minio_public_host}"
+           _ -> "#{minio_public_scheme}#{minio_public_host}:#{minio_public_port}"
+         end
+       )
+       |> Keyword.put(:internal_endpoint, "#{minio_scheme}#{minio_host}:#{minio_port}")
 
 retention_pruner_config = Application.get_env(:msgr, Messngr.Media.RetentionPruner, [])
 
@@ -243,11 +264,12 @@ pruner_batch_size =
     "MEDIA_RETENTION_SWEEP_BATCH_SIZE"
   )
 
-config :msgr, Messngr.Media.RetentionPruner,
-  retention_pruner_config
-  |> Keyword.put(:enabled, pruner_enabled)
-  |> Keyword.put(:interval_ms, pruner_interval)
-  |> Keyword.put(:batch_size, pruner_batch_size)
+config :msgr,
+       Messngr.Media.RetentionPruner,
+       retention_pruner_config
+       |> Keyword.put(:enabled, pruner_enabled)
+       |> Keyword.put(:interval_ms, pruner_interval)
+       |> Keyword.put(:batch_size, pruner_batch_size)
 
 watcher_pruner_config = Application.get_env(:msgr, Messngr.Chat.WatcherPruner, [])
 
@@ -264,10 +286,11 @@ watcher_pruner_interval =
     "CONVERSATION_WATCHER_SWEEP_INTERVAL_MS"
   )
 
-config :msgr, Messngr.Chat.WatcherPruner,
-  watcher_pruner_config
-  |> Keyword.put(:enabled, watcher_pruner_enabled)
-  |> Keyword.put(:interval_ms, watcher_pruner_interval)
+config :msgr,
+       Messngr.Chat.WatcherPruner,
+       watcher_pruner_config
+       |> Keyword.put(:enabled, watcher_pruner_enabled)
+       |> Keyword.put(:interval_ms, watcher_pruner_interval)
 
 # Noise configuration removed - now handled by Rust gateway
 # All Noise transport and key management is done in the Rust gateway service
@@ -292,6 +315,7 @@ config :auth_provider, AuthProvider.Guardian,
   secret_key: guardian_secret
 
 guardian_schema = System.get_env("GUARDIAN_DB_SCHEMA", "guardian_tokens")
+
 guardian_interval_minutes =
   System.get_env("GUARDIAN_DB_SWEEP_MINUTES", "60")
   |> String.trim()
@@ -313,6 +337,7 @@ config :teams, :prism_url, System.get_env("PRISM_URL", "http://localhost:3080")
 
 # APNS Push Notifications
 apns_key_id = blank_to_nil.(System.get_env("APNS_KEY_ID"))
+
 if apns_key_id do
   config :msgr, Messngr.Push.APNS,
     key_id: apns_key_id,
@@ -325,6 +350,7 @@ end
 
 # Web Push (VAPID)
 vapid_public = blank_to_nil.(System.get_env("VAPID_PUBLIC_KEY"))
+
 if vapid_public do
   config :msgr, Messngr.Push.WebPush,
     public_key: vapid_public,

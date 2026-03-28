@@ -36,14 +36,20 @@ defmodule Messngr.Media.RetentionPruner do
       true ->
         Logger.info("🔍 RetentionPruner building child spec...")
         name = Keyword.get(opts, :name, __MODULE__)
-        interval = Keyword.get(opts, :interval_ms, Keyword.get(opts, :interval, @default_interval))
+
+        interval =
+          Keyword.get(opts, :interval_ms, Keyword.get(opts, :interval, @default_interval))
+
         batch_size = Keyword.get(opts, :batch_size, @default_batch_size)
 
-        Logger.info("🔍 RetentionPruner config: name=#{name}, interval=#{interval}, batch_size=#{batch_size}")
+        Logger.info(
+          "🔍 RetentionPruner config: name=#{name}, interval=#{interval}, batch_size=#{batch_size}"
+        )
 
         result = %{
           id: name,
-          start: {__MODULE__, :start_link, [[name: name, interval: interval, batch_size: batch_size]]},
+          start:
+            {__MODULE__, :start_link, [[name: name, interval: interval, batch_size: batch_size]]},
           restart: :permanent,
           shutdown: 5000,
           type: :worker
@@ -107,9 +113,14 @@ defmodule Messngr.Media.RetentionPruner do
   end
 
   defp run_prune(batch_size) do
-    %{scanned: scanned, deleted: deleted, errors: errors} = Media.prune_expired_uploads(limit: batch_size)
+    %{scanned: scanned, deleted: deleted, errors: errors} =
+      Media.prune_expired_uploads(limit: batch_size)
 
-    Logger.debug("media retention prune run", scanned: scanned, deleted: deleted, errors: length(errors))
+    Logger.debug("media retention prune run",
+      scanned: scanned,
+      deleted: deleted,
+      errors: length(errors)
+    )
 
     Enum.each(errors, fn %{id: id, reason: reason} ->
       Logger.warning("media retention prune failed", upload_id: id, reason: inspect(reason))

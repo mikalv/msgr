@@ -32,7 +32,9 @@ defmodule MessngrWeb.TeamReadCursorController do
               nil ->
                 # Never read — count all messages
                 from(m in Message,
-                  where: m.channel_id == ^channel_id and is_nil(m.thread_parent_id) and is_nil(m.deleted_at),
+                  where:
+                    m.channel_id == ^channel_id and is_nil(m.thread_parent_id) and
+                      is_nil(m.deleted_at),
                   select: count(m.id)
                 )
                 |> Teams.Repo.one(prefix: prefix) || 0
@@ -40,12 +42,14 @@ defmodule MessngrWeb.TeamReadCursorController do
               last_msg_id ->
                 # Count messages after the last read one
                 last_msg = Teams.Repo.get(Message, last_msg_id, prefix: prefix)
+
                 if last_msg do
                   from(m in Message,
-                    where: m.channel_id == ^channel_id
-                      and is_nil(m.thread_parent_id)
-                      and is_nil(m.deleted_at)
-                      and m.inserted_at > ^last_msg.inserted_at,
+                    where:
+                      m.channel_id == ^channel_id and
+                        is_nil(m.thread_parent_id) and
+                        is_nil(m.deleted_at) and
+                        m.inserted_at > ^last_msg.inserted_at,
                     select: count(m.id)
                   )
                   |> Teams.Repo.one(prefix: prefix) || 0

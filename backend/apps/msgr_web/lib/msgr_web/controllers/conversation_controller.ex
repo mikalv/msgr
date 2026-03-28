@@ -28,10 +28,12 @@ defmodule MessngrWeb.ConversationController do
     case normalized_kind do
       "group" ->
         participant_ids = parse_participant_ids(params)
+
         attrs = %{
           topic: Map.get(params, "topic"),
           structure_type: parse_structure_type(params)
         }
+
         attrs = maybe_put_read_receipts_enabled(attrs, parse_read_receipts_enabled(params))
 
         with {:ok, conversation} <-
@@ -46,6 +48,7 @@ defmodule MessngrWeb.ConversationController do
           structure_type: parse_structure_type(params),
           visibility: parse_visibility(params)
         }
+
         attrs = maybe_put_read_receipts_enabled(attrs, parse_read_receipts_enabled(params))
 
         with {:ok, conversation} <- Messngr.create_channel_conversation(current_profile.id, attrs) do
@@ -142,10 +145,17 @@ defmodule MessngrWeb.ConversationController do
 
         if is_map(nested), do: parse_read_receipts_enabled(nested), else: nil
 
-      value when value in [true, false] -> value
-      value when value in ["true", "1", 1] -> true
-      value when value in ["false", "0", 0] -> false
-      _ -> nil
+      value when value in [true, false] ->
+        value
+
+      value when value in ["true", "1", 1] ->
+        true
+
+      value when value in ["false", "0", 0] ->
+        false
+
+      _ ->
+        nil
     end
   end
 
@@ -156,6 +166,7 @@ defmodule MessngrWeb.ConversationController do
   end
 
   defp maybe_put(opts, _key, nil), do: opts
+
   defp maybe_put(opts, :limit, value) do
     case Integer.parse(to_string(value)) do
       {int, _} when int > 0 and int <= 200 -> Keyword.put(opts, :limit, int)
@@ -170,5 +181,7 @@ defmodule MessngrWeb.ConversationController do
   defp hidden_to_visibility(_value), do: nil
 
   defp maybe_put_read_receipts_enabled(attrs, nil), do: attrs
-  defp maybe_put_read_receipts_enabled(attrs, value), do: Map.put(attrs, :read_receipts_enabled, value)
+
+  defp maybe_put_read_receipts_enabled(attrs, value),
+    do: Map.put(attrs, :read_receipts_enabled, value)
 end

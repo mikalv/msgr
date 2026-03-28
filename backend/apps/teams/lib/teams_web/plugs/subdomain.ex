@@ -6,22 +6,31 @@ defmodule TeamsWeb.Plugs.Subdomain do
   # we will use the options parameter and merge the incoming options with the existing one
   def init(opts) do
     conf = Application.get_env(:teams, TeamsWeb.Endpoint)
+
     Map.merge(
       opts,
-      %{ root_host: conf[:url][:host] }
+      %{root_host: conf[:url][:host]}
     )
   end
 
-# unpack subdomain_router argument
-  def call(%Plug.Conn{host: host} = conn, %{root_host: root_host, subdomain_router: router} = _opts) do
+  # unpack subdomain_router argument
+  def call(
+        %Plug.Conn{host: host} = conn,
+        %{root_host: root_host, subdomain_router: router} = _opts
+      ) do
     check_team_plug = TeamsWeb.Plugs.ExistingTeam
+
     case extract_subdomain(host, root_host) do
       subdomain when byte_size(subdomain) > 0 ->
-        Logger.info "Subdomain: #{subdomain}"
+        Logger.info("Subdomain: #{subdomain}")
+
         put_private(conn, :subdomain, subdomain)
         |> check_team_plug.call(%{})
-        |> router.call(router.init({})) # <--- call the router with the incoming connection
-        |> halt() # <--- halt further execution
+        # <--- call the router with the incoming connection
+        |> router.call(router.init({}))
+        # <--- halt further execution
+        |> halt()
+
       _ ->
         conn
     end

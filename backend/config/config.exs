@@ -7,6 +7,7 @@ config :msgr,
 config :msgr, :feature_flags, noise_handshake_required: true
 
 config :msgr, Messngr.Mailer, adapter: Swoosh.Adapters.Local
+
 config :msgr, Messngr.Auth.Notifier,
   email_sender: {"Messngr", System.get_env("MSGR_AUTH_EMAIL_FROM", "login@messngr.local")},
   sms_adapter: Messngr.Auth.Notifier.LogSmsAdapter
@@ -143,8 +144,7 @@ config :phoenix, :plug_init_mode, :runtime
 
 config :hammer,
   backend:
-    {Hammer.Backend.ETS,
-     [expiry_ms: :timer.minutes(10), cleanup_interval_ms: :timer.minutes(1)]}
+    {Hammer.Backend.ETS, [expiry_ms: :timer.minutes(10), cleanup_interval_ms: :timer.minutes(1)]}
 
 config :llm_gateway,
   default_provider: :openai,

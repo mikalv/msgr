@@ -26,27 +26,34 @@ defmodule Teams.TenantTeam do
   def append_members(tenant, new_members) when is_list(new_members) and is_binary(tenant) do
     t = get_team!(tenant)
     members = t.members ++ new_members
-    Logger.info "Appending new members to tenant=#{t.name}, new_members=#{inspect new_members}"
+    Logger.info("Appending new members to tenant=#{t.name}, new_members=#{inspect(new_members)}")
+
     t
-      |> changeset(%{members: members})
-      |> Teams.Repo.update()
+    |> changeset(%{members: members})
+    |> Teams.Repo.update()
   end
 
   @spec append_members(%__MODULE__{}, list(String.t())) :: %__MODULE__{}
   def append_members(%__MODULE__{} = tenant, new_members) when is_list(new_members) do
     members = tenant.members ++ new_members
-    Logger.info "Appending new members to tenant=#{tenant.name}, new_members=#{inspect new_members}"
+
+    Logger.info(
+      "Appending new members to tenant=#{tenant.name}, new_members=#{inspect(new_members)}"
+    )
+
     tenant
-      |> changeset(%{members: members})
-      |> Teams.Repo.update()
+    |> changeset(%{members: members})
+    |> Teams.Repo.update()
   end
 
   @spec am_i_a_member?(String.t(), String.t()) :: {true, %__MODULE__{}} | {false, nil}
   def am_i_a_member?(tenant, uid) do
     q = from(tt in __MODULE__, where: ^uid in tt.members and tt.name == ^tenant)
+
     case Teams.Repo.one(q) do
       nil ->
         {false, nil}
+
       tenant ->
         {true, tenant}
     end
@@ -57,11 +64,17 @@ defmodule Teams.TenantTeam do
     from(tt in __MODULE__, where: ^uid in tt.members) |> Teams.Repo.all()
   end
 
-  @spec create_tenant(String.t(), String.t(), String.t()) :: {:ok, %__MODULE__{}} | {:error, Ecto.Changeset.t}
+  @spec create_tenant(String.t(), String.t(), String.t()) ::
+          {:ok, %__MODULE__{}} | {:error, Ecto.Changeset.t()}
   def create_tenant(name, creator_uid, description \\ "") do
     %__MODULE__{}
-      |> changeset(%{name: name, creator_uid: creator_uid, description: description, members: [creator_uid]})
-      |> Teams.Repo.insert
+    |> changeset(%{
+      name: name,
+      creator_uid: creator_uid,
+      description: description,
+      members: [creator_uid]
+    })
+    |> Teams.Repo.insert()
   end
 
   @spec list() :: list(%__MODULE__{})

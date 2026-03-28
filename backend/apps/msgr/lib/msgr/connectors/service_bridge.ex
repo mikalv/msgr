@@ -46,12 +46,15 @@ defmodule Msgr.Connectors.ServiceBridge do
   Publishes an asynchronous action for downstream bridge workers.
   """
   @spec publish(t(), atom(), map(), keyword()) :: :ok | {:error, term()}
-  def publish(%__MODULE__{} = bridge, action, payload, opts \\ []) when is_atom(action) and is_map(payload) do
+  def publish(%__MODULE__{} = bridge, action, payload, opts \\ [])
+      when is_atom(action) and is_map(payload) do
     with {:ok, envelope} <- build_envelope(bridge, action, payload, opts),
          {:ok, instance} <- resolve_instance(bridge, opts) do
       queue_opts =
         bridge.queue_opts
-        |> Keyword.merge(Keyword.drop(opts, [:trace_id, :metadata, :occurred_at, :schema, :instance]))
+        |> Keyword.merge(
+          Keyword.drop(opts, [:trace_id, :metadata, :occurred_at, :schema, :instance])
+        )
 
       bridge.queue.publish(topic(bridge, action, instance), Envelope.to_map(envelope), queue_opts)
     end
@@ -61,12 +64,15 @@ defmodule Msgr.Connectors.ServiceBridge do
   Sends a request expecting a response from the bridge worker (e.g. account linking).
   """
   @spec request(t(), atom(), map(), keyword()) :: {:ok, map()} | {:error, term()}
-  def request(%__MODULE__{} = bridge, action, payload, opts \\ []) when is_atom(action) and is_map(payload) do
+  def request(%__MODULE__{} = bridge, action, payload, opts \\ [])
+      when is_atom(action) and is_map(payload) do
     with {:ok, envelope} <- build_envelope(bridge, action, payload, opts),
          {:ok, instance} <- resolve_instance(bridge, opts) do
       queue_opts =
         bridge.queue_opts
-        |> Keyword.merge(Keyword.drop(opts, [:trace_id, :metadata, :occurred_at, :schema, :instance]))
+        |> Keyword.merge(
+          Keyword.drop(opts, [:trace_id, :metadata, :occurred_at, :schema, :instance])
+        )
         |> Keyword.put_new(:timeout, bridge.default_timeout)
 
       bridge.queue.request(topic(bridge, action, instance), Envelope.to_map(envelope), queue_opts)

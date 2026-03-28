@@ -90,7 +90,12 @@ defmodule Messngr.Auth.NoiseHandshakeFlowTest do
     end
 
     test "accepts handshake after session rekey" do
-      %{session: _session, signature: _signature, device_key: device_key, device_public: device_public} =
+      %{
+        session: _session,
+        signature: _signature,
+        device_key: device_key,
+        device_public: device_public
+      } =
         establish_handshake()
 
       rekeyed_session =

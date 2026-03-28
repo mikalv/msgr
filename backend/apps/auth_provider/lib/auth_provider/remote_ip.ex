@@ -1,7 +1,8 @@
 defmodule AuthProvider.RemoteIp do
   @spec get(%Plug.Conn{}) :: String.t()
   def get(%Plug.Conn{} = conn) do
-    forwarded_for = conn
+    forwarded_for =
+      conn
       |> Plug.Conn.get_req_header("x-forwarded-for")
       |> List.first()
 

@@ -26,7 +26,8 @@ defmodule Teams.TenantModels.ReadCursor do
   end
 
   def get(prefix, channel_id, profile_id) do
-    Teams.Repo.get_by(__MODULE__,
+    Teams.Repo.get_by(
+      __MODULE__,
       [channel_id: channel_id, profile_id: profile_id],
       prefix: prefix
     )

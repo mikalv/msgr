@@ -32,7 +32,8 @@ defmodule Messngr.Notifications.PushDispatcher do
      %{
        attempted: length(tokens),
        sent: send_results,
-       suppressed: Enum.map(suppressed, &%{token: &1.id, reason: suppress_reason(&1, profile, now)})
+       suppressed:
+         Enum.map(suppressed, &%{token: &1.id, reason: suppress_reason(&1, profile, now)})
      }}
   end
 

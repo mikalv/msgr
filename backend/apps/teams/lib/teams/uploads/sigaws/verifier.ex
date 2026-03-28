@@ -204,15 +204,16 @@ defmodule Sigaws.Verifier do
          :ok <- match_signing_date(sd, dt) do
       sh = sh |> String.split(";") |> Enum.sort()
 
-      {:ok, %Ctxt{
-        access_key: ak,
-        region: rg,
-        service: sv,
-        signed_at_amz_dt: st,
-        expires_in: ex,
-        signed_headers: sh,
-        signature: sg
-      }}
+      {:ok,
+       %Ctxt{
+         access_key: ak,
+         region: rg,
+         service: sv,
+         signed_at_amz_dt: st,
+         expires_in: ex,
+         signed_headers: sh,
+         signature: sg
+       }}
     else
       {:error, _, _} = error -> error
     end
@@ -229,15 +230,16 @@ defmodule Sigaws.Verifier do
          :ok <- match_signing_date(sd, dt) do
       sh = sh |> String.split(";") |> Enum.sort()
 
-      {:ok, %Ctxt{
-        access_key: ak,
-        region: rg,
-        service: sv,
-        signed_at_amz_dt: st,
-        expires_in: ex,
-        signed_headers: sh,
-        signature: sg
-      }}
+      {:ok,
+       %Ctxt{
+         access_key: ak,
+         region: rg,
+         service: sv,
+         signed_at_amz_dt: st,
+         expires_in: ex,
+         signed_headers: sh,
+         signature: sg
+       }}
     else
       {:error, _, _} = error -> error
     end

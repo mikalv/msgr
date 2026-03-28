@@ -108,10 +108,14 @@ defmodule Messngr.BridgesTest do
 
     test "stores distinct bridge instances for the same service", %{account: account} do
       assert {:ok, first} =
-               Bridges.sync_linked_identity(account.id, :slack, %{external_id: "one"}, instance: "workspace-a")
+               Bridges.sync_linked_identity(account.id, :slack, %{external_id: "one"},
+                 instance: "workspace-a"
+               )
 
       assert {:ok, second} =
-               Bridges.sync_linked_identity(account.id, :slack, %{external_id: "two"}, instance: "workspace-b")
+               Bridges.sync_linked_identity(account.id, :slack, %{external_id: "two"},
+                 instance: "workspace-b"
+               )
 
       assert first.instance == "workspace-a"
       assert second.instance == "workspace-b"
@@ -124,7 +128,9 @@ defmodule Messngr.BridgesTest do
 
     test "rejects invalid instance identifiers", %{account: account} do
       assert {:error, {:invalid_instance, _}} =
-               Bridges.sync_linked_identity(account.id, :slack, %{external_id: "oops"}, instance: "")
+               Bridges.sync_linked_identity(account.id, :slack, %{external_id: "oops"},
+                 instance: ""
+               )
     end
   end
 
@@ -154,7 +160,8 @@ defmodule Messngr.BridgesTest do
     end
 
     test "returns error for unknown bridge account" do
-      assert {:error, :unknown_bridge_account} = Bridges.create_share_link(Ecto.UUID.generate(), :image, %{})
+      assert {:error, :unknown_bridge_account} =
+               Bridges.create_share_link(Ecto.UUID.generate(), :image, %{})
     end
   end
 
@@ -168,7 +175,9 @@ defmodule Messngr.BridgesTest do
                Bridges.sync_linked_identity(account.id, :telegram, %{external_id: "unlink-me"})
 
       assert {:ok, link} =
-               Bridges.create_share_link(linked.id, :file, %{payload: %{"url" => "https://example"}})
+               Bridges.create_share_link(linked.id, :file, %{
+                 payload: %{"url" => "https://example"}
+               })
 
       assert {:ok, _deleted} = Bridges.unlink_account(account.id, :telegram)
       assert Bridges.get_account(account.id, :telegram) == nil
@@ -187,7 +196,10 @@ defmodule Messngr.BridgesTest do
       |> Messngr.Repo.insert!()
 
     assert {:ok, _} =
-             Bridges.sync_linked_identity(account.id, :telegram, %{external_id: "lookup", contacts: []})
+             Bridges.sync_linked_identity(account.id, :telegram, %{
+               external_id: "lookup",
+               contacts: []
+             })
 
     fetched = Bridges.get_account(account.id, :telegram)
     assert fetched.external_id == "lookup"

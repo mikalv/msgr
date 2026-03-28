@@ -23,10 +23,14 @@ defmodule MessngrWeb.BridgeAccountControllerTest do
 
   test "unlinks a specific bridge instance", %{conn: conn, account: account} do
     assert {:ok, _} =
-             Bridges.sync_linked_identity(account.id, :slack, %{external_id: "one"}, instance: "workspace-a")
+             Bridges.sync_linked_identity(account.id, :slack, %{external_id: "one"},
+               instance: "workspace-a"
+             )
 
     assert {:ok, _} =
-             Bridges.sync_linked_identity(account.id, :slack, %{external_id: "two"}, instance: "workspace-b")
+             Bridges.sync_linked_identity(account.id, :slack, %{external_id: "two"},
+               instance: "workspace-b"
+             )
 
     conn = delete(conn, ~p"/api/bridges/slack?instance=workspace-a")
     assert response(conn, 204)

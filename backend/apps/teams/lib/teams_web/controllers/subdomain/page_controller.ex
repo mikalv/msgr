@@ -7,7 +7,6 @@ defmodule TeamsWeb.Subdomain.PageController do
     # The home page is often custom made,
     # so skip the default app layout.
     conn
-    |> send_resp(200, "Your shit: #{inspect conn}")
+    |> send_resp(200, "Your shit: #{inspect(conn)}")
   end
-
 end

@@ -13,7 +13,9 @@ defmodule Messngr.Repo.Migrations.EnhanceMediaUploads do
 
     execute("ALTER TABLE messages ALTER COLUMN kind TYPE message_kind USING kind::message_kind")
 
-    execute("ALTER TABLE media_uploads ALTER COLUMN kind TYPE message_kind USING kind::message_kind")
+    execute(
+      "ALTER TABLE media_uploads ALTER COLUMN kind TYPE message_kind USING kind::message_kind"
+    )
   end
 
   def down do

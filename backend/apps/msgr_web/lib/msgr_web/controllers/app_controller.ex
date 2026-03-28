@@ -16,10 +16,12 @@ defmodule MessngrWeb.AppController do
 
   @doc "GET /api/apps/directory — browse public apps"
   def directory(conn, params) do
-    apps = Apps.list_directory(
-      category: params["category"],
-      q: params["q"]
-    )
+    apps =
+      Apps.list_directory(
+        category: params["category"],
+        q: params["q"]
+      )
+
     json(conn, %{data: Enum.map(apps, &app_detail_json/1)})
   end
 
@@ -97,6 +99,7 @@ defmodule MessngrWeb.AppController do
         case Apps.install_app(app.id, team.id, config) do
           {:ok, installation} ->
             Apps.increment_install_count(app.id)
+
             conn
             |> put_status(:created)
             |> json(%{
@@ -167,19 +170,25 @@ defmodule MessngrWeb.AppController do
     team = conn.assigns.current_team
 
     case Apps.get_installation_by_app_slug(app_slug, team.id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       installation ->
         tokens = Apps.list_bot_tokens(installation.id)
-        json(conn, %{data: Enum.map(tokens, fn t ->
-          %{
-            id: t.id,
-            label: t.label,
-            scopes: t.scopes,
-            last_used_at: t.last_used_at,
-            expires_at: t.expires_at,
-            inserted_at: t.inserted_at
-          }
-        end)})
+
+        json(conn, %{
+          data:
+            Enum.map(tokens, fn t ->
+              %{
+                id: t.id,
+                label: t.label,
+                scopes: t.scopes,
+                last_used_at: t.last_used_at,
+                expires_at: t.expires_at,
+                inserted_at: t.inserted_at
+              }
+            end)
+        })
     end
   end
 

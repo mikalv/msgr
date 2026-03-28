@@ -86,7 +86,8 @@ defmodule AuthProvider.Idp do
     IdentityProvider.changeset(provider, attrs)
   end
 
-  @spec create_identity_provider(Tenant.t(), map()) :: {:ok, IdentityProvider.t()} | {:error, Changeset.t()}
+  @spec create_identity_provider(Tenant.t(), map()) ::
+          {:ok, IdentityProvider.t()} | {:error, Changeset.t()}
   def create_identity_provider(%Tenant{} = tenant, attrs) do
     attrs = attrs |> normalise_provider_attrs() |> Map.put(:tenant_id, tenant.id)
 
@@ -100,20 +101,25 @@ defmodule AuthProvider.Idp do
     end
   end
 
-  @spec update_identity_provider(IdentityProvider.t(), map()) :: {:ok, IdentityProvider.t()} | {:error, Changeset.t()}
+  @spec update_identity_provider(IdentityProvider.t(), map()) ::
+          {:ok, IdentityProvider.t()} | {:error, Changeset.t()}
   def update_identity_provider(%IdentityProvider{} = provider, attrs) do
     provider
     |> IdentityProvider.changeset(attrs)
     |> Repo.update()
   end
 
-  @spec delete_identity_provider(IdentityProvider.t()) :: {:ok, IdentityProvider.t()} | {:error, Changeset.t()}
-  def delete_identity_provider(%IdentityProvider{is_default: true}), do: {:error, :cannot_delete_default}
+  @spec delete_identity_provider(IdentityProvider.t()) ::
+          {:ok, IdentityProvider.t()} | {:error, Changeset.t()}
+  def delete_identity_provider(%IdentityProvider{is_default: true}),
+    do: {:error, :cannot_delete_default}
+
   def delete_identity_provider(%IdentityProvider{} = provider), do: Repo.delete(provider)
 
-  @spec fetch_identity_provider(Tenant.t(), binary() | String.t()) :: {:ok, IdentityProvider.t()} | :error
+  @spec fetch_identity_provider(Tenant.t(), binary() | String.t()) ::
+          {:ok, IdentityProvider.t()} | :error
   def fetch_identity_provider(%Tenant{} = tenant, id_or_slug) do
-    query = from p in IdentityProvider, where: p.tenant_id == ^tenant.id
+    query = from(p in IdentityProvider, where: p.tenant_id == ^tenant.id)
 
     result =
       case UUID.cast(id_or_slug) do
@@ -155,8 +161,10 @@ defmodule AuthProvider.Idp do
   def issue_tokens(%Tenant{} = tenant, %User{} = user, opts \\ []) do
     base_claims = Map.put(Map.new(Keyword.get(opts, :claims, %{})), "tenant", tenant.slug)
 
-    with {:ok, token, claims} <- Guardian.encode_and_sign(user, base_claims, Keyword.take(opts, [:permissions])),
-         {:ok, refresh_token, _} <- Guardian.encode_and_sign(user, base_claims, refresh_options(opts)) do
+    with {:ok, token, claims} <-
+           Guardian.encode_and_sign(user, base_claims, Keyword.take(opts, [:permissions])),
+         {:ok, refresh_token, _} <-
+           Guardian.encode_and_sign(user, base_claims, refresh_options(opts)) do
       {:ok, %{access_token: token, refresh_token: refresh_token, claims: claims}}
     end
   end
@@ -178,7 +186,8 @@ defmodule AuthProvider.Idp do
   @doc """
   Stores tenant and provider metadata in the Phoenix session.
   """
-  @spec sign_in(Plug.Conn.t(), Tenant.t(), User.t(), IdentityProvider.t(), keyword()) :: Plug.Conn.t()
+  @spec sign_in(Plug.Conn.t(), Tenant.t(), User.t(), IdentityProvider.t(), keyword()) ::
+          Plug.Conn.t()
   def sign_in(conn, tenant, user, provider, opts \\ []) do
     Session.sign_in(conn, tenant, user, provider, opts)
   end
@@ -201,7 +210,8 @@ defmodule AuthProvider.Idp do
   Builds an OAuth2 client for an external OIDC identity provider configuration.
   Returns `{:error, :unsupported_strategy}` for native providers.
   """
-  @spec build_service_provider_client(IdentityProvider.t()) :: {:ok, Client.t()} | {:error, term()}
+  @spec build_service_provider_client(IdentityProvider.t()) ::
+          {:ok, Client.t()} | {:error, term()}
   def build_service_provider_client(%IdentityProvider{strategy: :external_oidc} = provider) do
     {:ok,
      Client.new(
@@ -243,15 +253,22 @@ defmodule AuthProvider.Idp do
       |> Map.put(:tenant_id, tenant.id)
 
     Multi.new()
-    |> Multi.update_all(:clear_defaults, identity_provider_query(tenant), set: [is_default: false])
-    |> Multi.insert(:default_provider, IdentityProvider.changeset(%IdentityProvider{}, default_attrs))
+    |> Multi.update_all(:clear_defaults, identity_provider_query(tenant),
+      set: [is_default: false]
+    )
+    |> Multi.insert(
+      :default_provider,
+      IdentityProvider.changeset(%IdentityProvider{}, default_attrs)
+    )
   end
 
   defp maybe_clear_existing_default(multi, %Tenant{} = tenant, attrs) do
     attrs = normalise_provider_attrs(attrs)
 
     if truthy?(Map.get(attrs, :is_default) || Map.get(attrs, "is_default")) do
-      Multi.update_all(multi, :unset_default, identity_provider_query(tenant), set: [is_default: false])
+      Multi.update_all(multi, :unset_default, identity_provider_query(tenant),
+        set: [is_default: false]
+      )
     else
       multi
     end
@@ -262,7 +279,7 @@ defmodule AuthProvider.Idp do
   defp normalise_provider_attrs(value), do: value
 
   defp identity_provider_query(%Tenant{} = tenant) do
-    from p in IdentityProvider, where: p.tenant_id == ^tenant.id and p.is_default == true
+    from(p in IdentityProvider, where: p.tenant_id == ^tenant.id and p.is_default == true)
   end
 
   defp truthy?(value) when value in [true, "true", 1, "1"], do: true
@@ -274,4 +291,3 @@ defmodule AuthProvider.Idp do
     |> Keyword.merge(@refresh_defaults)
   end
 end
-

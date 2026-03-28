@@ -33,7 +33,13 @@ defmodule Teams.Search do
 
       url = "#{prism_url()}/collections/#{@collection}/documents"
 
-      case :hackney.request(:post, url, [{"Content-Type", "application/json"}], Jason.encode!(%{documents: [doc]}), [:with_body]) do
+      case :hackney.request(
+             :post,
+             url,
+             [{"Content-Type", "application/json"}],
+             Jason.encode!(%{documents: [doc]}),
+             [:with_body]
+           ) do
         {:ok, status, _, _} when status in 200..299 ->
           Logger.debug("Indexed message #{message.id} in Prism")
 
@@ -71,13 +77,20 @@ defmodule Teams.Search do
 
     url = "#{prism_url()}/collections/#{@collection}/search"
 
-    case :hackney.request(:post, url, [{"Content-Type", "application/json"}], Jason.encode!(search_body), [:with_body]) do
+    case :hackney.request(
+           :post,
+           url,
+           [{"Content-Type", "application/json"}],
+           Jason.encode!(search_body),
+           [:with_body]
+         ) do
       {:ok, status, _, body} when status in 200..299 ->
         case Jason.decode(body) do
           {:ok, %{"results" => results}} ->
             hits =
               Enum.map(results, fn hit ->
                 fields = hit["fields"] || hit["_source"] || %{}
+
                 %{
                   message_id: fields["message_id"],
                   channel_id: fields["channel_id"],
@@ -115,28 +128,30 @@ defmodule Teams.Search do
     channel_id = Keyword.get(opts, :channel_id)
     pattern = "%#{String.replace(query, "%", "\\%")}%"
 
-    base = from(m in Teams.TenantModels.Message,
-      where: is_nil(m.deleted_at) and is_nil(m.thread_parent_id),
-      where: fragment("coalesce(content->>'text', '') ILIKE ?", ^pattern),
-      preload: [:sender_profile],
-      order_by: [desc: m.inserted_at],
-      limit: ^limit
-    )
+    base =
+      from(m in Teams.TenantModels.Message,
+        where: is_nil(m.deleted_at) and is_nil(m.thread_parent_id),
+        where: fragment("coalesce(content->>'text', '') ILIKE ?", ^pattern),
+        preload: [:sender_profile],
+        order_by: [desc: m.inserted_at],
+        limit: ^limit
+      )
 
     base = if channel_id, do: from(m in base, where: m.channel_id == ^channel_id), else: base
 
     messages = Teams.Repo.all(base, prefix: prefix)
 
-    results = Enum.map(messages, fn m ->
-      %{
-        message_id: m.id,
-        channel_id: m.channel_id,
-        sender_name: if(m.sender_profile, do: m.sender_profile.display_name, else: ""),
-        content: extract_text(m.content),
-        inserted_at: to_string(m.inserted_at),
-        score: 1.0
-      }
-    end)
+    results =
+      Enum.map(messages, fn m ->
+        %{
+          message_id: m.id,
+          channel_id: m.channel_id,
+          sender_name: if(m.sender_profile, do: m.sender_profile.display_name, else: ""),
+          content: extract_text(m.content),
+          inserted_at: to_string(m.inserted_at),
+          score: 1.0
+        }
+      end)
 
     {:ok, results}
   rescue
@@ -165,5 +180,6 @@ defmodule Teams.Search do
       _, _ -> {:halt, nil}
     end)
   end
+
   defp get_in(_, _), do: nil
 end

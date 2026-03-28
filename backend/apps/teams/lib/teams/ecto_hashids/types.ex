@@ -4,18 +4,20 @@ defmodule EctoHashids.Types do
   # Schema names are here are for use as a human reference only; they may drift
   # due to refactoring or change to some completely different descriptive value.
   # These are just atoms, and won't raise an error if they don't actually exist.
-  @prefix_descriptions Application.get_env(:teams, :ecto_hashids)[:prefix_descriptions] || %{
-                         o: :ExampleModule
-                       }
+  @prefix_descriptions Application.get_env(:teams, :ecto_hashids)[:prefix_descriptions] ||
+                         %{
+                           o: :ExampleModule
+                         }
 
   @prefix_modules Map.new(@prefix_descriptions, fn {key, _schema} ->
                     prefix = Atom.to_string(key)
                     {prefix, Module.concat(__MODULE__, Macro.camelize(prefix))}
                   end)
 
-  @prefix_separator Application.get_env(:teams, :ecto_hashids)[:prefix_separator] ||  "_"
+  @prefix_separator Application.get_env(:teams, :ecto_hashids)[:prefix_separator] || "_"
 
-  @characters Application.get_env(:teams, :ecto_hashids)[:characters] || "0123456789abcdefghjkmnpqrstvwxyz"
+  @characters Application.get_env(:teams, :ecto_hashids)[:characters] ||
+                "0123456789abcdefghjkmnpqrstvwxyz"
 
   @salt Application.get_env(:teams, :ecto_hashids)[:salt] || "42"
 

@@ -36,7 +36,8 @@ defmodule Messngr.Apps.WebhookDispatch do
   @doc "List app installations for a team that have webhook URLs."
   def list_webhook_installations(team_id) do
     from(i in AppInstallation,
-      join: a in App, on: a.id == i.app_id,
+      join: a in App,
+      on: a.id == i.app_id,
       where: i.team_id == ^team_id and i.status == "active" and not is_nil(a.webhook_url),
       preload: [:app]
     )
@@ -49,27 +50,29 @@ defmodule Messngr.Apps.WebhookDispatch do
     url = app.webhook_url
     secret = app.webhook_secret
 
-    body = Jason.encode!(%{
-      event: event,
-      team_id: installation.team_id,
-      app_id: app.id,
-      timestamp: DateTime.utc_now() |> DateTime.to_iso8601(),
-      data: payload
-    })
+    body =
+      Jason.encode!(%{
+        event: event,
+        team_id: installation.team_id,
+        app_id: app.id,
+        timestamp: DateTime.utc_now() |> DateTime.to_iso8601(),
+        data: payload
+      })
 
     headers = [
       {"Content-Type", "application/json"},
       {"X-Relay-Event", event},
-      {"X-Relay-Delivery", Ecto.UUID.generate()},
+      {"X-Relay-Delivery", Ecto.UUID.generate()}
     ]
 
     # Add HMAC signature if secret is configured
-    headers = if secret && secret != "" do
-      sig = :crypto.mac(:hmac, :sha256, secret, body) |> Base.encode16(case: :lower)
-      [{"X-Relay-Signature", "sha256=#{sig}"} | headers]
-    else
-      headers
-    end
+    headers =
+      if secret && secret != "" do
+        sig = :crypto.mac(:hmac, :sha256, secret, body) |> Base.encode16(case: :lower)
+        [{"X-Relay-Signature", "sha256=#{sig}"} | headers]
+      else
+        headers
+      end
 
     case Finch.build(:post, url, headers, body)
          |> Finch.request(Messngr.Finch, receive_timeout: 10_000) do
@@ -78,11 +81,17 @@ defmodule Messngr.Apps.WebhookDispatch do
         :ok
 
       {:ok, %{status: status}} ->
-        Logger.warning("[WebhookDispatch] #{event} → #{app.slug}: HTTP #{status} (attempt #{attempt})")
+        Logger.warning(
+          "[WebhookDispatch] #{event} → #{app.slug}: HTTP #{status} (attempt #{attempt})"
+        )
+
         maybe_retry(installation, event, payload, attempt)
 
       {:error, reason} ->
-        Logger.warning("[WebhookDispatch] #{event} → #{app.slug}: #{inspect(reason)} (attempt #{attempt})")
+        Logger.warning(
+          "[WebhookDispatch] #{event} → #{app.slug}: #{inspect(reason)} (attempt #{attempt})"
+        )
+
         maybe_retry(installation, event, payload, attempt)
     end
   end
@@ -93,7 +102,7 @@ defmodule Messngr.Apps.WebhookDispatch do
   end
 
   defp maybe_retry(installation, event, payload, attempt) do
-    backoff = @initial_backoff_ms * :math.pow(2, attempt - 1) |> round()
+    backoff = (@initial_backoff_ms * :math.pow(2, attempt - 1)) |> round()
     Process.sleep(backoff)
     deliver(installation, event, payload, attempt + 1)
   end

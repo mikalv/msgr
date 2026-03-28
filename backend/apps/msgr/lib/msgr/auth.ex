@@ -36,8 +36,10 @@ defmodule Messngr.Auth do
     # This function verifies OTP and binds the account to the Noise session
     Repo.transaction(fn ->
       challenge = Repo.get!(Challenge, id)
-      session_id = Map.get(attrs, "session_id")  # UUID from Rust Gateway
-      session_token = Map.get(attrs, "session_token")  # Token from Rust Gateway
+      # UUID from Rust Gateway
+      session_id = Map.get(attrs, "session_id")
+      # Token from Rust Gateway
+      session_token = Map.get(attrs, "session_token")
 
       with :ok <- ensure_not_consumed(challenge),
            :ok <- ensure_not_expired(challenge),
@@ -48,8 +50,14 @@ defmodule Messngr.Auth do
              Accounts.verify_identity(identity, %{last_challenged_at: challenge.inserted_at}),
            {:ok, %{identity: identity, device: device}} <-
              Accounts.attach_device_for_identity(identity, device_attrs_from(challenge, attrs)),
-           :ok <- bind_noise_session_to_account(session_id, session_token, identity.account, Map.get(identity, :profile), device) do
-
+           :ok <-
+             bind_noise_session_to_account(
+               session_id,
+               session_token,
+               identity.account,
+               Map.get(identity, :profile),
+               device
+             ) do
         account = identity.account
         default_profile = List.first(List.wrap(account.profiles))
         default_profile_id = default_profile && default_profile.id
@@ -160,13 +168,14 @@ defmodule Messngr.Auth do
       |> Enum.join(" ")
 
     Repo.transaction(fn ->
-      with {:ok, identity} <- Accounts.ensure_identity(%{
-             kind: :email,
-             value: email,
-             display_name: display_name,
-             email: email,
-             phone_number: nil
-           }),
+      with {:ok, identity} <-
+             Accounts.ensure_identity(%{
+               kind: :email,
+               value: email,
+               display_name: display_name,
+               email: email,
+               phone_number: nil
+             }),
            account <- Repo.preload(identity.account, :profiles) do
         default_profile = List.first(List.wrap(account.profiles))
         default_profile_id = default_profile && default_profile.id
@@ -343,7 +352,9 @@ defmodule Messngr.Auth do
     Logger.info("Delivering OTP to #{challenge.channel}:#{challenge.target}")
 
     case Notifier.deliver_challenge(challenge, code) do
-      :ok -> :ok
+      :ok ->
+        :ok
+
       {:error, reason} ->
         Repo.delete(challenge)
         {:error, reason}

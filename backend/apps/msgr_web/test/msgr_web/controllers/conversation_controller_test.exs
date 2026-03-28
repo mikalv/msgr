@@ -27,7 +27,11 @@ defmodule MessngrWeb.ConversationControllerTest do
     assert length(participants) == 2
   end
 
-  test "lists conversations with metadata", %{conn: conn, target_profile: target_profile, current_profile: profile} do
+  test "lists conversations with metadata", %{
+    conn: conn,
+    target_profile: target_profile,
+    current_profile: profile
+  } do
     {:ok, conversation} = Chat.ensure_direct_conversation(profile.id, target_profile.id)
     {:ok, _} = Chat.send_message(conversation.id, profile.id, %{"body" => "Hei"})
 
@@ -45,7 +49,11 @@ defmodule MessngrWeb.ConversationControllerTest do
            } = json_response(conn, 200)
   end
 
-  test "watch endpoints manage watchers", %{conn: conn, target_profile: target_profile, current_profile: profile} do
+  test "watch endpoints manage watchers", %{
+    conn: conn,
+    target_profile: target_profile,
+    current_profile: profile
+  } do
     {:ok, conversation} = Chat.ensure_direct_conversation(profile.id, target_profile.id)
 
     watch_conn = post(conn, ~p"/api/conversations/#{conversation.id}/watch")

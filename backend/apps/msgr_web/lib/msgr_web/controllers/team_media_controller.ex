@@ -7,7 +7,8 @@ defmodule MessngrWeb.TeamMediaController do
 
   action_fallback MessngrWeb.FallbackController
 
-  @max_file_size 50 * 1024 * 1024  # 50 MB
+  # 50 MB
+  @max_file_size 50 * 1024 * 1024
 
   @doc "POST /api/teams/:slug/media/presign — presigned upload URL"
   def presign(conn, params) do
@@ -98,11 +99,13 @@ defmodule MessngrWeb.TeamMediaController do
 
   defp parse_size(nil), do: nil
   defp parse_size(size) when is_integer(size), do: size
+
   defp parse_size(size) when is_binary(size) do
     case Integer.parse(size) do
       {int, ""} -> int
       _ -> nil
     end
   end
+
   defp parse_size(_), do: nil
 end

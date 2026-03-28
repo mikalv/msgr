@@ -29,7 +29,12 @@ defmodule MessngrWeb.TeamReactionControllerTest do
   end
 
   describe "POST /api/teams/:slug/channels/:channel_id/messages/:message_id/reactions" do
-    test "adds a reaction", %{conn: conn, slug: slug, channel_id: channel_id, message_id: message_id} do
+    test "adds a reaction", %{
+      conn: conn,
+      slug: slug,
+      channel_id: channel_id,
+      message_id: message_id
+    } do
       conn =
         post(
           conn,

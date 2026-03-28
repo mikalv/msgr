@@ -80,6 +80,7 @@ defmodule MessngrWeb.AuthController do
 
   defp target_hint(%Challenge{channel: :email, target: target}) do
     [prefix | domain] = String.split(target, "@")
+
     masked_prefix =
       prefix
       |> String.slice(0, 2)
@@ -97,4 +98,3 @@ defmodule MessngrWeb.AuthController do
     "+***#{tail}"
   end
 end
-

@@ -34,7 +34,8 @@ defmodule Messngr.Auth.JwtTest do
     test "refresh token decodes with correct claims", %{account: account, profile: profile} do
       {_access, refresh_token} = Auth.issue_jwt_tokens(account, profile.id)
 
-      {:ok, claims} = AuthProvider.Guardian.decode_and_verify(refresh_token, %{"typ" => "refresh"})
+      {:ok, claims} =
+        AuthProvider.Guardian.decode_and_verify(refresh_token, %{"typ" => "refresh"})
 
       assert claims["sub"] == account.id
       assert claims["pid"] == profile.id

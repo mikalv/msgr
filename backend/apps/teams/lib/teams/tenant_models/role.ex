@@ -8,12 +8,14 @@ defmodule Teams.TenantModels.Role do
     field :permissions, {:array, :string}
     field :is_default, :boolean
     field :metadata, :map
+
     many_to_many(
       :profiles,
       Teams.TenantModels.Profile,
       join_through: Teams.TenantModels.ProfileRole,
       on_replace: :delete
     )
+
     timestamps(type: :utc_datetime)
   end
 
@@ -27,9 +29,11 @@ defmodule Teams.TenantModels.Role do
 
   # Query functions
 
-  def get_default(tenant), do: Teams.Repo.get_by(__MODULE__, [is_default: true], prefix: Triplex.to_prefix(tenant))
+  def get_default(tenant),
+    do: Teams.Repo.get_by(__MODULE__, [is_default: true], prefix: Triplex.to_prefix(tenant))
 
-  def get_by_name(tenant, name), do: Teams.Repo.get_by(__MODULE__, [name: name], prefix: Triplex.to_prefix(tenant))
+  def get_by_name(tenant, name),
+    do: Teams.Repo.get_by(__MODULE__, [name: name], prefix: Triplex.to_prefix(tenant))
 
   def list(tenant) do
     Teams.Repo.all(__MODULE__, prefix: Triplex.to_prefix(tenant))
@@ -37,8 +41,8 @@ defmodule Teams.TenantModels.Role do
 
   def create(tenant, attrs \\ %{}) do
     %__MODULE__{}
-      |> changeset(attrs)
-      |> Teams.Repo.insert(prefix: Triplex.to_prefix(tenant))
+    |> changeset(attrs)
+    |> Teams.Repo.insert(prefix: Triplex.to_prefix(tenant))
   end
 
   def update(tenant, obj, attrs) do

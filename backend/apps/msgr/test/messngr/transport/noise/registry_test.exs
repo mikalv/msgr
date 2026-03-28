@@ -23,7 +23,10 @@ defmodule Messngr.Transport.Noise.RegistryTest do
       {:ok, updated_session} = Registry.put(registry, updated_session)
 
       assert {:ok, ^updated_session} = Registry.fetch(registry, session.id)
-      assert {:ok, ^updated_session} = Registry.fetch_by_token(registry, Session.token(updated_session))
+
+      assert {:ok, ^updated_session} =
+               Registry.fetch_by_token(registry, Session.token(updated_session))
+
       assert Registry.count(registry) == 1
     end
   end

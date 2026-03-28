@@ -29,7 +29,12 @@ defmodule Messngr.AIConversationTest do
      }}
   end
 
-  test "conversation_reply/4 includes participant names in history", %{account: account, profile: profile, other_profile: other, conversation: conversation} do
+  test "conversation_reply/4 includes participant names in history", %{
+    account: account,
+    profile: profile,
+    other_profile: other,
+    conversation: conversation
+  } do
     expect(Messngr.AI.LlmClientMock, :chat_completion, fn team_id, messages, opts ->
       assert team_id == account.id
       assert is_list(messages)

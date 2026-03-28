@@ -1,6 +1,5 @@
 import Config
 
-
 # Configure your database
 config :auth_provider, AuthProvider.Repo,
   username: "mikalv",
@@ -50,14 +49,13 @@ config :teams, TeamsWeb.Endpoint,
 
 # Watch static and templates for browser reloading.
 config :auth_provider, AuthProvider.Endpoint,
-live_reload: [
-  patterns: [
-    ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
-    ~r"priv/gettext/.*(po)$",
-    ~r"lib/auth_provider/(controllers|live|components)/.*(ex|heex)$"
+  live_reload: [
+    patterns: [
+      ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
+      ~r"priv/gettext/.*(po)$",
+      ~r"lib/auth_provider/(controllers|live|components)/.*(ex|heex)$"
+    ]
   ]
-]
-
 
 # Watch static and templates for browser reloading.
 config :msgr_web, MessngrWeb.Endpoint,
@@ -68,6 +66,7 @@ config :msgr_web, MessngrWeb.Endpoint,
       ~r"lib/msgr_web/(controllers|live|components)/.*(ex|heex)$"
     ]
   ]
+
 # Enable dev routes for dashboard and mailbox
 config :teams, dev_routes: true
 
@@ -76,7 +75,6 @@ config :logger, :console, format: "[$level] $message\n"
 
 # Enable dev routes for dashboard and mailbox
 config :slack_api, dev_routes: false
-
 
 default_hostname = System.get_env("PHX_HOST") || "msgr.no"
 
@@ -92,7 +90,9 @@ config :teams, TeamsWeb.Endpoint,
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: System.get_env("SECRET_KEY_BASE") || "qwoyNQ1ugLHvds6ml4jYK4n8pDqngGDuhdaaOQOcTU3nbNRatQEx3NLZ0aNhbjJQ",
+  secret_key_base:
+    System.get_env("SECRET_KEY_BASE") ||
+      "qwoyNQ1ugLHvds6ml4jYK4n8pDqngGDuhdaaOQOcTU3nbNRatQEx3NLZ0aNhbjJQ",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:teams, ~w(--sourcemap=inline --watch)]},
     tailwind: {Tailwind, :install_and_run, [:teams, ~w(--watch)]}
@@ -103,33 +103,36 @@ config :msgr_web, MessngrWeb.Endpoint,
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: System.get_env("SECRET_KEY_BASE") || "qwoyNQ1ugLHvds6ml4jYK4n8pDqngGDuhdaaOQOcTU3nbNRatQEx3NLZ0aNhbjJQ",
+  secret_key_base:
+    System.get_env("SECRET_KEY_BASE") ||
+      "qwoyNQ1ugLHvds6ml4jYK4n8pDqngGDuhdaaOQOcTU3nbNRatQEx3NLZ0aNhbjJQ",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:msgr_web, ~w(--sourcemap=inline --watch)]},
     tailwind: {Tailwind, :install_and_run, [:msgr_web, ~w(--watch)]}
   ]
-
 
 config :slack_api, SlackApiWeb.Endpoint,
   url: [host: "teams-slack-api." <> default_hostname],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: System.get_env("SECRET_KEY_BASE") || "qNrctCYCmpwRTD0jUXPMxTq6LPBFp4mvKbX08Lje/p0JZYvtwGm28ZVk1HnLHGAM",
+  secret_key_base:
+    System.get_env("SECRET_KEY_BASE") ||
+      "qNrctCYCmpwRTD0jUXPMxTq6LPBFp4mvKbX08Lje/p0JZYvtwGm28ZVk1HnLHGAM",
   watchers: []
-
 
 config :auth_provider, AuthProvider.Endpoint,
   url: [host: "auth." <> default_hostname],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: System.get_env("SECRET_KEY_BASE") || "qwoyNQ1ugLHvds6ml4jYK4n8pDqngGDuhdaaOQOcTU3nbNRatQEx3NLZ0aNhbjJQ",
+  secret_key_base:
+    System.get_env("SECRET_KEY_BASE") ||
+      "qwoyNQ1ugLHvds6ml4jYK4n8pDqngGDuhdaaOQOcTU3nbNRatQEx3NLZ0aNhbjJQ",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:msgr_web, ~w(--sourcemap=inline --watch)]},
     tailwind: {Tailwind, :install_and_run, [:msgr_web, ~w(--watch)]}
   ]
-
 
 # Enable dev routes for dashboard and mailbox
 config :msgr_web, dev_routes: false

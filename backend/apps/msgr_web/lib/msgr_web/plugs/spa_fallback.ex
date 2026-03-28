@@ -19,11 +19,20 @@ defmodule MessngrWeb.Plugs.SpaFallback do
 
     cond do
       # Skip API, socket, health, metrics paths
-      String.starts_with?(path, "/api") -> conn
-      String.starts_with?(path, "/socket") -> conn
-      String.starts_with?(path, "/health") -> conn
-      String.starts_with?(path, "/metrics") -> conn
-      String.starts_with?(path, "/phoenix") -> conn
+      String.starts_with?(path, "/api") ->
+        conn
+
+      String.starts_with?(path, "/socket") ->
+        conn
+
+      String.starts_with?(path, "/health") ->
+        conn
+
+      String.starts_with?(path, "/metrics") ->
+        conn
+
+      String.starts_with?(path, "/phoenix") ->
+        conn
 
       # Serve index.html if it exists
       File.exists?(@index_path) ->

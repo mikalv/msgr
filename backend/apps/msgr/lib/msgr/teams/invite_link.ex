@@ -37,7 +37,10 @@ defmodule Messngr.Teams.InviteLink do
       team_id: team_id,
       created_by_account_id: account_id,
       code: generate_code(),
-      expires_at: DateTime.utc_now() |> DateTime.add(@default_ttl_days * 86400, :second) |> DateTime.truncate(:second)
+      expires_at:
+        DateTime.utc_now()
+        |> DateTime.add(@default_ttl_days * 86400, :second)
+        |> DateTime.truncate(:second)
     }
 
     %__MODULE__{}

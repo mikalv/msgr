@@ -42,15 +42,15 @@ defmodule AuthProvider.Idp.Tenant do
         }
 
   schema "idp_tenants" do
-    field :name, :string
-    field :slug, :string
-    field :default_locale, :string
-    field :default_identity_provider, Ecto.Enum, values: [:native, :external_oidc]
-    field :session_domain, :string
-    field :session_max_age_seconds, :integer, default: 86_400
-    field :metadata, :map, default: %{}
+    field(:name, :string)
+    field(:slug, :string)
+    field(:default_locale, :string)
+    field(:default_identity_provider, Ecto.Enum, values: [:native, :external_oidc])
+    field(:session_domain, :string)
+    field(:session_max_age_seconds, :integer, default: 86_400)
+    field(:metadata, :map, default: %{})
 
-    has_many :identity_providers, AuthProvider.Idp.IdentityProvider
+    has_many(:identity_providers, AuthProvider.Idp.IdentityProvider)
 
     timestamps()
   end
@@ -77,12 +77,17 @@ defmodule AuthProvider.Idp.Tenant do
   end
 
   defp cast_default_identity_provider(changeset, attrs) do
-    case {get_field(changeset, :default_identity_provider), Map.get(attrs, "default_identity_provider")} do
-      {nil, val} when val in ["native", :native] -> put_change(changeset, :default_identity_provider, :native)
+    case {get_field(changeset, :default_identity_provider),
+          Map.get(attrs, "default_identity_provider")} do
+      {nil, val} when val in ["native", :native] ->
+        put_change(changeset, :default_identity_provider, :native)
+
       {nil, val} when val in ["external_oidc", :external_oidc] ->
         put_change(changeset, :default_identity_provider, :external_oidc)
+
       {nil, nil} ->
         put_change(changeset, :default_identity_provider, :native)
+
       _ ->
         changeset
     end

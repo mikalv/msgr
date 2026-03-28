@@ -17,7 +17,10 @@ defmodule Messngr.Repo.Migrations.CreateSpacesAndCollaboration do
     create table(:space_memberships, primary_key: false) do
       add :id, :binary_id, primary_key: true
       add :space_id, references(:spaces, type: :binary_id, on_delete: :delete_all), null: false
-      add :profile_id, references(:profiles, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :profile_id, references(:profiles, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :role, :string, null: false, default: "member"
 
       timestamps(type: :utc_datetime)
@@ -28,7 +31,10 @@ defmodule Messngr.Repo.Migrations.CreateSpacesAndCollaboration do
     create table(:space_events, primary_key: false) do
       add :id, :binary_id, primary_key: true
       add :space_id, references(:spaces, type: :binary_id, on_delete: :delete_all), null: false
-      add :created_by_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all), null: false
+
+      add :created_by_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all),
+        null: false
+
       add :updated_by_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all)
       add :title, :string, null: false
       add :description, :text
@@ -47,7 +53,10 @@ defmodule Messngr.Repo.Migrations.CreateSpacesAndCollaboration do
     create table(:shopping_lists, primary_key: false) do
       add :id, :binary_id, primary_key: true
       add :space_id, references(:spaces, type: :binary_id, on_delete: :delete_all), null: false
-      add :created_by_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all), null: false
+
+      add :created_by_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all),
+        null: false
+
       add :name, :string, null: false
       add :status, :string, null: false, default: "active"
 
@@ -58,11 +67,17 @@ defmodule Messngr.Repo.Migrations.CreateSpacesAndCollaboration do
 
     create table(:shopping_list_items, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :list_id, references(:shopping_lists, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :list_id, references(:shopping_lists, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :name, :string, null: false
       add :quantity, :string
       add :checked, :boolean, null: false, default: false
-      add :added_by_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all), null: false
+
+      add :added_by_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all),
+        null: false
+
       add :checked_by_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all)
 
       timestamps(type: :utc_datetime)
@@ -73,7 +88,10 @@ defmodule Messngr.Repo.Migrations.CreateSpacesAndCollaboration do
     create table(:todo_lists, primary_key: false) do
       add :id, :binary_id, primary_key: true
       add :space_id, references(:spaces, type: :binary_id, on_delete: :delete_all), null: false
-      add :created_by_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all), null: false
+
+      add :created_by_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all),
+        null: false
+
       add :name, :string, null: false
       add :status, :string, null: false, default: "active"
 
@@ -88,9 +106,14 @@ defmodule Messngr.Repo.Migrations.CreateSpacesAndCollaboration do
       add :content, :string, null: false
       add :status, :string, null: false, default: "pending"
       add :due_at, :utc_datetime
-      add :created_by_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all), null: false
+
+      add :created_by_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all),
+        null: false
+
       add :assignee_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all)
-      add :completed_by_profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all)
+
+      add :completed_by_profile_id,
+          references(:profiles, type: :binary_id, on_delete: :nilify_all)
 
       timestamps(type: :utc_datetime)
     end

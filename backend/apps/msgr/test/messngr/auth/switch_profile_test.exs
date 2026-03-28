@@ -9,12 +9,18 @@ defmodule Messngr.Auth.SwitchProfileTest do
   setup do
     {:ok, account} = Accounts.create_account(%{"display_name" => "Kari"})
     profile = List.first(account.profiles)
-    {:ok, other} = Accounts.create_profile(%{"name" => "Jobb", "mode" => :work, "account_id" => account.id})
+
+    {:ok, other} =
+      Accounts.create_profile(%{"name" => "Jobb", "mode" => :work, "account_id" => account.id})
 
     %{account: account, profile: profile, other: other}
   end
 
-  test "switches active profile and updates device", %{account: account, profile: profile, other: other} do
+  test "switches active profile and updates device", %{
+    account: account,
+    profile: profile,
+    other: other
+  } do
     %{token: token, device: device, session: session} =
       SessionFixtures.noise_session_fixture(account, profile)
 
@@ -33,13 +39,15 @@ defmodule Messngr.Auth.SwitchProfileTest do
   test "rejects mismatched account", %{account: account, profile: profile, other: other} do
     %{token: token} = SessionFixtures.noise_session_fixture(account, profile)
 
-    assert {:error, :account_mismatch} = Auth.switch_profile(token, Ecto.UUID.generate(), other.id)
+    assert {:error, :account_mismatch} =
+             Auth.switch_profile(token, Ecto.UUID.generate(), other.id)
   end
 
   test "rejects unknown profile", %{account: account, profile: profile} do
     %{token: token} = SessionFixtures.noise_session_fixture(account, profile)
 
-    assert {:error, :profile_not_found} = Auth.switch_profile(token, account.id, Ecto.UUID.generate())
+    assert {:error, :profile_not_found} =
+             Auth.switch_profile(token, account.id, Ecto.UUID.generate())
   end
 
   test "rejects invalid token", %{account: account, other: other} do

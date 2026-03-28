@@ -233,19 +233,20 @@ defmodule Sigaws do
             key
         end
 
-      {:ok, %{
-        req_path: req_path,
-        method: method,
-        normalize_path: normalize_path,
-        params: params,
-        headers: headers,
-        body: body,
-        signed_at: signed_at_amz_dt,
-        region: rg,
-        service: sv,
-        access_key: creds[:access_key],
-        signing_key: signing_key
-      }}
+      {:ok,
+       %{
+         req_path: req_path,
+         method: method,
+         normalize_path: normalize_path,
+         params: params,
+         headers: headers,
+         body: body,
+         signed_at: signed_at_amz_dt,
+         region: rg,
+         service: sv,
+         access_key: creds[:access_key],
+         signing_key: signing_key
+       }}
     end
   end
 

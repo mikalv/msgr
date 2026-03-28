@@ -66,7 +66,6 @@ defmodule Teams.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.5"},
-
       {:timex, "~> 3.7"},
       {:triplex, "~> 1.3"},
       {:auth_provider, in_umbrella: true},
@@ -74,7 +73,7 @@ defmodule Teams.MixProject do
       {:hammer, "~> 6.2"},
       {:cors_plug, "~> 3.0"},
 
-      #Email
+      # Email
       {:swoosh, "~> 1.5"},
       {:gen_smtp, "~> 1.2"},
 

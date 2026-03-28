@@ -51,11 +51,21 @@ defmodule Messngr.Media do
       upload = Repo.get!(Upload, upload_id, lock: "FOR UPDATE")
 
       cond do
-        is_nil(upload) -> Repo.rollback(:not_found)
-        upload.conversation_id != conversation_id -> Repo.rollback(:invalid_conversation)
-        upload.profile_id != profile_id -> Repo.rollback(:invalid_profile)
-        upload.status != :pending -> Repo.rollback(:already_consumed)
-        Upload.expired?(upload) -> Repo.rollback(:expired)
+        is_nil(upload) ->
+          Repo.rollback(:not_found)
+
+        upload.conversation_id != conversation_id ->
+          Repo.rollback(:invalid_conversation)
+
+        upload.profile_id != profile_id ->
+          Repo.rollback(:invalid_profile)
+
+        upload.status != :pending ->
+          Repo.rollback(:already_consumed)
+
+        Upload.expired?(upload) ->
+          Repo.rollback(:expired)
+
         true ->
           with {:ok, normalized_metadata, _attrs} <- normalize_metadata(metadata),
                {:ok, updated} <-
@@ -77,7 +87,11 @@ defmodule Messngr.Media do
   objects. Returns a map describing how many uploads were scanned, deleted, and
   any errors encountered.
   """
-  @spec prune_expired_uploads(keyword()) :: %{scanned: non_neg_integer(), deleted: non_neg_integer(), errors: list()}
+  @spec prune_expired_uploads(keyword()) :: %{
+          scanned: non_neg_integer(),
+          deleted: non_neg_integer(),
+          errors: list()
+        }
   def prune_expired_uploads(opts \\ []) do
     now = Keyword.get(opts, :now, DateTime.utc_now())
     limit = Keyword.get(opts, :limit, 100)
@@ -153,7 +167,9 @@ defmodule Messngr.Media do
       Storage.presign_upload(upload.bucket, upload.object_key, content_type: upload.content_type)
 
     download_signed =
-      Storage.presign_download(upload.bucket, upload.object_key, content_type: upload.content_type)
+      Storage.presign_download(upload.bucket, upload.object_key,
+        content_type: upload.content_type
+      )
 
     %{
       "id" => upload.id,
@@ -180,6 +196,7 @@ defmodule Messngr.Media do
 
   defp build_thumbnail_instructions(%Upload{kind: kind} = upload) when kind in [:image, :video] do
     object_key = Upload.thumbnail_object_key(upload.object_key)
+
     upload_signed =
       Storage.presign_upload(upload.bucket, object_key, content_type: "image/jpeg")
 
@@ -276,11 +293,17 @@ defmodule Messngr.Media do
       end
 
     cond do
-      is_map(metadata["thumbnail"]) -> extract_thumbnail_pointer(metadata["thumbnail"], upload.bucket)
+      is_map(metadata["thumbnail"]) ->
+        extract_thumbnail_pointer(metadata["thumbnail"], upload.bucket)
+
       is_map(get_in(metadata, ["media", "thumbnail"])) ->
         extract_thumbnail_pointer(get_in(metadata, ["media", "thumbnail"]), upload.bucket)
-      upload.kind in [:image, :video] -> {upload.bucket, Upload.thumbnail_object_key(upload.object_key)}
-      true -> nil
+
+      upload.kind in [:image, :video] ->
+        {upload.bucket, Upload.thumbnail_object_key(upload.object_key)}
+
+      true ->
+        nil
     end
   end
 
@@ -316,7 +339,9 @@ defmodule Messngr.Media do
   end
 
   defp retention_until do
-    ttl = Application.get_env(:msgr, __MODULE__, []) |> Keyword.get(:retention_ttl_seconds, 604_800)
+    ttl =
+      Application.get_env(:msgr, __MODULE__, []) |> Keyword.get(:retention_ttl_seconds, 604_800)
+
     DateTime.add(DateTime.utc_now(), ttl, :second)
   end
 
@@ -410,7 +435,9 @@ defmodule Messngr.Media do
 
   defp sanitize_thumbnail(media) do
     case Map.get(media, "thumbnail") do
-      nil -> {:ok, media}
+      nil ->
+        {:ok, media}
+
       %{} = thumbnail ->
         normalized = string_keys(thumbnail)
 
@@ -423,8 +450,12 @@ defmodule Messngr.Media do
             normalized["object_key"]
 
         cond do
-          not allowed_thumbnail_bucket?(bucket) -> {:error, :thumbnail_bucket_invalid}
-          not is_binary(object_key) or String.trim(object_key) == "" -> {:error, :thumbnail_object_key_invalid}
+          not allowed_thumbnail_bucket?(bucket) ->
+            {:error, :thumbnail_bucket_invalid}
+
+          not is_binary(object_key) or String.trim(object_key) == "" ->
+            {:error, :thumbnail_object_key_invalid}
+
           true ->
             sanitized =
               normalized
@@ -458,7 +489,18 @@ defmodule Messngr.Media do
         {media_acc, Map.put(remaining_acc, "media", value)}
 
       {key, value}, {media_acc, remaining_acc}
-      when key in ["caption", "checksum", "duration", "durationMs", "waveform", "width", "height", "thumbnail", "metadata", "waveformSampleRate"] ->
+      when key in [
+             "caption",
+             "checksum",
+             "duration",
+             "durationMs",
+             "waveform",
+             "width",
+             "height",
+             "thumbnail",
+             "metadata",
+             "waveformSampleRate"
+           ] ->
         {Map.put(media_acc, key, value), remaining_acc}
 
       {key, value}, {media_acc, remaining_acc} ->

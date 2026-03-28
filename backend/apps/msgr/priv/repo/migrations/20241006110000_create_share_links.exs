@@ -17,9 +17,13 @@ defmodule Messngr.Repo.Migrations.CreateShareLinks do
       add :view_count, :integer, null: false, default: 0
       add :max_views, :integer
 
-      add :account_id, references(:accounts, type: :binary_id, on_delete: :delete_all), null: false
+      add :account_id, references(:accounts, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :profile_id, references(:profiles, type: :binary_id, on_delete: :nilify_all)
-      add :bridge_account_id, references(:bridge_accounts, type: :binary_id, on_delete: :delete_all)
+
+      add :bridge_account_id,
+          references(:bridge_accounts, type: :binary_id, on_delete: :delete_all)
 
       timestamps(type: :utc_datetime)
     end
@@ -30,4 +34,3 @@ defmodule Messngr.Repo.Migrations.CreateShareLinks do
     create index(:share_links, [:expires_at])
   end
 end
-

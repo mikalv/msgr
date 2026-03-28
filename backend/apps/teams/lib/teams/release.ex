@@ -14,9 +14,11 @@ defmodule Teams.Release do
 
   def migrate_tenants do
     load_app()
-    {:ok, _, _} = Ecto.Migrator.with_repo(Teams.Repo, fn _repo ->
-      Teams.Tenancy.migrate_all_tenants()
-    end)
+
+    {:ok, _, _} =
+      Ecto.Migrator.with_repo(Teams.Repo, fn _repo ->
+        Teams.Tenancy.migrate_all_tenants()
+      end)
   end
 
   def rollback(repo, version) do
@@ -34,7 +36,8 @@ defmodule Teams.Release do
   defp print_migrations_for(repo) do
     paths = repo_migrations_path(repo)
 
-    {:ok, repo_status, _} = Ecto.Migrator.with_repo(repo, &Ecto.Migrator.migrations(&1, paths), mode: :temporary)
+    {:ok, repo_status, _} =
+      Ecto.Migrator.with_repo(repo, &Ecto.Migrator.migrations(&1, paths), mode: :temporary)
 
     IO.puts(
       """

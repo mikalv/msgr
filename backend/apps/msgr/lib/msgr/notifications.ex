@@ -18,7 +18,8 @@ defmodule Messngr.Notifications do
   @doc """
   Registers or updates a push token for the specified device.
   """
-  @spec register_push_token(Device.t(), map()) :: {:ok, DevicePushToken.t()} | {:error, Ecto.Changeset.t()}
+  @spec register_push_token(Device.t(), map()) ::
+          {:ok, DevicePushToken.t()} | {:error, Ecto.Changeset.t()}
   def register_push_token(%Device{} = device, attrs) do
     Repo.transaction(fn ->
       profile = Repo.preload(device, :profile).profile
@@ -72,7 +73,8 @@ defmodule Messngr.Notifications do
   @doc """
   Dispatches a push payload for the given profile.
   """
-  @spec dispatch_push(Profile.t(), push_payload(), keyword()) :: {:ok, PushDispatcher.dispatch_report()}
+  @spec dispatch_push(Profile.t(), push_payload(), keyword()) ::
+          {:ok, PushDispatcher.dispatch_report()}
   def dispatch_push(%Profile{} = profile, payload, opts \\ []) when is_map(payload) do
     tokens = list_active_tokens(profile)
     PushDispatcher.dispatch(profile, tokens, payload, opts)

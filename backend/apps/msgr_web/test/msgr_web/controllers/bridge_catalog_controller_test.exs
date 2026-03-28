@@ -41,10 +41,14 @@ defmodule MessngrWeb.BridgeCatalogControllerTest do
 
   test "returns all linked instances for multi-tenant connectors", %{conn: conn, account: account} do
     assert {:ok, _} =
-             Bridges.sync_linked_identity(account.id, :slack, %{external_id: "one"}, instance: "workspace-a")
+             Bridges.sync_linked_identity(account.id, :slack, %{external_id: "one"},
+               instance: "workspace-a"
+             )
 
     assert {:ok, _} =
-             Bridges.sync_linked_identity(account.id, :slack, %{external_id: "two"}, instance: "workspace-b")
+             Bridges.sync_linked_identity(account.id, :slack, %{external_id: "two"},
+               instance: "workspace-b"
+             )
 
     conn = get(conn, ~p"/api/bridges/catalog")
 

@@ -4,7 +4,10 @@ defmodule Messngr.Repo.Migrations.CreateAccountIdentities do
   def change do
     create table(:account_identities, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :account_id, references(:accounts, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :account_id, references(:accounts, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :kind, :string, null: false
       add :value, :string
       add :provider, :string
@@ -16,6 +19,7 @@ defmodule Messngr.Repo.Migrations.CreateAccountIdentities do
     end
 
     create index(:account_identities, [:account_id])
+
     create unique_index(:account_identities, [:account_id, :kind, :value],
              name: :account_identities_account_id_kind_value_index,
              where: "value IS NOT NULL"
@@ -32,4 +36,3 @@ defmodule Messngr.Repo.Migrations.CreateAccountIdentities do
            )
   end
 end
-

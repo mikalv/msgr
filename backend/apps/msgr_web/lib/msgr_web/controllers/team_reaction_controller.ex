@@ -27,7 +27,9 @@ defmodule MessngrWeb.TeamReactionController do
           {:ok, reaction} ->
             conn
             |> put_status(:created)
-            |> json(%{data: %{action: "added", emoji: reaction.emoji, message_id: reaction.message_id}})
+            |> json(%{
+              data: %{action: "added", emoji: reaction.emoji, message_id: reaction.message_id}
+            })
 
           {:error, changeset} ->
             {:error, changeset}

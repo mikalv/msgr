@@ -64,8 +64,7 @@ defmodule MessngrWeb.MixProject do
       {:bandit, "~> 1.5"},
       # GRPC
       {:grpc, "~> 0.9.0"},
-      {:protobuf_generate, "~> 0.1.3"},
-
+      {:protobuf_generate, "~> 0.1.3"}
     ]
   end
 

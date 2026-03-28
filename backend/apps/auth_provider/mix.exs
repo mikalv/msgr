@@ -78,7 +78,6 @@ defmodule AuthProvider.MixProject do
       {:faker, "~> 0.14", only: :test},
       {:floki, ">= 0.30.0", only: :test},
       {:mock, "~> 0.3.8", only: :test}
-
     ]
   end
 

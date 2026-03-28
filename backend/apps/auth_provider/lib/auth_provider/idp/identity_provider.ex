@@ -37,20 +37,20 @@ defmodule AuthProvider.Idp.IdentityProvider do
         }
 
   schema "idp_identity_providers" do
-    belongs_to :tenant, AuthProvider.Idp.Tenant
+    belongs_to(:tenant, AuthProvider.Idp.Tenant)
 
-    field :name, :string
-    field :slug, :string
-    field :strategy, Ecto.Enum, values: [:native, :external_oidc]
-    field :issuer, :string
-    field :client_id, :string
-    field :client_secret, :string
-    field :authorization_endpoint, :string
-    field :token_endpoint, :string
-    field :userinfo_endpoint, :string
-    field :jwks_uri, :string
-    field :metadata, :map, default: %{}
-    field :is_default, :boolean, default: false
+    field(:name, :string)
+    field(:slug, :string)
+    field(:strategy, Ecto.Enum, values: [:native, :external_oidc])
+    field(:issuer, :string)
+    field(:client_id, :string)
+    field(:client_secret, :string)
+    field(:authorization_endpoint, :string)
+    field(:token_endpoint, :string)
+    field(:userinfo_endpoint, :string)
+    field(:jwks_uri, :string)
+    field(:metadata, :map, default: %{})
+    field(:is_default, :boolean, default: false)
 
     timestamps()
   end
@@ -83,19 +83,30 @@ defmodule AuthProvider.Idp.IdentityProvider do
 
   defp put_default_strategy(changeset, attrs) do
     case {get_field(changeset, :strategy), Map.get(attrs, "strategy")} do
-      {nil, nil} -> put_change(changeset, :strategy, :native)
-      {nil, val} when val in ["native", :native] -> put_change(changeset, :strategy, :native)
+      {nil, nil} ->
+        put_change(changeset, :strategy, :native)
+
+      {nil, val} when val in ["native", :native] ->
+        put_change(changeset, :strategy, :native)
+
       {nil, val} when val in ["external_oidc", :external_oidc] ->
         put_change(changeset, :strategy, :external_oidc)
-      _ -> changeset
+
+      _ ->
+        changeset
     end
   end
 
   defp maybe_generate_slug(changeset) do
     cond do
-      slug = get_field(changeset, :slug) -> put_change(changeset, :slug, AuthProvider.Idp.Tenant.slugify(slug))
-      name = get_field(changeset, :name) -> put_change(changeset, :slug, AuthProvider.Idp.Tenant.slugify(name))
-      true -> changeset
+      slug = get_field(changeset, :slug) ->
+        put_change(changeset, :slug, AuthProvider.Idp.Tenant.slugify(slug))
+
+      name = get_field(changeset, :name) ->
+        put_change(changeset, :slug, AuthProvider.Idp.Tenant.slugify(name))
+
+      true ->
+        changeset
     end
   end
 
@@ -110,7 +121,9 @@ defmodule AuthProvider.Idp.IdentityProvider do
           :authorization_endpoint,
           :token_endpoint
         ])
-      _ -> changeset
+
+      _ ->
+        changeset
     end
   end
 

@@ -18,21 +18,25 @@ defmodule MessngrWeb.TeamChannelController do
       end
 
     # Preload memberships+profiles for DM channels (needed for display names)
-    channels = Enum.map(channels, fn ch ->
-      if ch.kind in ["dm", "group_dm"] do
-        Teams.Repo.preload(ch, [memberships: :profile], prefix: prefix)
-      else
-        ch
-      end
-    end)
+    channels =
+      Enum.map(channels, fn ch ->
+        if ch.kind in ["dm", "group_dm"] do
+          Teams.Repo.preload(ch, [memberships: :profile], prefix: prefix)
+        else
+          ch
+        end
+      end)
 
     # Fetch last message per channel in one query
     channel_ids = Enum.map(channels, & &1.id)
     last_messages = Channels.last_messages_for_channels(prefix, channel_ids)
 
-    json(conn, %{data: Enum.map(channels, fn ch ->
-      channel_json(ch) |> Map.put(:last_message, last_messages[ch.id])
-    end)})
+    json(conn, %{
+      data:
+        Enum.map(channels, fn ch ->
+          channel_json(ch) |> Map.put(:last_message, last_messages[ch.id])
+        end)
+    })
   end
 
   @doc "POST /api/teams/:slug/channels — create a channel"
@@ -45,15 +49,19 @@ defmodule MessngrWeb.TeamChannelController do
     unless profile do
       {:error, :forbidden}
     else
-      channel_slug = case params["channel_slug"] do
-        s when is_binary(s) and s != "" -> s
-        _ ->
-          params["name"]
-          |> to_string()
-          |> String.downcase()
-          |> String.replace(~r/[^a-z0-9]+/, "-")
-          |> String.trim("-")
-      end
+      channel_slug =
+        case params["channel_slug"] do
+          s when is_binary(s) and s != "" ->
+            s
+
+          _ ->
+            params["name"]
+            |> to_string()
+            |> String.downcase()
+            |> String.replace(~r/[^a-z0-9]+/, "-")
+            |> String.trim("-")
+        end
+
       attrs = %{
         name: params["name"],
         slug: channel_slug,
@@ -114,17 +122,21 @@ defmodule MessngrWeb.TeamChannelController do
     prefix = conn.assigns.tenant_prefix
     members = Channels.list_members(prefix, channel_id)
 
-    json(conn, %{data: Enum.map(members, fn m ->
-      profile = m.profile
-      %{
-        profile_id: m.profile_id,
-        role: m.role,
-        joined_at: m.joined_at,
-        display_name: profile && profile.display_name,
-        avatar_url: profile && profile.avatar_url,
-        email: profile && profile.email
-      }
-    end)})
+    json(conn, %{
+      data:
+        Enum.map(members, fn m ->
+          profile = m.profile
+
+          %{
+            profile_id: m.profile_id,
+            role: m.role,
+            joined_at: m.joined_at,
+            display_name: profile && profile.display_name,
+            avatar_url: profile && profile.avatar_url,
+            email: profile && profile.email
+          }
+        end)
+    })
   end
 
   @doc "DELETE /api/teams/:slug/channels/:channel_id/members/:profile_id — remove a member"
@@ -186,17 +198,30 @@ defmodule MessngrWeb.TeamChannelController do
 
     # For DMs, include member display names so client can show proper titles
     if channel.kind in ["dm", "group_dm"] do
-      members = case channel.memberships do
-        %Ecto.Association.NotLoaded{} -> []
-        memberships when is_list(memberships) ->
-          Enum.map(memberships, fn m ->
-            case m.profile do
-              %Ecto.Association.NotLoaded{} -> %{profile_id: m.profile_id}
-              nil -> %{profile_id: m.profile_id}
-              p -> %{profile_id: m.profile_id, display_name: p.display_name, avatar_url: p.avatar_url}
-            end
-          end)
-      end
+      members =
+        case channel.memberships do
+          %Ecto.Association.NotLoaded{} ->
+            []
+
+          memberships when is_list(memberships) ->
+            Enum.map(memberships, fn m ->
+              case m.profile do
+                %Ecto.Association.NotLoaded{} ->
+                  %{profile_id: m.profile_id}
+
+                nil ->
+                  %{profile_id: m.profile_id}
+
+                p ->
+                  %{
+                    profile_id: m.profile_id,
+                    display_name: p.display_name,
+                    avatar_url: p.avatar_url
+                  }
+              end
+            end)
+        end
+
       Map.put(base, :members, members)
     else
       base

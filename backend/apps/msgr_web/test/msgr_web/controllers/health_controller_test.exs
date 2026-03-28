@@ -16,8 +16,8 @@ defmodule MessngrWeb.HealthControllerTest do
       resp = json_response(conn, 200)
 
       assert Enum.any?(resp["backends"], fn b ->
-        b["name"] == "MessngrWeb.Endpoint" and b["status"] == "healthy"
-      end)
+               b["name"] == "MessngrWeb.Endpoint" and b["status"] == "healthy"
+             end)
     end
   end
 

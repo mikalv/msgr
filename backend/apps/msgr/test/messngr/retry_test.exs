@@ -12,15 +12,16 @@ defmodule Messngr.RetryTest do
       {:ok, agent} = Agent.start_link(fn -> 0 end)
 
       result =
-        Retry.run(fn ->
-          attempt = Agent.get_and_update(agent, fn value -> {value + 1, value + 1} end)
+        Retry.run(
+          fn ->
+            attempt = Agent.get_and_update(agent, fn value -> {value + 1, value + 1} end)
 
-          if attempt < 2 do
-            raise DBConnection.ConnectionError.exception(message: "transient")
-          else
-            :done
-          end
-        end, backoff: 0, attempts: 3)
+            if attempt < 2 do
+              raise DBConnection.ConnectionError.exception(message: "transient")
+            else
+              :done
+            end
+          end, backoff: 0, attempts: 3)
 
       assert :done = result
       assert Agent.get(agent, & &1) == 2

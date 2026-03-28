@@ -6,11 +6,11 @@ defmodule AuthProvider.Account.AuthMethod do
   @foreign_key_type :binary_id
 
   schema "account_auth_methods" do
-    field :value, :string
-    field :metadata, :map
-    field :auth_type, :string
-    field :is_disabled, :boolean, default: false
-    belongs_to :user, AuthProvider.Account.User
+    field(:value, :string)
+    field(:metadata, :map)
+    field(:auth_type, :string)
+    field(:is_disabled, :boolean, default: false)
+    belongs_to(:user, AuthProvider.Account.User)
 
     timestamps()
   end
@@ -23,8 +23,11 @@ defmodule AuthProvider.Account.AuthMethod do
   end
 
   def get_current_auth_code_if_any_q(user_id) do
-    from(am in __MODULE__, where: am.user_id == ^user_id
-        and am.is_disabled == false
-        and am.auth_type == "one_time_code")
+    from(am in __MODULE__,
+      where:
+        am.user_id == ^user_id and
+          am.is_disabled == false and
+          am.auth_type == "one_time_code"
+    )
   end
 end

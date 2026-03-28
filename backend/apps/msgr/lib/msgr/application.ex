@@ -11,20 +11,25 @@ defmodule Messngr.Application do
     Logger.info("🚀 Starting Messngr.Application...")
 
     Logger.info("📦 Initializing retention_pruner_child...")
+
     retention_pruner_child =
       :msgr
       |> Application.get_env(Messngr.Media.RetentionPruner, [])
       |> Messngr.Media.RetentionPruner.child_spec()
+
     Logger.info("✅ retention_pruner_child initialized")
 
     Logger.info("📦 Initializing watcher_pruner_child...")
+
     watcher_pruner_child =
       :msgr
       |> Application.get_env(Messngr.Chat.WatcherPruner, [])
       |> Messngr.Chat.WatcherPruner.child_spec()
+
     Logger.info("✅ watcher_pruner_child initialized")
 
     Logger.info("📦 Building base children list...")
+
     children =
       [
         Messngr.FeatureFlags,
@@ -37,15 +42,18 @@ defmodule Messngr.Application do
         Messngr.Calls.CallRegistry,
         # {Guardian.DB.SweeperServer, []},
         # Start the Finch HTTP client for sending emails
-        {Finch, name: Messngr.Finch, pools: %{
-          "https://api.sandbox.push.apple.com" => [protocols: [:http2]],
-          "https://api.push.apple.com" => [protocols: [:http2]]
-        }},
+        {Finch,
+         name: Messngr.Finch,
+         pools: %{
+           "https://api.sandbox.push.apple.com" => [protocols: [:http2]],
+           "https://api.push.apple.com" => [protocols: [:http2]]
+         }},
         retention_pruner_child,
         watcher_pruner_child
         # Start a worker by calling: Messngr.Worker.start_link(arg)
         # {Messngr.Worker, arg}
       ]
+
     # Filter out nil children (disabled pruners return nil)
     children = Enum.reject(children, &is_nil/1)
     Logger.info("✅ Base children list built with #{length(children)} items")
@@ -71,7 +79,10 @@ defmodule Messngr.Application do
 
       try do
         # Standard Ecto migrations (msgr app)
-        Ecto.Migrator.run(Messngr.Repo, Application.app_dir(:msgr, "priv/repo/migrations"), :up, all: true)
+        Ecto.Migrator.run(Messngr.Repo, Application.app_dir(:msgr, "priv/repo/migrations"), :up,
+          all: true
+        )
+
         Logger.info("✅ Msgr migrations complete")
 
         # Tenant migrations (per-team schemas)
@@ -117,7 +128,8 @@ defmodule Messngr.Application do
   defp maybe_noise_registry_child do
     opts = Application.get_env(:msgr, :noise_session_registry, [])
 
-    if Keyword.get(opts, :enabled, false) and Code.ensure_loaded?(Messngr.Transport.Noise.Registry) do
+    if Keyword.get(opts, :enabled, false) and
+         Code.ensure_loaded?(Messngr.Transport.Noise.Registry) do
       registry_opts = Keyword.drop(opts, [:enabled])
       [{Messngr.Transport.Noise.Registry, registry_opts}]
     else

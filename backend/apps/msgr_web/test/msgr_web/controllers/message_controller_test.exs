@@ -25,13 +25,19 @@ defmodule MessngrWeb.MessageControllerTest do
      other_profile: other_profile}
   end
 
-  test "lists messages", %{conn: conn, conversation: conversation, current_profile: profile, other_profile: other} do
+  test "lists messages", %{
+    conn: conn,
+    conversation: conversation,
+    current_profile: profile,
+    other_profile: other
+  } do
     {:ok, message} = Chat.send_message(conversation.id, profile.id, %{"body" => "Hei"})
 
     conn = get(conn, ~p"/api/conversations/#{conversation.id}/messages")
 
     assert %{"data" => [msg], "meta" => meta} = json_response(conn, 200)
     assert msg["body"] == "Hei"
+
     assert [
              %{
                "status" => "pending",
@@ -58,7 +64,11 @@ defmodule MessngrWeb.MessageControllerTest do
              Enum.map(receipts, &Map.take(&1, ["status", "recipient_id"]))
   end
 
-  test "creates media upload and audio message", %{conn: conn, conversation: conversation, current_profile: profile} do
+  test "creates media upload and audio message", %{
+    conn: conn,
+    conversation: conversation,
+    current_profile: profile
+  } do
     conn_upload =
       post(conn, ~p"/api/conversations/#{conversation.id}/uploads", %{
         upload: %{
@@ -88,7 +98,13 @@ defmodule MessngrWeb.MessageControllerTest do
         }
       })
 
-    assert %{"data" => %{"type" => "audio", "payload" => %{"media" => media}, "media" => media_view}} =
+    assert %{
+             "data" => %{
+               "type" => "audio",
+               "payload" => %{"media" => media},
+               "media" => media_view
+             }
+           } =
              json_response(conn_message, 201)
 
     assert media["durationMs"] == 1200
@@ -96,10 +112,17 @@ defmodule MessngrWeb.MessageControllerTest do
     assert media["retention"]["expiresAt"]
     assert media["waveform"] == [0, 10, 20]
     assert media_view == media
-    assert Media.consume_upload(upload_id, conversation.id, profile.id, %{}) == {:error, :already_consumed}
+
+    assert Media.consume_upload(upload_id, conversation.id, profile.id, %{}) ==
+             {:error, :already_consumed}
   end
 
-  test "acknowledges message delivery", %{conn: conn, conversation: conversation, current_profile: profile, other_profile: other} do
+  test "acknowledges message delivery", %{
+    conn: conn,
+    conversation: conversation,
+    current_profile: profile,
+    other_profile: other
+  } do
     {:ok, message} = Chat.send_message(conversation.id, other.id, %{"body" => "Hei"})
 
     conn = post(conn, ~p"/api/conversations/#{conversation.id}/messages/#{message.id}/delivery")

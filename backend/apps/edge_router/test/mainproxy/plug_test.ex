@@ -106,7 +106,7 @@ defmodule MainProxy.PlugTest do
 
   defp host_generator do
     # TODO: include hyphens?
-    gen all domain <- string(:alphanumeric) do
+    gen all(domain <- string(:alphanumeric)) do
       "#{domain}.com"
     end
   end
@@ -125,14 +125,14 @@ defmodule MainProxy.PlugTest do
   end
 
   property "all domains match themselves" do
-    check all host <- host_generator() do
+    check all(host <- host_generator()) do
       {status, _headers, _body} = matches_domain?(host, host)
       assert status == 200
     end
   end
 
   property "all domains match themselves phoenix_endpoint" do
-    check all host <- host_generator() do
+    check all(host <- host_generator()) do
       {status, _headers, _body} = matches_domain_phoenix_endpoint?(host, host)
       assert status == 200
     end
@@ -140,42 +140,42 @@ defmodule MainProxy.PlugTest do
 
   property "all hosts match themselves" do
     # TODO: include hyphens?
-    check all host <- host_generator() do
+    check all(host <- host_generator()) do
       {status, _headers, _body} = matches_host?(Regex.compile!(host), host)
       assert status == 200
     end
   end
 
   property "all hosts match unspecified host" do
-    check all host <- host_generator() do
+    check all(host <- host_generator()) do
       {status, _headers, _body} = matches_host?(nil, host)
       assert status == 200
     end
   end
 
   property "all hosts match subset" do
-    check all host <- host_generator() do
+    check all(host <- host_generator()) do
       {status, _headers, _body} = matches_host?(Regex.compile!(String.slice(host, 1..-1)), host)
       assert status == 200
     end
   end
 
   property "all hosts match empty string" do
-    check all host <- host_generator() do
+    check all(host <- host_generator()) do
       {status, _headers, _body} = matches_host?(Regex.compile!(""), host)
       assert status == 200
     end
   end
 
   property "no hosts match" do
-    check all host <- host_generator() do
+    check all(host <- host_generator()) do
       {status, _headers, _body} = matches_host?(Regex.compile!("#{host}extra"), host)
       assert status == 404
     end
   end
 
   property "all paths match prefix" do
-    check all path <- path_generator() do
+    check all(path <- path_generator()) do
       {status, _headers, _body} =
         matches_path?(Regex.compile!("^" <> String.slice(path, 0..1)), path)
 
@@ -184,7 +184,7 @@ defmodule MainProxy.PlugTest do
   end
 
   property "all verbs match case insensitively" do
-    check all verb <- verb_generator() do
+    check all(verb <- verb_generator()) do
       {status, _headers, _body} =
         matches_verb?(Regex.compile!(verb, [:caseless]), String.upcase(verb))
 
@@ -193,9 +193,11 @@ defmodule MainProxy.PlugTest do
   end
 
   property "all exact match" do
-    check all host <- host_generator(),
-              path <- path_generator(),
-              verb <- verb_generator() do
+    check all(
+            host <- host_generator(),
+            path <- path_generator(),
+            verb <- verb_generator()
+          ) do
       {status, _headers, _body} =
         matches_all?(
           Regex.compile!(verb),
@@ -211,9 +213,11 @@ defmodule MainProxy.PlugTest do
   end
 
   property "verb and host and path with one off" do
-    check all host <- host_generator(),
-              path <- path_generator(),
-              verb <- verb_generator() do
+    check all(
+            host <- host_generator(),
+            path <- path_generator(),
+            verb <- verb_generator()
+          ) do
       {status, _headers, _body} =
         matches_all?(
           Regex.compile!(verb),

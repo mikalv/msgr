@@ -11,13 +11,16 @@ defmodule MessngrWeb.Application do
     Logger.info("🌟 Starting MessngrWeb.Application...")
 
     Logger.info("📦 Initializing prometheus_child...")
+
     prometheus_child =
       :msgr_web
       |> Application.get_env(:prometheus, [])
       |> prometheus_child_spec()
+
     Logger.info("✅ prometheus_child initialized: #{inspect(prometheus_child)}")
 
     Logger.info("📦 Building MessngrWeb children list...")
+
     children =
       [
         MessngrWeb.Telemetry,
@@ -29,6 +32,7 @@ defmodule MessngrWeb.Application do
         MessngrWeb.Endpoint
       ]
       |> Enum.reject(&is_nil/1)
+
     Logger.info("✅ MessngrWeb children list built with #{length(children)} items")
 
     # See https://hexdocs.pm/elixir/Supervisor.html

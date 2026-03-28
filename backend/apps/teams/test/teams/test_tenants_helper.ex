@@ -23,13 +23,13 @@ defmodule Teams.TenantsHelperTest do
 
   describe "is_tenant_name_available/1" do
     test "returns true if tenant name is available" do
-      with_mock Triplex, [exists?: fn _ -> false end] do
+      with_mock Triplex, exists?: fn _ -> false end do
         assert TenantsHelper.is_tenant_name_available("new_tenant")
       end
     end
 
     test "returns false if tenant name is not available" do
-      with_mock Triplex, [exists?: fn _ -> true end] do
+      with_mock Triplex, exists?: fn _ -> true end do
         refute TenantsHelper.is_tenant_name_available("existing_tenant")
       end
     end
@@ -37,7 +37,7 @@ defmodule Teams.TenantsHelperTest do
 
   describe "drop_tenant/1" do
     test "drops the tenant if it exists" do
-      with_mock Triplex, [exists?: fn _ -> true end, drop: fn _ -> :ok end] do
+      with_mock Triplex, exists?: fn _ -> true end, drop: fn _ -> :ok end do
         tenant = %TenantTeam{name: "existing_tenant"}
         Repo.insert!(tenant)
 
@@ -47,7 +47,7 @@ defmodule Teams.TenantsHelperTest do
     end
 
     test "does nothing if tenant does not exist" do
-      with_mock Triplex, [exists?: fn _ -> false end] do
+      with_mock Triplex, exists?: fn _ -> false end do
         assert TenantsHelper.drop_tenant("nonexistent_tenant") == nil
       end
     end
@@ -55,15 +55,14 @@ defmodule Teams.TenantsHelperTest do
 
   describe "create_tenant/3" do
     test "creates a new tenant and seeds tenant space" do
-      with_mock Triplex, [
+      with_mock Triplex,
         create_schema: fn _, _, _ -> :ok end,
-        migrate: fn _, _ -> :ok end
-      ] do
-        with_mock TenantTeam, [
+        migrate: fn _, _ -> :ok end do
+        with_mock TenantTeam,
           create_tenant: fn _, _, _ -> {:ok, %TenantTeam{name: "new_tenant"}} end,
-          get_team!: fn _ -> %TenantTeam{name: "new_tenant"} end
-        ] do
-          assert {:ok, %TenantTeam{name: "new_tenant"}} = TenantsHelper.create_tenant("new_tenant", "creator_uid", "description")
+          get_team!: fn _ -> %TenantTeam{name: "new_tenant"} end do
+          assert {:ok, %TenantTeam{name: "new_tenant"}} =
+                   TenantsHelper.create_tenant("new_tenant", "creator_uid", "description")
         end
       end
     end
@@ -71,7 +70,7 @@ defmodule Teams.TenantsHelperTest do
 
   describe "list_prefixes/0" do
     test "returns all tenant prefixes" do
-      with_mock Triplex, [all: fn -> ["tenant1", "tenant2"] end] do
+      with_mock Triplex, all: fn -> ["tenant1", "tenant2"] end do
         assert TenantsHelper.list_prefixes() == ["tenant1", "tenant2"]
       end
     end
@@ -80,7 +79,9 @@ defmodule Teams.TenantsHelperTest do
   describe "seed_tenant_space/1" do
     test "seeds the tenant space with default data" do
       tenant_team_name = "new_tenant"
-      with_mock Teams.TenantModels.Message, [create_system_message: fn _, _, _ -> {:ok, %Message{}} end] do
+
+      with_mock Teams.TenantModels.Message,
+        create_system_message: fn _, _, _ -> {:ok, %Message{}} end do
         assert TenantsHelper.seed_tenant_space(tenant_team_name) == :ok
       end
     end

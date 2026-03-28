@@ -35,8 +35,12 @@ defmodule Messngr.Bridges.ProfileLink do
     |> validate_change(:metadata, &ensure_map/2)
   end
 
-  defp normalize_source(source) when is_binary(source), do: source |> String.trim() |> String.downcase()
-  defp normalize_source(source) when is_atom(source), do: source |> Atom.to_string() |> normalize_source()
+  defp normalize_source(source) when is_binary(source),
+    do: source |> String.trim() |> String.downcase()
+
+  defp normalize_source(source) when is_atom(source),
+    do: source |> Atom.to_string() |> normalize_source()
+
   defp normalize_source(_), do: nil
 
   defp ensure_map(_field, value) when is_map(value), do: []

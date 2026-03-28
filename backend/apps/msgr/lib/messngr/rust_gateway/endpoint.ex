@@ -8,5 +8,5 @@ defmodule Messngr.RustGateway.Endpoint do
 
   use GRPC.Endpoint
 
-  run Messngr.RustGateway.Server
+  run(Messngr.RustGateway.Server)
 end

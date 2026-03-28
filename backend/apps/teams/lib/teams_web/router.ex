@@ -50,9 +50,10 @@ defmodule TeamsWeb.Router do
       pipe_through :browser
 
       live_dashboard "/dashboard",
-          metrics: TeamsWeb.Telemetry,
-          ecto_repos: [Teams.Repo, Messngr.Repo, AuthProvider.Repo],
-          ecto_psql_extras_options: [long_running_queries: [threshold: "200 milliseconds"]]
+        metrics: TeamsWeb.Telemetry,
+        ecto_repos: [Teams.Repo, Messngr.Repo, AuthProvider.Repo],
+        ecto_psql_extras_options: [long_running_queries: [threshold: "200 milliseconds"]]
+
       forward "/mailbox", Plug.Swoosh.MailboxPreview
     end
   end

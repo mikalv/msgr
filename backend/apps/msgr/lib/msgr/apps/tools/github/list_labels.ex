@@ -58,15 +58,17 @@ defmodule Messngr.Apps.Tools.GitHub.ListLabels do
       {:ok, {{_, status, _}, _resp_headers, resp_body}} when status >= 200 and status < 300 ->
         case Jason.decode(resp_body) do
           {:ok, labels} when is_list(labels) ->
-            {:ok, %{
-              "labels" => Enum.map(labels, fn l ->
-                %{
-                  "name" => l["name"],
-                  "description" => l["description"],
-                  "color" => l["color"]
-                }
-              end)
-            }}
+            {:ok,
+             %{
+               "labels" =>
+                 Enum.map(labels, fn l ->
+                   %{
+                     "name" => l["name"],
+                     "description" => l["description"],
+                     "color" => l["color"]
+                   }
+                 end)
+             }}
 
           _ ->
             {:error, "Kunne ikke parse GitHub label-respons"}

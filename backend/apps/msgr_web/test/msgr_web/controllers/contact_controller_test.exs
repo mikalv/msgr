@@ -15,7 +15,11 @@ defmodule MessngrWeb.ContactControllerTest do
   end
 
   describe "POST /api/contacts/import" do
-    test "persists normalized contacts and returns payload", %{conn: conn, account: account, profile: profile} do
+    test "persists normalized contacts and returns payload", %{
+      conn: conn,
+      account: account,
+      profile: profile
+    } do
       payload = %{
         "contacts" => [
           %{
@@ -53,7 +57,11 @@ defmodule MessngrWeb.ContactControllerTest do
   describe "POST /api/contacts/lookup" do
     test "returns known matches for imported channels", %{conn: conn} do
       {:ok, identity} =
-        Accounts.ensure_identity(%{kind: :email, value: "known@example.com", display_name: "Known"})
+        Accounts.ensure_identity(%{
+          kind: :email,
+          value: "known@example.com",
+          display_name: "Known"
+        })
 
       known_account = identity.account
       known_profile = hd(known_account.profiles)
@@ -74,6 +82,7 @@ defmodule MessngrWeb.ContactControllerTest do
       assert match_entry["match"]["account_name"] == known_account.display_name
       assert match_entry["match"]["identity_kind"] == "email"
       assert match_entry["match"]["identity_value"] == "known@example.com"
+
       assert match_entry["match"]["profile"] == %{
                "id" => known_profile.id,
                "mode" => known_profile.mode,

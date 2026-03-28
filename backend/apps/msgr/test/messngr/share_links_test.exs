@@ -38,7 +38,10 @@ defmodule Messngr.ShareLinksTest do
       }
 
       assert {:ok, link} = ShareLinks.create_link(attrs)
-      assert link.expires_at |> DateTime.truncate(:second) == DateTime.truncate(expires_at, :second)
+
+      assert link.expires_at |> DateTime.truncate(:second) ==
+               DateTime.truncate(expires_at, :second)
+
       assert link.capabilities["targets"]["irc"]["mode"] == "geo_link"
     end
   end
@@ -96,8 +99,11 @@ defmodule Messngr.ShareLinksTest do
 
   defp insert_bridge_account!(account, service) do
     %BridgeAccount{}
-    |> BridgeAccount.changeset(%{account_id: account.id, service: service, external_id: "ext-#{service}"})
+    |> BridgeAccount.changeset(%{
+      account_id: account.id,
+      service: service,
+      external_id: "ext-#{service}"
+    })
     |> Messngr.Repo.insert!()
   end
 end
-

@@ -6,7 +6,12 @@ defmodule Messngr.Accounts.DeviceTest do
 
   describe "devices" do
     setup do
-      {:ok, account} = Accounts.create_account(%{"display_name" => "Device Owner", "email" => "owner@example.com"})
+      {:ok, account} =
+        Accounts.create_account(%{
+          "display_name" => "Device Owner",
+          "email" => "owner@example.com"
+        })
+
       profile = List.first(account.profiles)
 
       {:ok, account: account, profile: profile}
@@ -30,6 +35,7 @@ defmodule Messngr.Accounts.DeviceTest do
       assert device.enabled
       assert device.device_public_key == key
       assert device.public_key_fingerprint == expected_fingerprint
+
       assert [%{"id" => "server", "signature" => "abc"}] =
                Enum.map(device.attesters, &normalize_keys/1)
 
@@ -38,6 +44,7 @@ defmodule Messngr.Accounts.DeviceTest do
 
     test "activate_device/1 and deactivate_device/1 toggle enabled flag", %{account: account} do
       key = "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI"
+
       {:ok, device} =
         Accounts.create_device(%{
           account_id: account.id,
@@ -88,6 +95,7 @@ defmodule Messngr.Accounts.DeviceTest do
 
     test "create_device/1 enforces unique Noise key per account", %{account: account} do
       key = "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ"
+
       {:ok, _device} =
         Accounts.create_device(%{
           account_id: account.id,

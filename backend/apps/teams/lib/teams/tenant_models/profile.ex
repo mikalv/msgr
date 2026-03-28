@@ -34,6 +34,7 @@ defmodule Teams.TenantModels.Profile do
   # Bot profiles don't need account_id
   defp validate_required_unless_bot(changeset, attrs) do
     role = Map.get(attrs, :role) || Map.get(attrs, "role")
+
     if role == "bot" do
       changeset
     else

@@ -8,10 +8,10 @@ defmodule AuthProvider.Account.User do
   @required_fields []
 
   schema "account_users" do
-    field :metadata, :map
-    field :email, :string
-    field :uid, :string, source: :id
-    field :msisdn, :string
+    field(:metadata, :map)
+    field(:email, :string)
+    field(:uid, :string, source: :id)
+    field(:msisdn, :string)
 
     timestamps()
   end

@@ -1,0 +1,70 @@
+#!/bin/bash
+set -e
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
+
+ERRORS=0
+
+# ── Elixir checks ──────────────────────────────────────────────
+if git diff --cached --name-only | grep -q '\.ex$\|\.exs$'; then
+  echo -e "${YELLOW}Running Elixir checks...${NC}"
+
+  # mix format --check-formatted
+  cd backend
+  if mix format --check-formatted 2>/dev/null; then
+    echo -e "${GREEN}  ✓ mix format${NC}"
+  else
+    echo -e "${RED}  ✗ mix format — run 'cd backend && mix format'${NC}"
+    ERRORS=$((ERRORS + 1))
+  fi
+
+  # mix credo (if available)
+  if mix credo --strict --min-priority high 2>/dev/null; then
+    echo -e "${GREEN}  ✓ mix credo${NC}"
+  else
+    echo -e "${YELLOW}  ⚠ mix credo found issues (non-blocking)${NC}"
+  fi
+  cd ..
+fi
+
+# ── Dart/Flutter checks ───────────────────────────────────────
+if git diff --cached --name-only | grep -q '\.dart$'; then
+  echo -e "${YELLOW}Running Dart checks...${NC}"
+
+  # Get list of changed dart files
+  DART_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.dart$' || true)
+
+  if [ -n "$DART_FILES" ]; then
+    # dart analyze on changed packages
+    PACKAGES=$(echo "$DART_FILES" | grep -oP 'flutter_frontend/packages/\w+' | sort -u)
+    for pkg in $PACKAGES; do
+      if dart analyze "$pkg" 2>/dev/null | grep -q "error •"; then
+        echo -e "${RED}  ✗ dart analyze $pkg — has errors${NC}"
+        dart analyze "$pkg" 2>/dev/null | grep "error •" | head -5
+        ERRORS=$((ERRORS + 1))
+      else
+        echo -e "${GREEN}  ✓ dart analyze $pkg${NC}"
+      fi
+    done
+
+    # dart format --set-exit-if-changed
+    if dart format --set-exit-if-changed --output=none $DART_FILES 2>/dev/null; then
+      echo -e "${GREEN}  ✓ dart format${NC}"
+    else
+      echo -e "${RED}  ✗ dart format — run 'dart format' on changed files${NC}"
+      ERRORS=$((ERRORS + 1))
+    fi
+  fi
+fi
+
+# ── Result ─────────────────────────────────────────────────────
+if [ $ERRORS -gt 0 ]; then
+  echo -e "\n${RED}Pre-commit failed with $ERRORS error(s). Fix and try again.${NC}"
+  exit 1
+fi
+
+echo -e "${GREEN}Pre-commit checks passed.${NC}"

@@ -20,27 +20,44 @@ defmodule Messngr.Connectors.SignalBridgeTest do
   test "link_account/3 forwards device-link payload", %{agent: agent} do
     bridge = SignalBridge.new(queue: QueueRecorder, queue_opts: [agent: agent])
     params = %{user_id: "u-1", session: %{blob: "abc"}, linking: %{device_name: "Msgr"}}
-    assert {:ok, %{status: :accepted}} = SignalBridge.link_account(bridge, params, trace_id: "link")
+
+    assert {:ok, %{status: :accepted}} =
+             SignalBridge.link_account(bridge, params, trace_id: "link")
 
     assert [request] = QueueRecorder.requests(agent)
     assert request.topic == "bridge/signal/link_account"
-    assert request.payload.payload == %{user_id: "u-1", session: %{blob: "abc"}, linking: %{device_name: "Msgr"}}
+
+    assert request.payload.payload == %{
+             user_id: "u-1",
+             session: %{blob: "abc"},
+             linking: %{device_name: "Msgr"}
+           }
+
     assert request.payload.trace_id == "link"
   end
 
   test "send_message/3 publishes outbound envelope", %{agent: agent} do
     bridge = SignalBridge.new(queue: QueueRecorder, queue_opts: [agent: agent])
-    params = %{chat_id: "uuid-123", message: "hei", attachments: [%{id: "file"}], metadata: %{sealed_sender: true}}
+
+    params = %{
+      chat_id: "uuid-123",
+      message: "hei",
+      attachments: [%{id: "file"}],
+      metadata: %{sealed_sender: true}
+    }
+
     assert :ok = SignalBridge.send_message(bridge, params, trace_id: "msg")
 
     assert [message] = QueueRecorder.published(agent)
     assert message.topic == "bridge/signal/outbound_message"
+
     assert message.payload.payload == %{
              chat_id: "uuid-123",
              message: "hei",
              attachments: [%{id: "file"}],
              metadata: %{sealed_sender: true}
            }
+
     assert message.payload.trace_id == "msg"
   end
 
@@ -73,10 +90,10 @@ defmodule Messngr.Connectors.SignalBridgeTest do
       "session" => %{"token" => "abc"},
       "capabilities" => %{"messaging" => %{"attachments" => ["image", "video"], "text" => true}},
       "contacts" => [
-        %{ "uuid" => "uuid-200", "name" => "Bob" }
+        %{"uuid" => "uuid-200", "name" => "Bob"}
       ],
       "conversations" => [
-        %{ "id" => "chat-1", "type" => "group", "title" => "Friends" }
+        %{"id" => "chat-1", "type" => "group", "title" => "Friends"}
       ]
     }
 

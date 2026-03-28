@@ -21,8 +21,9 @@ defmodule TeamsWeb.Plugs.SubdomainTest do
   end
 
   test "calls the subdomain router when subdomain is present" do
-    conn = conn(:get, "/")
-    |> put_req_header("host", "sub.example.com")
+    conn =
+      conn(:get, "/")
+      |> put_req_header("host", "sub.example.com")
 
     conn = Subdomain.call(conn, @opts)
 
@@ -31,8 +32,9 @@ defmodule TeamsWeb.Plugs.SubdomainTest do
   end
 
   test "does not call the subdomain router when subdomain is not present" do
-    conn = conn(:get, "/")
-    |> put_req_header("host", "example.com")
+    conn =
+      conn(:get, "/")
+      |> put_req_header("host", "example.com")
 
     conn = Subdomain.call(conn, @opts)
 

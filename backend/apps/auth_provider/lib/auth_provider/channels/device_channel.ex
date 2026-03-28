@@ -17,10 +17,11 @@ defmodule AuthProvider.DeviceChannel do
   # by sending replies to requests from the client
   @impl true
   def handle_in("identify", %{"from" => from, "payload" => payload}, socket) do
-    Logger.info "Payload: #{inspect payload}"
+    Logger.info("Payload: #{inspect(payload)}")
+
     if AuthProvider.DeviceHelper.validate_device_signature(payload) do
       {:ok, device} = AuthProvider.DeviceHelper.find_or_register_device(payload)
-      Logger.info "Device #{inspect device}"
+      Logger.info("Device #{inspect(device)}")
       {:reply, {:ok, from}, socket}
     else
       {:reply, {:error, "Invalid signature"}, socket}
@@ -28,7 +29,7 @@ defmodule AuthProvider.DeviceChannel do
   end
 
   def handle_in("login_request", %{"from" => from, "number" => number}, socket) do
-    Logger.info "Login request from #{number} via deviceId #{from}"
+    Logger.info("Login request from #{number} via deviceId #{from}")
     {:ok, user} = AuthProvider.UserHelper.find_or_register_user_by_msisdn(number, from)
     :ok = AuthProvider.UserHelper.create_login_code_for_user(user)
     push(socket, "login_response", %{"status" => "ok", "next" => "code", "uid" => user.uid})
@@ -36,14 +37,21 @@ defmodule AuthProvider.DeviceChannel do
   end
 
   def handle_in("login_code", %{"from" => from, "code" => code, "number" => number}, socket) do
-    Logger.info "Login code (#{code}) from #{number} via deviceId #{from}"
+    Logger.info("Login code (#{code}) from #{number} via deviceId #{from}")
     {:ok, user} = AuthProvider.UserHelper.find_or_register_user_by_msisdn(number, from)
+
     case AuthProvider.UserHelper.validate_login_code_for_user(code, user) do
       {:ok, :valid_code} ->
         handle_login(user, socket)
+
       {:error, :invalid_code} ->
-        push(socket, "login_code_response", %{"status" => "error", "details" => "wrong code", "uid" => user.uid})
+        push(socket, "login_code_response", %{
+          "status" => "error",
+          "details" => "wrong code",
+          "uid" => user.uid
+        })
     end
+
     {:noreply, socket}
   end
 
@@ -62,7 +70,13 @@ defmodule AuthProvider.DeviceChannel do
 
   def handle_login(user, socket) do
     {:ok, token, claims} = AuthProvider.Guardian.encode_and_sign(user)
-    push(socket, "login_code_response", %{"status" => "ok", "token" => token, "claims" => claims, "uid" => user.uid})
+
+    push(socket, "login_code_response", %{
+      "status" => "ok",
+      "token" => token,
+      "claims" => claims,
+      "uid" => user.uid
+    })
   end
 
   # Add authorization logic here as required.

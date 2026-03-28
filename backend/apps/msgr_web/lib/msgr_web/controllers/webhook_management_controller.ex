@@ -43,18 +43,20 @@ defmodule MessngrWeb.WebhookManagementController do
 
             conn
             |> put_status(:created)
-            |> json(%{data: %{
-              id: endpoint.id,
-              name: endpoint.name,
-              channel_id: endpoint.channel_id,
-              token: endpoint.token,
-              url: "https://#{host}/api/hooks/#{endpoint.token}",
-              enabled: endpoint.enabled,
-              message_count: endpoint.message_count,
-              template: endpoint.template,
-              template_preset: endpoint.template_preset,
-              inserted_at: endpoint.inserted_at
-            }})
+            |> json(%{
+              data: %{
+                id: endpoint.id,
+                name: endpoint.name,
+                channel_id: endpoint.channel_id,
+                token: endpoint.token,
+                url: "https://#{host}/api/hooks/#{endpoint.token}",
+                enabled: endpoint.enabled,
+                message_count: endpoint.message_count,
+                template: endpoint.template,
+                template_preset: endpoint.template_preset,
+                inserted_at: endpoint.inserted_at
+              }
+            })
 
           {:error, changeset} ->
             {:error, changeset}
@@ -68,35 +70,53 @@ defmodule MessngrWeb.WebhookManagementController do
     host = Application.get_env(:msgr_web, :invite_host, "dev.msgr.no")
     endpoints = WebhookEndpoint.list_for_team(team.id)
 
-    json(conn, %{data: Enum.map(endpoints, fn e ->
-      %{
-        id: e.id,
-        name: e.name,
-        channel_id: e.channel_id,
-        token: e.token,
-        url: "https://#{host}/api/hooks/#{e.token}",
-        enabled: e.enabled,
-        message_count: e.message_count,
-        template: e.template,
-        template_preset: e.template_preset,
-        inserted_at: e.inserted_at
-      }
-    end)})
+    json(conn, %{
+      data:
+        Enum.map(endpoints, fn e ->
+          %{
+            id: e.id,
+            name: e.name,
+            channel_id: e.channel_id,
+            token: e.token,
+            url: "https://#{host}/api/hooks/#{e.token}",
+            enabled: e.enabled,
+            message_count: e.message_count,
+            template: e.template,
+            template_preset: e.template_preset,
+            inserted_at: e.inserted_at
+          }
+        end)
+    })
   end
 
   @doc "PUT /api/teams/:slug/webhooks/:id — update a webhook"
   def update(conn, %{"id" => id} = params) do
     case Messngr.Repo.get(WebhookEndpoint, id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       endpoint ->
         attrs = %{}
         attrs = if params["name"], do: Map.put(attrs, :name, params["name"]), else: attrs
-        attrs = if params["template"], do: Map.put(attrs, :template, params["template"]), else: attrs
-        attrs = if Map.has_key?(params, "template_preset"), do: Map.put(attrs, :template_preset, params["template_preset"]), else: attrs
+
+        attrs =
+          if params["template"], do: Map.put(attrs, :template, params["template"]), else: attrs
+
+        attrs =
+          if Map.has_key?(params, "template_preset"),
+            do: Map.put(attrs, :template_preset, params["template_preset"]),
+            else: attrs
 
         case endpoint |> WebhookEndpoint.changeset(attrs) |> Messngr.Repo.update() do
           {:ok, updated} ->
-            json(conn, %{data: %{id: updated.id, template: updated.template, template_preset: updated.template_preset}})
+            json(conn, %{
+              data: %{
+                id: updated.id,
+                template: updated.template,
+                template_preset: updated.template_preset
+              }
+            })
+
           {:error, changeset} ->
             {:error, changeset}
         end

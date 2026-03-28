@@ -74,6 +74,7 @@ defmodule TeamsWeb.SubdomainRouter do
 
   scope "/v2/api", TeamsWeb.Subdomain do
     pipe_through [:api, :authed_api, :authorized_api, :graphql]
+
     forward "/graphql", TeamsWeb.Subdomain.Absinthe.Plug,
       schema: TeamsWeb.GraphQL.Schema,
       analyze_complexity: true,
@@ -81,8 +82,6 @@ defmodule TeamsWeb.SubdomainRouter do
   end
 
   scope "/v2/api" do
-    forward "/graphiql", Elixir.Absinthe.Plug.GraphiQL,
-      schema: TeamsWeb.GraphQL.Schema
+    forward "/graphiql", Elixir.Absinthe.Plug.GraphiQL, schema: TeamsWeb.GraphQL.Schema
   end
-
 end

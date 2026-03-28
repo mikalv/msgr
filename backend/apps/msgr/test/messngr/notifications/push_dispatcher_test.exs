@@ -14,7 +14,10 @@ defmodule Messngr.Notifications.PushDispatcherTest do
     end
 
     def push(token, payload, context) do
-      Agent.update(__MODULE__, fn acc -> [%{token: token, payload: payload, context: context} | acc] end)
+      Agent.update(__MODULE__, fn acc ->
+        [%{token: token, payload: payload, context: context} | acc]
+      end)
+
       %{token_id: token.id, status: :queued}
     end
 
@@ -45,11 +48,23 @@ defmodule Messngr.Notifications.PushDispatcherTest do
   end
 
   test "dispatch honours quiet hours", %{profile: profile, token: token} do
-    profile = %{profile | notification_policy: Map.put(profile.notification_policy, "quiet_hours", %{"enabled" => true, "start" => "21:00", "end" => "07:00"})}
+    profile = %{
+      profile
+      | notification_policy:
+          Map.put(profile.notification_policy, "quiet_hours", %{
+            "enabled" => true,
+            "start" => "21:00",
+            "end" => "07:00"
+          })
+    }
 
     late_night = DateTime.new!(Date.utc_today(), ~T[22:30:00], "Etc/UTC")
 
-    {:ok, report} = PushDispatcher.dispatch(profile, [token], %{"type" => "message"}, now: late_night, adapter: MemoryAdapter)
+    {:ok, report} =
+      PushDispatcher.dispatch(profile, [token], %{"type" => "message"},
+        now: late_night,
+        adapter: MemoryAdapter
+      )
 
     assert report.sent == []
     assert [%{reason: :quiet_hours}] = report.suppressed
@@ -58,7 +73,11 @@ defmodule Messngr.Notifications.PushDispatcherTest do
   test "dispatch sends during day", %{profile: profile, token: token} do
     morning = DateTime.new!(Date.utc_today(), ~T[09:00:00], "Etc/UTC")
 
-    {:ok, report} = PushDispatcher.dispatch(profile, [token], %{"type" => "message"}, now: morning, adapter: MemoryAdapter)
+    {:ok, report} =
+      PushDispatcher.dispatch(profile, [token], %{"type" => "message"},
+        now: morning,
+        adapter: MemoryAdapter
+      )
 
     assert length(report.sent) == 1
     assert [] == report.suppressed
@@ -70,7 +89,11 @@ defmodule Messngr.Notifications.PushDispatcherTest do
     other_token = %{token | mode: :work, id: Ecto.UUID.generate()}
     morning = DateTime.new!(Date.utc_today(), ~T[09:00:00], "Etc/UTC")
 
-    {:ok, report} = PushDispatcher.dispatch(profile, [other_token], %{"type" => "message"}, now: morning, adapter: MemoryAdapter)
+    {:ok, report} =
+      PushDispatcher.dispatch(profile, [other_token], %{"type" => "message"},
+        now: morning,
+        adapter: MemoryAdapter
+      )
 
     assert report.sent == []
     assert [%{reason: :mode_mismatch}] = report.suppressed
@@ -96,7 +119,8 @@ defmodule Messngr.Notifications.PushDispatcherTest do
       }
     ]
 
-    {:ok, report} = PushDispatcher.dispatch(profile, tokens, %{"type" => "alert"}, adapter: MemoryAdapter)
+    {:ok, report} =
+      PushDispatcher.dispatch(profile, tokens, %{"type" => "alert"}, adapter: MemoryAdapter)
 
     assert length(report.sent) == 1
   end

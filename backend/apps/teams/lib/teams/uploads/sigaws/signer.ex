@@ -145,16 +145,16 @@ defmodule Sigaws.Signer do
   defp normalize_header_value(v) when is_list(v) do
     v
     |> List.foldr([], fn
-         i, [] -> [normalize_header_value(i)]
-         i, acc -> [normalize_header_value(i), ",", acc]
-       end)
+      i, [] -> [normalize_header_value(i)]
+      i, acc -> [normalize_header_value(i), ",", acc]
+    end)
   end
 
   defp c_headers(%{} = headers) do
     headers
     |> Enum.map(fn {k, v} ->
-         {normalize_header_name(k), normalize_header_value(v)}
-       end)
+      {normalize_header_name(k), normalize_header_value(v)}
+    end)
     |> Enum.sort(&(&1 < &2))
     |> Enum.map(fn {k, v} -> [k, ":", v, "\n"] end)
   end

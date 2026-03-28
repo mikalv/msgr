@@ -56,7 +56,8 @@ defmodule Teams.SecureID.Alphabet do
   def char_at!(alphabet, index), do: Map.fetch!(alphabet, index)
 
   @spec split_and_exchange!(t(), index) :: t()
-  def split_and_exchange!(alphabet, split_index) when split_index >= 0 and split_index <= map_size(alphabet) - 1 do
+  def split_and_exchange!(alphabet, split_index)
+      when split_index >= 0 and split_index <= map_size(alphabet) - 1 do
     alphabet_size = map_size(alphabet)
 
     map(alphabet, fn {index, char} ->

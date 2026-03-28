@@ -7,6 +7,7 @@ listen_ip =
       |> String.split(".")
       |> Enum.map(&String.to_integer/1)
       |> List.to_tuple()
+
     _ ->
       {0, 0, 0, 0}
   end
@@ -83,8 +84,12 @@ openobserve_transport =
 openobserve_queue_module =
   System.get_env("OPENOBSERVE_QUEUE_MODULE")
   |> case do
-    nil -> nil
-    "" -> nil
+    nil ->
+      nil
+
+    "" ->
+      nil
+
     module ->
       module
       |> String.split(".")

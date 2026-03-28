@@ -57,12 +57,31 @@ defmodule Messngr.Apps.Executors.LlmExecutor do
     {:error, "LLM brukte for mange verktøy-runder (maks #{@max_tool_rounds})"}
   end
 
-  defp run_llm_loop(model, messages, tool_defs, tools, tool_context, temperature, max_tokens, round) do
+  defp run_llm_loop(
+         model,
+         messages,
+         tool_defs,
+         tools,
+         tool_context,
+         temperature,
+         max_tokens,
+         round
+       ) do
     body = build_request_body(model, messages, tool_defs, temperature, max_tokens)
 
     case http_post(@llm_proxy_url, body) do
       {:ok, %{"choices" => [%{"message" => message} | _]}} ->
-        handle_llm_response(message, model, messages, tool_defs, tools, tool_context, temperature, max_tokens, round)
+        handle_llm_response(
+          message,
+          model,
+          messages,
+          tool_defs,
+          tools,
+          tool_context,
+          temperature,
+          max_tokens,
+          round
+        )
 
       {:ok, unexpected} ->
         Logger.warning("Unexpected LLM response: #{inspect(unexpected)}")
@@ -73,7 +92,17 @@ defmodule Messngr.Apps.Executors.LlmExecutor do
     end
   end
 
-  defp handle_llm_response(%{"tool_calls" => tool_calls} = assistant_msg, model, messages, tool_defs, tools, tool_context, temperature, max_tokens, round)
+  defp handle_llm_response(
+         %{"tool_calls" => tool_calls} = assistant_msg,
+         model,
+         messages,
+         tool_defs,
+         tools,
+         tool_context,
+         temperature,
+         max_tokens,
+         round
+       )
        when is_list(tool_calls) and tool_calls != [] do
     # Execute each tool call and collect results
     tool_results =
@@ -94,15 +123,44 @@ defmodule Messngr.Apps.Executors.LlmExecutor do
         end)
 
     # Continue the loop
-    run_llm_loop(model, updated_messages, tool_defs, tools, tool_context, temperature, max_tokens, round + 1)
+    run_llm_loop(
+      model,
+      updated_messages,
+      tool_defs,
+      tools,
+      tool_context,
+      temperature,
+      max_tokens,
+      round + 1
+    )
   end
 
-  defp handle_llm_response(%{"content" => content}, _model, _messages, _tool_defs, _tools, _tool_context, _temperature, _max_tokens, _round)
+  defp handle_llm_response(
+         %{"content" => content},
+         _model,
+         _messages,
+         _tool_defs,
+         _tools,
+         _tool_context,
+         _temperature,
+         _max_tokens,
+         _round
+       )
        when is_binary(content) do
     {:ok, content}
   end
 
-  defp handle_llm_response(msg, _model, _messages, _tool_defs, _tools, _tool_context, _temperature, _max_tokens, _round) do
+  defp handle_llm_response(
+         msg,
+         _model,
+         _messages,
+         _tool_defs,
+         _tools,
+         _tool_context,
+         _temperature,
+         _max_tokens,
+         _round
+       ) do
     Logger.warning("LLM response missing content: #{inspect(msg)}")
     {:ok, msg["content"] || "Ingen respons fra LLM"}
   end
@@ -165,7 +223,8 @@ defmodule Messngr.Apps.Executors.LlmExecutor do
     end
   end
 
-  defp build_tool_context(%{installation: installation} = _context) when not is_nil(installation) do
+  defp build_tool_context(%{installation: installation} = _context)
+       when not is_nil(installation) do
     %{
       config: installation.config || %{},
       secrets: decrypt_secrets(installation.secrets_encrypted)
@@ -194,7 +253,8 @@ defmodule Messngr.Apps.Executors.LlmExecutor do
 
     case :httpc.request(
            :post,
-           {String.to_charlist(url), Enum.map(headers, fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end),
+           {String.to_charlist(url),
+            Enum.map(headers, fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end),
             ~c"application/json", Jason.encode!(body)},
            [{:timeout, 60_000}, {:connect_timeout, 10_000}],
            [{:body_format, :binary}]

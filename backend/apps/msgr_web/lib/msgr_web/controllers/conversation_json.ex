@@ -50,7 +50,8 @@ defmodule MessngrWeb.ConversationJSON do
 
   defp encode_last_message(_), do: nil
 
-  defp encode_meta(nil), do: %{start_cursor: nil, end_cursor: nil, has_more: %{before: false, after: false}}
+  defp encode_meta(nil),
+    do: %{start_cursor: nil, end_cursor: nil, has_more: %{before: false, after: false}}
 
   defp encode_meta(meta) when is_map(meta) do
     %{

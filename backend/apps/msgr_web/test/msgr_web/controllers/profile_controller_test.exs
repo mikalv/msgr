@@ -6,7 +6,10 @@ defmodule MessngrWeb.ProfileControllerTest do
   setup %{conn: conn} do
     {:ok, account} = Accounts.create_account(%{"display_name" => "Ingrid"})
     profile = List.first(account.profiles)
-    {:ok, other} = Accounts.create_profile(%{"name" => "Jobb", "mode" => :work, "account_id" => account.id})
+
+    {:ok, other} =
+      Accounts.create_profile(%{"name" => "Jobb", "mode" => :work, "account_id" => account.id})
+
     {conn, session} = attach_noise_session(conn, account, profile)
 
     {:ok,
@@ -27,7 +30,7 @@ defmodule MessngrWeb.ProfileControllerTest do
     assert [%{"id" => ^profile_id} | _] = response["data"]
     assert profile_id == profile.id
     assert Enum.any?(response["data"], &(&1["id"] == other.id))
-    assert Enum.any?(response["data"], &(&1["is_active"]))
+    assert Enum.any?(response["data"], & &1["is_active"])
   end
 
   test "creates profile with preferences", %{conn: conn, account: account} do
@@ -88,7 +91,14 @@ defmodule MessngrWeb.ProfileControllerTest do
     assert response["error"] == "cannot_delete_last_profile"
   end
 
-  test "switches active profile", %{conn: conn, account: account, profile: profile, other: other, device: device, token: token} do
+  test "switches active profile", %{
+    conn: conn,
+    account: account,
+    profile: profile,
+    other: other,
+    device: device,
+    token: token
+  } do
     response =
       conn
       |> post(~p"/api/profiles/#{other.id}/switch")

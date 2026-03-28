@@ -5,20 +5,23 @@ defmodule AuthProvider.Guardian do
     Logger.debug("Compiling AuthProvider.Guardian", module: __MODULE__)
   end
 
-  use Guardian, otp_app: :auth_provider,
-                    permissions: %{
-                      default: [:access],
-                      teams: %{
-                        owner: 0b000001,
-                        admin: 0b000010,
-                        channels_read: 0b000100,
-                        channels_write: 0b001000,
-                      }
-                    }
+  use Guardian,
+    otp_app: :auth_provider,
+    permissions: %{
+      default: [:access],
+      teams: %{
+        owner: 0b000001,
+        admin: 0b000010,
+        channels_read: 0b000100,
+        channels_write: 0b001000
+      }
+    }
+
   use Guardian.Permissions, encoding: Guardian.Permissions.BitwiseEncoding
 
   def issue_token_for_team(team_name, team_id, uid, profile_id \\ nil) do
     resource = AuthProvider.Account.User.get_by_uid(uid)
+
     if is_nil(profile_id) do
       encode_and_sign(resource, %{ten: team_name, tei: team_id})
     else
@@ -46,8 +49,9 @@ defmodule AuthProvider.Guardian do
     # found in the `"sub"` key. In above `subject_for_token/2` we returned
     # the resource id so here we'll rely on that to look it up.
     resource = AuthProvider.Account.User.get_by_uid(id)
-    {:ok,  resource}
+    {:ok, resource}
   end
+
   def resource_from_claims(_claims) do
     {:error, :reason_for_error}
   end
@@ -56,6 +60,7 @@ defmodule AuthProvider.Guardian do
     claims =
       claims
       |> encode_permissions_into_claims!(Keyword.get(opts, :permissions))
+
     {:ok, claims}
   end
 

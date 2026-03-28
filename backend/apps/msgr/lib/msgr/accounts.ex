@@ -133,7 +133,9 @@ defmodule Messngr.Accounts do
     |> to_string()
     |> String.trim()
     |> case do
-      "" -> nil
+      "" ->
+        nil
+
       trimmed ->
         trimmed
         |> String.split(~r/\s+/, trim: true)
@@ -148,7 +150,9 @@ defmodule Messngr.Accounts do
     |> to_string()
     |> String.trim()
     |> case do
-      "" -> nil
+      "" ->
+        nil
+
       trimmed ->
         local_part =
           trimmed
@@ -320,6 +324,7 @@ defmodule Messngr.Accounts do
   @spec import_contacts(Ecto.UUID.t(), [map()], keyword()) ::
           {:ok, [Contact.t()]} | {:error, term()}
   def import_contacts(account_id, contacts_attrs, opts \\ [])
+
   def import_contacts(account_id, contacts_attrs, opts) when is_list(contacts_attrs) do
     profile_id = Keyword.get(opts, :profile_id)
 
@@ -509,8 +514,11 @@ defmodule Messngr.Accounts do
       {:ok, encoded, raw} ->
         {:ok, %{encoded: encoded, raw: raw, fingerprint: DeviceKey.fingerprint(raw)}}
 
-      {:error, :empty} -> :none
-      {:error, _reason} -> {:error, :invalid_device_public_key}
+      {:error, :empty} ->
+        :none
+
+      {:error, _reason} ->
+        {:error, :invalid_device_public_key}
     end
   end
 
@@ -619,7 +627,9 @@ defmodule Messngr.Accounts do
         provided
 
       true ->
-        profiles |> List.first() |> case do
+        profiles
+        |> List.first()
+        |> case do
           nil -> nil
           profile -> profile.id
         end
@@ -661,7 +671,10 @@ defmodule Messngr.Accounts do
       |> Map.new()
       |> Map.put(:account_id, account.id)
       |> Map.put_new(:kind, Map.get(attrs, :kind) || Map.get(attrs, "kind"))
-      |> Map.put_new(:value, Map.get(attrs, :value) || Map.get(attrs, :email) || Map.get(attrs, :phone_number))
+      |> Map.put_new(
+        :value,
+        Map.get(attrs, :value) || Map.get(attrs, :email) || Map.get(attrs, :phone_number)
+      )
       |> Map.put_new(:provider, Map.get(attrs, :provider) || Map.get(attrs, "provider"))
       |> Map.put_new(:subject, Map.get(attrs, :subject) || Map.get(attrs, "subject"))
 
@@ -739,6 +752,7 @@ defmodule Messngr.Accounts do
     attrs = Map.new(attrs)
 
     email = attrs |> Map.get("email") |> Kernel.||(Map.get(attrs, :email))
+
     phone =
       attrs
       |> Map.get("phone_number")
@@ -752,6 +766,7 @@ defmodule Messngr.Accounts do
   end
 
   defp normalize_labels(nil), do: []
+
   defp normalize_labels(labels) when is_list(labels) do
     labels
     |> Enum.map(&to_string/1)

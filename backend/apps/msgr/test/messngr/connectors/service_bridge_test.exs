@@ -16,7 +16,12 @@ defmodule Messngr.Connectors.ServiceBridgeTest do
   end
 
   test "topic/2 includes instance namespace when configured", %{agent: agent} do
-    bridge = ServiceBridge.new(:example, queue: QueueRecorder, queue_opts: [agent: agent], instance: "shard-a")
+    bridge =
+      ServiceBridge.new(:example,
+        queue: QueueRecorder,
+        queue_opts: [agent: agent],
+        instance: "shard-a"
+      )
 
     assert ServiceBridge.topic(bridge, :send) == "bridge/example/shard-a/send"
     assert ServiceBridge.topic(bridge, "outbound", "shard-b") == "bridge/example/shard-b/outbound"
@@ -43,7 +48,8 @@ defmodule Messngr.Connectors.ServiceBridgeTest do
   end
 
   test "request/4 delegates to the queue with default timeout", %{bridge: bridge, agent: agent} do
-    assert {:ok, %{status: :accepted}} = ServiceBridge.request(bridge, :link, %{}, trace_id: "link")
+    assert {:ok, %{status: :accepted}} =
+             ServiceBridge.request(bridge, :link, %{}, trace_id: "link")
 
     assert [request] = QueueRecorder.requests(agent)
     assert request.opts[:timeout] == 5_000
@@ -62,7 +68,10 @@ defmodule Messngr.Connectors.ServiceBridgeTest do
 
   test "request/4 propagates instance routing", %{bridge: bridge, agent: agent} do
     assert {:ok, %{status: :accepted}} =
-             ServiceBridge.request(bridge, :link, %{}, instance: :matrix_east, trace_id: "instance")
+             ServiceBridge.request(bridge, :link, %{},
+               instance: :matrix_east,
+               trace_id: "instance"
+             )
 
     assert [request] = QueueRecorder.requests(agent)
     assert request.topic == "bridge/example/matrix_east/link"
@@ -74,6 +83,7 @@ defmodule Messngr.Connectors.ServiceBridgeTest do
   end
 
   test "publish/4 rejects invalid instance override", %{bridge: bridge} do
-    assert {:error, {:invalid_instance, ""}} = ServiceBridge.publish(bridge, :send, %{body: "hi"}, instance: "")
+    assert {:error, {:invalid_instance, ""}} =
+             ServiceBridge.publish(bridge, :send, %{body: "hi"}, instance: "")
   end
 end

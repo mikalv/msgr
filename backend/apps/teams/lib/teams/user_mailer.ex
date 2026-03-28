@@ -1,7 +1,8 @@
 defmodule Teams.UserMailer do
   import Swoosh.Email
 
-  @spec login_code(String.t(), %{required(:name) => String.t(), required(:email) => String.t()}) :: Swoosh.Email.t()
+  @spec login_code(String.t(), %{required(:name) => String.t(), required(:email) => String.t()}) ::
+          Swoosh.Email.t()
   def login_code(tenantName, user) do
     new()
     |> to({user.name, user.email})

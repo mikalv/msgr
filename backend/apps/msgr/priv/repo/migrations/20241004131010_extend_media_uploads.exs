@@ -38,9 +38,14 @@ defmodule Messngr.Repo.Migrations.ExtendMediaUploads do
 
     execute("DROP TYPE IF EXISTS message_kind")
 
-    execute("CREATE TYPE message_kind AS ENUM ('text','markdown','code','system','image','video','audio','location')")
+    execute(
+      "CREATE TYPE message_kind AS ENUM ('text','markdown','code','system','image','video','audio','location')"
+    )
 
     execute("ALTER TABLE messages ALTER COLUMN kind TYPE message_kind USING kind::message_kind")
-    execute("ALTER TABLE media_uploads ALTER COLUMN kind TYPE message_kind USING kind::message_kind")
+
+    execute(
+      "ALTER TABLE media_uploads ALTER COLUMN kind TYPE message_kind USING kind::message_kind"
+    )
   end
 end

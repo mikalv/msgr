@@ -38,6 +38,7 @@ defmodule Teams.TenantModels.MediaUpload do
 
   def for_profile(prefix, profile_id) do
     import Ecto.Query
+
     from(u in __MODULE__, where: u.profile_id == ^profile_id, order_by: [desc: u.inserted_at])
     |> Teams.Repo.all(prefix: prefix)
   end

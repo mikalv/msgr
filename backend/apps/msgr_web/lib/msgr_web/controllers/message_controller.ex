@@ -21,7 +21,8 @@ defmodule MessngrWeb.MessageController do
     current_profile = conn.assigns.current_profile
 
     with _participant <- Messngr.ensure_membership(conversation_id, current_profile.id),
-         {:ok, message} <- Messngr.send_message(conversation_id, current_profile.id, message_params) do
+         {:ok, message} <-
+           Messngr.send_message(conversation_id, current_profile.id, message_params) do
       conn
       |> put_status(:created)
       |> render(:show, message: message)
@@ -64,6 +65,7 @@ defmodule MessngrWeb.MessageController do
   end
 
   defp maybe_put(opts, _key, nil), do: opts
+
   defp maybe_put(opts, :limit, value) do
     case Integer.parse(to_string(value)) do
       {int, _} when int > 0 and int <= 200 -> Keyword.put(opts, :limit, int)

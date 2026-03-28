@@ -35,7 +35,9 @@ defmodule Messngr.Logging.OpenObserveBackendTest do
       end
     ]
 
-    {:ok, state} = OpenObserveBackend.init({OpenObserveBackend, Keyword.merge(defaults, overrides)})
+    {:ok, state} =
+      OpenObserveBackend.init({OpenObserveBackend, Keyword.merge(defaults, overrides)})
+
     state
   end
 

@@ -32,7 +32,8 @@ defmodule Messngr.Connectors.SlackBridgeTest do
       workspace: %{id: "T123", name: "Acme"}
     }
 
-    assert {:ok, %{status: :accepted}} = SlackBridge.link_account(bridge, params, trace_id: "slack-link")
+    assert {:ok, %{status: :accepted}} =
+             SlackBridge.link_account(bridge, params, trace_id: "slack-link")
 
     assert [request] = QueueRecorder.requests(agent)
     assert request.topic == "bridge/slack/link_account"
@@ -82,7 +83,9 @@ defmodule Messngr.Connectors.SlackBridgeTest do
 
   test "health_snapshot/3 requests runtime telemetry", %{agent: agent} do
     responder = fn -> {:ok, %{"status" => "ok", "summary" => %{"total_clients" => 1}}} end
-    bridge = SlackBridge.new(queue: QueueRecorder, queue_opts: [agent: agent, responder: responder])
+
+    bridge =
+      SlackBridge.new(queue: QueueRecorder, queue_opts: [agent: agent, responder: responder])
 
     assert {:ok, %{"status" => "ok"}} = SlackBridge.health_snapshot(bridge, %{instance: "T123"})
 
@@ -94,19 +97,19 @@ defmodule Messngr.Connectors.SlackBridgeTest do
   test "link_account/3 persists workspace snapshot", %{agent: agent, account: account} do
     response = %{
       "status" => "linked",
-      "team" => %{ "id" => "T999", "name" => "Acme", "domain" => "acme" },
+      "team" => %{"id" => "T999", "name" => "Acme", "domain" => "acme"},
       "user" => %{
         "id" => "U123",
         "real_name" => "Alice Example",
-        "profile" => %{ "display_name" => "alice" }
+        "profile" => %{"display_name" => "alice"}
       },
-      "session" => %{ "access_token" => "xoxp-1" },
-      "capabilities" => %{ "messaging" => %{ "threads" => true } },
+      "session" => %{"access_token" => "xoxp-1"},
+      "capabilities" => %{"messaging" => %{"threads" => true}},
       "members" => [
-        %{ "id" => "U234", "real_name" => "Bob Builder", "name" => "bobb" }
+        %{"id" => "U234", "real_name" => "Bob Builder", "name" => "bobb"}
       ],
       "conversations" => [
-        %{ "id" => "C1", "name" => "general", "type" => "channel" }
+        %{"id" => "C1", "name" => "general", "type" => "channel"}
       ]
     }
 

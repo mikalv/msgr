@@ -18,7 +18,18 @@ defmodule Messngr.Bridges.Auth do
     """
 
     @enforce_keys [:id, :service, :display_name, :description, :auth, :capabilities, :status]
-    defstruct [:id, :service, :display_name, :description, :auth, :capabilities, :status, :categories, :prerequisites, :tags]
+    defstruct [
+      :id,
+      :service,
+      :display_name,
+      :description,
+      :auth,
+      :capabilities,
+      :status,
+      :categories,
+      :prerequisites,
+      :tags
+    ]
 
     @type status :: :available | :coming_soon
 
@@ -92,7 +103,8 @@ defmodule Messngr.Bridges.Auth do
         id: "signal",
         service: "signal",
         display_name: "Signal",
-        description: "Link your Signal device to Msgr and relay encrypted conversations securely.",
+        description:
+          "Link your Signal device to Msgr and relay encrypted conversations securely.",
         status: :available,
         categories: ["consumer"],
         prerequisites: ["Existing Signal device"],
@@ -324,6 +336,7 @@ defmodule Messngr.Bridges.Auth do
   @spec start_session(Account.t() | Ecto.UUID.t(), String.t(), map()) ::
           {:ok, AuthSession.t()} | {:error, term()}
   def start_session(account, connector_id, attrs \\ %{})
+
   def start_session(%Account{id: account_id}, connector_id, attrs) do
     start_session(account_id, connector_id, attrs)
   end
@@ -338,7 +351,8 @@ defmodule Messngr.Bridges.Auth do
         state: "awaiting_user",
         login_method: entry.auth[:method],
         auth_surface: entry.auth[:auth_surface],
-        client_context: ensure_map(Map.get(attrs, :client_context) || Map.get(attrs, "client_context")),
+        client_context:
+          ensure_map(Map.get(attrs, :client_context) || Map.get(attrs, "client_context")),
         metadata: build_metadata(entry, attrs),
         catalog_snapshot: CatalogEntry.to_map(entry),
         expires_at: normalise_expires_at(attrs, now),
@@ -358,9 +372,11 @@ defmodule Messngr.Bridges.Auth do
   """
   @spec fetch_session(Account.t() | Ecto.UUID.t(), Ecto.UUID.t()) ::
           {:ok, AuthSession.t()} | {:error, term()}
-  def fetch_session(%Account{id: account_id}, session_id), do: fetch_session(account_id, session_id)
+  def fetch_session(%Account{id: account_id}, session_id),
+    do: fetch_session(account_id, session_id)
 
-  def fetch_session(account_id, session_id) when is_binary(account_id) and is_binary(session_id) do
+  def fetch_session(account_id, session_id)
+      when is_binary(account_id) and is_binary(session_id) do
     case Repo.get(AuthSession, session_id) do
       %AuthSession{account_id: ^account_id} = session -> {:ok, session}
       %AuthSession{} -> {:error, :forbidden}
@@ -561,7 +577,8 @@ defmodule Messngr.Bridges.Auth do
 
   def public_metadata(_other), do: %{}
 
-  defp ensure_connector_match(%AuthSession{} = session, connector_id) when is_binary(connector_id) do
+  defp ensure_connector_match(%AuthSession{} = session, connector_id)
+       when is_binary(connector_id) do
     connector = session.catalog_snapshot["id"] || session.service
 
     if connector == connector_id do
@@ -576,7 +593,9 @@ defmodule Messngr.Bridges.Auth do
   defp ensure_oauth_session(%AuthSession{login_method: "oauth"}), do: :ok
   defp ensure_oauth_session(%AuthSession{}), do: {:error, :unsupported_login_method}
 
-  defp ensure_non_oauth_session(%AuthSession{login_method: "oauth"}), do: {:error, :unsupported_login_method}
+  defp ensure_non_oauth_session(%AuthSession{login_method: "oauth"}),
+    do: {:error, :unsupported_login_method}
+
   defp ensure_non_oauth_session(%AuthSession{}), do: :ok
 
   defp ensure_not_expired(%AuthSession{expires_at: nil} = session), do: {:ok, session}
@@ -599,10 +618,16 @@ defmodule Messngr.Bridges.Auth do
         Map.put(acc, normalise_provider_key(key), normalise_provider(value))
       end)
 
-    Map.get(providers, normalise_provider_key(service), normalise_provider(@default_oauth_provider))
+    Map.get(
+      providers,
+      normalise_provider_key(service),
+      normalise_provider(@default_oauth_provider)
+    )
   end
 
-  defp normalise_provider({module, opts}) when is_atom(module) and is_list(opts), do: {module, opts}
+  defp normalise_provider({module, opts}) when is_atom(module) and is_list(opts),
+    do: {module, opts}
+
   defp normalise_provider(module) when is_atom(module), do: {module, []}
 
   defp normalise_provider(%{module: module} = map) when is_atom(module) do
@@ -632,10 +657,14 @@ defmodule Messngr.Bridges.Auth do
 
   defp fetch_required(map, key) when is_map(map) do
     cond do
-      Map.has_key?(map, key) -> {:ok, map[key]}
+      Map.has_key?(map, key) ->
+        {:ok, map[key]}
+
       true ->
         case maybe_atom_key(key) do
-          nil -> {:error, {:missing_value, key}}
+          nil ->
+            {:error, {:missing_value, key}}
+
           atom ->
             case Map.fetch(map, atom) do
               {:ok, value} -> {:ok, value}
@@ -767,8 +796,13 @@ defmodule Messngr.Bridges.Auth do
       |> Map.get(:consent_plan)
 
     entry_metadata = %{}
-    entry_metadata = if scopes == [], do: entry_metadata, else: Map.put(entry_metadata, "scopes", scopes)
-    entry_metadata = if is_nil(poll), do: entry_metadata, else: Map.put(entry_metadata, "poll", poll)
+
+    entry_metadata =
+      if scopes == [], do: entry_metadata, else: Map.put(entry_metadata, "scopes", scopes)
+
+    entry_metadata =
+      if is_nil(poll), do: entry_metadata, else: Map.put(entry_metadata, "poll", poll)
+
     entry_metadata =
       if is_nil(consent_plan) do
         entry_metadata
@@ -784,14 +818,20 @@ defmodule Messngr.Bridges.Auth do
     |> Map.get(:expires_at)
     |> Kernel.||(Map.get(attrs, "expires_at"))
     |> case do
-      nil -> DateTime.add(now, default_session_ttl_seconds(), :second)
-      %DateTime{} = dt -> DateTime.truncate(dt, :second)
+      nil ->
+        DateTime.add(now, default_session_ttl_seconds(), :second)
+
+      %DateTime{} = dt ->
+        DateTime.truncate(dt, :second)
+
       value when is_binary(value) ->
         case DateTime.from_iso8601(value) do
           {:ok, dt, _offset} -> DateTime.truncate(dt, :second)
           {:error, _} -> DateTime.add(now, default_session_ttl_seconds(), :second)
         end
-      _ -> DateTime.add(now, default_session_ttl_seconds(), :second)
+
+      _ ->
+        DateTime.add(now, default_session_ttl_seconds(), :second)
     end
   end
 

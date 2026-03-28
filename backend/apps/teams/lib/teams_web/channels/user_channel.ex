@@ -26,9 +26,9 @@ defmodule TeamsWeb.UserChannel do
     token = socket.assigns[:token]
     {:ok, claims} = AuthProvider.Guardian.decode_and_verify(token)
     profileID = claims["pid"]
-    Logger.info "User #{uid} joined their own channel under the #{tenant} tenant"
+    Logger.info("User #{uid} joined their own channel under the #{tenant} tenant")
     data = Teams.ClientBootstrap.build_bootstrap_payload_for(tenant, profileID)
-    push(socket, "bootstrap:packet", %{type: "bootstrap", status: "ok", "data": data})
+    push(socket, "bootstrap:packet", %{type: "bootstrap", status: "ok", data: data})
     {:noreply, socket}
   end
 

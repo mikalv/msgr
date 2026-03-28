@@ -100,8 +100,12 @@ defmodule MessngrWeb.FamilyEventController do
 
   defp maybe_put_datetime(params, key) do
     case Map.fetch(params, key) do
-      :error -> {:ok, params}
-      {:ok, nil} -> {:ok, params}
+      :error ->
+        {:ok, params}
+
+      {:ok, nil} ->
+        {:ok, params}
+
       {:ok, value} ->
         case parse_datetime(value) do
           {:ok, datetime} -> {:ok, Map.put(params, key, datetime)}

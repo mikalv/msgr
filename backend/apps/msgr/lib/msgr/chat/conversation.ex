@@ -13,6 +13,7 @@ defmodule Messngr.Chat.Conversation do
   schema "conversations" do
     field :topic, :string
     field :kind, Ecto.Enum, values: [:direct, :group, :channel], default: :direct
+
     field :structure_type, Ecto.Enum,
       values: [:family, :business, :friends, :project, :other],
       default: nil

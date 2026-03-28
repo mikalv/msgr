@@ -37,8 +37,17 @@ defmodule MessngrWeb.TeamProfileController do
 
       profile ->
         attrs = %{}
-        attrs = if params["display_name"], do: Map.put(attrs, :display_name, params["display_name"]), else: attrs
-        attrs = if params["avatar_url"], do: Map.put(attrs, :avatar_url, params["avatar_url"]), else: attrs
+
+        attrs =
+          if params["display_name"],
+            do: Map.put(attrs, :display_name, params["display_name"]),
+            else: attrs
+
+        attrs =
+          if params["avatar_url"],
+            do: Map.put(attrs, :avatar_url, params["avatar_url"]),
+            else: attrs
+
         attrs = if params["email"], do: Map.put(attrs, :email, params["email"]), else: attrs
         attrs = if params["phone"], do: Map.put(attrs, :phone, params["phone"]), else: attrs
 

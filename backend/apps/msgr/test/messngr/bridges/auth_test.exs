@@ -49,6 +49,7 @@ defmodule Messngr.Bridges.AuthTest do
       assert is_map(plan)
       assert plan["kind"] == "embedded_browser"
       assert is_list(plan["steps"])
+
       assert Enum.any?(plan["steps"], fn step -> step["action"] == "resource_specific_consent" end)
     end
 
@@ -91,7 +92,9 @@ defmodule Messngr.Bridges.AuthTest do
       %URI{query: query} = URI.parse(redirect_url)
       params = URI.decode_query(query)
 
-      assert {:ok, updated, %{credential_ref: ref}} = Auth.complete_oauth_callback(session, params)
+      assert {:ok, updated, %{credential_ref: ref}} =
+               Auth.complete_oauth_callback(session, params)
+
       assert updated.state == "completing"
       assert updated.metadata["oauth"]["credential_ref"] == ref
 

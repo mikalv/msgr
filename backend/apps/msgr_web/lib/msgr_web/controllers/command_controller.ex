@@ -103,15 +103,16 @@ defmodule MessngrWeb.CommandController do
       end
 
     json(conn, %{
-      data: Enum.map(commands, fn cmd ->
-        %{
-          name: cmd.name,
-          description: cmd.description,
-          permissions: cmd.permissions,
-          app_slug: cmd.app_slug,
-          app_name: cmd.app_name
-        }
-      end)
+      data:
+        Enum.map(commands, fn cmd ->
+          %{
+            name: cmd.name,
+            description: cmd.description,
+            permissions: cmd.permissions,
+            app_slug: cmd.app_slug,
+            app_name: cmd.app_name
+          }
+        end)
     })
   end
 
@@ -120,10 +121,11 @@ defmodule MessngrWeb.CommandController do
   defp dispatch_command(%{executor_type: "builtin"} = _app, slash_command, command, context) do
     case executor_for_builtin(slash_command.name) do
       nil ->
-        {:ok, %{
-          type: :message,
-          content: "Kommando /#{slash_command.name} er ikke implementert ennå"
-        }}
+        {:ok,
+         %{
+           type: :message,
+           content: "Kommando /#{slash_command.name} er ikke implementert ennå"
+         }}
 
       executor ->
         executor.execute(command, context)
@@ -135,20 +137,22 @@ defmodule MessngrWeb.CommandController do
   end
 
   defp dispatch_command(%{executor_type: "webhook"} = _app, slash_command, _command, _context) do
-    {:ok, %{
-      message: "Webhook-kommando /#{slash_command.name} sendt",
-      command: slash_command.name,
-      executor: "webhook",
-      status: "dispatched"
-    }}
+    {:ok,
+     %{
+       message: "Webhook-kommando /#{slash_command.name} sendt",
+       command: slash_command.name,
+       executor: "webhook",
+       status: "dispatched"
+     }}
   end
 
   defp dispatch_command(_app, slash_command, _command, _context) do
-    {:ok, %{
-      message: "Kommando /#{slash_command.name} er ikke implementert ennå",
-      command: slash_command.name,
-      executor: "unknown"
-    }}
+    {:ok,
+     %{
+       message: "Kommando /#{slash_command.name} er ikke implementert ennå",
+       command: slash_command.name,
+       executor: "unknown"
+     }}
   end
 
   # ── Built-in executor routing ──────────────────────────────────
@@ -164,7 +168,11 @@ defmodule MessngrWeb.CommandController do
   # ── Side effects ───────────────────────────────────────────────
 
   # Handle :update_topic by updating the channel and converting to a message result.
-  defp apply_side_effects({:ok, %{type: :update_topic, topic: topic} = result}, prefix, channel_id) do
+  defp apply_side_effects(
+         {:ok, %{type: :update_topic, topic: topic} = result},
+         prefix,
+         channel_id
+       ) do
     case Teams.Channels.update_topic(prefix, channel_id, topic) do
       {:ok, _channel} ->
         {:ok, %{type: :message, content: result.content}}

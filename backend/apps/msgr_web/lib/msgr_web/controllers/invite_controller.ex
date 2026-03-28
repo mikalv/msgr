@@ -22,10 +22,12 @@ defmodule MessngrWeb.InviteController do
         case TeamManagement.member?(team.id, account.id) do
           true ->
             # Already a member — just return team info
-            json(conn, %{data: %{
-              team: team_json(team),
-              already_member: true
-            }})
+            json(conn, %{
+              data: %{
+                team: team_json(team),
+                already_member: true
+              }
+            })
 
           false ->
             case TeamManagement.join_team(team, account.id, %{
@@ -33,18 +35,24 @@ defmodule MessngrWeb.InviteController do
                  }) do
               {:ok, result} ->
                 InviteLink.increment_used_count(link)
-                Logger.info("Invite redeemed: account=#{account.id} team=#{team.slug} code=#{link.code}")
+
+                Logger.info(
+                  "Invite redeemed: account=#{account.id} team=#{team.slug} code=#{link.code}"
+                )
 
                 conn
                 |> put_status(:created)
-                |> json(%{data: %{
-                  team: team_json(team),
-                  profile_id: result.profile.id,
-                  already_member: false
-                }})
+                |> json(%{
+                  data: %{
+                    team: team_json(team),
+                    profile_id: result.profile.id,
+                    already_member: false
+                  }
+                })
 
               {:error, reason} ->
                 Logger.warning("Invite join failed: #{inspect(reason)}")
+
                 conn
                 |> put_status(:unprocessable_entity)
                 |> json(%{error: "Failed to join team"})

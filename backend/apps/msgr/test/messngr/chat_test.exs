@@ -17,7 +17,10 @@ defmodule Messngr.ChatTest do
     {:ok, %{profile_a: profile_a, profile_b: profile_b}}
   end
 
-  test "ensure_direct_conversation/2 creates conversation", %{profile_a: profile_a, profile_b: profile_b} do
+  test "ensure_direct_conversation/2 creates conversation", %{
+    profile_a: profile_a,
+    profile_b: profile_b
+  } do
     assert {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
     assert conversation.kind == :direct
     assert conversation.visibility == :private
@@ -25,7 +28,10 @@ defmodule Messngr.ChatTest do
     assert Enum.count(conversation.participants) == 2
   end
 
-  test "create_group_conversation/3 creates group with owner", %{profile_a: profile_a, profile_b: profile_b} do
+  test "create_group_conversation/3 creates group with owner", %{
+    profile_a: profile_a,
+    profile_b: profile_b
+  } do
     {:ok, account_c} = Accounts.create_account(%{"display_name" => "Per"})
     profile_c = List.first(account_c.profiles)
 
@@ -45,7 +51,10 @@ defmodule Messngr.ChatTest do
     assert owner.profile.id == profile_a.id
   end
 
-  test "create_channel_conversation/2 creates channel with members", %{profile_a: profile_a, profile_b: profile_b} do
+  test "create_channel_conversation/2 creates channel with members", %{
+    profile_a: profile_a,
+    profile_b: profile_b
+  } do
     assert {:ok, conversation} =
              Chat.create_channel_conversation(profile_a.id, %{
                "topic" => "Announcements",
@@ -56,10 +65,17 @@ defmodule Messngr.ChatTest do
     assert conversation.topic == "Announcements"
     assert conversation.structure_type == :project
     assert conversation.visibility == :team
-    assert Enum.any?(conversation.participants, &(&1.role == :member && &1.profile.id == profile_b.id))
+
+    assert Enum.any?(
+             conversation.participants,
+             &(&1.role == :member && &1.profile.id == profile_b.id)
+           )
   end
 
-  test "create_channel_conversation/2 supports private visibility", %{profile_a: profile_a, profile_b: profile_b} do
+  test "create_channel_conversation/2 supports private visibility", %{
+    profile_a: profile_a,
+    profile_b: profile_b
+  } do
     assert {:ok, conversation} =
              Chat.create_channel_conversation(profile_a.id, %{
                "topic" => "Secret",
@@ -72,9 +88,14 @@ defmodule Messngr.ChatTest do
     assert conversation.structure_type == :business
   end
 
-  test "create_group_conversation/3 defaults structure type when missing", %{profile_a: profile_a, profile_b: profile_b} do
+  test "create_group_conversation/3 defaults structure type when missing", %{
+    profile_a: profile_a,
+    profile_b: profile_b
+  } do
     assert {:ok, conversation} =
-             Chat.create_group_conversation(profile_a.id, [profile_b.id], %{"topic" => "Afterwork"})
+             Chat.create_group_conversation(profile_a.id, [profile_b.id], %{
+               "topic" => "Afterwork"
+             })
 
     assert conversation.structure_type == :friends
   end
@@ -114,7 +135,10 @@ defmodule Messngr.ChatTest do
     refute page.meta.has_more.after
   end
 
-  test "send_message/3 attaches audio payload with caption metadata", %{profile_a: profile_a, profile_b: profile_b} do
+  test "send_message/3 attaches audio payload with caption metadata", %{
+    profile_a: profile_a,
+    profile_b: profile_b
+  } do
     {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
 
     {:ok, upload, _instructions} =
@@ -148,12 +172,17 @@ defmodule Messngr.ChatTest do
     assert message.payload["media"]["durationMs"] == 1500
     assert message.payload["media"]["contentType"] == "audio/mpeg"
     assert message.payload["media"]["waveform"] == [0, 50, 100]
+
     assert %{"url" => "https://cdn/thumb.jpg", "width" => 120, "height" => 80} =
              message.payload["media"]["thumbnail"]
+
     assert %Upload{status: :consumed} = Repo.get!(Upload, upload.id)
   end
 
-  test "send_message/3 validates media payload for images", %{profile_a: profile_a, profile_b: profile_b} do
+  test "send_message/3 validates media payload for images", %{
+    profile_a: profile_a,
+    profile_b: profile_b
+  } do
     {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
 
     {:ok, upload, _} =
@@ -179,7 +208,11 @@ defmodule Messngr.ChatTest do
                  "caption" => "Skisse",
                  "width" => 800,
                  "height" => 600,
-                 "thumbnail" => %{"url" => "https://cdn/thumb.jpg", "width" => 200, "height" => 150}
+                 "thumbnail" => %{
+                   "url" => "https://cdn/thumb.jpg",
+                   "width" => 200,
+                   "height" => 150
+                 }
                }
              })
 
@@ -189,7 +222,10 @@ defmodule Messngr.ChatTest do
     assert message.payload["media"]["thumbnail"]["width"] == 200
   end
 
-  test "send_message/3 validates audio waveform samples", %{profile_a: profile_a, profile_b: profile_b} do
+  test "send_message/3 validates audio waveform samples", %{
+    profile_a: profile_a,
+    profile_b: profile_b
+  } do
     {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
 
     {:ok, upload, _} =
@@ -211,7 +247,10 @@ defmodule Messngr.ChatTest do
     assert %{payload: ["waveform must be <=512 samples between 0 and 100"]} = errors_on(changeset)
   end
 
-  test "send_message/3 validates thumbnail structure", %{profile_a: profile_a, profile_b: profile_b} do
+  test "send_message/3 validates thumbnail structure", %{
+    profile_a: profile_a,
+    profile_b: profile_b
+  } do
     {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
 
     {:ok, upload, _} =
@@ -295,7 +334,9 @@ defmodule Messngr.ChatTest do
       :ok = Chat.subscribe_to_conversation(conversation.id)
 
       assert {:ok, pinned} =
-               Chat.pin_message(conversation.id, author.id, message.id, %{"metadata" => %{"section" => "important"}})
+               Chat.pin_message(conversation.id, author.id, message.id, %{
+                 "metadata" => %{"section" => "important"}
+               })
 
       assert pinned.pinned_by_id == author.id
       assert pinned.metadata == %{"section" => "important"}
@@ -449,7 +490,9 @@ defmodule Messngr.ChatTest do
       :ok = Chat.subscribe_to_conversation(conversation.id)
 
       assert {:ok, updated} =
-               Chat.update_message(conversation.id, author.id, message.id, %{"body" => "Oppdatert"})
+               Chat.update_message(conversation.id, author.id, message.id, %{
+                 "body" => "Oppdatert"
+               })
 
       assert updated.body == "Oppdatert"
       assert updated.edited_at
@@ -476,7 +519,10 @@ defmodule Messngr.ChatTest do
     end
   end
 
-  test "list_conversations/2 includes unread counts and last message", %{profile_a: profile_a, profile_b: profile_b} do
+  test "list_conversations/2 includes unread counts and last message", %{
+    profile_a: profile_a,
+    profile_b: profile_b
+  } do
     {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
 
     {:ok, _} = Chat.send_message(conversation.id, profile_a.id, %{"body" => "Hei"})
@@ -542,7 +588,10 @@ defmodule Messngr.ChatTest do
     assert payload.watchers == []
   end
 
-  test "purge_stale_watchers removes expired watchers and broadcasts", %{profile_a: profile_a, profile_b: profile_b} do
+  test "purge_stale_watchers removes expired watchers and broadcasts", %{
+    profile_a: profile_a,
+    profile_b: profile_b
+  } do
     {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
 
     previous_ttl = Application.get_env(:msgr, :conversation_watcher_ttl_ms)
@@ -567,7 +616,10 @@ defmodule Messngr.ChatTest do
     assert_receive {:conversation_watchers, %{count: 0, watchers: []}}
   end
 
-  test "around_id/3 falls back when the pivot message is missing", %{profile_a: profile_a, profile_b: profile_b} do
+  test "around_id/3 falls back when the pivot message is missing", %{
+    profile_a: profile_a,
+    profile_b: profile_b
+  } do
     {:ok, conversation} = Chat.ensure_direct_conversation(profile_a.id, profile_b.id)
 
     {:ok, message} = Chat.send_message(conversation.id, profile_a.id, %{"body" => "first"})

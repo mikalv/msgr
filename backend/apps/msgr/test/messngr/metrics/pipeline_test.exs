@@ -13,7 +13,10 @@ defmodule Messngr.Metrics.PipelineTest do
     end
 
     def record(metric, measurement, metadata) do
-      Agent.update(__MODULE__, fn acc -> [%{metric: metric, measurement: measurement, metadata: metadata} | acc] end)
+      Agent.update(__MODULE__, fn acc ->
+        [%{metric: metric, measurement: measurement, metadata: metadata} | acc]
+      end)
+
       :ok
     end
 

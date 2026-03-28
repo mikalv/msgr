@@ -21,7 +21,6 @@ defmodule MessngrWeb.UserSocket do
   # See the [`Channels guide`](https://hexdocs.pm/phoenix/channels.html)
   # for further details.
 
-
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After
   # verification, you can put default assigns into
@@ -37,7 +36,8 @@ defmodule MessngrWeb.UserSocket do
   # See `Phoenix.Token` documentation for examples in
   # performing token verification on connect.
   @impl true
-  def connect(%{"token" => token} = params, socket, _connect_info) when is_binary(token) and token != "" do
+  def connect(%{"token" => token} = params, socket, _connect_info)
+      when is_binary(token) and token != "" do
     # JWT-based authentication
     Logger.debug("WebSocket connection attempt via JWT")
 
@@ -47,10 +47,11 @@ defmodule MessngrWeb.UserSocket do
         profile_id = claims["pid"]
 
         with account when not is_nil(account) <- load_account(account_id) do
-          profile = case validate_uuid(profile_id, "profile_id") do
-            {:ok, pid} -> load_profile(pid, account)
-            _ -> nil
-          end
+          profile =
+            case validate_uuid(profile_id, "profile_id") do
+              {:ok, pid} -> load_profile(pid, account)
+              _ -> nil
+            end
 
           socket =
             socket
@@ -94,12 +95,12 @@ defmodule MessngrWeb.UserSocket do
 
     with {:ok, account_id} <- validate_uuid(account_id, "account_id"),
          account when not is_nil(account) <- load_account(account_id) do
-
       # Profile is optional at connect time — team profile is resolved per-channel join
-      profile = case validate_uuid(profile_id, "profile_id") do
-        {:ok, pid} -> load_profile(pid, account)
-        _ -> nil
-      end
+      profile =
+        case validate_uuid(profile_id, "profile_id") do
+          {:ok, pid} -> load_profile(pid, account)
+          _ -> nil
+        end
 
       socket =
         socket

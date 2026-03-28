@@ -8,6 +8,7 @@ defmodule Messngr.Chat do
   alias Phoenix.PubSub
 
   alias Messngr.{Accounts, Media, Repo, Retry}
+
   alias Messngr.Chat.{
     Conversation,
     Message,
@@ -16,6 +17,7 @@ defmodule Messngr.Chat do
     Participant,
     PinnedMessage
   }
+
   alias Messngr.Accounts.{Account, Device, Profile}
 
   @conversation_topic_prefix "conversation"
@@ -24,7 +26,8 @@ defmodule Messngr.Chat do
           {:ok, Conversation.t()} | {:error, Ecto.Changeset.t()} | {:error, term()}
   def create_direct_conversation(profile_a_id, profile_b_id) do
     Repo.transaction(fn ->
-      with {:ok, conversation} <- %Conversation{} |> Conversation.changeset(%{kind: :direct}) |> Repo.insert(),
+      with {:ok, conversation} <-
+             %Conversation{} |> Conversation.changeset(%{kind: :direct}) |> Repo.insert(),
            {:ok, _} <- add_participant(conversation, profile_a_id, :owner),
            {:ok, _} <- add_participant(conversation, profile_b_id, :member) do
         preload_conversation(conversation.id)
@@ -70,18 +73,36 @@ defmodule Messngr.Chat do
           {:ok, Participant.t()} | {:error, Ecto.Changeset.t()}
   def add_participant(%Conversation{id: conversation_id}, profile_id, role \\ :member) do
     %Participant{}
-    |> Participant.changeset(%{conversation_id: conversation_id, profile_id: profile_id, role: role})
+    |> Participant.changeset(%{
+      conversation_id: conversation_id,
+      profile_id: profile_id,
+      role: role
+    })
     |> Repo.insert()
   end
 
-  @spec send_message(binary(), binary(), map()) :: {:ok, Message.t()} | {:error, Ecto.Changeset.t()} | {:error, term()}
-  @message_kinds [:text, :markdown, :code, :system, :image, :video, :audio, :voice, :file, :thumbnail, :location]
+  @spec send_message(binary(), binary(), map()) ::
+          {:ok, Message.t()} | {:error, Ecto.Changeset.t()} | {:error, term()}
+  @message_kinds [
+    :text,
+    :markdown,
+    :code,
+    :system,
+    :image,
+    :video,
+    :audio,
+    :voice,
+    :file,
+    :thumbnail,
+    :location
+  ]
 
   def send_message(conversation_id, profile_id, attrs) do
     Repo.transaction(fn ->
       _participant = ensure_participant!(conversation_id, profile_id)
 
       kind = resolve_kind(attrs)
+
       {media_payload, sanitized_attrs} =
         maybe_resolve_media(kind, conversation_id, profile_id, attrs)
 
@@ -100,14 +121,18 @@ defmodule Messngr.Chat do
         {:ok, message} ->
           :ok = ensure_pending_receipts(message, conversation_id, profile_id)
           Repo.preload(message, [:profile, receipts: [:recipient, :device]])
-        {:error, reason} -> Repo.rollback(reason)
+
+        {:error, reason} ->
+          Repo.rollback(reason)
       end
     end)
     |> case do
-        {:ok, message} ->
-          broadcast_message(message)
-          {:ok, message}
-        {:error, reason} -> {:error, reason}
+      {:ok, message} ->
+        broadcast_message(message)
+        {:ok, message}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -271,7 +296,8 @@ defmodule Messngr.Chat do
 
           {updated, message, read_at, receipt, message_info, allow_receipts?}
 
-        {:error, reason} -> Repo.rollback(reason)
+        {:error, reason} ->
+          Repo.rollback(reason)
       end
     end)
     |> case do
@@ -320,7 +346,8 @@ defmodule Messngr.Chat do
 
           {updated_receipt, delivered_at, message_info}
 
-        {:error, reason} -> Repo.rollback(reason)
+        {:error, reason} ->
+          Repo.rollback(reason)
       end
     end)
     |> case do
@@ -461,7 +488,10 @@ defmodule Messngr.Chat do
       |> Enum.reverse()
       |> Repo.preload([:profile, receipts: [:recipient, :device]])
 
-    %{entries: entries, meta: build_meta(conversation_id, entries, pivot, :before, has_more_before)}
+    %{
+      entries: entries,
+      meta: build_meta(conversation_id, entries, pivot, :before, has_more_before)
+    }
   end
 
   defp list_messages_after(_conversation_id, _after_id, limit)
@@ -522,7 +552,8 @@ defmodule Messngr.Chat do
               before_page.meta.has_more.before ||
                 has_more(conversation_id, List.first(entries), :before),
             after:
-              after_page.meta.has_more.after || has_more(conversation_id, List.last(entries), :after)
+              after_page.meta.has_more.after ||
+                has_more(conversation_id, List.last(entries), :after)
           }
         }
 
@@ -644,7 +675,10 @@ defmodule Messngr.Chat do
   defp cursor_id(%Message{id: id}), do: id
 
   defp empty_page do
-    %{entries: [], meta: %{start_cursor: nil, end_cursor: nil, has_more: %{before: false, after: false}}}
+    %{
+      entries: [],
+      meta: %{start_cursor: nil, end_cursor: nil, has_more: %{before: false, after: false}}
+    }
   end
 
   @spec list_conversations(binary(), keyword()) :: %{entries: [Conversation.t()], meta: map()}
@@ -728,7 +762,8 @@ defmodule Messngr.Chat do
     )
   end
 
-  @spec ensure_direct_conversation(binary(), binary()) :: {:ok, Conversation.t()} | {:error, term()}
+  @spec ensure_direct_conversation(binary(), binary()) ::
+          {:ok, Conversation.t()} | {:error, term()}
   def ensure_direct_conversation(profile_a_id, profile_b_id) do
     case conversation_for_profiles(profile_a_id, profile_b_id) do
       nil -> create_direct_conversation(profile_a_id, profile_b_id)
@@ -821,10 +856,11 @@ defmodule Messngr.Chat do
 
         filtered =
           query
-          |> where([
-            c,
-            _cp
-          ],
+          |> where(
+            [
+              c,
+              _cp
+            ],
             fragment("COALESCE(?, ?) < ?", c.updated_at, c.inserted_at, ^cutoff) or
               (fragment("COALESCE(?, ?) = ?", c.updated_at, c.inserted_at, ^cutoff) and
                  c.id < ^conversation.id)
@@ -865,8 +901,7 @@ defmodule Messngr.Chat do
     unread_count =
       from(m in Message,
         where: m.conversation_id == ^conversation.id,
-        where:
-          is_nil(^last_read_at) or m.inserted_at > ^last_read_at
+        where: is_nil(^last_read_at) or m.inserted_at > ^last_read_at
       )
       |> Repo.aggregate(:count, :id)
 
@@ -885,7 +920,8 @@ defmodule Messngr.Chat do
       where: cp.profile_id == ^profile_id,
       where:
         fragment("COALESCE(?, ?) > ?", c.updated_at, c.inserted_at, ^cutoff) or
-          (fragment("COALESCE(?, ?) = ?", c.updated_at, c.inserted_at, ^cutoff) and c.id > ^pivot.id),
+          (fragment("COALESCE(?, ?) = ?", c.updated_at, c.inserted_at, ^cutoff) and
+             c.id > ^pivot.id),
       select: 1,
       limit: 1
     )
@@ -900,7 +936,8 @@ defmodule Messngr.Chat do
       where: cp.profile_id == ^profile_id,
       where:
         fragment("COALESCE(?, ?) < ?", c.updated_at, c.inserted_at, ^cutoff) or
-          (fragment("COALESCE(?, ?) = ?", c.updated_at, c.inserted_at, ^cutoff) and c.id < ^pivot.id),
+          (fragment("COALESCE(?, ?) = ?", c.updated_at, c.inserted_at, ^cutoff) and
+             c.id < ^pivot.id),
       select: 1,
       limit: 1
     )
@@ -911,7 +948,13 @@ defmodule Messngr.Chat do
     case :ets.whereis(@watcher_table) do
       :undefined ->
         try do
-          :ets.new(@watcher_table, [:named_table, :bag, :public, read_concurrency: true, write_concurrency: true])
+          :ets.new(@watcher_table, [
+            :named_table,
+            :bag,
+            :public,
+            read_concurrency: true,
+            write_concurrency: true
+          ])
         rescue
           ArgumentError -> :ets.whereis(@watcher_table)
         end
@@ -975,7 +1018,8 @@ defmodule Messngr.Chat do
   Removes expired watcher entries across all conversations and broadcasts
   updated watcher payloads when changes occur.
   """
-  @spec purge_stale_watchers() :: {:ok, %{conversations: non_neg_integer(), watchers: non_neg_integer()}}
+  @spec purge_stale_watchers() ::
+          {:ok, %{conversations: non_neg_integer(), watchers: non_neg_integer()}}
   def purge_stale_watchers do
     table = ensure_watcher_table!()
     ttl = watcher_ttl_ms()
@@ -1002,7 +1046,8 @@ defmodule Messngr.Chat do
       broadcast_watchers(conversation_id, payload)
     end)
 
-    watchers_removed = Enum.reduce(removed, 0, fn {_conversation_id, count}, acc -> acc + count end)
+    watchers_removed =
+      Enum.reduce(removed, 0, fn {_conversation_id, count}, acc -> acc + count end)
 
     {:ok, %{conversations: map_size(removed), watchers: watchers_removed}}
   end
@@ -1042,14 +1087,17 @@ defmodule Messngr.Chat do
 
   defp watcher_ttl_ms do
     case Application.get_env(:msgr, :conversation_watcher_ttl_ms, 30_000) do
-      value when is_integer(value) and value >= 0 -> value
+      value when is_integer(value) and value >= 0 ->
+        value
+
       value when is_binary(value) ->
         case Integer.parse(value) do
           {int, _} when int >= 0 -> int
           _ -> 30_000
         end
 
-      _ -> 30_000
+      _ ->
+        30_000
     end
   end
 
@@ -1073,7 +1121,6 @@ defmodule Messngr.Chat do
     end
   end
 
-
   defp resolve_kind(attrs) do
     attrs
     |> Map.get("kind")
@@ -1096,6 +1143,7 @@ defmodule Messngr.Chat do
   defp create_structured_conversation(kind, owner_profile_id, participant_ids, attrs) do
     owner_profile_id = to_string(owner_profile_id)
     topic = attrs |> Map.get("topic") |> Kernel.||(Map.get(attrs, :topic))
+
     structure_type =
       attrs
       |> Map.get("structure_type")
@@ -1124,7 +1172,8 @@ defmodule Messngr.Chat do
     member_ids = normalize_participant_ids(participant_ids, owner_profile_id)
 
     Repo.transaction(fn ->
-      with {:ok, conversation} <- %Conversation{} |> Conversation.changeset(conversation_attrs) |> Repo.insert(),
+      with {:ok, conversation} <-
+             %Conversation{} |> Conversation.changeset(conversation_attrs) |> Repo.insert(),
            {:ok, _owner} <- add_participant(conversation, owner_profile_id, :owner),
            {:ok, _members} <- add_members(conversation, member_ids) do
         preload_conversation(conversation.id)
@@ -1163,12 +1212,15 @@ defmodule Messngr.Chat do
   defp maybe_put_topic(attrs, topic), do: Map.put(attrs, :topic, topic)
 
   defp maybe_put_structure_type(attrs, nil), do: attrs
-  defp maybe_put_structure_type(attrs, structure_type), do: Map.put(attrs, :structure_type, structure_type)
+
+  defp maybe_put_structure_type(attrs, structure_type),
+    do: Map.put(attrs, :structure_type, structure_type)
 
   defp normalize_structure_type(nil, default), do: default
 
-  defp normalize_structure_type(value, _default) when value in [:family, :business, :friends, :project, :other],
-    do: value
+  defp normalize_structure_type(value, _default)
+       when value in [:family, :business, :friends, :project, :other],
+       do: value
 
   defp normalize_structure_type(value, default) when is_binary(value) do
     normalized = String.downcase(value)
@@ -1267,7 +1319,8 @@ defmodule Messngr.Chat do
 
           {normalized_payload, sanitized}
 
-        {:error, reason} -> Repo.rollback(reason)
+        {:error, reason} ->
+          Repo.rollback(reason)
       end
     else
       Repo.rollback(:missing_media_upload)
@@ -1341,7 +1394,9 @@ defmodule Messngr.Chat do
     end
   end
 
-  defp normalize_waveform_media_point(value) when is_number(value), do: clamp(round(value), 0, 100)
+  defp normalize_waveform_media_point(value) when is_number(value),
+    do: clamp(round(value), 0, 100)
+
   defp normalize_waveform_media_point(_), do: nil
 
   defp maybe_put_waveform(media, nil), do: Map.delete(media, "waveform")
@@ -1351,6 +1406,7 @@ defmodule Messngr.Chat do
       waveform
       |> Enum.filter(&is_integer/1)
       |> Enum.take(512)
+
     if clean == [] do
       Map.delete(media, "waveform")
     else
@@ -1359,16 +1415,19 @@ defmodule Messngr.Chat do
   end
 
   defp maybe_put_string(map, _key, nil), do: map
+
   defp maybe_put_string(map, key, value) when is_binary(value) and value != "" do
     Map.put(map, key, value)
   end
+
   defp maybe_put_string(map, key, _value), do: Map.delete(map, key)
 
   defp maybe_put_map(map, _key, nil), do: map
   defp maybe_put_map(map, key, value) when is_map(value), do: Map.put(map, key, value)
   defp maybe_put_map(map, key, _), do: Map.delete(map, key)
 
-  defp maybe_put_media_body(payload, kind, caption) when kind in [:image, :video, :audio, :voice, :file] do
+  defp maybe_put_media_body(payload, kind, caption)
+       when kind in [:image, :video, :audio, :voice, :file] do
     if caption && caption != "" do
       Map.put(payload, "body", caption)
     else
@@ -1429,7 +1488,9 @@ defmodule Messngr.Chat do
 
   defp maybe_attach_dimensions(map, media) do
     case fetch_dimensions(media) do
-      {nil, nil} -> map
+      {nil, nil} ->
+        map
+
       {width, height} ->
         map
         |> Map.put_new("width", width)
@@ -1439,12 +1500,20 @@ defmodule Messngr.Chat do
 
   defp fetch_dimensions(media) do
     direct_width = normalize_positive_integer(Map.get(media, "width") || Map.get(media, :width))
-    direct_height = normalize_positive_integer(Map.get(media, "height") || Map.get(media, :height))
+
+    direct_height =
+      normalize_positive_integer(Map.get(media, "height") || Map.get(media, :height))
 
     case Map.get(media, "dimensions") || Map.get(media, :dimensions) do
       %{} = dims ->
-        width = direct_width || normalize_positive_integer(Map.get(dims, "width") || Map.get(dims, :width))
-        height = direct_height || normalize_positive_integer(Map.get(dims, "height") || Map.get(dims, :height))
+        width =
+          direct_width ||
+            normalize_positive_integer(Map.get(dims, "width") || Map.get(dims, :width))
+
+        height =
+          direct_height ||
+            normalize_positive_integer(Map.get(dims, "height") || Map.get(dims, :height))
+
         {width, height}
 
       _ ->
@@ -1459,7 +1528,8 @@ defmodule Messngr.Chat do
     end
   end
 
-  defp normalize_media_entry(_kind, key, value) when key in ["checksum", :checksum, "hash", :hash] do
+  defp normalize_media_entry(_kind, key, value)
+       when key in ["checksum", :checksum, "hash", :hash] do
     case normalize_checksum(value) do
       nil -> :skip
       checksum -> {"checksum", checksum}
@@ -1473,7 +1543,8 @@ defmodule Messngr.Chat do
     end
   end
 
-  defp normalize_media_entry(_kind, key, value) when key in ["durationMs", :durationMs, "duration_ms", :duration_ms] do
+  defp normalize_media_entry(_kind, key, value)
+       when key in ["durationMs", :durationMs, "duration_ms", :duration_ms] do
     case normalize_duration_ms(value) do
       nil -> :skip
       duration_ms -> {"durationMs", duration_ms}
@@ -1494,7 +1565,8 @@ defmodule Messngr.Chat do
     end
   end
 
-  defp normalize_media_entry(_kind, key, value) when key in ["waveformSampleRate", :waveformSampleRate] do
+  defp normalize_media_entry(_kind, key, value)
+       when key in ["waveformSampleRate", :waveformSampleRate] do
     case normalize_positive_integer(value) do
       nil -> :skip
       rate -> {"waveformSampleRate", rate}
@@ -1521,7 +1593,8 @@ defmodule Messngr.Chat do
     end
   end
 
-  defp normalize_media_entry(_kind, key, value) when key in ["width", :width, "height", :height] do
+  defp normalize_media_entry(_kind, key, value)
+       when key in ["width", :width, "height", :height] do
     # Dimensions handled separately to support nested maps.
     case normalize_positive_integer(value) do
       nil -> :skip
@@ -1569,7 +1642,10 @@ defmodule Messngr.Chat do
   end
 
   defp normalize_duration_ms(value) when is_integer(value) and value > 0, do: value
-  defp normalize_duration_ms(value) when is_float(value) and value > 0, do: trunc(Float.round(value))
+
+  defp normalize_duration_ms(value) when is_float(value) and value > 0,
+    do: trunc(Float.round(value))
+
   defp normalize_duration_ms(_), do: nil
 
   defp normalize_checksum(value) when is_binary(value) do
@@ -1626,14 +1702,16 @@ defmodule Messngr.Chat do
 
   defp normalize_thumbnail(_), do: nil
 
-  defp normalize_thumbnail_entry(key, value) when key in ["bucket", :bucket, "bucketName", :bucketName] do
+  defp normalize_thumbnail_entry(key, value)
+       when key in ["bucket", :bucket, "bucketName", :bucketName] do
     case normalize_string(value, 1, 200) do
       nil -> :skip
       bucket -> {"bucket", bucket}
     end
   end
 
-  defp normalize_thumbnail_entry(key, value) when key in ["objectKey", :objectKey, "object_key", :object_key] do
+  defp normalize_thumbnail_entry(key, value)
+       when key in ["objectKey", :objectKey, "object_key", :object_key] do
     case normalize_string(value, 1, 500) do
       nil -> :skip
       object_key -> {"objectKey", object_key}
@@ -1654,7 +1732,8 @@ defmodule Messngr.Chat do
     end
   end
 
-  defp normalize_thumbnail_entry(key, value) when key in ["contentType", :contentType, "mimeType", :mimeType] do
+  defp normalize_thumbnail_entry(key, value)
+       when key in ["contentType", :contentType, "mimeType", :mimeType] do
     case normalize_string(value, 3, 256) do
       nil -> :skip
       mime -> {"contentType", mime}
@@ -1689,6 +1768,7 @@ defmodule Messngr.Chat do
   end
 
   defp normalize_positive_integer(_), do: nil
+
   defp fetch_message!(conversation_id, message_id) do
     case Repo.get_by(Message, id: message_id, conversation_id: conversation_id) do
       %Message{deleted_at: nil} = message -> message
@@ -1724,7 +1804,9 @@ defmodule Messngr.Chat do
       )
 
     case recipient_ids do
-      [] -> :ok
+      [] ->
+        :ok
+
       ids ->
         now = DateTime.utc_now()
 
@@ -1752,11 +1834,20 @@ defmodule Messngr.Chat do
 
   defp resolve_receipt_device(%Participant{} = participant, opts) when is_map(opts) do
     cond do
-      match?(%Device{}, opts[:device]) -> ensure_device_owner(opts[:device], participant)
-      device_id = Map.get(opts, :device_id) -> load_device_for_participant(device_id, participant)
-      device_id = Map.get(opts, "device_id") -> load_device_for_participant(device_id, participant)
-      device_id = Map.get(opts, "deviceId") -> load_device_for_participant(device_id, participant)
-      true -> nil
+      match?(%Device{}, opts[:device]) ->
+        ensure_device_owner(opts[:device], participant)
+
+      device_id = Map.get(opts, :device_id) ->
+        load_device_for_participant(device_id, participant)
+
+      device_id = Map.get(opts, "device_id") ->
+        load_device_for_participant(device_id, participant)
+
+      device_id = Map.get(opts, "deviceId") ->
+        load_device_for_participant(device_id, participant)
+
+      true ->
+        nil
     end
   end
 
@@ -1765,7 +1856,8 @@ defmodule Messngr.Chat do
       is_binary(device.profile_id) and device.profile_id != participant.profile_id ->
         Repo.rollback(:invalid_device)
 
-      true -> device
+      true ->
+        device
     end
   end
 
@@ -1812,7 +1904,8 @@ defmodule Messngr.Chat do
              maybe_update_message_status(message)
              |> Map.put(:conversation_id, message.conversation_id)}
 
-          {:error, reason} -> Repo.rollback(reason)
+          {:error, reason} ->
+            Repo.rollback(reason)
         end
     end
   end
@@ -1858,7 +1951,11 @@ defmodule Messngr.Chat do
     end
   end
 
-  defp maybe_broadcast_message_status(%{status_changed?: true, message_id: message_id, conversation_id: conversation_id}) do
+  defp maybe_broadcast_message_status(%{
+         status_changed?: true,
+         message_id: message_id,
+         conversation_id: conversation_id
+       }) do
     message =
       Message
       |> Repo.get!(message_id)
@@ -1890,21 +1987,29 @@ defmodule Messngr.Chat do
   end
 
   defp broadcast_message_delivered(conversation_id, %MessageReceipt{} = receipt, delivered_at) do
-    broadcast_conversation_event(conversation_id, {:message_delivered, %{
-      profile_id: receipt.recipient_id,
-      message_id: receipt.message_id,
-      delivered_at: delivered_at,
-      device_id: receipt.device_id
-    }})
+    broadcast_conversation_event(
+      conversation_id,
+      {:message_delivered,
+       %{
+         profile_id: receipt.recipient_id,
+         message_id: receipt.message_id,
+         delivered_at: delivered_at,
+         device_id: receipt.device_id
+       }}
+    )
   end
 
   defp broadcast_message_read(conversation_id, profile_id, message_id, read_at, device_id) do
-    broadcast_conversation_event(conversation_id, {:message_read, %{
-      profile_id: profile_id,
-      message_id: message_id,
-      read_at: read_at,
-      device_id: device_id
-    }})
+    broadcast_conversation_event(
+      conversation_id,
+      {:message_read,
+       %{
+         profile_id: profile_id,
+         message_id: message_id,
+         read_at: read_at,
+         device_id: device_id
+       }}
+    )
   end
 
   defp broadcast_conversation_event(conversation_id, event) do

@@ -30,18 +30,26 @@ defmodule MessngrWeb.WebhookController do
         prefix = team.schema_name
 
         # Render message via template engine (supports Liquid templates, presets, and fallback)
-        {text, bot_name} = case Messngr.Webhooks.TemplateEngine.render(params, endpoint.template, endpoint.template_preset) do
-          {:ok, rendered} ->
-            name = params["username"] || params["name"] || endpoint.name
-            {rendered, name}
-          _ ->
-            extract_message(params, endpoint)
-        end
+        {text, bot_name} =
+          case Messngr.Webhooks.TemplateEngine.render(
+                 params,
+                 endpoint.template,
+                 endpoint.template_preset
+               ) do
+            {:ok, rendered} ->
+              name = params["username"] || params["name"] || endpoint.name
+              {rendered, name}
+
+            _ ->
+              extract_message(params, endpoint)
+          end
 
         if text == nil or text == "" do
           conn
           |> put_status(:bad_request)
-          |> json(%{error: "No message content. Send {\"text\": \"...\"} or {\"content\": \"...\"}"})
+          |> json(%{
+            error: "No message content. Send {\"text\": \"...\"} or {\"content\": \"...\"}"
+          })
         else
           # Find or create a bot profile for this webhook
           bot_profile = ensure_bot_profile(prefix, endpoint, bot_name)
@@ -63,7 +71,9 @@ defmodule MessngrWeb.WebhookController do
               # Increment webhook usage counter
               WebhookEndpoint.increment_count(endpoint)
 
-              Logger.info("Webhook message received: team=#{team.slug} channel=#{endpoint.channel_id} webhook=#{endpoint.name}")
+              Logger.info(
+                "Webhook message received: team=#{team.slug} channel=#{endpoint.channel_id} webhook=#{endpoint.name}"
+              )
 
               conn
               |> put_status(:ok)
@@ -71,6 +81,7 @@ defmodule MessngrWeb.WebhookController do
 
             {:error, reason} ->
               Logger.warning("Webhook message creation failed: #{inspect(reason)}")
+
               conn
               |> put_status(:unprocessable_entity)
               |> json(%{error: "Failed to create message"})
@@ -91,6 +102,7 @@ defmodule MessngrWeb.WebhookController do
   end
 
   defp extract_blocks_text(nil), do: nil
+
   defp extract_blocks_text(blocks) when is_list(blocks) do
     # Extract text from Slack blocks (simplified — handles section blocks)
     blocks
@@ -106,6 +118,7 @@ defmodule MessngrWeb.WebhookController do
       text -> text
     end
   end
+
   defp extract_blocks_text(_), do: nil
 
   # --- Bot profile ---
@@ -114,16 +127,19 @@ defmodule MessngrWeb.WebhookController do
     # Look for existing bot profile by webhook name
     import Ecto.Query
 
-    case Teams.Repo.get_by(Teams.TenantModels.Profile,
+    case Teams.Repo.get_by(
+           Teams.TenantModels.Profile,
            [display_name: bot_name, role: "bot"],
-           prefix: prefix) do
+           prefix: prefix
+         ) do
       nil ->
         # Create bot profile (no account_id needed for bots)
-        {:ok, profile} = Teams.TenantModels.Profile.create(prefix, %{
-          display_name: bot_name,
-          role: "bot",
-          avatar_url: endpoint.avatar_url
-        })
+        {:ok, profile} =
+          Teams.TenantModels.Profile.create(prefix, %{
+            display_name: bot_name,
+            role: "bot",
+            avatar_url: endpoint.avatar_url
+          })
 
         # Auto-join the channel
         Teams.TenantModels.ChannelMembership.join(prefix, %{
@@ -150,12 +166,15 @@ defmodule MessngrWeb.WebhookController do
       content: message.content,
       media_refs: message.media_refs || [],
       inserted_at: message.inserted_at,
-      sender_profile: if(message.sender_profile, do: %{
-        id: message.sender_profile.id,
-        display_name: message.sender_profile.display_name,
-        avatar_url: message.sender_profile.avatar_url,
-        role: message.sender_profile.role
-      })
+      sender_profile:
+        if(message.sender_profile,
+          do: %{
+            id: message.sender_profile.id,
+            display_name: message.sender_profile.display_name,
+            avatar_url: message.sender_profile.avatar_url,
+            role: message.sender_profile.role
+          }
+        )
     }
 
     MessngrWeb.Endpoint.broadcast!(

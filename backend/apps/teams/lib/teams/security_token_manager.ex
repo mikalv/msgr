@@ -6,19 +6,20 @@ defmodule SecurityTokenManager do
 
   @security_token_size 20
   @milliseconds_in_second 1000
-  @expires_in_seconds 60 * 15 # 15 minutes
+  # 15 minutes
+  @expires_in_seconds 60 * 15
 
   def format_status(_reason, [pdict, state]) do
     {:ok,
-      [
-        pdict,
-        %{
-          state
-          | access_key: "<sensitive_data>",
-            secret_access: "<sensitive_data>",
-            security_token: "<sensitive_data>"
-        }
-      ]}
+     [
+       pdict,
+       %{
+         state
+         | access_key: "<sensitive_data>",
+           secret_access: "<sensitive_data>",
+           security_token: "<sensitive_data>"
+       }
+     ]}
   end
 
   def start_link do
@@ -79,7 +80,6 @@ defmodule SecurityTokenManager do
     DateTime.utc_now() |> DateTime.add(@expires_in_seconds)
   end
 end
-
 
 defimpl Inspect, for: SecurityTokenManager do
   def inspect(%SecurityTokenManager{} = state, opts) do

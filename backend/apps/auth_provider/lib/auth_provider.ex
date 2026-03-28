@@ -68,7 +68,11 @@ defmodule AuthProvider do
 
   def view do
     quote do
-      use Phoenix.View, root: "lib/auth_provider/controllers/oauth", namespace: AuthProvider, pattern: "**/*"
+      use Phoenix.View,
+        root: "lib/auth_provider/controllers/oauth",
+        namespace: AuthProvider,
+        pattern: "**/*"
+
       # Import convenience functions from controllers
       import Phoenix.Controller, only: [get_csrf_token: 0, view_module: 1]
 
@@ -80,6 +84,7 @@ defmodule AuthProvider do
       import Phoenix.HTML
       import Phoenix.HTML.Form
       use PhoenixHTMLHelpers
+
       # import AuthProvider.Router.Helpers # @note: deprecated, use Route instead (Phoenix 1.4 requirements)
       import Phoenix.LiveView.Helpers
       use Phoenix.VerifiedRoutes, router: AuthProvider.Router, endpoint: AuthProvider.Endpoint

@@ -60,6 +60,7 @@ defmodule MessngrWeb.TeamMessageController do
 
           # Broadcast to team topic (sidebar unread for everyone)
           slug = conn.path_params["slug"]
+
           if slug do
             MessngrWeb.Endpoint.broadcast(
               "team:#{slug}",
@@ -81,14 +82,18 @@ defmodule MessngrWeb.TeamMessageController do
 
           # Unfurl link previews async — updates message content + broadcasts update
           Task.Supervisor.start_child(Messngr.TaskSupervisor, fn ->
-            text = case message.content do
-              %{"text" => t} when is_binary(t) -> t
-              _ -> ""
-            end
+            text =
+              case message.content do
+                %{"text" => t} when is_binary(t) -> t
+                _ -> ""
+              end
+
             previews = Messngr.LinkUnfurl.unfurl_all(text)
+
             if previews != [] do
               updated_content = Map.put(message.content, "link_previews", previews)
               Messages.update_message(prefix, message, %{content: updated_content})
+
               MessngrWeb.Endpoint.broadcast("channel:#{channel_id}", "message:updated", %{
                 id: message.id,
                 content: updated_content
@@ -98,6 +103,7 @@ defmodule MessngrWeb.TeamMessageController do
 
           # Dispatch to subscribed app webhooks (best-effort, async)
           team = conn.assigns.current_team
+
           if team do
             Messngr.Apps.WebhookDispatch.dispatch(team.id, "message:created", %{
               channel_id: channel_id,
@@ -164,7 +170,11 @@ defmodule MessngrWeb.TeamMessageController do
             {:error, :forbidden}
           else
             new_content = params["content"] || %{}
-            case Messages.update_message(prefix, message, %{content: new_content, edited_at: DateTime.utc_now() |> DateTime.truncate(:second)}) do
+
+            case Messages.update_message(prefix, message, %{
+                   content: new_content,
+                   edited_at: DateTime.utc_now() |> DateTime.truncate(:second)
+                 }) do
               {:ok, updated} ->
                 updated = Messages.get_message(prefix, updated.id)
 
@@ -194,7 +204,9 @@ defmodule MessngrWeb.TeamMessageController do
       {:error, :forbidden}
     else
       case Messages.get_message(prefix, message_id) do
-        nil -> {:error, :not_found}
+        nil ->
+          {:error, :not_found}
+
         message ->
           if message.sender_profile_id != profile.id do
             {:error, :forbidden}
@@ -209,7 +221,8 @@ defmodule MessngrWeb.TeamMessageController do
 
                 json(conn, %{ok: true})
 
-              {:error, _} -> {:error, :bad_request}
+              {:error, _} ->
+                {:error, :bad_request}
             end
           end
       end
@@ -245,16 +258,27 @@ defmodule MessngrWeb.TeamMessageController do
       {:error, :forbidden}
     else
       case Messages.get_message(prefix, message_id) do
-        nil -> {:error, :not_found}
+        nil ->
+          {:error, :not_found}
+
         message ->
           alias Teams.TenantModels.Message
+
           case Message.pin(prefix, message, profile.id) do
             {:ok, pinned} ->
               pinned = Messages.get_message(prefix, pinned.id)
               slug = conn.path_params["slug"]
-              MessngrWeb.Endpoint.broadcast("channel:#{pinned.channel_id}", "message:pinned", message_json(pinned))
+
+              MessngrWeb.Endpoint.broadcast(
+                "channel:#{pinned.channel_id}",
+                "message:pinned",
+                message_json(pinned)
+              )
+
               json(conn, %{data: message_json(pinned)})
-            {:error, changeset} -> {:error, changeset}
+
+            {:error, changeset} ->
+              {:error, changeset}
           end
       end
     end
@@ -265,14 +289,22 @@ defmodule MessngrWeb.TeamMessageController do
     prefix = conn.assigns.tenant_prefix
 
     case Messages.get_message(prefix, message_id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       message ->
         alias Teams.TenantModels.Message
+
         case Message.unpin(prefix, message) do
           {:ok, _} ->
-            MessngrWeb.Endpoint.broadcast("channel:#{message.channel_id}", "message:unpinned", %{id: message_id})
+            MessngrWeb.Endpoint.broadcast("channel:#{message.channel_id}", "message:unpinned", %{
+              id: message_id
+            })
+
             json(conn, %{ok: true})
-          {:error, changeset} -> {:error, changeset}
+
+          {:error, changeset} ->
+            {:error, changeset}
         end
     end
   end
@@ -312,6 +344,7 @@ defmodule MessngrWeb.TeamMessageController do
           sender_profile: profile_json(replied.sender_profile),
           content: replied.content
         })
+
       _ ->
         base
     end

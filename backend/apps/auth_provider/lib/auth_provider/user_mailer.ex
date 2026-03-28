@@ -1,7 +1,8 @@
 defmodule AuthProvider.UserMailer do
   import Swoosh.Email
 
-  @spec login_code(%{required(:name) => String.t(), required(:email) => String.t()}) :: Swoosh.Email.t()
+  @spec login_code(%{required(:name) => String.t(), required(:email) => String.t()}) ::
+          Swoosh.Email.t()
   def login_code(user) do
     new()
     |> to({user.name, user.email})

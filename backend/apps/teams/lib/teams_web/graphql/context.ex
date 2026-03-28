@@ -18,7 +18,7 @@ defmodule TeamsWeb.GraphQL.Context do
   """
   def build_context(conn) do
     with ["Bearer " <> token] <- get_req_header(conn, "authorization"),
-    {:ok, profile, uid} <- authorize(conn) do
+         {:ok, profile, uid} <- authorize(conn) do
       %{current_uid: uid, current_profile: profile}
     else
       _ -> %{}
@@ -32,7 +32,6 @@ defmodule TeamsWeb.GraphQL.Context do
     end
   end
 
-
   defp get_authed_context(conn) do
     tenant = conn.private[:subdomain]
     claims = Guardian.Plug.current_claims(conn)
@@ -40,5 +39,4 @@ defmodule TeamsWeb.GraphQL.Context do
     profile = Profile.get_by_uid(tenant, uid)
     {tenant, profile, uid}
   end
-
 end

@@ -1,5 +1,6 @@
 defmodule TeamsWeb.Plugs.AuthPipeline do
-  use Guardian.Plug.Pipeline, otp_app: :teams,
+  use Guardian.Plug.Pipeline,
+    otp_app: :teams,
     module: AuthProvider.Guardian,
     error_handler: TeamsWeb.AuthErrorHandler
 

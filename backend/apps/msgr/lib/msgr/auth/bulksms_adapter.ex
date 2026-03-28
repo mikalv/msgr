@@ -19,9 +19,9 @@ defmodule Messngr.Auth.Notifier.BulkSmsAdapter do
 
     url =
       "#{@api_url}?username=#{URI.encode_www_form(username)}" <>
-      "&password=#{URI.encode_www_form(password)}" <>
-      "&msisdn=#{msisdn}" <>
-      "&message=#{URI.encode_www_form(message)}"
+        "&password=#{URI.encode_www_form(password)}" <>
+        "&msisdn=#{msisdn}" <>
+        "&message=#{URI.encode_www_form(message)}"
 
     case :hackney.request(:get, url, [], <<>>, [:with_body]) do
       {:ok, 200, _headers, body} ->

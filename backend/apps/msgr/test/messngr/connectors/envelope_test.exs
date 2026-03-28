@@ -75,7 +75,13 @@ defmodule Messngr.Connectors.EnvelopeTest do
     end
 
     test "from_map/1 returns error for invalid occurred_at" do
-      map = %{service: "telegram", action: "send", trace_id: "t", occurred_at: :not_a_datetime, payload: %{}}
+      map = %{
+        service: "telegram",
+        action: "send",
+        trace_id: "t",
+        occurred_at: :not_a_datetime,
+        payload: %{}
+      }
 
       assert {:error, {:invalid_occurred_at, :not_a_datetime}} = Envelope.from_map(map)
     end

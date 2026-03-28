@@ -23,7 +23,8 @@ defmodule MessngrWeb.TeamDmController do
       valid_tenant_ids =
         raw_ids
         |> Enum.filter(fn id ->
-          id != profile.id and Teams.Repo.get(Teams.TenantModels.Profile, id, prefix: prefix) != nil
+          id != profile.id and
+            Teams.Repo.get(Teams.TenantModels.Profile, id, prefix: prefix) != nil
         end)
 
       # Always include the current user's team profile

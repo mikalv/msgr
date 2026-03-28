@@ -12,7 +12,10 @@ defmodule Messngr.AuthTest do
   describe "start_auth_challenge/1" do
     test "creates and returns code" do
       assert {:ok, %Challenge{} = challenge, code} =
-               Messngr.start_auth_challenge(%{"channel" => "email", "identifier" => "otp@example.com"})
+               Messngr.start_auth_challenge(%{
+                 "channel" => "email",
+                 "identifier" => "otp@example.com"
+               })
 
       assert challenge.target == "otp@example.com"
       assert challenge.channel == :email
@@ -34,6 +37,7 @@ defmodule Messngr.AuthTest do
 
     test "rate limits repeated requests" do
       identifier = "limit-#{System.unique_integer([:positive])}@example.com"
+
       limit =
         Application.get_env(:msgr, :rate_limits)
         |> Keyword.fetch!(:auth_challenge)
@@ -79,4 +83,3 @@ defmodule Messngr.AuthTest do
     end
   end
 end
-

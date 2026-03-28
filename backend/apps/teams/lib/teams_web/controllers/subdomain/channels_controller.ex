@@ -5,7 +5,8 @@ defmodule TeamsWeb.Subdomain.ChannelsController do
   alias Teams.TenantModels.{Profile, Channel}
   alias TeamsWeb.MiddleLayers.ChannelLayer
 
-  def filter_channel_for_json(channel), do: Map.drop(Map.from_struct(channel), [:__meta__, :updated_at, :inserted_at, :metadata])
+  def filter_channel_for_json(channel),
+    do: Map.drop(Map.from_struct(channel), [:__meta__, :updated_at, :inserted_at, :metadata])
 
   defp get_authed_context(conn) do
     tenant = conn.private[:subdomain]
@@ -31,11 +32,17 @@ defmodule TeamsWeb.Subdomain.ChannelsController do
         conn |> send_resp(200, Jason.encode!(filter_channel_for_json(channel)))
 
       {:error, err} ->
-        Logger.error "Error while trying to create channel: #{inspect err}"
+        Logger.error("Error while trying to create channel: #{inspect(err)}")
         conn |> send_resp(500, Jason.encode!(%{error: "Sorry! try again later"}))
 
       {:permission_error, err} ->
-        conn |> send_resp(401, Jason.encode!(%{error: "You don't have the roles or permission to create a new channel! (#{err})"}))
+        conn
+        |> send_resp(
+          401,
+          Jason.encode!(%{
+            error: "You don't have the roles or permission to create a new channel! (#{err})"
+          })
+        )
     end
   end
 

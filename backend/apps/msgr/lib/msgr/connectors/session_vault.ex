@@ -27,9 +27,11 @@ defmodule Msgr.Connectors.SessionVault do
   When no token material is present the original (string-keyed) session map is
   returned unchanged.
   """
-  @spec scrub_and_store(service(), account_id(), instance(), session()) :: {:ok, map()} | {:error, term()}
+  @spec scrub_and_store(service(), account_id(), instance(), session()) ::
+          {:ok, map()} | {:error, term()}
   def scrub_and_store(service, account_id, instance, session)
-      when (is_binary(account_id) or is_atom(account_id)) and (is_atom(service) or is_binary(service)) do
+      when (is_binary(account_id) or is_atom(account_id)) and
+             (is_atom(service) or is_binary(service)) do
     normalised_service = normalise_service(service)
     normalised_account = normalise_account(account_id)
     normalised_instance = normalise_instance(instance)
@@ -78,6 +80,7 @@ defmodule Msgr.Connectors.SessionVault do
 
         is_map(value) ->
           {nested_tokens, nested_clean} = extract_tokens(value)
+
           updated_tokens =
             if nested_tokens == %{} do
               token_acc
@@ -89,6 +92,7 @@ defmodule Msgr.Connectors.SessionVault do
 
         is_list(value) ->
           {nested_tokens, nested_clean} = extract_tokens_from_list(value)
+
           updated_tokens =
             if nested_tokens == [] do
               token_acc
@@ -111,6 +115,7 @@ defmodule Msgr.Connectors.SessionVault do
       cond do
         is_map(value) ->
           {nested_tokens, nested_clean} = extract_tokens(value)
+
           token_acc =
             if nested_tokens == %{} do
               token_acc
@@ -122,6 +127,7 @@ defmodule Msgr.Connectors.SessionVault do
 
         is_list(value) ->
           {nested_tokens, nested_clean} = extract_tokens_from_list(value)
+
           token_acc =
             if nested_tokens == [] do
               token_acc
@@ -142,13 +148,19 @@ defmodule Msgr.Connectors.SessionVault do
   defp ensure_map(_session), do: %{}
 
   defp normalise_service(service) when is_atom(service), do: Atom.to_string(service)
-  defp normalise_service(service) when is_binary(service), do: String.downcase(String.trim(service))
+
+  defp normalise_service(service) when is_binary(service),
+    do: String.downcase(String.trim(service))
 
   defp normalise_account(account) when is_binary(account), do: String.trim(account)
-  defp normalise_account(account) when is_atom(account), do: account |> Atom.to_string() |> normalise_account()
+
+  defp normalise_account(account) when is_atom(account),
+    do: account |> Atom.to_string() |> normalise_account()
 
   defp normalise_instance(nil), do: Bridges.default_instance()
-  defp normalise_instance(instance) when is_atom(instance), do: instance |> Atom.to_string() |> normalise_instance()
+
+  defp normalise_instance(instance) when is_atom(instance),
+    do: instance |> Atom.to_string() |> normalise_instance()
 
   defp normalise_instance(instance) when is_binary(instance) do
     trimmed = String.trim(instance)

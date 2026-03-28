@@ -14,9 +14,23 @@ defmodule Messngr.Chat.Message do
     field :body, :string
     field :status, Ecto.Enum, values: [:sending, :sent, :delivered, :read], default: :sent
     field :sent_at, :utc_datetime
+
     field :kind, Ecto.Enum,
-      values: [:text, :markdown, :code, :system, :image, :video, :audio, :voice, :file, :thumbnail, :location],
+      values: [
+        :text,
+        :markdown,
+        :code,
+        :system,
+        :image,
+        :video,
+        :audio,
+        :voice,
+        :file,
+        :thumbnail,
+        :location
+      ],
       default: :text
+
     field :payload, :map, default: %{}
     field :metadata, :map, default: %{}
     field :edited_at, :utc_datetime
@@ -108,7 +122,9 @@ defmodule Messngr.Chat.Message do
 
   defp validate_media_payload(changeset, kind, payload) do
     case require_payload_keys(changeset, payload, ["media"]) do
-      %Ecto.Changeset{valid?: false} = changeset -> changeset
+      %Ecto.Changeset{valid?: false} = changeset ->
+        changeset
+
       %Ecto.Changeset{} ->
         media = Map.get(payload, "media") || %{}
         base_keys = ["bucket", "objectKey", "contentType", "byteSize", "url"]
@@ -149,6 +165,7 @@ defmodule Messngr.Chat.Message do
     case Map.fetch(media, key) do
       {:ok, value} when is_integer(value) or is_float(value) ->
         minimum = Keyword.get(opts, :greater_than)
+
         if is_number(value) and (is_nil(minimum) or value > minimum) do
           changeset
           |> validate_waveform_payload(media)
@@ -169,7 +186,9 @@ defmodule Messngr.Chat.Message do
 
   defp validate_optional_caption(changeset, media) do
     case Map.get(media, "caption") do
-      nil -> changeset
+      nil ->
+        changeset
+
       caption when is_binary(caption) ->
         if String.length(String.trim(caption)) <= 4_000 do
           changeset
@@ -184,7 +203,9 @@ defmodule Messngr.Chat.Message do
 
   defp validate_optional_waveform(changeset, kind, media) when kind in [:audio, :voice] do
     case Map.get(media, "waveform") do
-      nil -> changeset
+      nil ->
+        changeset
+
       waveform when is_list(waveform) ->
         if Enum.all?(waveform, &valid_waveform_point?/1) and length(waveform) <= 512 do
           changeset
@@ -205,7 +226,9 @@ defmodule Messngr.Chat.Message do
 
   defp validate_optional_thumbnail(changeset, media) do
     case Map.get(media, "thumbnail") do
-      nil -> changeset
+      nil ->
+        changeset
+
       %{} = thumb ->
         base_keys = ["url", "width", "height"]
         missing = Enum.reject(base_keys, &Map.has_key?(thumb, &1))
@@ -243,9 +266,12 @@ defmodule Messngr.Chat.Message do
 
   defp validate_waveform_payload(changeset, media) do
     case Map.get(media, "waveform") do
-      nil -> changeset
+      nil ->
+        changeset
+
       waveform when is_list(waveform) ->
-        valid? = Enum.all?(waveform, fn value -> is_number(value) and value >= 0 and value <= 1 end)
+        valid? =
+          Enum.all?(waveform, fn value -> is_number(value) and value >= 0 and value <= 1 end)
 
         if valid? do
           changeset
@@ -260,7 +286,9 @@ defmodule Messngr.Chat.Message do
 
   defp validate_thumbnail_payload(changeset, media) do
     case Map.get(media, "thumbnail") do
-      nil -> changeset
+      nil ->
+        changeset
+
       %{} = thumbnail ->
         missing =
           ["bucket", "objectKey", "url"]
@@ -288,9 +316,15 @@ defmodule Messngr.Chat.Message do
 
   defp validate_positive_integer(media, key, message) do
     case Map.get(media, key) do
-      nil -> nil
-      value when is_integer(value) and value > 0 -> nil
-      value when is_float(value) and value > 0 -> nil
+      nil ->
+        nil
+
+      value when is_integer(value) and value > 0 ->
+        nil
+
+      value when is_float(value) and value > 0 ->
+        nil
+
       value when is_binary(value) ->
         case Integer.parse(value) do
           {int, _} when int > 0 -> nil
@@ -304,7 +338,9 @@ defmodule Messngr.Chat.Message do
 
   defp validate_checksum_payload(changeset, media) do
     case Map.get(media, "checksum") do
-      nil -> changeset
+      nil ->
+        changeset
+
       checksum when is_binary(checksum) ->
         if Regex.match?(~r/\A[A-Fa-f0-9]{32,128}\z/, checksum) do
           changeset

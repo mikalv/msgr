@@ -32,7 +32,18 @@ defmodule Messngr.Contacts.Contact do
   @doc false
   def changeset(contact, attrs) do
     contact
-    |> cast(attrs, [:display_name, :notes, :name, :email, :phone_number, :labels, :metadata, :owner_account_id, :account_id, :profile_id])
+    |> cast(attrs, [
+      :display_name,
+      :notes,
+      :name,
+      :email,
+      :phone_number,
+      :labels,
+      :metadata,
+      :owner_account_id,
+      :account_id,
+      :profile_id
+    ])
     |> validate_required([:owner_account_id])
   end
 end

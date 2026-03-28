@@ -32,28 +32,37 @@ defmodule Messngr.Push.Dispatcher do
 
         # Get all device tokens for channel members except sender
         tokens = get_push_tokens(prefix, channel_id, sender_id)
-        Logger.info("Push tokens found: #{length(tokens)} for channel=#{channel_id} sender=#{sender_id}")
+
+        Logger.info(
+          "Push tokens found: #{length(tokens)} for channel=#{channel_id} sender=#{sender_id}"
+        )
+
         if tokens == [], do: throw(:no_tokens)
 
-        payload = APNS.message_payload(sender_name, content,
-          channel_id: channel_id,
-          message_id: message.id,
-          team_slug: team_slug
-        )
+        payload =
+          APNS.message_payload(sender_name, content,
+            channel_id: channel_id,
+            message_id: message.id,
+            team_slug: team_slug
+          )
 
-        web_payload = WebPush.message_payload(sender_name, content,
-          channel_id: channel_id,
-          message_id: message.id,
-          team_slug: team_slug
-        )
+        web_payload =
+          WebPush.message_payload(sender_name, content,
+            channel_id: channel_id,
+            message_id: message.id,
+            team_slug: team_slug
+          )
 
         for {token, platform} <- tokens do
           Logger.info("Push sending to platform=#{platform}")
-          result = case platform do
-            "apns" -> APNS.push(token, payload)
-            "web_push" -> WebPush.push(token, web_payload)
-            _ -> Logger.debug("Skipping push for platform: #{platform}")
-          end
+
+          result =
+            case platform do
+              "apns" -> APNS.push(token, payload)
+              "web_push" -> WebPush.push(token, web_payload)
+              _ -> Logger.debug("Skipping push for platform: #{platform}")
+            end
+
           Logger.info("Push result for #{platform}: #{inspect(result)}")
         end
 

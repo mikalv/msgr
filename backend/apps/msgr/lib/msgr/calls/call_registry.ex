@@ -31,7 +31,8 @@ defmodule Messngr.Calls.CallRegistry do
   conversation is allowed; attempting to start a second call will return
   `{:error, :call_in_progress}`.
   """
-  @spec create_call(String.t(), String.t(), keyword()) :: {:ok, CallSession.t()} | {:error, term()}
+  @spec create_call(String.t(), String.t(), keyword()) ::
+          {:ok, CallSession.t()} | {:error, term()}
   def create_call(conversation_id, host_profile_id, opts \\ []) do
     GenServer.call(server(opts), {:create_call, conversation_id, host_profile_id, opts})
   end
@@ -47,7 +48,8 @@ defmodule Messngr.Calls.CallRegistry do
   @doc """
   Returns an active call for the given conversation.
   """
-  @spec fetch_call_for_conversation(String.t(), keyword()) :: {:ok, CallSession.t()} | {:error, term()}
+  @spec fetch_call_for_conversation(String.t(), keyword()) ::
+          {:ok, CallSession.t()} | {:error, term()}
   def fetch_call_for_conversation(conversation_id, opts \\ []) do
     GenServer.call(server(opts), {:fetch_call_for_conversation, conversation_id})
   end
@@ -136,7 +138,11 @@ defmodule Messngr.Calls.CallRegistry do
         role = Keyword.get(opts, :role, :participant)
         status = Keyword.get(opts, :status, :connecting)
 
-        case CallSession.add_participant(session, profile_id, role: role, status: status, metadata: metadata) do
+        case CallSession.add_participant(session, profile_id,
+               role: role,
+               status: status,
+               metadata: metadata
+             ) do
           {:ok, updated_session, participant} ->
             new_state = put_session(state, updated_session)
             {:reply, {:ok, updated_session, participant}, new_state}
@@ -231,7 +237,10 @@ defmodule Messngr.Calls.CallRegistry do
       |> Map.put_new("kind", "host")
 
     host = Participant.host(session.host_profile_id)
-    participants = Map.put(session.participants, session.host_profile_id, %{host | metadata: host_metadata})
+
+    participants =
+      Map.put(session.participants, session.host_profile_id, %{host | metadata: host_metadata})
+
     %CallSession{session | participants: participants}
   end
 

@@ -11,9 +11,12 @@ defmodule Messngr.Metrics.Reporter.Log do
   def handle_metric(metric, measurement, metadata) do
     Logger.debug(fn ->
       [
-        "metric=", Atom.to_string(metric),
-        " measurement=", inspect(measurement),
-        " metadata=", inspect(metadata)
+        "metric=",
+        Atom.to_string(metric),
+        " measurement=",
+        inspect(measurement),
+        " metadata=",
+        inspect(metadata)
       ]
       |> IO.iodata_to_binary()
     end)

@@ -23,7 +23,8 @@ defmodule Teams.Channels do
     # Get IDs of private channels the profile is a member of
     private_channel_ids =
       from(cm in ChannelMembership,
-        join: c in Channel, on: cm.channel_id == c.id,
+        join: c in Channel,
+        on: cm.channel_id == c.id,
         where: cm.profile_id == ^profile_id and c.visibility == "private",
         select: cm.channel_id
       )
@@ -106,7 +107,12 @@ defmodule Teams.Channels do
 
     # Generate a stable slug for DM lookup
     sorted_ids = Enum.sort(profile_ids)
-    dm_slug = "dm-" <> (:crypto.hash(:sha256, Enum.join(sorted_ids, ":")) |> Base.encode16(case: :lower) |> binary_part(0, 12))
+
+    dm_slug =
+      "dm-" <>
+        (:crypto.hash(:sha256, Enum.join(sorted_ids, ":"))
+         |> Base.encode16(case: :lower)
+         |> binary_part(0, 12))
 
     # Try to find existing DM first, then create if not found
     case Channel.get_by_slug(prefix, dm_slug) do
@@ -164,7 +170,8 @@ defmodule Teams.Channels do
                joined_at: now
              }) do
           {:ok, _} -> acc + 1
-          {:error, _} -> acc  # already a member or invalid
+          # already a member or invalid
+          {:error, _} -> acc
         end
       end)
 
@@ -204,34 +211,43 @@ defmodule Teams.Channels do
   Returns a map of channel_id => %{sender_name, text, inserted_at}.
   """
   def last_messages_for_channels(_prefix, []), do: %{}
+
   def last_messages_for_channels(prefix, channel_ids) do
     alias Teams.TenantModels.Message
 
     # Use a lateral join / window function to get one message per channel
-    query = from(m in Message,
-      where: m.channel_id in ^channel_ids and is_nil(m.deleted_at) and is_nil(m.thread_parent_id),
-      distinct: m.channel_id,
-      order_by: [asc: m.channel_id, desc: m.inserted_at],
-      preload: [:sender_profile]
-    )
+    query =
+      from(m in Message,
+        where:
+          m.channel_id in ^channel_ids and is_nil(m.deleted_at) and is_nil(m.thread_parent_id),
+        distinct: m.channel_id,
+        order_by: [asc: m.channel_id, desc: m.inserted_at],
+        preload: [:sender_profile]
+      )
 
     Teams.Repo.all(query, prefix: prefix)
     |> Enum.into(%{}, fn m ->
-      text = case m.content do
-        %{"text" => t} when is_binary(t) -> if(String.length(t) > 100, do: String.slice(t, 0, 100) <> "...", else: t)
-        _ -> ""
-      end
+      text =
+        case m.content do
+          %{"text" => t} when is_binary(t) ->
+            if(String.length(t) > 100, do: String.slice(t, 0, 100) <> "...", else: t)
 
-      sender_name = case m.sender_profile do
-        nil -> "Unknown"
-        p -> p.display_name || "Unknown"
-      end
+          _ ->
+            ""
+        end
 
-      {m.channel_id, %{
-        sender_name: sender_name,
-        text: text,
-        inserted_at: m.inserted_at
-      }}
+      sender_name =
+        case m.sender_profile do
+          nil -> "Unknown"
+          p -> p.display_name || "Unknown"
+        end
+
+      {m.channel_id,
+       %{
+         sender_name: sender_name,
+         text: text,
+         inserted_at: m.inserted_at
+       }}
     end)
   end
 end

@@ -19,13 +19,20 @@ defmodule TeamsWeb.ConversationChannel do
     {:reply, {:ok, payload}, socket}
   end
 
-
   @impl true
   def handle_in("create:msg", payload, %{topic: "conversation:" <> destdata} = socket) do
     [team, conversation_id] = String.split(destdata, ".")
-    Logger.info "Got create:msg: #{inspect payload} socket: #{inspect socket}"
-    message = Message.create_conversation_message(team, conversation_id, payload["profile_id"], payload["content"])
-    Logger.info "Message created: #{inspect message}"
+    Logger.info("Got create:msg: #{inspect(payload)} socket: #{inspect(socket)}")
+
+    message =
+      Message.create_conversation_message(
+        team,
+        conversation_id,
+        payload["profile_id"],
+        payload["content"]
+      )
+
+    Logger.info("Message created: #{inspect(message)}")
     broadcast!(socket, "new:msg", filter_msg_for_json(message))
     {:reply, {:ok, %{"status" => "ok"}}, socket}
   end
@@ -38,9 +45,18 @@ defmodule TeamsWeb.ConversationChannel do
     {:noreply, socket}
   end
 
-
-  defp filter_msg_for_json(msg), do: Map.drop(Map.from_struct(msg), [:__meta__, :id, :metadata, :channel, :conversation, :profile, :parent, :children])
-
+  defp filter_msg_for_json(msg),
+    do:
+      Map.drop(Map.from_struct(msg), [
+        :__meta__,
+        :id,
+        :metadata,
+        :channel,
+        :conversation,
+        :profile,
+        :parent,
+        :children
+      ])
 
   # Add authorization logic here as required.
   defp authorized?(_payload) do

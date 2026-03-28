@@ -13,6 +13,7 @@ defmodule EdgeRouter.Application do
     children = [
       {EdgeRouter.MainProxy, []}
     ]
+
     Logger.info("📦 EdgeRouter children prepared: #{inspect(children)}")
 
     Logger.info("🔧 Starting EdgeRouter supervisor...")

@@ -15,7 +15,7 @@ defmodule Messngr.Media.Storage do
 
   @spec object_key(binary(), binary() | nil, binary() | nil) :: String.t()
   def object_key(conversation_id, kind, filename) do
-    extension = filename && Path.extname(filename) || ""
+    extension = (filename && Path.extname(filename)) || ""
     cleaned = extension |> to_string() |> String.trim()
     type = kind || "media"
     uuid = UUID.uuid4()
@@ -144,7 +144,7 @@ defmodule Messngr.Media.Storage do
     ExAws.Config.new(:s3, %{
       scheme: "#{uri.scheme}://",
       host: uri.host,
-      port: uri.port || (if uri.scheme == "https", do: 443, else: 80),
+      port: uri.port || if(uri.scheme == "https", do: 443, else: 80),
       force_path_style: true
     })
   end

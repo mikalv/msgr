@@ -19,11 +19,11 @@ defmodule MessngrWeb.PushTokenController do
       }
 
       case Messngr.Repo.insert(
-        %Messngr.Push.DeviceToken{}
-        |> Ecto.Changeset.change(attrs),
-        on_conflict: {:replace, [:enabled, :device_name, :updated_at]},
-        conflict_target: [:account_id, :token]
-      ) do
+             %Messngr.Push.DeviceToken{}
+             |> Ecto.Changeset.change(attrs),
+             on_conflict: {:replace, [:enabled, :device_name, :updated_at]},
+             conflict_target: [:account_id, :token]
+           ) do
         {:ok, _} ->
           json(conn, %{ok: true})
 

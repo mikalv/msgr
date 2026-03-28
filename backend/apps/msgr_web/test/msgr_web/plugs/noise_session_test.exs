@@ -43,7 +43,11 @@ defmodule MessngrWeb.Plugs.NoiseSessionTest do
     assert get_session(conn, :noise_session_token) == token
   end
 
-  test "uses session-stored token when header is missing", %{conn: conn, account: account, profile: profile} do
+  test "uses session-stored token when header is missing", %{
+    conn: conn,
+    account: account,
+    profile: profile
+  } do
     %{token: token} = noise_session_fixture(account, profile)
 
     conn =
@@ -55,7 +59,11 @@ defmodule MessngrWeb.Plugs.NoiseSessionTest do
     assert conn.assigns.current_profile.id == profile.id
   end
 
-  test "does not persist token when assign_session is false", %{conn: conn, account: account, profile: profile} do
+  test "does not persist token when assign_session is false", %{
+    conn: conn,
+    account: account,
+    profile: profile
+  } do
     %{token: token} = noise_session_fixture(account, profile)
 
     conn =
@@ -115,10 +123,18 @@ defmodule MessngrWeb.Plugs.NoiseSessionTest do
 
     test "supports device lookup via public key", %{account: account, profile: profile} do
       {:ok, device} =
-        Accounts.create_device(%{account_id: account.id, profile_id: profile.id, device_public_key: "pk-#{System.unique_integer([:positive])}"})
+        Accounts.create_device(%{
+          account_id: account.id,
+          profile_id: profile.id,
+          device_public_key: "pk-#{System.unique_integer([:positive])}"
+        })
 
       {:ok, session} =
-        SessionStore.issue(%{account_id: account.id, profile_id: profile.id, device_public_key: device.device_public_key})
+        SessionStore.issue(%{
+          account_id: account.id,
+          profile_id: profile.id,
+          device_public_key: device.device_public_key
+        })
 
       token = SessionStore.encode_token(Session.token(session))
 

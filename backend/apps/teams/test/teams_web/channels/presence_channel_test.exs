@@ -38,11 +38,7 @@ defmodule TeamsWeb.PresenceChannelTest do
       end
     end)
 
-    {:ok,
-     account: account,
-     team: team,
-     profile: profile,
-     slug: slug}
+    {:ok, account: account, team: team, profile: profile, slug: slug}
   end
 
   describe "join presence:{slug}" do
@@ -61,7 +57,12 @@ defmodule TeamsWeb.PresenceChannelTest do
       assert socket.assigns.prefix == team.schema_name
     end
 
-    test "assigns presence tracking after join", %{account: account, profile: profile, slug: slug, team: team} do
+    test "assigns presence tracking after join", %{
+      account: account,
+      profile: profile,
+      slug: slug,
+      team: team
+    } do
       {:ok, _, socket} =
         TeamsWeb.UserSocket
         |> socket("user:#{account.id}", %{
@@ -77,7 +78,12 @@ defmodule TeamsWeb.PresenceChannelTest do
       assert is_map(presence_state)
     end
 
-    test "returns presence state with profile info", %{account: account, profile: profile, slug: slug, team: team} do
+    test "returns presence state with profile info", %{
+      account: account,
+      profile: profile,
+      slug: slug,
+      team: team
+    } do
       {:ok, _, _socket} =
         TeamsWeb.UserSocket
         |> socket("user:#{account.id}", %{

@@ -25,4 +25,3 @@ defmodule Messngr.Repo.Migrations.CreateAuthChallenges do
            )
   end
 end
-

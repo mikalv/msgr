@@ -20,7 +20,9 @@ defmodule Messngr.Accounts.DeviceKey do
     value
     |> String.trim()
     |> case do
-      "" -> {:error, :empty}
+      "" ->
+        {:error, :empty}
+
       trimmed ->
         with {:error, _} <- decode_base64url(trimmed),
              {:error, _} <- decode_base64(trimmed),
@@ -47,7 +49,9 @@ defmodule Messngr.Accounts.DeviceKey do
 
   defp decode_base64url(value) do
     case Base.url_decode64(value, padding: false) do
-      {:ok, raw} -> {:ok, raw}
+      {:ok, raw} ->
+        {:ok, raw}
+
       :error ->
         case Base.url_decode64(value, padding: true) do
           {:ok, raw} -> {:ok, raw}
@@ -58,7 +62,9 @@ defmodule Messngr.Accounts.DeviceKey do
 
   defp decode_base64(value) do
     case Base.decode64(value, padding: false) do
-      {:ok, raw} -> {:ok, raw}
+      {:ok, raw} ->
+        {:ok, raw}
+
       :error ->
         case Base.decode64(value) do
           {:ok, raw} -> {:ok, raw}
@@ -72,8 +78,12 @@ defmodule Messngr.Accounts.DeviceKey do
     size = byte_size(hex)
 
     cond do
-      rem(size, 2) != 0 -> {:error, :invalid_hex}
-      size < 64 or size > 128 -> {:error, :invalid_hex}
+      rem(size, 2) != 0 ->
+        {:error, :invalid_hex}
+
+      size < 64 or size > 128 ->
+        {:error, :invalid_hex}
+
       true ->
         try do
           {:ok, Base.decode16!(hex, case: :lower)}

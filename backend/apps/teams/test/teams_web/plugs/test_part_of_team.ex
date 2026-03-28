@@ -19,8 +19,9 @@ defmodule TeamsWeb.Plugs.PartOfTeamTest do
   end
 
   test "halts the connection if the user is not part of the team" do
-    conn = conn(:get, "/")
-    |> put_private(:subdomain, "example")
+    conn =
+      conn(:get, "/")
+      |> put_private(:subdomain, "example")
 
     conn = PartOfTeam.call(conn, @opts)
 
@@ -33,8 +34,9 @@ defmodule TeamsWeb.Plugs.PartOfTeamTest do
     Teams.TenantModels.Profile
     |> expect(:get_by_uid, fn _subdomain, _uid -> %{} end)
 
-    conn = conn(:get, "/")
-    |> put_private(:subdomain, "example")
+    conn =
+      conn(:get, "/")
+      |> put_private(:subdomain, "example")
 
     conn = PartOfTeam.call(conn, @opts)
 

@@ -13,7 +13,16 @@ defmodule Messngr.Bridges do
   alias Ecto.Changeset
   alias Messngr.Accounts.Account
   alias Messngr.Accounts.Contact, as: MsgrContact
-  alias Messngr.Bridges.{BridgeAccount, Channel, Contact, ContactProfile, ContactProfileKey, ProfileLink}
+
+  alias Messngr.Bridges.{
+    BridgeAccount,
+    Channel,
+    Contact,
+    ContactProfile,
+    ContactProfileKey,
+    ProfileLink
+  }
+
   alias Messngr.ShareLinks
   alias Messngr.Repo
 
@@ -37,7 +46,11 @@ defmodule Messngr.Bridges do
 
     case instance do
       {:ok, instance_value} ->
-        Repo.get_by(BridgeAccount, account_id: account_id, service: service, instance: instance_value)
+        Repo.get_by(BridgeAccount,
+          account_id: account_id,
+          service: service,
+          instance: instance_value
+        )
         |> maybe_preload()
 
       {:error, _reason} ->
@@ -69,8 +82,11 @@ defmodule Messngr.Bridges do
           {:ok, ShareLinks.ShareLink.t()} | {:error, term()}
   def create_share_link(bridge_account_id, kind, attrs \\ %{}) do
     case Repo.get(BridgeAccount, bridge_account_id) do
-      nil -> {:error, :unknown_bridge_account}
-      %BridgeAccount{} = bridge_account -> ShareLinks.create_bridge_link(bridge_account, kind, attrs)
+      nil ->
+        {:error, :unknown_bridge_account}
+
+      %BridgeAccount{} = bridge_account ->
+        ShareLinks.create_bridge_link(bridge_account, kind, attrs)
     end
   end
 
@@ -82,13 +98,18 @@ defmodule Messngr.Bridges do
           {:ok, BridgeAccount.t()} | {:error, term()}
   def unlink_account(account, service, opts \\ [])
 
-  def unlink_account(%Account{id: account_id}, service, opts), do: unlink_account(account_id, service, opts)
+  def unlink_account(%Account{id: account_id}, service, opts),
+    do: unlink_account(account_id, service, opts)
 
   def unlink_account(account_id, service, opts) when is_binary(account_id) and is_list(opts) do
     service = normalise_service(service)
 
     with {:ok, instance} <- normalise_instance_default(Keyword.get(opts, :instance)) do
-      case Repo.get_by(BridgeAccount, account_id: account_id, service: service, instance: instance) do
+      case Repo.get_by(BridgeAccount,
+             account_id: account_id,
+             service: service,
+             instance: instance
+           ) do
         nil -> {:error, :not_found}
         %BridgeAccount{} = account -> Repo.delete(account)
       end
@@ -101,7 +122,8 @@ defmodule Messngr.Bridges do
   Fetches an active share link by token, returning an error if it has expired or
   exhausted its view limit.
   """
-  @spec fetch_share_link(String.t(), keyword()) :: {:ok, ShareLinks.ShareLink.t()} | {:error, term()}
+  @spec fetch_share_link(String.t(), keyword()) ::
+          {:ok, ShareLinks.ShareLink.t()} | {:error, term()}
   def fetch_share_link(token, opts \\ []) do
     ShareLinks.fetch_active(token, opts)
   end
@@ -229,7 +251,9 @@ defmodule Messngr.Bridges do
           [] -> fetch_attr(attrs, ["conversations", :conversations])
           chats -> chats
         end
-      channels -> channels
+
+      channels ->
+        channels
     end
     |> ensure_list()
   end
@@ -254,8 +278,13 @@ defmodule Messngr.Bridges do
   defp maybe_extract_instance(%{"id" => value}) when not is_nil(value), do: value
   defp maybe_extract_instance(%{external_id: value}) when not is_nil(value), do: value
   defp maybe_extract_instance(%{"external_id" => value}) when not is_nil(value), do: value
-  defp maybe_extract_instance(%{tenant: tenant}) when not is_nil(tenant), do: maybe_extract_instance(tenant)
-  defp maybe_extract_instance(%{"tenant" => tenant}) when not is_nil(tenant), do: maybe_extract_instance(tenant)
+
+  defp maybe_extract_instance(%{tenant: tenant}) when not is_nil(tenant),
+    do: maybe_extract_instance(tenant)
+
+  defp maybe_extract_instance(%{"tenant" => tenant}) when not is_nil(tenant),
+    do: maybe_extract_instance(tenant)
+
   defp maybe_extract_instance(%{workspace: workspace}) when not is_nil(workspace),
     do: maybe_extract_instance(workspace)
 
@@ -267,8 +296,11 @@ defmodule Messngr.Bridges do
   defp normalise_instance_default(nil), do: {:ok, @default_instance}
   defp normalise_instance_default(value), do: normalise_instance(value)
 
-  defp normalise_instance(value) when is_atom(value), do: normalise_instance(Atom.to_string(value))
-  defp normalise_instance(value) when is_integer(value), do: normalise_instance(Integer.to_string(value))
+  defp normalise_instance(value) when is_atom(value),
+    do: normalise_instance(Atom.to_string(value))
+
+  defp normalise_instance(value) when is_integer(value),
+    do: normalise_instance(Integer.to_string(value))
 
   defp normalise_instance(value) when is_binary(value) do
     trimmed = String.trim(value)
@@ -292,10 +324,13 @@ defmodule Messngr.Bridges do
     value = stringify_keys(value)
 
     external_id =
-      value["external_id"] || value["id"] || value["uuid"] || value["jid"] || value["phone_number"]
+      value["external_id"] || value["id"] || value["uuid"] || value["jid"] ||
+        value["phone_number"]
 
     cond do
-      not is_binary(external_id) or external_id == "" -> nil
+      not is_binary(external_id) or external_id == "" ->
+        nil
+
       true ->
         display_name =
           value["display_name"] ||
@@ -347,7 +382,9 @@ defmodule Messngr.Bridges do
       value["external_id"] || value["id"] || value["chat_id"] || value["peer_id"] || value["jid"]
 
     cond do
-      not is_binary(external_id) and not is_integer(external_id) -> nil
+      not is_binary(external_id) and not is_integer(external_id) ->
+        nil
+
       true ->
         name =
           value["name"] ||
@@ -363,7 +400,15 @@ defmodule Messngr.Bridges do
 
         metadata =
           value
-          |> Map.take(["type", "kind", "topic", "role", "muted", "participant_count", "invite_link"])
+          |> Map.take([
+            "type",
+            "kind",
+            "topic",
+            "role",
+            "muted",
+            "participant_count",
+            "invite_link"
+          ])
           |> Map.merge(extract_metadata(value))
           |> compact_map()
 
@@ -428,9 +473,12 @@ defmodule Messngr.Bridges do
 
   defp do_fetch_attr(attrs, key) when is_atom(key) do
     case attrs do
-      %{^key => value} -> value
+      %{^key => value} ->
+        value
+
       _ ->
         string_key = Atom.to_string(key)
+
         case attrs do
           %{^string_key => value} -> value
           _ -> nil
@@ -440,7 +488,9 @@ defmodule Messngr.Bridges do
 
   defp do_fetch_attr(attrs, key) when is_binary(key) do
     cond do
-      Map.has_key?(attrs, key) -> Map.get(attrs, key)
+      Map.has_key?(attrs, key) ->
+        Map.get(attrs, key)
+
       true ->
         atom_key =
           try do
@@ -474,7 +524,9 @@ defmodule Messngr.Bridges do
       |> Enum.uniq()
 
     case profile_ids do
-      [] -> []
+      [] ->
+        []
+
       ids ->
         Repo.all(
           from p in ContactProfile,
@@ -503,10 +555,13 @@ defmodule Messngr.Bridges do
       |> Enum.uniq_by(&{&1.kind, &1.value})
 
     case with_keys do
-      [] -> {:error, :no_match_keys}
+      [] ->
+        {:error, :no_match_keys}
+
       match_keys ->
         Repo.transaction(fn ->
-          {:ok, profile} = ensure_profile_from_keys(match_keys, contact.name, contact.metadata || %{})
+          {:ok, profile} =
+            ensure_profile_from_keys(match_keys, contact.name, contact.metadata || %{})
 
           link_metadata = %{
             "account_id" => to_string(contact.account_id),
@@ -535,7 +590,9 @@ defmodule Messngr.Bridges do
     msgr_profile_ids =
       Repo.all(
         from l in ProfileLink,
-          where: l.source == "msgr_contact" and fragment("?->>'account_id' = ?", l.metadata, ^account_id_str),
+          where:
+            l.source == "msgr_contact" and
+              fragment("?->>'account_id' = ?", l.metadata, ^account_id_str),
           select: l.profile_id
       )
 
@@ -589,8 +646,11 @@ defmodule Messngr.Bridges do
             {:error, reason} -> Repo.rollback(reason)
           end
 
-        [id] -> Repo.get!(ContactProfile, id)
-        [primary_id | rest] -> merge_profiles(primary_id, rest)
+        [id] ->
+          Repo.get!(ContactProfile, id)
+
+        [primary_id | rest] ->
+          merge_profiles(primary_id, rest)
       end
 
     {:ok, profile}
@@ -627,7 +687,8 @@ defmodule Messngr.Bridges do
 
         updated
 
-      true -> profile
+      true ->
+        profile
     end
   end
 
@@ -652,9 +713,13 @@ defmodule Messngr.Bridges do
       if other do
         transfer_keys(other, primary)
 
-        Repo.update_all(from(c in Contact, where: c.profile_id == ^other.id), set: [profile_id: primary.id])
+        Repo.update_all(from(c in Contact, where: c.profile_id == ^other.id),
+          set: [profile_id: primary.id]
+        )
 
-        Repo.update_all(from(l in ProfileLink, where: l.profile_id == ^other.id), set: [profile_id: primary.id])
+        Repo.update_all(from(l in ProfileLink, where: l.profile_id == ^other.id),
+          set: [profile_id: primary.id]
+        )
 
         Repo.delete(other)
       end
@@ -669,7 +734,12 @@ defmodule Messngr.Bridges do
     keys = Repo.all(from k in ContactProfileKey, where: k.profile_id == ^other.id)
 
     Enum.each(keys, fn key ->
-      attrs = %{profile_id: primary.id, kind: key.kind, value: key.value, confidence: key.confidence}
+      attrs = %{
+        profile_id: primary.id,
+        kind: key.kind,
+        value: key.value,
+        confidence: key.confidence
+      }
 
       %ContactProfileKey{}
       |> ContactProfileKey.changeset(attrs)
@@ -729,14 +799,22 @@ defmodule Messngr.Bridges do
 
   defp normalise_key_value(kind, value) do
     cond do
-      kind == "email" -> value |> to_string() |> String.trim() |> String.downcase()
-      kind == "phone" -> value |> to_string() |> String.replace(~r/\D+/, "")
-      String.starts_with?(kind, "handle") -> value |> to_string() |> String.trim() |> String.downcase()
-      true -> value |> to_string() |> String.trim()
+      kind == "email" ->
+        value |> to_string() |> String.trim() |> String.downcase()
+
+      kind == "phone" ->
+        value |> to_string() |> String.replace(~r/\D+/, "")
+
+      String.starts_with?(kind, "handle") ->
+        value |> to_string() |> String.trim() |> String.downcase()
+
+      true ->
+        value |> to_string() |> String.trim()
     end
   end
 
   defp maybe_add_key(keys, _kind, value, _confidence) when value in [nil, ""], do: keys
+
   defp maybe_add_key(keys, kind, values, confidence) when is_list(values) do
     Enum.reduce(values, keys, fn value, acc -> maybe_add_key(acc, kind, value, confidence) end)
   end
@@ -775,5 +853,7 @@ defmodule Messngr.Bridges do
   end
 
   defp normalise_service(service) when is_atom(service), do: Atom.to_string(service)
-  defp normalise_service(service) when is_binary(service), do: String.downcase(String.trim(service))
+
+  defp normalise_service(service) when is_binary(service),
+    do: String.downcase(String.trim(service))
 end

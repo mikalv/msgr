@@ -13,11 +13,18 @@ defmodule Messngr.Connectors.MatrixBridgeTest do
 
   test "link_account/3 forwards login envelope", %{bridge: bridge, agent: agent} do
     params = %{user_id: "u-1", homeserver: "https://example", login: %{type: :password}}
-    assert {:ok, %{status: :accepted}} = MatrixBridge.link_account(bridge, params, trace_id: "matrix-link")
+
+    assert {:ok, %{status: :accepted}} =
+             MatrixBridge.link_account(bridge, params, trace_id: "matrix-link")
 
     assert [request] = QueueRecorder.requests(agent)
     assert request.topic == "bridge/matrix/link_account"
-    assert request.payload.payload == %{user_id: "u-1", homeserver: "https://example", login: %{type: :password}}
+
+    assert request.payload.payload == %{
+             user_id: "u-1",
+             homeserver: "https://example",
+             login: %{type: :password}
+           }
   end
 
   test "send_event/3 publishes outbound Matrix event", %{bridge: bridge, agent: agent} do
@@ -26,12 +33,14 @@ defmodule Messngr.Connectors.MatrixBridgeTest do
 
     assert [message] = QueueRecorder.published(agent)
     assert message.topic == "bridge/matrix/outbound_event"
+
     assert message.payload.payload == %{
              room_id: "!room:server",
              event_type: "m.room.message",
              content: %{body: "Hello"},
              metadata: %{}
            }
+
     assert message.payload.trace_id == "event"
   end
 

@@ -31,7 +31,7 @@ defmodule MessngrWeb.RTCChannel do
         "participants" => encode_participants(call)
       }
 
-        {:ok, Map.put(payload, "participant", encode_participant(participant)), socket}
+      {:ok, Map.put(payload, "participant", encode_participant(participant)), socket}
     else
       {:error, reason} ->
         {:error, %{reason: to_string(reason)}}
@@ -93,7 +93,8 @@ defmodule MessngrWeb.RTCChannel do
     :ok
   end
 
-  defp ensure_call(_conversation_id, _profile_id, %{"call_id" => call_id}) when is_binary(call_id) do
+  defp ensure_call(_conversation_id, _profile_id, %{"call_id" => call_id})
+       when is_binary(call_id) do
     case Calls.fetch_call(call_id) do
       {:ok, call} -> {:ok, call}
       {:error, :not_found} -> {:error, :call_not_found}

@@ -78,7 +78,11 @@ defmodule Messngr.Bridges.HealthReporter do
       ]
     rescue
       error ->
-        Logger.error("Failed to initialise bridge health reporter", connector: inspect(connector), error: inspect(error))
+        Logger.error("Failed to initialise bridge health reporter",
+          connector: inspect(connector),
+          error: inspect(error)
+        )
+
         []
     end
   end
@@ -101,6 +105,7 @@ defmodule Messngr.Bridges.HealthReporter do
     case result do
       {:ok, snapshot} ->
         emit_metrics(name, snapshot, metadata)
+
       {:error, reason} ->
         Logger.warning("Bridge health snapshot failed", bridge: name, reason: inspect(reason))
     end
@@ -138,13 +143,18 @@ defmodule Messngr.Bridges.HealthReporter do
         |> maybe_put(:user_id, fetch(client, :user_id))
         |> maybe_put(:workspace_id, fetch(client, :workspace_id) || fetch(client, :tenant_id))
 
-      :telemetry.execute([:messngr, :bridges, name, :client_health], client_measurements, client_meta)
+      :telemetry.execute(
+        [:messngr, :bridges, name, :client_health],
+        client_measurements,
+        client_meta
+      )
     end)
   end
 
   defp emit_metrics(_name, _snapshot, _metadata), do: :ok
 
   defp fetch(data, key, default \\ nil)
+
   defp fetch(data, key, default) when is_map(data) do
     Map.get(data, key, Map.get(data, to_string(key), default))
   end

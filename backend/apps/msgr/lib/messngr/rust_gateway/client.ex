@@ -17,11 +17,13 @@ defmodule Messngr.RustGateway.Client do
   owns a particular session.
   """
   @spec bind_account(map()) :: :ok | {:error, term()}
-  def bind_account(%{
-        session_id: session_id,
-        session_token: session_token,
-        account_id: account_id
-      } = params) do
+  def bind_account(
+        %{
+          session_id: session_id,
+          session_token: session_token,
+          account_id: account_id
+        } = params
+      ) do
     request = %BindAccountRequest{
       session_id: session_id,
       session_token: session_token,

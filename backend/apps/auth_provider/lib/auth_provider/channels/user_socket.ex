@@ -20,7 +20,6 @@ defmodule AuthProvider.UserSocket do
   # See the [`Channels guide`](https://hexdocs.pm/phoenix/channels.html)
   # for further details.
 
-
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After
   # verification, you can put default assigns into
@@ -37,7 +36,7 @@ defmodule AuthProvider.UserSocket do
   # performing token verification on connect.
   @impl true
   def connect(params, socket, _connect_info) do
-    Logger.debug "New socket connection! with params #{inspect params}"
+    Logger.debug("New socket connection! with params #{inspect(params)}")
     token = params["token"]
     AuthProvider.Guardian.decode_and_verify(token)
     {:ok, socket}
@@ -57,5 +56,5 @@ defmodule AuthProvider.UserSocket do
   # Returning `nil` makes this socket anonymous.
   @impl true
   def id(socket), do: "user_socket:#{socket.assigns.user_id}"
-  #def id(_socket), do: nil
+  # def id(_socket), do: nil
 end

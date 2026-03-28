@@ -26,7 +26,15 @@ defmodule Messngr.Contacts.ContactIdentity do
   @doc false
   def changeset(identity, attrs) do
     identity
-    |> cast(attrs, [:contact_id, :uri, :canonical_uri, :bridge_type, :bridge_meta, :is_primary, :verified_at])
+    |> cast(attrs, [
+      :contact_id,
+      :uri,
+      :canonical_uri,
+      :bridge_type,
+      :bridge_meta,
+      :is_primary,
+      :verified_at
+    ])
     |> validate_required([:contact_id])
     |> unique_constraint(:uri)
   end

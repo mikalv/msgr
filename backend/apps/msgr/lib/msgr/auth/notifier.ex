@@ -22,7 +22,9 @@ defmodule Messngr.Auth.Notifier do
   @spec deliver_challenge(Challenge.t(), otp_code()) :: :ok | {:error, term()}
   def deliver_challenge(%Challenge{channel: :email} = challenge, code) do
     case deliver_email(challenge, code) do
-      {:ok, _response} -> :ok
+      {:ok, _response} ->
+        :ok
+
       {:error, reason} ->
         Logger.warning("failed to deliver auth email", channel: :email, reason: inspect(reason))
         {:error, {:email_delivery_failed, reason}}

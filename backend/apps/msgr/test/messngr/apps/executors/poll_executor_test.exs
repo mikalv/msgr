@@ -6,7 +6,9 @@ defmodule Messngr.Apps.Executors.PollExecutorTest do
   describe "parse_poll_args/1" do
     test "parses quoted question and options" do
       args = ~s("What for lunch?" "Pizza" "Sushi" "Tacos")
-      assert {:ok, "What for lunch?", ["Pizza", "Sushi", "Tacos"]} = PollExecutor.parse_poll_args(args)
+
+      assert {:ok, "What for lunch?", ["Pizza", "Sushi", "Tacos"]} =
+               PollExecutor.parse_poll_args(args)
     end
 
     test "parses two options" do

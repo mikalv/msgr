@@ -83,7 +83,8 @@ defmodule Messngr.Accounts.KeyStore do
   Generates backup codes for the profile. Existing codes are rotated out by
   incrementing the generation counter.
   """
-  @spec generate_backup_codes(Profile.t() | binary(), keyword()) :: {:ok, [binary()]} | {:error, term()}
+  @spec generate_backup_codes(Profile.t() | binary(), keyword()) ::
+          {:ok, [binary()]} | {:error, term()}
   def generate_backup_codes(profile_or_id, opts \\ []) do
     quantity = Keyword.get(opts, :quantity, 10)
 
@@ -102,7 +103,8 @@ defmodule Messngr.Accounts.KeyStore do
           where: code.profile_id == ^profile.id and is_nil(code.used_at)
       )
 
-      codes = Enum.map(1..quantity, fn _ -> build_backup_code(profile.id, latest_generation + 1) end)
+      codes =
+        Enum.map(1..quantity, fn _ -> build_backup_code(profile.id, latest_generation + 1) end)
 
       Repo.insert_all(
         ProfileBackupCode,
@@ -136,17 +138,20 @@ defmodule Messngr.Accounts.KeyStore do
       code =
         Repo.one(
           from code in ProfileBackupCode,
-            where:
-              code.profile_id == ^profile.id and is_nil(code.used_at),
+            where: code.profile_id == ^profile.id and is_nil(code.used_at),
             lock: "FOR UPDATE"
         )
 
       cond do
-        code == nil -> Repo.rollback(:invalid_code)
+        code == nil ->
+          Repo.rollback(:invalid_code)
+
         verify_code(code, plaintext) ->
           Repo.update!(Ecto.Changeset.change(code, used_at: DateTime.utc_now()))
           :ok
-        true -> Repo.rollback(:invalid_code)
+
+        true ->
+          Repo.rollback(:invalid_code)
       end
     end)
     |> case do
@@ -208,6 +213,8 @@ defmodule Messngr.Accounts.KeyStore do
   defp unwrap({:ok, result}), do: {:ok, result}
   defp unwrap({:error, reason}), do: {:error, reason}
 
-  defp secure_compare(a, b) when byte_size(a) == byte_size(b), do: Plug.Crypto.secure_compare(a, b)
+  defp secure_compare(a, b) when byte_size(a) == byte_size(b),
+    do: Plug.Crypto.secure_compare(a, b)
+
   defp secure_compare(_a, _b), do: false
 end

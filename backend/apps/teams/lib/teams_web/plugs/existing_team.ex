@@ -10,16 +10,18 @@ defmodule TeamsWeb.Plugs.ExistingTeam do
 
   def call(%Plug.Conn{} = conn, _opts) do
     subdomain = conn.private[:subdomain]
+
     try do
       team = Teams.TenantTeam.get_team!(subdomain)
-      Logger.debug "Found team for subdomain #{subdomain} : #{inspect team}"
+      Logger.debug("Found team for subdomain #{subdomain} : #{inspect(team)}")
+
       conn
-        |> put_private(:tenant, team.name)
+      |> put_private(:tenant, team.name)
     rescue
       _e in Ecto.NoResultsError ->
         conn
-          |> send_resp(400, "Teams don't exist!")
-          |> halt()
+        |> send_resp(400, "Teams don't exist!")
+        |> halt()
     end
   end
 end

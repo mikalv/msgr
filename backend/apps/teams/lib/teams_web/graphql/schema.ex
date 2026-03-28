@@ -20,10 +20,11 @@ defmodule TeamsWeb.GraphQL.Schema do
 
   query do
     field :item, :item do
-      arg :id, non_null(:id)
-      resolve fn %{id: item_id}, _ ->
+      arg(:id, non_null(:id))
+
+      resolve(fn %{id: item_id}, _ ->
         {:ok, @items[item_id]}
-      end
+      end)
     end
   end
 end

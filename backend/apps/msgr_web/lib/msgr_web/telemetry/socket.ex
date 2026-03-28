@@ -9,7 +9,9 @@ defmodule MessngrWeb.Telemetry.Socket do
   """
   @spec message_sent(binary(), binary(), map()) :: :ok
   def message_sent(conversation_id, profile_id, metadata \\ %{}) do
-    emit([:messngr, :socket, :message, :sent], %{count: 1},
+    emit(
+      [:messngr, :socket, :message, :sent],
+      %{count: 1},
       Map.merge(metadata, %{conversation_id: conversation_id, profile_id: profile_id})
     )
   end
@@ -19,7 +21,9 @@ defmodule MessngrWeb.Telemetry.Socket do
   """
   @spec message_acknowledged(binary(), binary(), binary(), map()) :: :ok
   def message_acknowledged(conversation_id, profile_id, message_id, metadata \\ %{}) do
-    emit([:messngr, :socket, :message, :acknowledged], %{count: 1},
+    emit(
+      [:messngr, :socket, :message, :acknowledged],
+      %{count: 1},
       Map.merge(metadata, %{
         conversation_id: conversation_id,
         profile_id: profile_id,
@@ -33,7 +37,9 @@ defmodule MessngrWeb.Telemetry.Socket do
   """
   @spec typing_started(binary(), binary(), map()) :: :ok
   def typing_started(conversation_id, profile_id, metadata \\ %{}) do
-    emit([:messngr, :socket, :typing, :started], %{count: 1},
+    emit(
+      [:messngr, :socket, :typing, :started],
+      %{count: 1},
       Map.merge(metadata, %{conversation_id: conversation_id, profile_id: profile_id})
     )
   end
@@ -43,7 +49,9 @@ defmodule MessngrWeb.Telemetry.Socket do
   """
   @spec typing_stopped(binary(), binary(), map()) :: :ok
   def typing_stopped(conversation_id, profile_id, metadata \\ %{}) do
-    emit([:messngr, :socket, :typing, :stopped], %{count: 1},
+    emit(
+      [:messngr, :socket, :typing, :stopped],
+      %{count: 1},
       Map.merge(metadata, %{conversation_id: conversation_id, profile_id: profile_id})
     )
   end

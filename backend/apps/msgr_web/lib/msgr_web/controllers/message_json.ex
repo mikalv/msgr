@@ -14,7 +14,8 @@ defmodule MessngrWeb.MessageJSON do
     %{data: receipt_payload(receipt)}
   end
 
-  defp encode_meta(nil), do: %{start_cursor: nil, end_cursor: nil, has_more: %{before: false, after: false}}
+  defp encode_meta(nil),
+    do: %{start_cursor: nil, end_cursor: nil, has_more: %{before: false, after: false}}
 
   defp encode_meta(meta) when is_map(meta) do
     %{

@@ -49,6 +49,7 @@ defmodule AuthProvider.DeviceHelperTest do
         public_key_sign: @valid_key_data["pubkey"],
         public_key_dh: @valid_key_data["dhpubkey"]
       }
+
       Repo.insert!(device)
 
       payload = %{"keyData" => @valid_key_data, "deviceInfo" => @valid_device_info}
@@ -69,6 +70,7 @@ defmodule AuthProvider.DeviceHelperTest do
         public_key_sign: @valid_key_data["pubkey"],
         public_key_dh: @valid_key_data["dhpubkey"]
       }
+
       Repo.insert!(device)
 
       assert %Device{} = DeviceHelper.find_by_device_id(@valid_key_data["deviceId"])

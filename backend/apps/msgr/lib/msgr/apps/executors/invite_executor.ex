@@ -14,16 +14,25 @@ defmodule Messngr.Apps.Executors.InviteExecutor do
     else
       # Find profile by display_name (closest to username)
       profiles = Teams.TenantModels.Profile.list(prefix)
-      profile = Enum.find(profiles, fn p ->
-        String.downcase(p.display_name || "") == String.downcase(username)
-      end)
+
+      profile =
+        Enum.find(profiles, fn p ->
+          String.downcase(p.display_name || "") == String.downcase(username)
+        end)
 
       if profile do
         case Teams.Channels.add_members(prefix, channel_id, [profile.id]) do
           {:ok, count} when count > 0 ->
-            {:ok, %{type: :message, content: "✅ **#{profile.display_name}** has been added to this channel."}}
+            {:ok,
+             %{
+               type: :message,
+               content: "✅ **#{profile.display_name}** has been added to this channel."
+             }}
+
           {:ok, _} ->
-            {:ok, %{type: :message, content: "**#{profile.display_name}** is already in this channel."}}
+            {:ok,
+             %{type: :message, content: "**#{profile.display_name}** is already in this channel."}}
+
           {:error, _} ->
             {:error, "Could not add #{username} to channel."}
         end

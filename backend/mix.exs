@@ -40,7 +40,15 @@ defmodule Messngr.Umbrella.MixProject do
       {:gen_smtp, "~> 1.3", override: true},
       {:decibel, "~> 0.2.4", override: true},
       {:ex_json_schema, "~> 0.11.1", override: true},
-      {:castle, "~> 0.3.0", runtime: false}
+      {:castle, "~> 0.3.0", runtime: false},
+
+      # Code quality
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
+
+      # Runtime debugging/observability
+      {:recon, "~> 2.5.6"}
     ]
   end
 
@@ -60,8 +68,17 @@ defmodule Messngr.Umbrella.MixProject do
         "cmd --app auth_provider mix setup",
         "cmd --app msgr mix setup",
         "cmd --app msgr_web mix setup"
+      ],
+      lint: [
+        "format --check-formatted",
+        "credo --strict",
+        "sobelow --config"
+      ],
+      quality: [
+        "format --check-formatted",
+        "credo --strict --min-priority high",
+        "dialyzer"
       ]
     ]
   end
-
 end

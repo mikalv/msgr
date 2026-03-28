@@ -81,12 +81,13 @@ defmodule Msgr.Connectors.SignalBridge do
 
   defp fetch_account_id(params) when is_map(params) do
     params
-    |> Map.get(:user_id) || Map.get(params, "user_id")
-    |> case do
-      nil -> {:error, :missing_account_id}
-      value when is_binary(value) and value != "" -> {:ok, value}
-      value -> {:error, {:invalid_account_id, value}}
-    end
+    |> Map.get(:user_id) ||
+      Map.get(params, "user_id")
+      |> case do
+        nil -> {:error, :missing_account_id}
+        value when is_binary(value) and value != "" -> {:ok, value}
+        value -> {:error, {:invalid_account_id, value}}
+      end
   end
 
   defp build_sync_attrs(response) when is_map(response) do

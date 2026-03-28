@@ -27,7 +27,15 @@ defmodule Messngr.Accounts.Identity do
   @doc false
   def changeset(identity, attrs) do
     identity
-    |> cast(attrs, [:account_id, :kind, :value, :provider, :subject, :verified_at, :last_challenged_at])
+    |> cast(attrs, [
+      :account_id,
+      :kind,
+      :value,
+      :provider,
+      :subject,
+      :verified_at,
+      :last_challenged_at
+    ])
     |> validate_required([:account_id, :kind])
     |> validate_value_presence()
     |> unique_constraint(:value, name: :account_identities_account_id_kind_value_index)
@@ -47,4 +55,3 @@ defmodule Messngr.Accounts.Identity do
 
   defp validate_value_presence(changeset), do: changeset
 end
-

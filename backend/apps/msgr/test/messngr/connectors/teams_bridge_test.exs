@@ -27,7 +27,9 @@ defmodule Messngr.Connectors.TeamsBridgeTest do
     bridge = TeamsBridge.new(queue: QueueRecorder, queue_opts: [agent: agent])
 
     params = %{user_id: "acct-1", tenant: %{id: "tenant-a", name: "Acme"}}
-    assert {:ok, %{status: :accepted}} = TeamsBridge.link_account(bridge, params, trace_id: "teams-link")
+
+    assert {:ok, %{status: :accepted}} =
+             TeamsBridge.link_account(bridge, params, trace_id: "teams-link")
 
     assert [request] = QueueRecorder.requests(agent)
     assert request.topic == "bridge/teams/link_account"
@@ -39,7 +41,9 @@ defmodule Messngr.Connectors.TeamsBridgeTest do
     bridge = TeamsBridge.new(queue: QueueRecorder, queue_opts: [agent: agent])
 
     params = %{user_id: "acct-2", tenant: %{id: "tenant-b"}}
-    assert {:ok, %{status: :accepted}} = TeamsBridge.link_account(bridge, params, instance: :tenant_b)
+
+    assert {:ok, %{status: :accepted}} =
+             TeamsBridge.link_account(bridge, params, instance: :tenant_b)
 
     assert [request] = QueueRecorder.requests(agent)
     assert request.topic == "bridge/teams/tenant_b/link_account"
@@ -72,9 +76,12 @@ defmodule Messngr.Connectors.TeamsBridgeTest do
 
   test "health_snapshot/3 requests runtime telemetry", %{agent: agent} do
     responder = fn -> {:ok, %{"status" => "ok", "summary" => %{"total_clients" => 2}}} end
-    bridge = TeamsBridge.new(queue: QueueRecorder, queue_opts: [agent: agent, responder: responder])
 
-    assert {:ok, %{"status" => "ok"}} = TeamsBridge.health_snapshot(bridge, %{tenant_id: "tenant-a"})
+    bridge =
+      TeamsBridge.new(queue: QueueRecorder, queue_opts: [agent: agent, responder: responder])
+
+    assert {:ok, %{"status" => "ok"}} =
+             TeamsBridge.health_snapshot(bridge, %{tenant_id: "tenant-a"})
 
     assert [request] = QueueRecorder.requests(agent)
     assert request.topic == "bridge/teams/health_snapshot"
@@ -84,15 +91,15 @@ defmodule Messngr.Connectors.TeamsBridgeTest do
   test "link_account/3 persists tenant roster", %{agent: agent, account: account} do
     response = %{
       "status" => "linked",
-      "tenant" => %{ "id" => "tenant-z", "name" => "Acme" },
-      "user" => %{ "id" => "user-1", "displayName" => "Alice" },
-      "session" => %{ "refresh_token" => "rt" },
-      "capabilities" => %{ "messaging" => %{ "reactions" => true } },
+      "tenant" => %{"id" => "tenant-z", "name" => "Acme"},
+      "user" => %{"id" => "user-1", "displayName" => "Alice"},
+      "session" => %{"refresh_token" => "rt"},
+      "capabilities" => %{"messaging" => %{"reactions" => true}},
       "members" => [
-        %{ "id" => "user-2", "displayName" => "Bob" }
+        %{"id" => "user-2", "displayName" => "Bob"}
       ],
       "chats" => [
-        %{ "id" => "chat-1", "topic" => "Project", "kind" => "group" }
+        %{"id" => "chat-1", "topic" => "Project", "kind" => "group"}
       ]
     }
 

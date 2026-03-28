@@ -57,7 +57,11 @@ defmodule Messngr.Metrics.Pipeline do
   Emits a delivery rate measurement.
   """
   def emit_delivery_rate(delivered, attempted, metadata \\ %{}) do
-    :telemetry.execute(@delivery_rate_event, %{delivered: delivered, attempted: attempted}, metadata)
+    :telemetry.execute(
+      @delivery_rate_event,
+      %{delivered: delivered, attempted: attempted},
+      metadata
+    )
   end
 
   @doc """
@@ -84,7 +88,9 @@ defmodule Messngr.Metrics.Pipeline do
     report(reporter, :delivery_latency, %{duration_ms: duration}, metadata)
   end
 
-  defp handle_rate(_event, %{delivered: delivered, attempted: attempted}, metadata, %{reporter: reporter}) do
+  defp handle_rate(_event, %{delivered: delivered, attempted: attempted}, metadata, %{
+         reporter: reporter
+       }) do
     rate = if attempted > 0, do: delivered / attempted, else: 0.0
     measurement = %{delivered: delivered, attempted: attempted, success_rate: rate}
     report(reporter, :delivery_rate, measurement, metadata)
@@ -112,7 +118,8 @@ defmodule Messngr.Metrics.Pipeline do
         Application.get_env(:msgr, __MODULE__, [])
         |> Keyword.get(:reporter, Messngr.Metrics.Reporter.Log)
 
-      reporter -> reporter
+      reporter ->
+        reporter
     end
   end
 end

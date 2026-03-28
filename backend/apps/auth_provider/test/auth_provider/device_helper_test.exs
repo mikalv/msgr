@@ -75,7 +75,9 @@ defmodule AuthProvider.DeviceHelperTest do
         |> Repo.insert!()
 
       assert {:ok, %Device{} = updated} =
-               DeviceHelper.upsert_device_context("existing", %{"os" => "android"}, %{"version" => "1.0.0"})
+               DeviceHelper.upsert_device_context("existing", %{"os" => "android"}, %{
+                 "version" => "1.0.0"
+               })
 
       assert updated.device_info == %{"os" => "android"}
       assert get_in(updated.metadata, ["app_info", "version"]) == "1.0.0"

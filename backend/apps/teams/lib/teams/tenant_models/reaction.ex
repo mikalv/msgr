@@ -35,7 +35,8 @@ defmodule Teams.TenantModels.Reaction do
   end
 
   def toggle(prefix, %{message_id: message_id, profile_id: profile_id, emoji: emoji} = attrs) do
-    case Teams.Repo.get_by(__MODULE__,
+    case Teams.Repo.get_by(
+           __MODULE__,
            [message_id: message_id, profile_id: profile_id, emoji: emoji],
            prefix: prefix
          ) do

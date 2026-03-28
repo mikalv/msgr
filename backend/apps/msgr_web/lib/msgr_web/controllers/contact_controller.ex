@@ -9,7 +9,8 @@ defmodule MessngrWeb.ContactController do
     current_account = conn.assigns.current_account
     current_profile = conn.assigns.current_profile
 
-    with {:ok, imported} <- Messngr.import_contacts(current_account.id, contacts, profile_id: current_profile.id) do
+    with {:ok, imported} <-
+           Messngr.import_contacts(current_account.id, contacts, profile_id: current_profile.id) do
       render(conn, :index, contacts: imported)
     end
   end

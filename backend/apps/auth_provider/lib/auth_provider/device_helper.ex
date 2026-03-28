@@ -3,7 +3,6 @@ defmodule AuthProvider.DeviceHelper do
   alias AuthProvider.Repo
   require Logger
 
-
   def validate_device_signature(%{"keyData" => keyData} = _payload) do
     signature = Base.decode64!(keyData["signature"])
     public_key = Base.decode64!(keyData["pubkey"])
@@ -18,14 +17,17 @@ defmodule AuthProvider.DeviceHelper do
       public_key_dh: keyData["dhpubkey"],
       metadata: metadata_from_payload(payload)
     }
+
     %Device{}
     |> Device.changeset(attrs)
-    |> Repo.insert
+    |> Repo.insert()
   end
 
   def find_or_register_device(%{"keyData" => keyData} = payload) do
     case Repo.get_by(Device, device_id: keyData["deviceId"]) do
-      nil -> register_device(payload)
+      nil ->
+        register_device(payload)
+
       %Device{} = device ->
         attrs =
           %{}
@@ -72,6 +74,7 @@ defmodule AuthProvider.DeviceHelper do
 
   defp merge_metadata(existing, app_info, timestamp) do
     base_metadata = existing || %{}
+
     with_last_seen =
       Map.put(base_metadata, "last_seen_at", DateTime.to_iso8601(timestamp))
 

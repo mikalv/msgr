@@ -12,7 +12,11 @@ defmodule Messngr.Repo.Migrations.AddBridgeContactProfiles do
 
     create table(:bridge_contact_profile_keys, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :profile_id, references(:bridge_contact_profiles, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :profile_id,
+          references(:bridge_contact_profiles, type: :binary_id, on_delete: :delete_all),
+          null: false
+
       add :kind, :string, null: false
       add :value, :string, null: false
       add :confidence, :integer, default: 1, null: false
@@ -25,7 +29,11 @@ defmodule Messngr.Repo.Migrations.AddBridgeContactProfiles do
 
     create table(:bridge_contact_profile_links, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :profile_id, references(:bridge_contact_profiles, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :profile_id,
+          references(:bridge_contact_profiles, type: :binary_id, on_delete: :delete_all),
+          null: false
+
       add :source, :string, null: false
       add :source_id, :string, null: false
       add :metadata, :map, default: %{}
@@ -37,7 +45,8 @@ defmodule Messngr.Repo.Migrations.AddBridgeContactProfiles do
     create index(:bridge_contact_profile_links, [:profile_id])
 
     alter table(:bridge_contacts) do
-      add :profile_id, references(:bridge_contact_profiles, type: :binary_id, on_delete: :nilify_all)
+      add :profile_id,
+          references(:bridge_contact_profiles, type: :binary_id, on_delete: :nilify_all)
     end
 
     create index(:bridge_contacts, [:profile_id])

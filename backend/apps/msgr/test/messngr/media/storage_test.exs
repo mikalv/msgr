@@ -16,7 +16,11 @@ defmodule Messngr.Media.StorageTest do
   end
 
   test "presign_download embeds checksum into the query" do
-    result = Storage.presign_download("bucket", "object-key", checksum: "abc123", content_type: "image/png")
+    result =
+      Storage.presign_download("bucket", "object-key",
+        checksum: "abc123",
+        content_type: "image/png"
+      )
 
     params =
       result.url
@@ -56,7 +60,11 @@ defmodule Messngr.Media.StorageTest do
       {:ok, %Finch.Response{status: 204, body: "", headers: []}}
     end
 
-    Application.put_env(:msgr, Storage, Keyword.put(Application.get_env(:msgr, Storage, []), :http_client, client))
+    Application.put_env(
+      :msgr,
+      Storage,
+      Keyword.put(Application.get_env(:msgr, Storage, []), :http_client, client)
+    )
 
     assert :ok = Storage.delete_object("media", "object-key")
     assert_received {:delete_request, %Finch.Request{method: "DELETE"}}
@@ -67,7 +75,11 @@ defmodule Messngr.Media.StorageTest do
       {:ok, %Finch.Response{status: 404, body: "", headers: []}}
     end
 
-    Application.put_env(:msgr, Storage, Keyword.put(Application.get_env(:msgr, Storage, []), :http_client, client))
+    Application.put_env(
+      :msgr,
+      Storage,
+      Keyword.put(Application.get_env(:msgr, Storage, []), :http_client, client)
+    )
 
     assert :ok = Storage.delete_object("media", "missing")
   end
@@ -77,7 +89,11 @@ defmodule Messngr.Media.StorageTest do
       {:ok, %Finch.Response{status: 500, body: "", headers: []}}
     end
 
-    Application.put_env(:msgr, Storage, Keyword.put(Application.get_env(:msgr, Storage, []), :http_client, client))
+    Application.put_env(
+      :msgr,
+      Storage,
+      Keyword.put(Application.get_env(:msgr, Storage, []), :http_client, client)
+    )
 
     assert {:error, {:http_error, 500}} = Storage.delete_object("media", "object-key")
   end

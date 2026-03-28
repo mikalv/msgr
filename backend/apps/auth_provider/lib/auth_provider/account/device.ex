@@ -5,11 +5,11 @@ defmodule AuthProvider.Account.Device do
   @foreign_key_type :binary_id
 
   schema "account_devices" do
-    field :metadata, :map
-    field :device_id, :string
-    field :public_key_sign, :string
-    field :public_key_dh, :string
-    field :device_info, :map
+    field(:metadata, :map)
+    field(:device_id, :string)
+    field(:public_key_sign, :string)
+    field(:public_key_dh, :string)
+    field(:device_info, :map)
 
     timestamps()
   end

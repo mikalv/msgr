@@ -17,7 +17,14 @@ defmodule Teams.TenantModels.MessageReminder do
 
   def changeset(reminder, attrs) do
     reminder
-    |> cast(attrs, [:message_id, :channel_id, :profile_id, :remind_at, :delivered, :message_preview])
+    |> cast(attrs, [
+      :message_id,
+      :channel_id,
+      :profile_id,
+      :remind_at,
+      :delivered,
+      :message_preview
+    ])
     |> validate_required([:channel_id, :profile_id, :remind_at])
   end
 

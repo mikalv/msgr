@@ -62,7 +62,10 @@ defmodule Teams.Messages do
   Gets a single message by id. Returns nil if not found.
   """
   def get_message(prefix, id) do
-    from(m in Message, where: m.id == ^id, preload: [:sender_profile, :reactions, reply_to: :sender_profile])
+    from(m in Message,
+      where: m.id == ^id,
+      preload: [:sender_profile, :reactions, reply_to: :sender_profile]
+    )
     |> Teams.Repo.one(prefix: prefix)
   end
 

@@ -82,11 +82,17 @@ defmodule Messngr.Chat.MessageReceipt do
     next = get_field(changeset, :status)
 
     cond do
-      is_nil(current) -> changeset
-      is_nil(next) -> changeset
+      is_nil(current) ->
+        changeset
+
+      is_nil(next) ->
+        changeset
+
       status_rank(next) < status_rank(current) ->
         add_error(changeset, :status, "cannot regress status")
-      true -> changeset
+
+      true ->
+        changeset
     end
   end
 
@@ -109,4 +115,3 @@ defmodule Messngr.Chat.MessageReceipt do
   defp status_rank(:read), do: 2
   defp status_rank(_), do: -1
 end
-

@@ -11,6 +11,8 @@ defmodule Messngr.Repo.Migrations.CreateAccountDevicesV2 do
       add_if_not_exists :last_seen_at, :utc_datetime
     end
 
-    create_if_not_exists unique_index(:account_devices, [:full_uri], where: "full_uri IS NOT NULL")
+    create_if_not_exists unique_index(:account_devices, [:full_uri],
+                           where: "full_uri IS NOT NULL"
+                         )
   end
 end

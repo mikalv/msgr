@@ -110,7 +110,11 @@ defmodule Messngr.Chat.WatcherPruner do
         :ok
 
       {:ok, %{conversations: conversations, watchers: watchers}} ->
-        Logger.debug("conversation watcher sweep", conversations: conversations, watchers: watchers)
+        Logger.debug("conversation watcher sweep",
+          conversations: conversations,
+          watchers: watchers
+        )
+
         :ok
     end
   end

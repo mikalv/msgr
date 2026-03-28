@@ -19,13 +19,15 @@ defmodule MessngrWeb.ReminderController do
         {:ok, remind_at, _} ->
           # Get message for preview
           message = Messages.get_message(prefix, message_id)
-          preview = if message do
-            case message.content do
-              %{"text" => t} -> String.slice(t, 0, 200)
-              t when is_binary(t) -> String.slice(t, 0, 200)
-              _ -> nil
+
+          preview =
+            if message do
+              case message.content do
+                %{"text" => t} -> String.slice(t, 0, 200)
+                t when is_binary(t) -> String.slice(t, 0, 200)
+                _ -> nil
+              end
             end
-          end
 
           attrs = %{
             message_id: message_id,
@@ -39,12 +41,14 @@ defmodule MessngrWeb.ReminderController do
             {:ok, reminder} ->
               conn
               |> put_status(:created)
-              |> json(%{data: %{
-                id: reminder.id,
-                message_id: reminder.message_id,
-                remind_at: reminder.remind_at,
-                message_preview: reminder.message_preview
-              }})
+              |> json(%{
+                data: %{
+                  id: reminder.id,
+                  message_id: reminder.message_id,
+                  remind_at: reminder.remind_at,
+                  message_preview: reminder.message_preview
+                }
+              })
 
             {:error, changeset} ->
               {:error, changeset}
@@ -68,15 +72,19 @@ defmodule MessngrWeb.ReminderController do
       json(conn, %{data: []})
     else
       reminders = MessageReminder.list_for_profile(prefix, profile.id)
-      json(conn, %{data: Enum.map(reminders, fn r ->
-        %{
-          id: r.id,
-          message_id: r.message_id,
-          channel_id: r.channel_id,
-          remind_at: r.remind_at,
-          message_preview: r.message_preview
-        }
-      end)})
+
+      json(conn, %{
+        data:
+          Enum.map(reminders, fn r ->
+            %{
+              id: r.id,
+              message_id: r.message_id,
+              channel_id: r.channel_id,
+              remind_at: r.remind_at,
+              message_preview: r.message_preview
+            }
+          end)
+      })
     end
   end
 end

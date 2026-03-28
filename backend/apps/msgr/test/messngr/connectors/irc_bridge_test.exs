@@ -12,8 +12,15 @@ defmodule Messngr.Connectors.IRCBridgeTest do
   end
 
   test "configure_identity/3 records identity config", %{bridge: bridge, agent: agent} do
-    params = %{user_id: "u-irc", network: "irc.libera.chat", nickname: "msgr", auth: %{method: :sasl}}
-    assert {:ok, %{status: :accepted}} = IRCBridge.configure_identity(bridge, params, trace_id: "irc-config")
+    params = %{
+      user_id: "u-irc",
+      network: "irc.libera.chat",
+      nickname: "msgr",
+      auth: %{method: :sasl}
+    }
+
+    assert {:ok, %{status: :accepted}} =
+             IRCBridge.configure_identity(bridge, params, trace_id: "irc-config")
 
     assert [request] = QueueRecorder.requests(agent)
     assert request.topic == "bridge/irc/configure_identity"
@@ -26,12 +33,14 @@ defmodule Messngr.Connectors.IRCBridgeTest do
 
     assert [message] = QueueRecorder.published(agent)
     assert message.topic == "bridge/irc/outbound_command"
+
     assert message.payload.payload == %{
              command: "PRIVMSG",
              target: "#msgr",
              arguments: ["Hello"],
              metadata: %{}
            }
+
     assert message.payload.trace_id == "cmd"
   end
 

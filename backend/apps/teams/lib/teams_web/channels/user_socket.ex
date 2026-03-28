@@ -24,7 +24,6 @@ defmodule TeamsWeb.UserSocket do
   # See the [`Channels guide`](https://hexdocs.pm/phoenix/channels.html)
   # for further details.
 
-
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After
   # verification, you can put default assigns into
@@ -41,20 +40,28 @@ defmodule TeamsWeb.UserSocket do
   # performing token verification on connect.
   @impl true
   def connect(%{"token" => token} = _params, socket, %{uri: %URI{} = uri} = connect_info) do
-    Logger.debug "New socket connection! with connect_info: #{inspect connect_info}"
-    Logger.debug "uri: #{inspect uri}"
+    Logger.debug("New socket connection! with connect_info: #{inspect(connect_info)}")
+    Logger.debug("uri: #{inspect(uri)}")
+
     case AuthProvider.Guardian.decode_and_verify(token) do
       {:ok, claims} ->
-        Logger.info "User logged onto websocket with claims: #{inspect claims}"
-        socket = socket
+        Logger.info("User logged onto websocket with claims: #{inspect(claims)}")
+
+        socket =
+          socket
           |> assign(:uid, claims["sub"])
           |> assign(:tenant, claims["ten"])
           |> assign(:profile_id, claims["pid"])
           |> assign(:team_id, claims["tei"])
           |> assign(:token, token)
+
         {:ok, socket}
+
       {:error, emsg} ->
-        Logger.warning "Socket connection had invalid token: #{inspect emsg} token: #{inspect token}"
+        Logger.warning(
+          "Socket connection had invalid token: #{inspect(emsg)} token: #{inspect(token)}"
+        )
+
         {:error, "Invalid token!"}
     end
   end
@@ -62,20 +69,28 @@ defmodule TeamsWeb.UserSocket do
   # Header-based auth fallback: accepts account_id + profile_id directly.
   # Used by Flutter app which authenticates via X-Account-Id / X-Profile-Id headers.
   # The tenant is resolved per-channel join (TeamChannel, ChatChannel, PresenceChannel).
-  def connect(%{"account_id" => account_id, "profile_id" => profile_id} = _params, socket, _connect_info) do
-    Logger.info "Socket connection via account_id/profile_id: account=#{account_id} profile=#{profile_id}"
-    socket = socket
+  def connect(
+        %{"account_id" => account_id, "profile_id" => profile_id} = _params,
+        socket,
+        _connect_info
+      ) do
+    Logger.info(
+      "Socket connection via account_id/profile_id: account=#{account_id} profile=#{profile_id}"
+    )
+
+    socket =
+      socket
       |> assign(:uid, account_id)
       |> assign(:profile_id, profile_id)
       |> assign(:tenant, nil)
       |> assign(:team_id, nil)
+
     {:ok, socket}
   end
 
   def disconnect_user(uid) do
     TeamsWeb.Endpoint.broadcast("user_socket:#{uid}", "disconnect", %{"reason" => "testing"})
   end
-
 
   # Socket IDs are topics that allow you to identify all sockets for a given user:
   #
@@ -89,5 +104,5 @@ defmodule TeamsWeb.UserSocket do
   # Returning `nil` makes this socket anonymous.
   @impl true
   def id(socket), do: "user:#{socket.assigns.uid}"
-  #def id(_socket), do: nil
+  # def id(_socket), do: nil
 end

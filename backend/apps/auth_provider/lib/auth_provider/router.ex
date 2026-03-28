@@ -48,7 +48,6 @@ defmodule AuthProvider.Router do
     post "/introspect", IntrospectController, :introspect
   end
 
-
   scope "/openid", AuthProvider.Openid do
     pipe_through [:api]
 

@@ -24,7 +24,10 @@ defmodule Messngr.Bridges.Auth.Providers.Mock do
     url =
       callback_path
       |> URI.parse()
-      |> Map.put(:query, URI.encode_query(%{"code" => code, "state" => state, "cc" => code_challenge}))
+      |> Map.put(
+        :query,
+        URI.encode_query(%{"code" => code, "state" => state, "cc" => code_challenge})
+      )
       |> URI.to_string()
 
     {:ok, url, %{code: code}}

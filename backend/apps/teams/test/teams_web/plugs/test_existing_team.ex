@@ -15,9 +15,10 @@ defmodule TeamsWeb.Plugs.ExistingTeamTest do
       Teams.TenantTeam
       |> expect(:get_team!, fn ^subdomain -> team end)
 
-      conn = conn(:get, "/")
-             |> put_private(:subdomain, subdomain)
-             |> ExistingTeam.call(@opts)
+      conn =
+        conn(:get, "/")
+        |> put_private(:subdomain, subdomain)
+        |> ExistingTeam.call(@opts)
 
       assert conn.private[:tenant] == team.name
       assert conn.status == nil
@@ -30,9 +31,10 @@ defmodule TeamsWeb.Plugs.ExistingTeamTest do
       Teams.TenantTeam
       |> expect(:get_team!, fn ^subdomain -> raise Ecto.NoResultsError end)
 
-      conn = conn(:get, "/")
-             |> put_private(:subdomain, subdomain)
-             |> ExistingTeam.call(@opts)
+      conn =
+        conn(:get, "/")
+        |> put_private(:subdomain, subdomain)
+        |> ExistingTeam.call(@opts)
 
       assert conn.status == 400
       assert conn.resp_body == "Teams don't exist!"

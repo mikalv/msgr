@@ -34,8 +34,12 @@ defmodule Messngr.Noise.DevHandshakeTest do
     ]
 
     Application.put_env(:msgr, :noise, noise_config)
-    Application.put_env(:msgr, :noise_session_registry, [ttl: 200])
-    Application.put_env(:msgr, Messngr.Noise.DevHandshake, enabled: true, allow_without_transport: false)
+    Application.put_env(:msgr, :noise_session_registry, ttl: 200)
+
+    Application.put_env(:msgr, Messngr.Noise.DevHandshake,
+      enabled: true,
+      allow_without_transport: false
+    )
 
     {:ok,
      %{
@@ -45,7 +49,10 @@ defmodule Messngr.Noise.DevHandshakeTest do
      }}
   end
 
-  test "generate/1 persists session and exposes server metadata", %{public_key: public_key, fingerprint: fingerprint} do
+  test "generate/1 persists session and exposes server metadata", %{
+    public_key: public_key,
+    fingerprint: fingerprint
+  } do
     assert {:ok, payload} = DevHandshake.generate(ttl_ms: 200)
 
     assert %Session{} = payload.session
@@ -68,13 +75,13 @@ defmodule Messngr.Noise.DevHandshakeTest do
   end
 
   test "generate/1 returns error when transport disabled" do
-    Application.put_env(:msgr, :noise, [enabled: false])
+    Application.put_env(:msgr, :noise, enabled: false)
 
     assert {:error, :noise_transport_disabled} = DevHandshake.generate()
   end
 
   test "generate/1 returns error when key material missing" do
-    Application.put_env(:msgr, :noise, [enabled: true, private_key: nil, public_key: nil])
+    Application.put_env(:msgr, :noise, enabled: true, private_key: nil, public_key: nil)
 
     assert {:error, :noise_private_key_missing} = DevHandshake.generate()
   end
@@ -95,7 +102,10 @@ defmodule Messngr.Noise.DevHandshakeTest do
       prologue: KeyLoader.prologue()
     )
 
-    Application.put_env(:msgr, Messngr.Noise.DevHandshake, enabled: true, allow_without_transport: true)
+    Application.put_env(:msgr, Messngr.Noise.DevHandshake,
+      enabled: true,
+      allow_without_transport: true
+    )
 
     assert {:ok, payload} = DevHandshake.generate(ttl_ms: 50)
 

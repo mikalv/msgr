@@ -73,7 +73,8 @@ defmodule MessngrWeb.BridgeCatalogJSON do
     |> Map.new()
   end
 
-  defp maybe_put_linked_at(auth_details, %{"linked_at" => linked_at}) when not is_nil(linked_at) do
+  defp maybe_put_linked_at(auth_details, %{"linked_at" => linked_at})
+       when not is_nil(linked_at) do
     Map.put(auth_details, :linked_at, linked_at)
   end
 
@@ -84,7 +85,10 @@ defmodule MessngrWeb.BridgeCatalogJSON do
   defp maybe_put_linked_at(auth_details, _link_payload), do: auth_details
 
   defp format_datetime(%DateTime{} = value), do: DateTime.to_iso8601(value)
-  defp format_datetime(%NaiveDateTime{} = value), do: DateTime.from_naive!(value, "Etc/UTC") |> DateTime.to_iso8601()
+
+  defp format_datetime(%NaiveDateTime{} = value),
+    do: DateTime.from_naive!(value, "Etc/UTC") |> DateTime.to_iso8601()
+
   defp format_datetime(_), do: nil
 
   defp stringify_keys(value) when is_map(value) do

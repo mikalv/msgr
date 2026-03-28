@@ -208,8 +208,9 @@ defmodule Messngr.Logging.OpenObserveBackend do
 
   defp inspect_metadata(%{__struct__: _} = value), do: inspect(value)
 
-  defp inspect_metadata(value) when is_pid(value) or is_reference(value) or is_function(value) or is_port(value),
-    do: inspect(value)
+  defp inspect_metadata(value)
+       when is_pid(value) or is_reference(value) or is_function(value) or is_port(value),
+       do: inspect(value)
 
   defp inspect_metadata(value) when is_tuple(value) or is_map(value) or is_list(value),
     do: inspect(value)
@@ -237,7 +238,9 @@ defmodule Messngr.Logging.OpenObserveBackend do
     request = {String.to_charlist(state.url), headers, ~c"application/json", payload}
 
     case state.http_client.(:post, request, [], []) do
-      {:ok, _response} -> :ok
+      {:ok, _response} ->
+        :ok
+
       {:error, reason} ->
         IO.warn("Failed to deliver log entry to OpenObserve: #{inspect(reason)}")
         :error

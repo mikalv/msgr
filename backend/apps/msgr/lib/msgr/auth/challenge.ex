@@ -26,7 +26,15 @@ defmodule Messngr.Auth.Challenge do
   @doc false
   def changeset(challenge, attrs) do
     challenge
-    |> cast(attrs, [:channel, :target, :code_hash, :expires_at, :consumed_at, :identity_id, :issued_for])
+    |> cast(attrs, [
+      :channel,
+      :target,
+      :code_hash,
+      :expires_at,
+      :consumed_at,
+      :identity_id,
+      :issued_for
+    ])
     |> validate_required([:channel, :target, :code_hash, :expires_at])
     |> validate_length(:target, min: 4)
     |> unique_constraint(:active_challenge,
@@ -35,4 +43,3 @@ defmodule Messngr.Auth.Challenge do
     )
   end
 end
-

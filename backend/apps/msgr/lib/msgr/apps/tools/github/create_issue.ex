@@ -74,12 +74,13 @@ defmodule Messngr.Apps.Tools.GitHub.CreateIssue do
       {:ok, {{_, status, _}, _resp_headers, resp_body}} when status >= 200 and status < 300 ->
         case Jason.decode(resp_body) do
           {:ok, data} ->
-            {:ok, %{
-              "number" => data["number"],
-              "url" => data["html_url"],
-              "title" => data["title"],
-              "state" => data["state"]
-            }}
+            {:ok,
+             %{
+               "number" => data["number"],
+               "url" => data["html_url"],
+               "title" => data["title"],
+               "state" => data["state"]
+             }}
 
           {:error, _} ->
             {:error, "Kunne ikke parse GitHub-respons"}

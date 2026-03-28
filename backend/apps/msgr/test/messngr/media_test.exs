@@ -13,12 +13,13 @@ defmodule Messngr.MediaTest do
 
     {:ok, conversation} = Chat.ensure_direct_conversation(profile.id, peer.id)
 
-    {:ok,
-     profile: profile,
-     conversation: conversation}
+    {:ok, profile: profile, conversation: conversation}
   end
 
-  test "create_upload returns signed instructions and can be consumed with metadata", %{profile: profile, conversation: conversation} do
+  test "create_upload returns signed instructions and can be consumed with metadata", %{
+    profile: profile,
+    conversation: conversation
+  } do
     {:ok, upload, instructions} =
       Media.create_upload(conversation.id, profile.id, %{
         "kind" => "image",
@@ -37,7 +38,10 @@ defmodule Messngr.MediaTest do
     assert String.ends_with?(thumb_key, "-thumbnail.png")
 
     sha = String.duplicate("a", 64)
-    assert %{"method" => "PUT", "url" => upload_url, "headers" => headers} = instructions["upload"]
+
+    assert %{"method" => "PUT", "url" => upload_url, "headers" => headers} =
+             instructions["upload"]
+
     assert headers["content-type"] == "image/png"
     assert headers["x-amz-server-side-encryption"] == "AES256"
     assert upload_url =~ "signature="
@@ -70,18 +74,25 @@ defmodule Messngr.MediaTest do
     assert media_payload["height"] == 1080
     assert media_payload["caption"] == "Sommerferie"
     assert media_payload["sha256"] == sha
-    assert %{"url" => url, "bucket" => bucket, "objectKey" => thumb_key} = media_payload["thumbnail"]
+
+    assert %{"url" => url, "bucket" => bucket, "objectKey" => thumb_key} =
+             media_payload["thumbnail"]
+
     assert url =~ thumb_key
     assert bucket == thumbnail_pointer["bucket"]
     assert payload["body"] == "Sommerferie"
     assert payload["encryption"]["strategy"] == "profile-enveloped"
     assert payload["clientState"]["profileId"] == profile.id
     assert media_payload["encryption"]["cipher"] == "aes-256-gcm"
-  
-    assert %Upload{status: :consumed, width: 1920, height: 1080, sha256: ^sha} = Repo.get!(Upload, upload.id)
+
+    assert %Upload{status: :consumed, width: 1920, height: 1080, sha256: ^sha} =
+             Repo.get!(Upload, upload.id)
   end
 
-  test "consume_upload rejects invalid sha digest", %{profile: profile, conversation: conversation} do
+  test "consume_upload rejects invalid sha digest", %{
+    profile: profile,
+    conversation: conversation
+  } do
     {:ok, upload, _} =
       Media.create_upload(conversation.id, profile.id, %{
         "kind" => "audio",
@@ -97,7 +108,10 @@ defmodule Messngr.MediaTest do
     assert %{sha256: ["must be a valid SHA-256 hex digest"]} = errors_on(changeset)
   end
 
-  test "consume_upload returns checksum error for malformed checksum field", %{profile: profile, conversation: conversation} do
+  test "consume_upload returns checksum error for malformed checksum field", %{
+    profile: profile,
+    conversation: conversation
+  } do
     {:ok, upload, _instructions} =
       Media.create_upload(conversation.id, profile.id, %{
         "kind" => "audio",
@@ -111,7 +125,10 @@ defmodule Messngr.MediaTest do
              })
   end
 
-  test "creation_changeset validates checksum format", %{profile: profile, conversation: conversation} do
+  test "creation_changeset validates checksum format", %{
+    profile: profile,
+    conversation: conversation
+  } do
     params = %{
       "kind" => "image",
       "bucket" => Storage.bucket(),
@@ -129,7 +146,10 @@ defmodule Messngr.MediaTest do
     assert %{checksum: ["must be a hexadecimal digest"]} = errors_on(changeset)
   end
 
-  test "creation_changeset rejects buckets that do not match storage config", %{profile: profile, conversation: conversation} do
+  test "creation_changeset rejects buckets that do not match storage config", %{
+    profile: profile,
+    conversation: conversation
+  } do
     params = %{
       "kind" => "image",
       "bucket" => "public-cdn",
@@ -146,7 +166,10 @@ defmodule Messngr.MediaTest do
     assert %{bucket: ["is not allowed"]} = errors_on(changeset)
   end
 
-  test "consume_upload rejects thumbnails pointing at foreign buckets", %{profile: profile, conversation: conversation} do
+  test "consume_upload rejects thumbnails pointing at foreign buckets", %{
+    profile: profile,
+    conversation: conversation
+  } do
     {:ok, upload, _} =
       Media.create_upload(conversation.id, profile.id, %{
         "kind" => "image",
@@ -162,7 +185,10 @@ defmodule Messngr.MediaTest do
              })
   end
 
-  test "consume_upload rejects thumbnails without an object key", %{profile: profile, conversation: conversation} do
+  test "consume_upload rejects thumbnails without an object key", %{
+    profile: profile,
+    conversation: conversation
+  } do
     {:ok, upload, _} =
       Media.create_upload(conversation.id, profile.id, %{
         "kind" => "image",

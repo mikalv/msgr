@@ -11,7 +11,7 @@ defmodule MainProxy.Plug do
 
   def call(conn, opts) do
     backends = Keyword.fetch!(opts, :backends)
-    #options = backends()
+    # options = backends()
 
     backend = choose_backend(conn, backends)
     log_request("Backend chosen: #{inspect(backend)}")
@@ -39,7 +39,6 @@ defmodule MainProxy.Plug do
     path = Map.get(backend, :path)
     wild = Map.get(backend, :wildcard)
 
-
     verb_match = if verb, do: Regex.match?(verb, conn.method), else: true
     domain_match = if domain, do: conn.host == domain, else: true
     host_match = if host, do: Regex.match?(host, conn.host), else: true
@@ -48,6 +47,7 @@ defmodule MainProxy.Plug do
     if wild do
       [_head | tail] = String.split(conn.host, ".")
       wildcard = ["*"] ++ tail
+
       if String.split(domain, ".") == wildcard do
         true
       else

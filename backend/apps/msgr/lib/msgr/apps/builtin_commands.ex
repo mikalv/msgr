@@ -28,7 +28,11 @@ defmodule Messngr.Apps.BuiltinCommands do
   def seed! do
     app = ensure_builtin_app!()
     ensure_commands!(app)
-    Logger.info("Built-in commands registered: #{Enum.map_join(@builtin_commands, ", ", & &1.name)}")
+
+    Logger.info(
+      "Built-in commands registered: #{Enum.map_join(@builtin_commands, ", ", & &1.name)}"
+    )
+
     :ok
   end
 

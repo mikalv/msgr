@@ -33,19 +33,25 @@ defmodule MainProxy.Plug.Metrics do
       {:ok, false} ->
         conn
         |> put_resp_content_type("application/json")
-        |> send_resp(403, Jason.encode!(%{
-          error: "Access denied",
-          message: "Metrics endpoint is not accessible from your IP address"
-        }))
+        |> send_resp(
+          403,
+          Jason.encode!(%{
+            error: "Access denied",
+            message: "Metrics endpoint is not accessible from your IP address"
+          })
+        )
 
       {:error, reason} ->
         Logger.error("Metrics access control error: #{inspect(reason)}")
 
         conn
         |> put_resp_content_type("application/json")
-        |> send_resp(500, Jason.encode!(%{
-          error: "Internal server error"
-        }))
+        |> send_resp(
+          500,
+          Jason.encode!(%{
+            error: "Internal server error"
+          })
+        )
     end
   end
 
@@ -55,9 +61,10 @@ defmodule MainProxy.Plug.Metrics do
     # Allow from local networks and Docker networks by default
     allowed_networks = get_allowed_networks()
 
-    allowed = Enum.any?(allowed_networks, fn network ->
-      ip_in_network?(remote_ip, network)
-    end)
+    allowed =
+      Enum.any?(allowed_networks, fn network ->
+        ip_in_network?(remote_ip, network)
+      end)
 
     {:ok, allowed}
   rescue
@@ -84,12 +91,18 @@ defmodule MainProxy.Plug.Metrics do
   defp get_allowed_networks do
     # Default: allow localhost, private networks, and Docker networks
     default_networks = [
-      "127.0.0.0/8",      # localhost
-      "10.0.0.0/8",       # Private network
-      "172.16.0.0/12",    # Private network (includes Docker default 172.17.0.0/16)
-      "192.168.0.0/16",   # Private network
-      "::1/128",          # IPv6 localhost
-      "fc00::/7"          # IPv6 private
+      # localhost
+      "127.0.0.0/8",
+      # Private network
+      "10.0.0.0/8",
+      # Private network (includes Docker default 172.17.0.0/16)
+      "172.16.0.0/12",
+      # Private network
+      "192.168.0.0/16",
+      # IPv6 localhost
+      "::1/128",
+      # IPv6 private
+      "fc00::/7"
     ]
 
     # Allow override via environment variable
@@ -142,14 +155,17 @@ defmodule MainProxy.Plug.Metrics do
   end
 
   defp ip_to_bits({a, b, c, d}), do: <<a, b, c, d>>
-  defp ip_to_bits({a, b, c, d, e, f, g, h}), do: <<a::16, b::16, c::16, d::16, e::16, f::16, g::16, h::16>>
+
+  defp ip_to_bits({a, b, c, d, e, f, g, h}),
+    do: <<a::16, b::16, c::16, d::16, e::16, f::16, g::16, h::16>>
 
   defp collect_metrics do
     backends = EdgeRouter.MainProxy.backends()
 
-    backend_metrics = Enum.map(backends, fn backend ->
-      collect_backend_metrics(backend)
-    end)
+    backend_metrics =
+      Enum.map(backends, fn backend ->
+        collect_backend_metrics(backend)
+      end)
 
     %{
       backends: backend_metrics,
@@ -157,11 +173,15 @@ defmodule MainProxy.Plug.Metrics do
     }
   end
 
-  defp collect_backend_metrics(%{phoenix_endpoint: endpoint} = backend) when not is_nil(endpoint) do
-    status = case Process.whereis(endpoint) do
-      nil -> 0  # down
-      pid when is_pid(pid) -> 1  # up
-    end
+  defp collect_backend_metrics(%{phoenix_endpoint: endpoint} = backend)
+       when not is_nil(endpoint) do
+    status =
+      case Process.whereis(endpoint) do
+        # down
+        nil -> 0
+        # up
+        pid when is_pid(pid) -> 1
+      end
 
     %{
       type: "phoenix_endpoint",
@@ -176,7 +196,8 @@ defmodule MainProxy.Plug.Metrics do
       type: "plug",
       name: inspect(plug),
       path: inspect(Map.get(backend, :path, "unknown")),
-      status: 1  # plugs are always "up" if configured
+      # plugs are always "up" if configured
+      status: 1
     }
   end
 
@@ -193,15 +214,17 @@ defmodule MainProxy.Plug.Metrics do
       "# TYPE edge_router_backend_up gauge"
     ]
 
-    backend_lines = Enum.map(metrics.backends, fn backend ->
-      labels = format_labels(%{
-        type: backend.type,
-        name: backend.name,
-        domain: Map.get(backend, :domain, "unknown")
-      })
+    backend_lines =
+      Enum.map(metrics.backends, fn backend ->
+        labels =
+          format_labels(%{
+            type: backend.type,
+            name: backend.name,
+            domain: Map.get(backend, :domain, "unknown")
+          })
 
-      "edge_router_backend_up{#{labels}} #{backend.status}"
-    end)
+        "edge_router_backend_up{#{labels}} #{backend.status}"
+      end)
 
     info_lines = [
       "",

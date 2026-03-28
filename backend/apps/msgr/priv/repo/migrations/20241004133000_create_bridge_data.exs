@@ -4,7 +4,10 @@ defmodule Messngr.Repo.Migrations.CreateBridgeData do
   def change do
     create table(:bridge_accounts, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :account_id, references(:accounts, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :account_id, references(:accounts, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :service, :string, null: false
       add :external_id, :string
       add :display_name, :string
@@ -20,8 +23,10 @@ defmodule Messngr.Repo.Migrations.CreateBridgeData do
 
     create table(:bridge_contacts, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :bridge_account_id, references(:bridge_accounts, type: :binary_id, on_delete: :delete_all),
-        null: false
+
+      add :bridge_account_id,
+          references(:bridge_accounts, type: :binary_id, on_delete: :delete_all), null: false
+
       add :external_id, :string, null: false
       add :display_name, :string
       add :handle, :string
@@ -35,8 +40,10 @@ defmodule Messngr.Repo.Migrations.CreateBridgeData do
 
     create table(:bridge_channels, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :bridge_account_id, references(:bridge_accounts, type: :binary_id, on_delete: :delete_all),
-        null: false
+
+      add :bridge_account_id,
+          references(:bridge_accounts, type: :binary_id, on_delete: :delete_all), null: false
+
       add :external_id, :string, null: false
       add :name, :string
       add :kind, :string, null: false, default: "chat"

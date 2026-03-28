@@ -102,6 +102,7 @@ defmodule Messngr.Media.Upload do
   """
   @spec expired?(t()) :: boolean()
   def expired?(%__MODULE__{expires_at: nil}), do: false
+
   def expired?(%__MODULE__{expires_at: expires_at}) do
     DateTime.compare(expires_at, DateTime.utc_now()) == :lt
   end
@@ -140,6 +141,7 @@ defmodule Messngr.Media.Upload do
 
   defp merge_metadata(base, metadata) when is_map(metadata) do
     normalized = for {key, value} <- metadata, into: %{}, do: {to_string(key), value}
+
     media_overrides =
       case Map.get(normalized, "media") do
         %{} = nested -> Map.merge(Map.delete(normalized, "media"), nested)
@@ -173,6 +175,7 @@ defmodule Messngr.Media.Upload do
 
   defp normalize_dimension(value) when is_integer(value) and value > 0, do: value
   defp normalize_dimension(value) when is_float(value) and value > 0, do: round(value)
+
   defp normalize_dimension(value) when is_binary(value) do
     with {int, ""} <- Integer.parse(value) do
       normalize_dimension(int)
@@ -184,6 +187,7 @@ defmodule Messngr.Media.Upload do
         end
     end
   end
+
   defp normalize_dimension(_), do: nil
 
   defp normalize_sha(media) do
@@ -199,7 +203,7 @@ defmodule Messngr.Media.Upload do
   def thumbnail_object_key(object_key) when is_binary(object_key) do
     ext = Path.extname(object_key)
     base = Path.rootname(object_key, ext)
-    base <> "-thumbnail" <> (ext == "" && ".jpg" || ext)
+    base <> "-thumbnail" <> ((ext == "" && ".jpg") || ext)
   end
 
   defp validate_sha256(:sha256, nil), do: []
@@ -225,6 +229,7 @@ defmodule Messngr.Media.Upload do
       true -> add_error(changeset, :retention_expires_at, "must be after expires_at")
     end
   end
+
   defp maybe_presign_thumbnail(%{"media" => %{"thumbnail" => %{} = thumbnail}} = payload) do
     bucket =
       thumbnail
@@ -237,8 +242,12 @@ defmodule Messngr.Media.Upload do
     object_key = Map.get(thumbnail, "objectKey") || Map.get(thumbnail, "object_key")
 
     cond do
-      not allowed_bucket?(bucket) -> drop_thumbnail(payload)
-      not is_binary(object_key) or object_key == "" -> drop_thumbnail(payload)
+      not allowed_bucket?(bucket) ->
+        drop_thumbnail(payload)
+
+      not is_binary(object_key) or object_key == "" ->
+        drop_thumbnail(payload)
+
       true ->
         resolved_bucket = bucket || Messngr.Media.Storage.bucket()
         download = Messngr.Media.Storage.presign_download(resolved_bucket, object_key)

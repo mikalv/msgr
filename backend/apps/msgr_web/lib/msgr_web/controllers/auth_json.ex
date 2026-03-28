@@ -47,6 +47,7 @@ defmodule MessngrWeb.AuthJSON do
   end
 
   defp maybe_put_tokens(map, nil, _), do: map
+
   defp maybe_put_tokens(map, access_token, refresh_token) do
     map
     |> Map.put(:access_token, access_token)

@@ -106,6 +106,7 @@ defmodule AuthProvider.IdpTest do
       conn =
         Plug.Test.conn(:get, "/")
         |> Plug.Test.init_test_session(%{})
+
       %{tenant: tenant, user: user, provider: provider, conn: conn}
     end
 
@@ -114,7 +115,12 @@ defmodule AuthProvider.IdpTest do
       assert claims["tenant"] == tenant.slug
     end
 
-    test "sign_in/4 stores ids in session", %{tenant: tenant, user: user, provider: provider, conn: conn} do
+    test "sign_in/4 stores ids in session", %{
+      tenant: tenant,
+      user: user,
+      provider: provider,
+      conn: conn
+    } do
       conn = Idp.sign_in(conn, tenant, user, provider)
 
       assert Plug.Conn.get_session(conn, "idp_tenant_id") == tenant.id
@@ -133,4 +139,3 @@ defmodule AuthProvider.IdpTest do
     end
   end
 end
-

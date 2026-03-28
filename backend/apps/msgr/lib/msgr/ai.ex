@@ -23,7 +23,15 @@ defmodule Messngr.AI do
   @type message :: %{required(:role) => String.t(), required(:content) => String.t()}
   @type messages :: [message()]
 
-  @forwarded_opts [:temperature, :max_tokens, :provider, :model, :response_format, :credentials, :config]
+  @forwarded_opts [
+    :temperature,
+    :max_tokens,
+    :provider,
+    :model,
+    :response_format,
+    :credentials,
+    :config
+  ]
 
   @doc """
   Execute a raw chat completion request with the provided messages.
@@ -84,7 +92,8 @@ defmodule Messngr.AI do
         |> maybe_append(context_message)
         |> Kernel.++([%{role: "user", content: text}])
 
-      forwarded_opts = Keyword.drop(opts, [:language, :style, :instructions, :context, :system_prompt])
+      forwarded_opts =
+        Keyword.drop(opts, [:language, :style, :instructions, :context, :system_prompt])
 
       chat(team_id, messages, forwarded_opts)
     end
@@ -103,7 +112,8 @@ defmodule Messngr.AI do
     * `:tone` – free text description of the desired tone (default "friendly and concise")
     * `:extra_context` – additional context injected as a system message
   """
-  @spec conversation_reply(term(), binary(), Profile.t(), keyword()) :: {:ok, map()} | {:error, term()}
+  @spec conversation_reply(term(), binary(), Profile.t(), keyword()) ::
+          {:ok, map()} | {:error, term()}
   def conversation_reply(team_id, conversation_id, %Profile{} = profile, opts \\ []) do
     history_limit = Keyword.get(opts, :history_limit, 20)
 
@@ -126,7 +136,8 @@ defmodule Messngr.AI do
       |> maybe_append(build_context_message(opts[:extra_context]))
       |> Kernel.++(Enum.map(history, &history_entry(&1, profile)))
 
-    forwarded_opts = Keyword.drop(opts, [:history_limit, :system_prompt, :assistant_name, :tone, :extra_context])
+    forwarded_opts =
+      Keyword.drop(opts, [:history_limit, :system_prompt, :assistant_name, :tone, :extra_context])
 
     chat(team_id, messages, forwarded_opts)
   end
@@ -228,7 +239,9 @@ defmodule Messngr.AI do
   defp normalize_option(:response_format, nil), do: {:ok, nil}
   defp normalize_option(:response_format, _), do: {:error, {:invalid_option, :response_format}}
 
-  defp normalize_option(:credentials, value) when is_map(value) or is_list(value), do: {:ok, value}
+  defp normalize_option(:credentials, value) when is_map(value) or is_list(value),
+    do: {:ok, value}
+
   defp normalize_option(:credentials, nil), do: {:ok, nil}
   defp normalize_option(:credentials, _), do: {:error, {:invalid_option, :credentials}}
 
@@ -277,12 +290,17 @@ defmodule Messngr.AI do
 
   defp default_summary_prompt(opts) do
     language = opts |> Keyword.get(:language, "Norwegian Bokmål") |> to_string()
-    style = opts |> Keyword.get(:style, "concise paragraph or bullet list when it improves clarity") |> to_string()
+
+    style =
+      opts
+      |> Keyword.get(:style, "concise paragraph or bullet list when it improves clarity")
+      |> to_string()
+
     instructions = opts |> Keyword.get(:instructions)
 
     base =
-      "You summarise texts for humans. Write the summary in #{language} as a #{style}. " \
-      <> "Preserve key facts, dates and names."
+      "You summarise texts for humans. Write the summary in #{language} as a #{style}. " <>
+        "Preserve key facts, dates and names."
 
     case instructions do
       nil -> base
@@ -297,9 +315,9 @@ defmodule Messngr.AI do
     tone = Keyword.get(opts, :tone, "friendly and concise")
     display_name = name || "brukeren"
 
-    "You are #{assistant_name}, an AI collaborator helping #{display_name} in a group chat. " \
-    <> "Craft one #{tone} reply that moves the conversation forward. " \
-    <> "Reference other participants by name when helpful and keep the reply short."
+    "You are #{assistant_name}, an AI collaborator helping #{display_name} in a group chat. " <>
+      "Craft one #{tone} reply that moves the conversation forward. " <>
+      "Reference other participants by name when helpful and keep the reply short."
   end
 
   defp history_entry(%Message{} = message, %Profile{} = current_profile) do

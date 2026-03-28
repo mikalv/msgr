@@ -4,6 +4,7 @@ defmodule Messngr.Auth.DeviceFlowTest do
   describe "OTP device registration" do
     test "verify_auth_challenge/3 upserts device using issued_for" do
       key = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE"
+
       {:ok, challenge, code} =
         Messngr.start_auth_challenge(%{
           "channel" => "email",
@@ -40,6 +41,7 @@ defmodule Messngr.Auth.DeviceFlowTest do
   describe "OIDC device registration" do
     test "complete_oidc/1 associates device by Noise key" do
       key = "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI"
+
       {:ok, %{account: account}} =
         Messngr.complete_oidc(%{
           "provider" => "example",

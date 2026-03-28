@@ -41,7 +41,9 @@ defmodule MessngrWeb.FamilyShoppingListJSON do
   end
 
   defp maybe_profile(nil), do: nil
-  defp maybe_profile(%Profile{} = profile), do: %{id: profile.id, name: profile.name, slug: profile.slug}
+
+  defp maybe_profile(%Profile{} = profile),
+    do: %{id: profile.id, name: profile.name, slug: profile.slug}
 
   defp render_datetime(nil), do: nil
   defp render_datetime(%DateTime{} = datetime), do: DateTime.to_iso8601(datetime)

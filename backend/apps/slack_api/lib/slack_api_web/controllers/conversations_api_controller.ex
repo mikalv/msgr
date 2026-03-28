@@ -15,6 +15,7 @@ defmodule SlackApiWeb.Controllers.ConversationsApiController do
   end
 
   def create(conn, _params), do: render_not_implemented(conn)
+
   def mark(conn, params) do
     current_profile = conn.assigns.current_profile
 
@@ -52,6 +53,7 @@ defmodule SlackApiWeb.Controllers.ConversationsApiController do
         json(conn, SlackResponse.error(reason))
     end
   end
+
   def replies(conn, _params), do: render_not_implemented(conn)
   def setPurpose(conn, _params), do: render_not_implemented(conn)
   def setTopic(conn, _params), do: render_not_implemented(conn)

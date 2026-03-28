@@ -51,12 +51,15 @@ defmodule MessngrWeb.AccountController do
 
     with {:ok, _updated} <- Messngr.update_account(current_account, attrs) do
       account = Messngr.get_account!(current_account.id)
-      json(conn, %{data: %{
-        id: account.id,
-        display_name: account.display_name,
-        handle: account.handle,
-        email: account.email
-      }})
+
+      json(conn, %{
+        data: %{
+          id: account.id,
+          display_name: account.display_name,
+          handle: account.handle,
+          email: account.email
+        }
+      })
     end
   end
 

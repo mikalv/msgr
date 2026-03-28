@@ -27,7 +27,14 @@ defmodule Messngr.Bridges.Contact do
   @doc false
   def changeset(contact, attrs) do
     contact
-    |> cast(attrs, [:bridge_account_id, :profile_id, :external_id, :display_name, :handle, :metadata])
+    |> cast(attrs, [
+      :bridge_account_id,
+      :profile_id,
+      :external_id,
+      :display_name,
+      :handle,
+      :metadata
+    ])
     |> validate_required([:bridge_account_id, :profile_id, :external_id])
     |> validate_change(:metadata, &ensure_map/2)
   end

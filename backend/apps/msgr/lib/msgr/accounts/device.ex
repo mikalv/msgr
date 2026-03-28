@@ -65,7 +65,10 @@ defmodule Messngr.Accounts.Device do
           {:ok, encoded, raw} ->
             changeset
             |> Ecto.Changeset.put_change(:device_public_key, encoded)
-            |> Ecto.Changeset.put_change(:public_key_fingerprint, Messngr.Accounts.DeviceKey.fingerprint(raw))
+            |> Ecto.Changeset.put_change(
+              :public_key_fingerprint,
+              Messngr.Accounts.DeviceKey.fingerprint(raw)
+            )
 
           {:error, :empty} ->
             Ecto.Changeset.add_error(changeset, :device_public_key, "can't be blank")
@@ -82,14 +85,17 @@ defmodule Messngr.Accounts.Device do
 
   defp ensure_fingerprint_present(%Ecto.Changeset{} = changeset) do
     case {
-           Ecto.Changeset.get_field(changeset, :device_public_key),
-           Ecto.Changeset.get_field(changeset, :public_key_fingerprint)
-         } do
+      Ecto.Changeset.get_field(changeset, :device_public_key),
+      Ecto.Changeset.get_field(changeset, :public_key_fingerprint)
+    } do
       {key, nil} when is_binary(key) ->
         with {:ok, encoded, raw} <- Messngr.Accounts.DeviceKey.normalize(key) do
           changeset
           |> Ecto.Changeset.put_change(:device_public_key, encoded)
-          |> Ecto.Changeset.put_change(:public_key_fingerprint, Messngr.Accounts.DeviceKey.fingerprint(raw))
+          |> Ecto.Changeset.put_change(
+            :public_key_fingerprint,
+            Messngr.Accounts.DeviceKey.fingerprint(raw)
+          )
         else
           {:error, _reason} ->
             Ecto.Changeset.add_error(

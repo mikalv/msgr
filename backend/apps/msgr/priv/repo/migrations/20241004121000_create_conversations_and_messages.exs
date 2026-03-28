@@ -2,12 +2,20 @@ defmodule Messngr.Repo.Migrations.CreateConversationsAndMessages do
   use Ecto.Migration
 
   def change do
-    execute("CREATE TYPE conversation_kind AS ENUM ('direct','group')",
-            "DROP TYPE IF EXISTS conversation_kind")
-    execute("CREATE TYPE participant_role AS ENUM ('member','owner')",
-            "DROP TYPE IF EXISTS participant_role")
-    execute("CREATE TYPE message_status AS ENUM ('sending','sent','delivered','read')",
-            "DROP TYPE IF EXISTS message_status")
+    execute(
+      "CREATE TYPE conversation_kind AS ENUM ('direct','group')",
+      "DROP TYPE IF EXISTS conversation_kind"
+    )
+
+    execute(
+      "CREATE TYPE participant_role AS ENUM ('member','owner')",
+      "DROP TYPE IF EXISTS participant_role"
+    )
+
+    execute(
+      "CREATE TYPE message_status AS ENUM ('sending','sent','delivered','read')",
+      "DROP TYPE IF EXISTS message_status"
+    )
 
     create table(:conversations, primary_key: false) do
       add :id, :binary_id, primary_key: true
@@ -36,8 +44,12 @@ defmodule Messngr.Repo.Migrations.CreateConversationsAndMessages do
       add :id, :binary_id, primary_key: true
       add :role, :string, null: false, default: "member"
       add :last_read_at, :utc_datetime
-      add :conversation_id, references(:conversations, type: :binary_id, on_delete: :delete_all), null: false
-      add :profile_id, references(:profiles, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :conversation_id, references(:conversations, type: :binary_id, on_delete: :delete_all),
+        null: false
+
+      add :profile_id, references(:profiles, type: :binary_id, on_delete: :delete_all),
+        null: false
 
       timestamps(type: :utc_datetime)
     end
@@ -64,8 +76,12 @@ defmodule Messngr.Repo.Migrations.CreateConversationsAndMessages do
       add :body, :text, null: false
       add :status, :string, null: false, default: "sent"
       add :sent_at, :utc_datetime
-      add :conversation_id, references(:conversations, type: :binary_id, on_delete: :delete_all), null: false
-      add :profile_id, references(:profiles, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :conversation_id, references(:conversations, type: :binary_id, on_delete: :delete_all),
+        null: false
+
+      add :profile_id, references(:profiles, type: :binary_id, on_delete: :delete_all),
+        null: false
 
       timestamps(type: :utc_datetime)
     end

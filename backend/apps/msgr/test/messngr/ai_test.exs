@@ -29,7 +29,9 @@ defmodule Messngr.AITest do
 
   test "summarize/3 builds default prompt" do
     expect(Messngr.AI.LlmClientMock, :chat_completion, fn "team", messages, _opts ->
-      assert [%{role: "system", content: system}, %{role: "user", content: "Lang tekst"}] = messages
+      assert [%{role: "system", content: system}, %{role: "user", content: "Lang tekst"}] =
+               messages
+
       assert String.contains?(system, "Norwegian Bokmål")
       {:ok, %{"choices" => []}}
     end)

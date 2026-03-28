@@ -28,7 +28,9 @@ defmodule Messngr.LinkUnfurl do
   """
   def unfurl(url) when is_binary(url) do
     case cached(url) do
-      {:ok, result} -> result
+      {:ok, result} ->
+        result
+
       :miss ->
         result = fetch_og(url)
         cache(url, result)
@@ -62,13 +64,15 @@ defmodule Messngr.LinkUnfurl do
            |> Finch.request(Messngr.Finch, receive_timeout: @fetch_timeout) do
         {:ok, %{status: status, body: body, headers: headers}} when status in 200..299 ->
           content_type = get_header(headers, "content-type") || ""
+
           if String.contains?(content_type, "text/html") do
             parse_og(body |> String.slice(0, @max_body_bytes), url)
           else
             nil
           end
 
-        _ -> nil
+        _ ->
+          nil
       end
     rescue
       _ -> nil
@@ -97,9 +101,14 @@ defmodule Messngr.LinkUnfurl do
 
   defp extract_meta(html, property) do
     case Regex.run(~r{<meta[^>]*property="#{Regex.escape(property)}"[^>]*content="([^"]*)"}, html) do
-      [_, content] -> content
+      [_, content] ->
+        content
+
       nil ->
-        case Regex.run(~r{<meta[^>]*content="([^"]*)"[^>]*property="#{Regex.escape(property)}"}, html) do
+        case Regex.run(
+               ~r{<meta[^>]*content="([^"]*)"[^>]*property="#{Regex.escape(property)}"},
+               html
+             ) do
           [_, content] -> content
           nil -> nil
         end
@@ -121,8 +130,10 @@ defmodule Messngr.LinkUnfurl do
   end
 
   defp maybe_absolute_url(nil, _base), do: nil
+
   defp maybe_absolute_url(url, base) do
     uri = URI.parse(url)
+
     if uri.scheme do
       url
     else
@@ -149,7 +160,9 @@ defmodule Messngr.LinkUnfurl do
           :ets.delete(__MODULE__, url)
           :miss
         end
-      [] -> :miss
+
+      [] ->
+        :miss
     end
   rescue
     ArgumentError -> :miss

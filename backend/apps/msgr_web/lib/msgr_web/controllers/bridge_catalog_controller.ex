@@ -21,7 +21,10 @@ defmodule MessngrWeb.BridgeCatalogController do
   end
 
   defp parse_status(%{"status" => status}), do: parse_status(status)
-  defp parse_status(status) when status in ["available", "coming_soon"], do: String.to_existing_atom(status)
+
+  defp parse_status(status) when status in ["available", "coming_soon"],
+    do: String.to_existing_atom(status)
+
   defp parse_status(_), do: nil
 
   defp current_linked_accounts(%{assigns: %{current_account: %{id: account_id}}})

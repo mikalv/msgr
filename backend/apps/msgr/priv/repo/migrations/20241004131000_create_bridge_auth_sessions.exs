@@ -4,7 +4,10 @@ defmodule Messngr.Repo.Migrations.CreateBridgeAuthSessions do
   def change do
     create table(:bridge_auth_sessions, primary_key: false) do
       add :id, :binary_id, primary_key: true
-      add :account_id, references(:accounts, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :account_id, references(:accounts, type: :binary_id, on_delete: :delete_all),
+        null: false
+
       add :service, :string, null: false
       add :state, :string, null: false
       add :login_method, :string, null: false

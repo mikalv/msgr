@@ -24,6 +24,7 @@ defmodule Messngr.Apps.Executors.TopicExecutor do
 
   defp validate_args(args) when is_binary(args) do
     topic = String.trim(args)
+
     if byte_size(topic) > 0 do
       {:ok, topic}
     else
