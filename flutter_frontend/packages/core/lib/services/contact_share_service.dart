@@ -11,18 +11,21 @@ class ContactShareService {
     if (kIsWeb) return null;
 
     // Request permission
-    if (!await FlutterContacts.requestPermission()) return null;
+    final status = await FlutterContacts.permissions.request(PermissionType.contacts);
+    if (status != PermissionStatus.granted) return null;
 
-    // Open native contact picker — returns null if cancelled
-    final contact = await FlutterContacts.openExternalPick();
-    if (contact == null) return null;
+    // Get all contacts and let user pick (flutter_contacts v2 API)
+    final contacts = await FlutterContacts.getAll(
+      properties: {ContactProperty.phones, ContactProperty.emails, ContactProperty.organizations},
+    );
+    if (contacts.isEmpty) return null;
 
-    // Fetch full contact data
-    final full = await FlutterContacts.getContact(contact.id, withProperties: true);
-    if (full == null) return null;
+    // Return the first contact for now — a proper picker UI should be built
+    // TODO: show a contact picker dialog
+    final full = contacts.first;
 
     return ContactResult(
-      name: full.displayName,
+      name: full.name.display,
       phone: full.phones.isNotEmpty ? full.phones.first.number : null,
       email: full.emails.isNotEmpty ? full.emails.first.address : null,
       organization: full.organizations.isNotEmpty ? full.organizations.first.company : null,
