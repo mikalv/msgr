@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
-import 'mock_api_data.dart';
 import 'models.dart';
 import 'team_list_provider.dart';
 
@@ -16,12 +15,11 @@ class TeamPresenceNotifier extends StateNotifier<Map<String, PresenceInfo>> {
 
   final Ref _ref;
 
-  /// Connect to presence channel for a team.
-  Future<void> connectForTeam(String teamSlug) async {
-    // TODO: Connect to presence:{team_slug} Phoenix channel and listen for
-    //       presence_state / presence_diff events.
-    await Future<void>.delayed(const Duration(milliseconds: 50));
-    state = mockPresenceData[teamSlug] ?? {};
+  /// Called when team changes. Presence data arrives via WebSocket
+  /// presence_state/presence_diff events routed by RealtimeNotifier.
+  void connectForTeam(String teamSlug) {
+    // Clear previous team's presence — new data arrives via WS events
+    state = {};
   }
 
   /// Handle a presence diff from Phoenix Presence.

@@ -11,6 +11,7 @@ import 'messages_provider.dart';
 import 'models.dart';
 import 'msgr_client_provider.dart';
 import 'notification_provider.dart';
+import 'presence_provider.dart';
 import 'settings_provider.dart';
 import 'team_list_provider.dart';
 import 'thread_provider.dart';
@@ -393,9 +394,45 @@ class RealtimeNotifier extends StateNotifier<RealtimeState> {
 
   void _handlePresenceEvent(
       String topic, String event, Map<String, dynamic> payload) {
-    // Presence events are handled by phoenix_socket's Presence module
-    // and delivered via the onPresence callback. For now just log.
-    _log.fine('Presence event: $event');
+    switch (event) {
+      case 'presence_state':
+        // Full presence state on join — each key is a profile_id
+        final joins = <PresenceInfo>[];
+        for (final entry in payload.entries) {
+          final profileId = entry.key;
+          joins.add(PresenceInfo(
+            profileId: profileId,
+            status: PresenceStatus.online,
+          ));
+        }
+        _ref.read(teamPresenceProvider.notifier).applyDiff(joins: joins);
+        _log.info('Presence state: ${joins.length} online');
+
+      case 'presence_diff':
+        final rawJoins = payload['joins'] as Map<String, dynamic>? ?? {};
+        final rawLeaves = payload['leaves'] as Map<String, dynamic>? ?? {};
+
+        final joins = rawJoins.keys.map((id) => PresenceInfo(
+          profileId: id,
+          status: PresenceStatus.online,
+        )).toList();
+
+        final leaves = rawLeaves.keys.map((id) => PresenceInfo(
+          profileId: id,
+          status: PresenceStatus.offline,
+          lastSeenAt: DateTime.now(),
+        )).toList();
+
+        if (joins.isNotEmpty || leaves.isNotEmpty) {
+          _ref.read(teamPresenceProvider.notifier).applyDiff(joins: joins, leaves: leaves);
+          _log.fine('Presence diff: +${joins.length} -${leaves.length}');
+        }
+
+      case 'phx_reply' || 'phx_error' || 'phx_close':
+        break;
+      default:
+        _log.fine('Unhandled presence event: $event');
+    }
   }
 
   void _onNewMessage(String channelId, Map<String, dynamic> data) {

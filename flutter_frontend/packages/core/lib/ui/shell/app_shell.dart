@@ -10,6 +10,7 @@ import 'package:core/providers/models.dart' hide ChannelKind;
 import 'package:core/providers/msgr_client_provider.dart';
 import 'package:core/providers/team_list_provider.dart';
 import 'package:core/providers/favorites_provider.dart';
+import 'package:core/providers/presence_provider.dart';
 import 'package:core/providers/theme_provider.dart';
 import 'package:core/providers/unread_provider.dart';
 import 'package:core/services/dock_badge_service.dart';
@@ -330,6 +331,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     final channelState = ref.watch(channelListProvider);
     final unreadCounts = ref.watch(unreadCountsProvider);
     final myProfileId = ref.watch(simpleAuthProvider).profileId;
+    final presence = ref.watch(teamPresenceProvider);
 
     return channelState.dmChannels.map((c) {
       // Build DM title from member names (exclude self)
@@ -350,10 +352,18 @@ class _AppShellState extends ConsumerState<AppShell> {
       final isSelf = members == null || members.isEmpty ||
           members.entries.every((e) => e.key == myProfileId);
 
+      // Check if the other DM member is online
+      final otherProfileId = members?.entries
+          .where((e) => e.key != myProfileId)
+          .map((e) => e.key)
+          .firstOrNull;
+      final isOtherOnline = otherProfileId != null &&
+          presence[otherProfileId]?.status == PresenceStatus.online;
+
       return DmItem(
         id: c.id,
         name: isSelf ? 'Notes to self' : dmName,
-        isOnline: false,
+        isOnline: isOtherOnline,
         unreadCount: unreadCounts[c.id] ?? 0,
         isSelf: isSelf,
         lastActivityAt: c.lastMessage?.insertedAt,
