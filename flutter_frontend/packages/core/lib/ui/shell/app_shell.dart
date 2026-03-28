@@ -401,6 +401,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         isSelf: isSelf,
         lastActivityAt: c.lastMessage?.insertedAt,
         lastMessageText: c.lastMessage?.text,
+        memberCount: members?.length ?? 2,
       );
     }).toList();
   }
@@ -553,6 +554,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         _onDmSelected(dm.id);
       },
       onCreateChannel: _showCreateChannelDialog,
+      onNewMessage: _showNewMessageDialog,
       onLeaveChannel: (channel) => _leaveChannel(channel.id),
       onCloseDm: (dm) => _leaveChannel(dm.id),
       favorites: ref.watch(favoritesProvider),
@@ -1113,6 +1115,141 @@ class _AppShellState extends ConsumerState<AppShell> {
         );
       },
     );
+  }
+
+  Future<void> _showNewMessageDialog() async {
+    final team = ref.read(selectedTeamProvider);
+    final auth = ref.read(simpleAuthProvider);
+    if (team == null) return;
+
+    // Load team profiles for selection
+    final client = ref.read(msgrApiProvider);
+    List<Map<String, dynamic>> profiles;
+    try {
+      profiles = await client.getProfiles(team.slug);
+      // Remove self
+      profiles = profiles
+          .where((p) => p['account_id']?.toString() != auth.accountId)
+          .toList();
+    } catch (_) {
+      return;
+    }
+
+    final selected = <String>{};
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF2A2A3E),
+          title:
+              const Text('New message', style: TextStyle(color: Colors.white)),
+          content: SizedBox(
+            width: 360,
+            height: 400,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Select one or more people:',
+                  style: TextStyle(
+                      color: Colors.white.withAlpha(120), fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: profiles.length,
+                    itemBuilder: (_, index) {
+                      final p = profiles[index];
+                      final id = p['id']?.toString() ?? '';
+                      final name = p['display_name']?.toString() ?? 'Unknown';
+                      final isSelected = selected.contains(id);
+
+                      return CheckboxListTile(
+                        value: isSelected,
+                        activeColor: const Color(0xFF02ac88),
+                        title: Text(name,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 13)),
+                        subtitle: p['role'] != null
+                            ? Text(p['role'].toString(),
+                                style: TextStyle(
+                                    color: Colors.white.withAlpha(80),
+                                    fontSize: 11))
+                            : null,
+                        controlAffinity: ListTileControlAffinity.leading,
+                        onChanged: (v) {
+                          setDialogState(() {
+                            if (v == true) {
+                              selected.add(id);
+                            } else {
+                              selected.remove(id);
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+                if (selected.length > 1)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '${selected.length} people selected — this will create a group DM',
+                      style: TextStyle(
+                          color: Colors.white.withAlpha(100), fontSize: 11),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child:
+                  const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              onPressed:
+                  selected.isEmpty ? null : () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF02ac88)),
+              child: Text(selected.length > 1 ? 'Create group DM' : 'Open DM'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != true || selected.isEmpty || !mounted) return;
+
+    // Add self to the DM
+    final myProfileId = auth.profileId;
+    final allIds = [...selected, if (myProfileId != null) myProfileId];
+
+    try {
+      final raw = await client.createDm(team.slug, allIds);
+      final data = raw.containsKey('data') && raw['data'] is Map
+          ? raw['data'] as Map<String, dynamic>
+          : raw;
+      final channelId = data['id']?.toString();
+      if (channelId == null) return;
+
+      await ref.read(channelListProvider.notifier).refresh();
+      final channels = ref.read(channelListProvider).channels;
+      final dm = channels.where((c) => c.id == channelId).firstOrNull;
+      if (dm != null) {
+        ref.read(selectedChannelProvider.notifier).select(dm);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Failed to create DM: $e'),
+              duration: const Duration(seconds: 3)),
+        );
+      }
+    }
   }
 
   Future<void> _showCreateChannelDialog() async {

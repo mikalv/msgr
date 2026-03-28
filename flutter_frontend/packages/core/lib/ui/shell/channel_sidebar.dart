@@ -23,6 +23,7 @@ class ChannelSidebar extends StatelessWidget {
     this.onChannelSelected,
     this.onDmSelected,
     this.onCreateChannel,
+    this.onNewMessage,
     this.onLeaveChannel,
     this.onCloseDm,
     this.favorites = const {},
@@ -45,6 +46,7 @@ class ChannelSidebar extends StatelessWidget {
   final ValueChanged<ChannelItem>? onChannelSelected;
   final ValueChanged<DmItem>? onDmSelected;
   final VoidCallback? onCreateChannel;
+  final VoidCallback? onNewMessage;
   final ValueChanged<ChannelItem>? onLeaveChannel;
   final ValueChanged<DmItem>? onCloseDm;
   final Set<String> favorites;
@@ -121,14 +123,17 @@ class ChannelSidebar extends StatelessWidget {
                     onPressed: onOpenSettings,
                     tooltip: S.settings,
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    constraints:
+                        const BoxConstraints(minWidth: 28, minHeight: 28),
                   ),
                   IconButton(
-                    icon: Icon(Icons.edit_square, color: t.sidebarText, size: 18),
-                    onPressed: () {},
+                    icon:
+                        Icon(Icons.edit_square, color: t.sidebarText, size: 18),
+                    onPressed: onNewMessage,
                     tooltip: S.newMessage,
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    constraints:
+                        const BoxConstraints(minWidth: 28, minHeight: 28),
                   ),
                 ],
               ),
@@ -142,7 +147,8 @@ class ChannelSidebar extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 children: [
                   // --- Starred / Favorites section ---
-                  if (_starredChannels.isNotEmpty || _starredDms.isNotEmpty) ...[
+                  if (_starredChannels.isNotEmpty ||
+                      _starredDms.isNotEmpty) ...[
                     _SectionHeader(
                       icon: Icons.star_rounded,
                       title: S.starred,
@@ -156,7 +162,8 @@ class ChannelSidebar extends StatelessWidget {
                           isSelected: channel.id == selectedChannelId,
                           onTap: () => onChannelSelected?.call(channel),
                           onLeave: () => onLeaveChannel?.call(channel),
-                          onToggleStar: () => onToggleFavorite?.call(channel.id),
+                          onToggleStar: () =>
+                              onToggleFavorite?.call(channel.id),
                           isStarred: true,
                         ),
                       ),
@@ -235,7 +242,8 @@ class ChannelSidebar extends StatelessWidget {
             // User section at bottom
             if (onLogout != null || userEmail != null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   border: Border(
                     top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
@@ -248,13 +256,13 @@ class ChannelSidebar extends StatelessWidget {
                       child: MouseRegion(
                         cursor: SystemMouseCursors.click,
                         child: ProfileAvatar(
-                      profileId: userProfileId ?? '',
-                      displayName: userDisplayName ?? '',
-                      email: userEmail,
-                      size: MsgrDimensions.sidebarProfileAvatarSize,
-                      showOnlineIndicator: true,
-                      isOnline: true,
-                    ),
+                          profileId: userProfileId ?? '',
+                          displayName: userDisplayName ?? '',
+                          email: userEmail,
+                          size: MsgrDimensions.sidebarProfileAvatarSize,
+                          showOnlineIndicator: true,
+                          isOnline: true,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -289,11 +297,13 @@ class ChannelSidebar extends StatelessWidget {
                     ),
                     if (onLogout != null)
                       IconButton(
-                        icon: Icon(Icons.logout, color: t.sidebarText, size: 16),
+                        icon:
+                            Icon(Icons.logout, color: t.sidebarText, size: 16),
                         tooltip: S.logout,
                         onPressed: onLogout,
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                        constraints:
+                            const BoxConstraints(minWidth: 28, minHeight: 28),
                       ),
                   ],
                 ),

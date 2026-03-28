@@ -58,6 +58,7 @@ class DmItem {
     this.lastActivityAt,
     this.isSelf = false,
     this.lastMessageText,
+    this.memberCount = 2,
   });
 
   final String id;
@@ -68,4 +69,5 @@ class DmItem {
   final DateTime? lastActivityAt;
   final bool isSelf;
   final String? lastMessageText;
+  final int memberCount;
 }
