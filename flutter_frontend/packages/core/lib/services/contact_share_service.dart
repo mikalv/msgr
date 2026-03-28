@@ -11,24 +11,26 @@ class ContactShareService {
     if (kIsWeb) return null;
 
     // Request permission
-    final status = await FlutterContacts.permissions.request(PermissionType.contacts);
+    final status = await FlutterContacts.permissions.request(PermissionType.read);
     if (status != PermissionStatus.granted) return null;
 
-    // Get all contacts and let user pick (flutter_contacts v2 API)
+    // Get all contacts
     final contacts = await FlutterContacts.getAll(
-      properties: {ContactProperty.phones, ContactProperty.emails, ContactProperty.organizations},
+      properties: {ContactProperty.phone, ContactProperty.email, ContactProperty.organization},
     );
     if (contacts.isEmpty) return null;
 
-    // Return the first contact for now — a proper picker UI should be built
-    // TODO: show a contact picker dialog
+    // TODO: show a proper contact picker dialog instead of using first contact
     final full = contacts.first;
+    final displayName = [full.name?.first, full.name?.last]
+        .where((s) => s != null && s.isNotEmpty)
+        .join(' ');
 
     return ContactResult(
-      name: full.name.display,
+      name: displayName.isNotEmpty ? displayName : 'Unknown',
       phone: full.phones.isNotEmpty ? full.phones.first.number : null,
       email: full.emails.isNotEmpty ? full.emails.first.address : null,
-      organization: full.organizations.isNotEmpty ? full.organizations.first.company : null,
+      organization: full.organizations.isNotEmpty ? full.organizations.first.name : null,
     );
   }
 }
