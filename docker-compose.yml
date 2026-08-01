@@ -176,6 +176,8 @@ services:
       CLAMAV_ENABLED: ${CLAMAV_ENABLED:-true}
       CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
       CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+      CLAMAV_MAX_CONCURRENCY: ${CLAMAV_MAX_CONCURRENCY:-2}
+      CLAMAV_MAX_QUEUE: ${CLAMAV_MAX_QUEUE:-100}
     working_dir: /app
     ports:
       - "127.0.0.1:4001:4000"

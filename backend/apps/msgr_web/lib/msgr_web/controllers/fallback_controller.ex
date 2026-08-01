@@ -32,6 +32,12 @@ defmodule MessngrWeb.FallbackController do
     |> json(%{error: "infected"})
   end
 
+  def call(conn, {:error, :scan_queue_full}) do
+    conn
+    |> put_status(:service_unavailable)
+    |> json(%{error: "scan_queue_full"})
+  end
+
   def call(conn, {:error, :too_many_attempts}) do
     conn
     |> put_status(:too_many_requests)

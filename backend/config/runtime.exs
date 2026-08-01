@@ -286,6 +286,20 @@ clamav_port =
     "CLAMAV_PORT"
   )
 
+clamav_max_concurrency =
+  int_env.(
+    System.get_env("CLAMAV_MAX_CONCURRENCY"),
+    Keyword.get(virus_scan_config, :max_concurrency, 2),
+    "CLAMAV_MAX_CONCURRENCY"
+  )
+
+clamav_max_queue =
+  int_env.(
+    System.get_env("CLAMAV_MAX_QUEUE"),
+    Keyword.get(virus_scan_config, :max_queue, 100),
+    "CLAMAV_MAX_QUEUE"
+  )
+
 config :msgr,
        Messngr.Media.VirusScan,
        virus_scan_config
@@ -299,6 +313,8 @@ config :msgr,
            Keyword.get(virus_scan_config, :quarantine_prefix, "quarantine/")
          )
        )
+       |> Keyword.put(:max_concurrency, clamav_max_concurrency)
+       |> Keyword.put(:max_queue, clamav_max_queue)
 
 watcher_pruner_config = Application.get_env(:msgr, Messngr.Chat.WatcherPruner, [])
 

@@ -64,7 +64,9 @@ config :msgr, Messngr.Media.VirusScan,
   fetch_object: fn _bucket, _key -> {:ok, "test-bytes"} end,
   quarantine_object: fn _bucket, _key, _qkey -> :ok end,
   quarantine_prefix: "quarantine/",
-  max_scan_bytes: 50 * 1024 * 1024
+  max_scan_bytes: 50 * 1024 * 1024,
+  max_concurrency: 2,
+  max_queue: 100
 
 shared_repo_config =
   [

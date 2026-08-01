@@ -202,6 +202,52 @@ defmodule MessngrWeb.TeamMediaVirusScanTest do
     assert {:error, :infected} = VirusScan.authorize_download(%{upload | scan_status: :infected})
   end
 
+  test "complete rejects when scan queue is saturated", %{
+    conn: conn,
+    slug: slug,
+    prefix: prefix,
+    team: team,
+    profile: profile
+  } do
+    put_scan_env(
+      scanner: Messngr.Media.VirusScan.BlockingStub,
+      max_concurrency: 1,
+      max_queue: 0
+    )
+
+    {:ok, first} =
+      MediaUpload.create(prefix, %{
+        profile_id: profile.id,
+        object_key: "teams/#{team.id}/#{Ecto.UUID.generate()}/a.bin",
+        content_type: "application/octet-stream",
+        filename: "a.bin",
+        size: 1,
+        scan_status: :awaiting_upload
+      })
+
+    {:ok, second} =
+      MediaUpload.create(prefix, %{
+        profile_id: profile.id,
+        object_key: "teams/#{team.id}/#{Ecto.UUID.generate()}/b.bin",
+        content_type: "application/octet-stream",
+        filename: "b.bin",
+        size: 1,
+        scan_status: :awaiting_upload
+      })
+
+    first_resp = post(conn, "/api/teams/#{slug}/media/#{first.id}/complete")
+    assert json_response(first_resp, 200)["data"]["scan_status"] == "scanning"
+
+    # Give the worker a moment to start the blocking scan so capacity is consumed.
+    Process.sleep(50)
+
+    second_resp = post(conn, "/api/teams/#{slug}/media/#{second.id}/complete")
+    assert json_response(second_resp, 503)["error"] == "scan_queue_full"
+
+    reloaded = MediaUpload.get_by_id(prefix, second.id)
+    assert reloaded.scan_status == :awaiting_upload
+  end
+
   defp put_scan_env(overrides) do
     Application.put_env(
       :msgr,
@@ -215,7 +261,9 @@ defmodule MessngrWeb.TeamMediaVirusScanTest do
           quarantine_object: fn _b, _k, _q -> :ok end,
           delete_object: fn _b, _k -> :ok end,
           quarantine_prefix: "quarantine/",
-          max_scan_bytes: 50 * 1024 * 1024
+          max_scan_bytes: 50 * 1024 * 1024,
+          max_concurrency: 2,
+          max_queue: 100
         ],
         overrides
       )

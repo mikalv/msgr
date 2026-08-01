@@ -24,15 +24,42 @@ defmodule Messngr.Media.VirusScan do
   """
   def complete_upload(prefix, upload) when is_map(upload) do
     if enabled?() do
-      with {:ok, upload} <-
-             media_upload().update(prefix, upload, %{
-               scan_status: :scanning,
-               scanned_at: nil,
-               threat_name: nil,
-               quarantine_key: nil
-             }) do
-        enqueue(prefix, upload.id)
-        {:ok, upload}
+      case media_upload().update(prefix, upload, %{
+             scan_status: :scanning,
+             scanned_at: nil,
+             threat_name: nil,
+             quarantine_key: nil
+           }) do
+        {:ok, updated} ->
+          case enqueue(prefix, updated.id) do
+            :ok ->
+              {:ok, updated}
+
+            {:error, :queue_full} ->
+              {:ok, _reverted} =
+                media_upload().update(prefix, updated, %{
+                  scan_status: :awaiting_upload,
+                  scanned_at: nil,
+                  threat_name: nil,
+                  quarantine_key: nil
+                })
+
+              {:error, :scan_queue_full}
+
+            {:error, :worker_unavailable} ->
+              {:ok, _reverted} =
+                media_upload().update(prefix, updated, %{
+                  scan_status: :awaiting_upload,
+                  scanned_at: nil,
+                  threat_name: nil,
+                  quarantine_key: nil
+                })
+
+              {:error, :scan_queue_full}
+          end
+
+        {:error, reason} ->
+          {:error, reason}
       end
     else
       now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -45,13 +72,13 @@ defmodule Messngr.Media.VirusScan do
     end
   end
 
-  @doc "Enqueue scan for an existing upload id (idempotent enough for retries)."
-  def enqueue(prefix, upload_id) do
-    Task.Supervisor.start_child(Messngr.TaskSupervisor, fn ->
-      scan_upload(prefix, upload_id)
-    end)
+  @doc """
+  Enqueue scan for an existing upload id via the bounded worker queue.
 
-    :ok
+  Returns `:ok` or `{:error, :queue_full | :worker_unavailable}`.
+  """
+  def enqueue(prefix, upload_id) do
+    Messngr.Media.VirusScan.Worker.enqueue(prefix, upload_id)
   end
 
   @doc "Synchronously scan an upload (used by tests and the async worker)."
