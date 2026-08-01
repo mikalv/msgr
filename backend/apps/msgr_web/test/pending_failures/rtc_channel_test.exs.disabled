@@ -102,7 +102,8 @@ defmodule MessngrWeb.RTCChannelTest do
 
     ref = push(peer_socket, "call:leave", %{})
     assert_reply ref, :ok
-    assert_broadcast "participant:left", %{"profile_id" => peer_profile.id}
+    peer_profile_id = peer_profile.id
+    assert_broadcast "participant:left", %{"profile_id" => ^peer_profile_id}
 
     ref = push(host_socket, "call:end", %{})
     assert_reply ref, :ok
