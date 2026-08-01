@@ -69,6 +69,21 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     restart: "no"
 
+  clamav:
+    image: clamav/clamav:1.4
+    container_name: msgr_clamav
+    ports:
+      - "127.0.0.1:3310:3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping 3 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+
   rust_gateway:
     build:
       context: ./rust-gateway
@@ -120,6 +135,8 @@ services:
         condition: service_healthy
       minio_init:
         condition: service_completed_successfully
+      clamav:
+        condition: service_started
     environment:
       MIX_ENV: prod
       PHX_SERVER: "true"
@@ -156,6 +173,11 @@ services:
       MINIO_PUBLIC_PORT: ${MINIO_PUBLIC_PORT:-9000}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      CLAMAV_ENABLED: ${CLAMAV_ENABLED:-true}
+      CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+      CLAMAV_MAX_CONCURRENCY: ${CLAMAV_MAX_CONCURRENCY:-2}
+      CLAMAV_MAX_QUEUE: ${CLAMAV_MAX_QUEUE:-100}
     working_dir: /app
     ports:
       - "127.0.0.1:4001:4000"
@@ -277,6 +299,7 @@ volumes:
   postgres_data:
   redis_data:
   minio_data:
+  clamav_data:
   elixir_deps:
   elixir_build:
   tailwind_cache:

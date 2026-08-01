@@ -220,7 +220,8 @@ defmodule MessngrWeb.TeamSecurityControllerTest do
           object_key: object_key,
           content_type: "application/pdf",
           filename: "ok.pdf",
-          size: 100
+          size: 100,
+          scan_status: :clean
         })
 
       encoded = URI.encode(object_key, &URI.char_unreserved?/1)

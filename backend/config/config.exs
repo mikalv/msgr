@@ -63,6 +63,16 @@ config :msgr, Messngr.Media.RetentionPruner,
   interval_ms: :timer.minutes(10),
   batch_size: 100
 
+config :msgr, Messngr.Media.VirusScan,
+  enabled: false,
+  host: "127.0.0.1",
+  port: 3310,
+  scanner: Messngr.Media.VirusScan.Clamd,
+  quarantine_prefix: "quarantine/",
+  max_scan_bytes: 50 * 1024 * 1024,
+  max_concurrency: 2,
+  max_queue: 100
+
 config :msgr, Messngr.Chat.WatcherPruner,
   enabled: true,
   interval_ms: :timer.minutes(1)

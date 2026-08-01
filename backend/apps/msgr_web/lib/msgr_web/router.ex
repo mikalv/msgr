@@ -142,6 +142,7 @@ defmodule MessngrWeb.Router do
     get "/profiles/:id", TeamProfileController, :show
     put "/profiles/me", TeamProfileController, :update
     post "/media/presign", TeamMediaController, :presign
+    post "/media/:upload_id/complete", TeamMediaController, :complete
     get "/media/:object_key/url", TeamMediaController, :download_url
     post "/dms", TeamDmController, :create
 

@@ -85,6 +85,31 @@ defmodule Messngr.Media.Storage do
     URI.merge(public_endpoint, "#{bucket}/#{object_key}") |> to_string()
   end
 
+  @spec head_object(String.t(), String.t()) ::
+          {:ok, %{content_length: non_neg_integer() | nil}} | {:error, term()}
+  def head_object(bucket, object_key) do
+    case ExAws.S3.head_object(bucket, object_key) |> ExAws.request(internal_overrides()) do
+      {:ok, %{headers: headers}} ->
+        {:ok, %{content_length: content_length_from_headers(headers)}}
+
+      {:ok, response} when is_map(response) ->
+        headers = Map.get(response, :headers) || Map.get(response, "headers") || []
+        {:ok, %{content_length: content_length_from_headers(headers)}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @spec get_object(String.t(), String.t()) :: {:ok, binary()} | {:error, term()}
+  def get_object(bucket, object_key) do
+    case ExAws.S3.get_object(bucket, object_key) |> ExAws.request(internal_overrides()) do
+      {:ok, %{body: body}} when is_binary(body) -> {:ok, body}
+      {:ok, %{body: body}} -> {:ok, IO.iodata_to_binary(body)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   @spec delete_object(String.t(), String.t()) :: :ok | {:error, term()}
   def delete_object(bucket, object_key) do
     case ExAws.S3.delete_object(bucket, object_key) |> ExAws.request(internal_overrides()) do
@@ -93,6 +118,53 @@ defmodule Messngr.Media.Storage do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  @doc """
+  Attempts to copy an object to a quarantine key, then always deletes the
+  original so infected bytes cannot keep being served from the live key.
+
+  Returns `:ok` when the quarantine copy succeeded. Returns `{:error, reason}`
+  when the copy failed (original is still deleted).
+  """
+  @spec quarantine_object(String.t(), String.t(), String.t()) :: :ok | {:error, term()}
+  def quarantine_object(bucket, object_key, quarantine_key) do
+    copy =
+      ExAws.S3.put_object_copy(bucket, quarantine_key, bucket, object_key)
+      |> ExAws.request(internal_overrides())
+
+    case copy do
+      {:ok, _} ->
+        _ = delete_object(bucket, object_key)
+        :ok
+
+      {:error, reason} ->
+        Logger.warning("Failed to copy object #{object_key} to quarantine: #{inspect(reason)}")
+        # Prefer deleting infected content over leaving it at the live key.
+        _ = delete_object(bucket, object_key)
+        {:error, reason}
+    end
+  end
+
+  defp content_length_from_headers(headers) when is_list(headers) do
+    headers
+    |> Enum.find_value(fn
+      {"Content-Length", value} -> parse_length(value)
+      {"content-length", value} -> parse_length(value)
+      _ -> nil
+    end)
+  end
+
+  defp content_length_from_headers(_), do: nil
+
+  defp parse_length(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} when int >= 0 -> int
+      _ -> nil
+    end
+  end
+
+  defp parse_length(value) when is_integer(value) and value >= 0, do: value
+  defp parse_length(_), do: nil
 
   @spec ensure_bucket!(String.t()) :: :ok
   def ensure_bucket!(bucket_name) do
