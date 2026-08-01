@@ -134,7 +134,8 @@ if Code.ensure_loaded?(Messngr.Logging.OpenObserveBackend) do
       stream: "backend",
       dataset: "_json",
       username: "root@example.com",
-      password: "Complexpass#123",
+      # Override via OPENOBSERVE_PASSWORD in runtime/dev config — do not ship real secrets here.
+      password: "",
       metadata: [:application, :module, :function, :line, :request_id, :pid],
       level: :info,
       service: "msgr_backend"

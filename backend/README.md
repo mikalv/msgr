@@ -54,9 +54,10 @@ docker compose build stonemq --build-arg STONEMQ_REF=<commit-eller-branch>
 - Sett `PROMETHEUS_ENABLED=false` dersom du vil skru av eksportøren i et
   begrenset miljø. Porten kan overstyres med `PROMETHEUS_PORT`.
 - **Grafana** startes med en forhåndsprovisjonert Prometheus-datakilde og er
-  tilgjengelig på `http://localhost:3000` (bruker/pass: `admin`/`admin`).
-- **OpenObserve** håndterer loggdata på `http://localhost:5080`. Standardbrukeren
-  er `root@example.com` med passord `Complexpass#123`.
+  tilgjengelig på `http://localhost:3000` (bruker/pass fra
+  `GF_SECURITY_ADMIN_USER` / `GF_SECURITY_ADMIN_PASSWORD` i `.env`).
+- **OpenObserve** håndterer loggdata på `http://localhost:5088`
+  (`ZO_ROOT_USER_EMAIL` / `ZO_ROOT_USER_PASSWORD` i `.env`).
 
 Backenden publiserer applikasjonslogger via StoneMQ-topicen `observability/logs`
 ved hjelp av `Messngr.Logging.OpenObserveBackend`. En dedikert konsument kan

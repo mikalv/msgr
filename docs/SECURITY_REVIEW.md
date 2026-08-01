@@ -10,16 +10,16 @@
 
 ## Alvorlighetsoversikt
 
-| ID | Alvorlighet | Funn |
-|----|-------------|------|
-| SEC-1 | 🔴 Kritisk | OTP-koder genereres med ikke-kryptografisk PRNG (`:rand.uniform`) |
-| SEC-2 | 🔴 Kritisk | Brutt tilgangskontroll i team-API — flere endepunkter mangler medlemskapssjekk (cross-tenant IDOR) |
-| SEC-3 | 🔴 Kritisk | Media-nedlasting aksepterer vilkårlig `object_key` (cross-tenant fil-tilgang) |
-| SEC-4 | 🟠 Høy | OTP-koder lagres som usaltet SHA-256 av 6-sifret rom (trivielt å brute-force ved DB-lekkasje) |
-| SEC-5 | 🟠 Høy | Ingen kanal-nivå autorisasjon — team-medlem kan lese/skrive i private kanaler de ikke er med i |
-| SEC-6 | 🟡 Medium | Bot-secret sammenlignes ikke i konstant tid (timing-angrep) |
-| SEC-7 | 🟡 Medium | Hardkodede secrets i `docker-compose.yml` (dekket av [#193](https://github.com/mikalv/msgr/issues/193)) |
-| SEC-8 | 🟢 Lav | Misvisende `authorization_schemes: [:noise]`-opsjon som er en no-op |
+| ID | Alvorlighet | Funn | Status |
+|----|-------------|------|--------|
+| SEC-1 | 🔴 Kritisk | OTP-koder genereres med ikke-kryptografisk PRNG (`:rand.uniform`) | ✅ Fikset i [#231](https://github.com/mikalv/msgr/pull/231) |
+| SEC-2 | 🔴 Kritisk | Brutt tilgangskontroll i team-API — flere endepunkter mangler medlemskapssjekk (cross-tenant IDOR) | ✅ Fikset i [#231](https://github.com/mikalv/msgr/pull/231) |
+| SEC-3 | 🔴 Kritisk | Media-nedlasting aksepterer vilkårlig `object_key` (cross-tenant fil-tilgang) | ✅ Fikset i [#231](https://github.com/mikalv/msgr/pull/231) |
+| SEC-4 | 🟠 Høy | OTP-koder lagres som usaltet SHA-256 av 6-sifret rom (trivielt å brute-force ved DB-lekkasje) | ✅ Fikset i [#231](https://github.com/mikalv/msgr/pull/231) (HMAC + attempt lockout) |
+| SEC-5 | 🟠 Høy | Ingen kanal-nivå autorisasjon — team-medlem kan lese/skrive i private kanaler de ikke er med i | ✅ Fikset i [#231](https://github.com/mikalv/msgr/pull/231) |
+| SEC-6 | 🟡 Medium | Bot-secret sammenlignes ikke i konstant tid (timing-angrep) | ✅ Fikset i [#231](https://github.com/mikalv/msgr/pull/231) |
+| SEC-7 | 🟡 Medium | Hardkodede secrets i `docker-compose.yml` (dekket av [#193](https://github.com/mikalv/msgr/issues/193)) | ✅ Secrets via `.env` + [docs/SECRET_MANAGEMENT.md](SECRET_MANAGEMENT.md) |
+| SEC-8 | 🟢 Lav | Misvisende `authorization_schemes: [:noise]`-opsjon som er en no-op | ✅ Fjernet no-op + oppdatert docstring |
 
 ---
 

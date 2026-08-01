@@ -21,6 +21,7 @@ Flutter-appar og støtteverktøy.
 
 ```bash
 cp .env.example .env
+# Fill required secrets (SECRET_KEY_BASE, SERVER_STATIC_KEY, …) — see docs/SECRET_MANAGEMENT.md
 docker compose up --build
 ```
 
@@ -32,5 +33,6 @@ Backenden starter da på port `4000` (HTTP) og, dersom TLS er aktivert, på
 - [architecture.md](architecture.md) – høynivå arkitektur og mål.
 - [docs/architecture_alignment.md](docs/architecture_alignment.md) – siste
   status på hvordan kodebasen matcher arkitekturprinsippene.
+- [docs/SECRET_MANAGEMENT.md](docs/SECRET_MANAGEMENT.md) – secrets for lokal og prod.
 - [backend/README.md](backend/README.md) – detaljer om Docker-stacken og
   backend-konfigurasjon.

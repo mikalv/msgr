@@ -1,7 +1,7 @@
 defmodule MessngrWeb.Plugs.CurrentActor do
   @moduledoc """
-  Wrapper around `MessngrWeb.Plugs.SessionContext` for extracting session
-  information from Rust Gateway headers.
+  Wrapper around `MessngrWeb.Plugs.SessionContext` that authenticates the
+  request from a Guardian JWT (`Authorization: Bearer …`).
   """
 
   alias MessngrWeb.Plugs.SessionContext
