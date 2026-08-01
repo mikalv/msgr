@@ -447,25 +447,31 @@ defmodule Messngr.Auth do
     end
   end
 
-  defp record_failed_attempt(%Challenge{} = challenge) do
-    next_count = (challenge.attempt_count || 0) + 1
+  defp record_failed_attempt(%Challenge{id: id}) do
+    import Ecto.Query
 
-    attrs =
-      if next_count >= @max_verify_attempts do
-        %{"attempt_count" => next_count, "consumed_at" => DateTime.utc_now()}
-      else
-        %{"attempt_count" => next_count}
-      end
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    case challenge |> Challenge.changeset(attrs) |> Repo.update() do
-      {:ok, _updated} when next_count >= @max_verify_attempts ->
+    # Atomic increment so concurrent wrong guesses cannot lose attempts.
+    {updated, rows} =
+      from(c in Challenge,
+        where: c.id == ^id and is_nil(c.consumed_at),
+        select: c.attempt_count
+      )
+      |> Repo.update_all(inc: [attempt_count: 1])
+
+    case {updated, rows} do
+      {1, [count]} when is_integer(count) and count >= @max_verify_attempts ->
+        from(c in Challenge, where: c.id == ^id and is_nil(c.consumed_at))
+        |> Repo.update_all(set: [consumed_at: now])
+
         {:error, :too_many_attempts}
 
-      {:ok, _updated} ->
+      {1, _} ->
         {:error, :invalid_code}
 
-      {:error, reason} ->
-        {:error, reason}
+      {0, _} ->
+        {:error, :too_many_attempts}
     end
   end
 

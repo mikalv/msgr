@@ -6,7 +6,7 @@ defmodule MessngrWeb.Router do
   end
 
   pipeline :actor do
-    plug MessngrWeb.Plugs.CurrentActor, authorization_schemes: [:noise]
+    plug MessngrWeb.Plugs.CurrentActor
   end
 
   pipeline :browser do

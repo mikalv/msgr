@@ -109,7 +109,7 @@
 | Mangel | Beskrivelse | Prioritet |
 |--------|-------------|-----------|
 | **Double Ratchet E2EE** | Kun tabellstruktur (`OmemoRatchets`), ingen faktisk implementasjon | P0 |
-| **Secret Management** | Hardkodede secrets i docker-compose (SECRET_KEY_BASE) | P0 |
+| **Secret Management** | Secrets skal komme fra `.env` / secret store (se `docs/SECRET_MANAGEMENT.md`) | P0 |
 | **Database HA** | Ingen Patroni/HA-konfigurasjon | P0 |
 | **Database Backup** | Ingen backup-strategi dokumentert/implementert | P0 |
 | **SSL/TLS Sertifikater** | Produksjon krever gyldige sertifikater, kun toggle-støtte | P0 |

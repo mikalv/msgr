@@ -1,13 +1,10 @@
 defmodule MessngrWeb.Plugs.SessionContext do
   @moduledoc """
-  Extract session context from JWT Bearer token or headers injected by Rust Gateway.
+  Authenticate the request from a Guardian JWT Bearer token and load account/profile assigns.
 
-  Authentication priority:
-  1. Authorization: Bearer <JWT> header — decode JWT, extract account_id, profile_id, teams
-  2. X-Account-Id / X-Profile-Id / X-Device-Id / X-Session-Id headers (backward compat)
-
-  This plug reads the authentication data and loads the corresponding database records,
-  making them available to controllers and channels via assigns.
+  Expects `Authorization: Bearer <access JWT>`. Invalid or missing tokens are rejected
+  with HTTP 401. Actor identity is taken only from verified JWT claims (`sub`, `pid`, `ten`)
+  — legacy `X-Account-Id` / `X-Profile-Id` headers are not trusted.
   """
 
   import Plug.Conn
