@@ -151,14 +151,14 @@ class ChatViewModel extends ChangeNotifier {
       _messages = [
         for (final message in messages) await _maybeDecrypt(message),
       ];
-      for (final message in messages) {
+      for (final message in _messages) {
         if (message.isDeleted) {
           messageEditingNotifier.markDeleted(message.id);
         } else {
           messageEditingNotifier.restore(message.id);
         }
       }
-      await _cache.saveMessages(_thread!.id, messages);
+      await _cache.saveMessages(_thread!.id, _messages);
       _updateOffline(false);
       notifyListeners();
     } on ApiException catch (error) {
