@@ -63,6 +63,10 @@ jobs:
             ${{ runner.os }}-plt-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-
       - name: Dialyzer
         run: mix dialyzer --format short
+      - name: Prepare test database
+        run: |
+          mix do --app msgr ecto.create --quiet
+          mix do --app msgr ecto.migrate --quiet
       - name: Test with coverage
         run: mix coveralls.json --umbrella
       - name: Upload backend coverage

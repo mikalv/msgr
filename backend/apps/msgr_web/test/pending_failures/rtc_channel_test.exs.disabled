@@ -64,12 +64,13 @@ defmodule MessngrWeb.RTCChannelTest do
         "call_id" => host_response["call_id"]
       })
 
-    push(host_socket, "signal:offer", %{"sdp" => "offer", "target" => peer_profile.id})
+    peer_profile_id = peer_profile.id
+    host_profile_id = host_profile.id
+    push(host_socket, "signal:offer", %{"sdp" => "offer", "target" => peer_profile_id})
 
     assert_broadcast "signal:offer", %{
       "sdp" => "offer",
-      "from" => host_profile.id,
-      peer_profile_id = peer_profile.id
+      "from" => ^host_profile_id,
       "target" => ^peer_profile_id
     }
   end
