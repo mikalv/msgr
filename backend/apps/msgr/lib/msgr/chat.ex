@@ -7,7 +7,7 @@ defmodule Messngr.Chat do
 
   alias Phoenix.PubSub
 
-  alias Messngr.{Accounts, Media, Repo, Retry}
+  alias Messngr.{Accounts, E2ee, Media, Repo, Retry}
 
   alias Messngr.Chat.{
     Conversation,
@@ -94,7 +94,8 @@ defmodule Messngr.Chat do
     :voice,
     :file,
     :thumbnail,
-    :location
+    :location,
+    :encrypted
   ]
 
   def send_message(conversation_id, profile_id, attrs) do
@@ -116,6 +117,7 @@ defmodule Messngr.Chat do
         |> Map.put_new("conversation_id", conversation_id)
         |> Map.put_new("profile_id", profile_id)
         |> Map.put_new_lazy("sent_at", fn -> DateTime.utc_now() end)
+        |> maybe_annotate_e2ee_fanout(conversation_id, profile_id, kind)
 
       case %Message{} |> Message.changeset(message_attrs) |> Repo.insert() do
         {:ok, message} ->
@@ -1140,6 +1142,49 @@ defmodule Messngr.Chat do
     end
   end
 
+  # Temporary rid:* fan-out hint (#235 tracks better device discovery).
+  # Broadcast already reaches conversation subscribers; metadata lists known
+  # E2EE device IDs on peer profiles for clients that want explicit targets.
+  defp maybe_annotate_e2ee_fanout(attrs, conversation_id, sender_profile_id, :encrypted) do
+    payload = Map.get(attrs, "payload") || %{}
+    e2ee = Map.get(payload, "e2ee") || %{}
+    keys = Map.get(e2ee, "keys") || []
+
+    has_wildcard? =
+      Enum.any?(keys, fn key ->
+        is_map(key) and (Map.get(key, "rid") == "*" or Map.get(key, :rid) == "*")
+      end)
+
+    if has_wildcard? do
+      peer_device_ids =
+        conversation_id
+        |> list_participant_profile_ids()
+        |> Enum.reject(&(&1 == sender_profile_id))
+        |> Enum.flat_map(&E2ee.list_device_ids_for_profile/1)
+        |> Enum.uniq()
+
+      metadata = Map.get(attrs, "metadata") || Map.get(attrs, :metadata) || %{}
+
+      Map.put(
+        attrs,
+        "metadata",
+        Map.put(metadata, "e2ee_fanout_device_ids", peer_device_ids)
+      )
+    else
+      attrs
+    end
+  end
+
+  defp maybe_annotate_e2ee_fanout(attrs, _conversation_id, _sender_profile_id, _kind), do: attrs
+
+  defp list_participant_profile_ids(conversation_id) do
+    from(p in Participant,
+      where: p.conversation_id == ^conversation_id,
+      select: p.profile_id
+    )
+    |> Repo.all()
+  end
+
   defp create_structured_conversation(kind, owner_profile_id, participant_ids, attrs) do
     owner_profile_id = to_string(owner_profile_id)
     topic = attrs |> Map.get("topic") |> Kernel.||(Map.get(attrs, :topic))
@@ -1808,7 +1853,7 @@ defmodule Messngr.Chat do
         :ok
 
       ids ->
-        now = DateTime.utc_now()
+        now = DateTime.utc_now() |> DateTime.truncate(:second)
 
         entries =
           Enum.map(ids, fn recipient_id ->
@@ -1816,7 +1861,7 @@ defmodule Messngr.Chat do
               id: Ecto.UUID.generate(),
               message_id: message.id,
               recipient_id: recipient_id,
-              status: "pending",
+              status: :pending,
               metadata: %{},
               inserted_at: now,
               updated_at: now
