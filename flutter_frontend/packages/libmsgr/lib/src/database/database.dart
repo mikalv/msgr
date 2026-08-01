@@ -6,6 +6,7 @@ import 'package:libmsgr/src/database/migrations/002_profile_preferences.dart';
 import 'package:libmsgr/src/database/migrations/003_outgoing_message_queue.dart';
 import 'package:libmsgr/src/database/migrations/004_message_delivery_status.dart';
 import 'package:libmsgr/src/database/migrations/005_create_drafts_table.dart';
+import 'package:libmsgr/src/database/migrations/006_create_omemo_tables.dart';
 import 'package:libmsgr/src/storage/storage_interface.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
@@ -21,6 +22,7 @@ const List<Migration<DatabaseMigrationData>> migrations = [
   Migration(5, upgradeFromV4ToV5),
   Migration(6, upgradeFromV5ToV6),
   Migration(7, upgradeFromV6ToV7),
+  Migration(8, upgradeFromV7ToV8),
 ];
 
 class DatabaseService {

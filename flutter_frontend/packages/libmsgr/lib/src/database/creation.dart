@@ -1,4 +1,5 @@
 import 'package:libmsgr/src/database/constants.dart';
+import 'package:libmsgr/src/database/migrations/006_create_omemo_tables.dart';
 import 'package:libmsgr/src/storage/storage_interface.dart';
 
 Future<void> configureDatabase(DatabaseConnection db) async {
@@ -121,4 +122,6 @@ Future<void> createDatabase(DatabaseConnection db) async {
   await db.execute(
     'CREATE INDEX drafts_team_idx ON $draftsTable(team_slug)',
   );
+
+  await createOmemoTables(db);
 }

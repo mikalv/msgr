@@ -11,6 +11,7 @@ class ChatThread extends Equatable {
     required this.id,
     required this.participantNames,
     required this.kind,
+    this.participantIds = const [],
     this.topic,
     this.structureType,
     this.visibility = ChatVisibility.private,
@@ -18,10 +19,19 @@ class ChatThread extends Equatable {
 
   final String id;
   final List<String> participantNames;
+  final List<String> participantIds;
   final ChatThreadKind kind;
   final String? topic;
   final ChatStructureType? structureType;
   final ChatVisibility visibility;
+
+  /// First participant that is not [localProfileId], for 1:1 E2EE.
+  String? peerProfileId(String localProfileId) {
+    for (final id in participantIds) {
+      if (id != localProfileId) return id;
+    }
+    return null;
+  }
 
   String get displayName {
     final topicValue = topic?.trim();
@@ -48,10 +58,16 @@ class ChatThread extends Equatable {
     final names = participants
         .map((raw) => raw['profile']?['name'] as String? ?? 'Ukjent')
         .toList();
+    final ids = participants
+        .map((raw) => raw['profile']?['id'] as String? ?? raw['profile_id'] as String?)
+        .whereType<String>()
+        .where((id) => id.isNotEmpty)
+        .toList();
 
     return ChatThread(
       id: json['id'] as String,
       participantNames: names,
+      participantIds: ids,
       kind: _parseKind(json['kind'] as String?),
       topic: json['topic'] as String?,
       structureType: _parseStructureType(json['structure_type'] as String?),
@@ -124,6 +140,13 @@ class ChatThread extends Equatable {
   }
 
   @override
-  List<Object?> get props =>
-      [id, participantNames, kind, topic, structureType, visibility];
+  List<Object?> get props => [
+        id,
+        participantNames,
+        participantIds,
+        kind,
+        topic,
+        structureType,
+        visibility,
+      ];
 }

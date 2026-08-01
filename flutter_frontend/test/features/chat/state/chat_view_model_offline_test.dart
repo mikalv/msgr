@@ -125,6 +125,14 @@ class _FakeRealtime implements ChatRealtime {
   }
 
   @override
+  Future<ChatMessage> sendEncrypted({
+    required Map<String, dynamic> payload,
+    String body = '',
+  }) async {
+    throw ChatSocketException('offline');
+  }
+
+  @override
   Future<void> startTyping({String? threadId}) async {}
 
   @override

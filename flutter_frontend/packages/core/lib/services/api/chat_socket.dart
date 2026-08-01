@@ -27,6 +27,12 @@ abstract class ChatRealtime {
   /// Send en melding over sanntidskanalen.
   Future<ChatMessage> send(String body);
 
+  /// Send an opaque E2EE envelope (`kind: encrypted`).
+  Future<ChatMessage> sendEncrypted({
+    required Map<String, dynamic> payload,
+    String body = '',
+  });
+
   /// Marker at brukeren begynner å skrive.
   Future<void> startTyping({String? threadId});
 
@@ -213,12 +219,28 @@ class ChatSocket implements ChatRealtime {
 
   @override
   Future<ChatMessage> send(String body) async {
+    return _pushMessageCreate({'body': body});
+  }
+
+  @override
+  Future<ChatMessage> sendEncrypted({
+    required Map<String, dynamic> payload,
+    String body = '',
+  }) {
+    return _pushMessageCreate({
+      'kind': 'encrypted',
+      'body': body,
+      'payload': payload,
+    });
+  }
+
+  Future<ChatMessage> _pushMessageCreate(Map<String, dynamic> attrs) async {
     final channel = _channel;
     if (!_isConnected || channel == null) {
       throw ChatSocketException('Samtalen er ikke tilkoblet.');
     }
 
-    final push = channel.push('message:create', {'body': body});
+    final push = channel.push('message:create', attrs);
 
     try {
       final response = await push.future;

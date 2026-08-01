@@ -332,6 +332,14 @@ class _MockRealtime implements ChatRealtime {
     throw UnimplementedError('send is not exercised in these tests');
   }
 
+  @override
+  Future<ChatMessage> sendEncrypted({
+    required Map<String, dynamic> payload,
+    String body = '',
+  }) async {
+    throw UnimplementedError('sendEncrypted is not exercised in these tests');
+  }
+
   void emit(ChatRealtimeEvent event) {
     if (!_controller.isClosed) {
       _controller.add(event);

@@ -18,6 +18,7 @@ import 'package:core/services/api/chat_api.dart';
 import 'package:core/services/api/chat_socket.dart';
 import 'package:core/services/api/chat_realtime_event.dart';
 import 'package:core/services/api/contact_api.dart';
+import 'package:libmsgr/libmsgr.dart' show E2eeService;
 import 'package:msgr_messages/msgr_messages.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -36,12 +37,14 @@ class ChatViewModel extends ChangeNotifier {
     MessageEditingNotifier? editing,
     ChatMediaUploader? mediaUploader,
     ContactApi? contacts,
+    E2eeService? e2ee,
   })  : _identity = identity,
         _api = api ?? ChatApi(),
         _realtime = realtime ?? ChatSocket(),
         _cache = cache ?? HiveChatCacheStore(),
         _connectivity = connectivity ?? Connectivity(),
         _contactApi = contacts ?? ContactApi(),
+        _e2ee = e2ee,
         composerController = composer ?? ChatComposerController(),
         typingNotifier = typing ?? TypingParticipantsNotifier(),
         reactionNotifier = reactions ?? ReactionAggregatorNotifier(),
@@ -62,6 +65,7 @@ class ChatViewModel extends ChangeNotifier {
   final ChatCacheStore _cache;
   final Connectivity _connectivity;
   final ContactApi _contactApi;
+  final E2eeService? _e2ee;
   final ChatComposerController composerController;
   final TypingParticipantsNotifier typingNotifier;
   final ReactionAggregatorNotifier reactionNotifier;
@@ -144,7 +148,9 @@ class ChatViewModel extends ChangeNotifier {
         current: _identity,
         conversationId: _thread!.id,
       );
-      _messages = messages;
+      _messages = [
+        for (final message in messages) await _maybeDecrypt(message),
+      ];
       for (final message in messages) {
         if (message.isDeleted) {
           messageEditingNotifier.markDeleted(message.id);
@@ -759,6 +765,10 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   Future<ChatMessage> _sendOverPreferredChannel(String body) async {
+    if (_shouldUseE2ee) {
+      return _sendEncrypted(body);
+    }
+
     if (_realtimeConnected && _realtime.isConnected) {
       return _realtime.send(body);
     }
@@ -768,6 +778,122 @@ class ChatViewModel extends ChangeNotifier {
       conversationId: _thread!.id,
       body: body,
     );
+  }
+
+  bool get _shouldUseE2ee {
+    final thread = _thread;
+    final e2ee = _e2ee;
+    if (e2ee == null || thread == null) return false;
+    if (thread.visibility != ChatVisibility.private) return false;
+    if (thread.kind != ChatThreadKind.direct) return false;
+    return thread.peerProfileId(_identity.profileId) != null;
+  }
+
+  Future<ChatMessage> _sendEncrypted(String body) async {
+    final e2ee = _e2ee!;
+    final peerId = _thread!.peerProfileId(_identity.profileId)!;
+    final prepared = await e2ee.prepareSend(
+      peerProfileId: peerId,
+      plaintext: body,
+    );
+
+    Future<ChatMessage> push() async {
+      if (_realtimeConnected && _realtime.isConnected) {
+        return _realtime.sendEncrypted(
+          payload: prepared.payload,
+          body: '',
+        );
+      }
+      return _api.sendStructuredMessage(
+        current: _identity,
+        conversationId: _thread!.id,
+        kind: prepared.kind,
+        body: '',
+        payload: prepared.payload,
+      );
+    }
+
+    final persisted = await push();
+    if (prepared.queued) {
+      // Handshake-only; keep optimistic plaintext locally until ack flush.
+      return persisted.copyWith(
+        body: body,
+        metadata: {
+          ...persisted.metadata,
+          'e2ee_connecting': true,
+        },
+      );
+    }
+    return persisted.copyWith(body: body);
+  }
+
+  Future<ChatMessage> _maybeDecrypt(ChatMessage message) async {
+    final e2ee = _e2ee;
+    final thread = _thread;
+    if (e2ee == null || thread == null) return message;
+    final payload = message.metadata['e2ee_payload'];
+    if (payload is! Map) return message;
+
+    final peerId = message.profileId == _identity.profileId
+        ? thread.peerProfileId(_identity.profileId)
+        : message.profileId;
+    if (peerId == null) return message;
+
+    final result = await e2ee.handleIncoming(
+      peerProfileId: peerId,
+      payload: Map<String, dynamic>.from(payload),
+    );
+
+    if (result.ackPayload != null) {
+      unawaited(_sendE2eeEnvelope(result.ackPayload!));
+    }
+
+    if (result.plaintext != null) {
+      return message.copyWith(body: result.plaintext);
+    }
+
+    if (result.connecting) {
+      return message.copyWith(
+        body: message.body.isEmpty ? 'Kobler…' : message.body,
+        metadata: {...message.metadata, 'e2ee_connecting': true},
+      );
+    }
+
+    if (result.undecryptable && message.metadata['e2ee_raw_type'] == 'encrypted') {
+      return message.copyWith(body: '[kunne ikke dekryptere]');
+    }
+
+    // After init_ack, flush queued plaintext as encrypted msgs.
+    if (payload['e2ee'] is Map &&
+        ((payload['e2ee'] as Map)['keys'] as List?)?.any(
+              (k) => k is Map && k['type'] == 'init_ack',
+            ) ==
+            true) {
+      final flushed = await e2ee.flushPending(peerProfileId: peerId);
+      for (final item in flushed) {
+        unawaited(_sendE2eeEnvelope(item.payload));
+      }
+    }
+
+    return message;
+  }
+
+  Future<void> _sendE2eeEnvelope(Map<String, dynamic> payload) async {
+    try {
+      if (_realtimeConnected && _realtime.isConnected) {
+        await _realtime.sendEncrypted(payload: payload, body: '');
+      } else {
+        await _api.sendStructuredMessage(
+          current: _identity,
+          conversationId: _thread!.id,
+          kind: 'encrypted',
+          body: '',
+          payload: payload,
+        );
+      }
+    } catch (error, stack) {
+      debugPrint('E2EE envelope send failed: $error\n$stack');
+    }
   }
 
   void _setLoading(bool value) {
@@ -924,9 +1050,12 @@ class ChatViewModel extends ChangeNotifier {
     }
 
     if (event is ChatMessageEvent) {
-      _mergeMessage(event.message);
-      _persistMessages();
-      _markMessageRead(event.message);
+      unawaited(() async {
+        final decrypted = await _maybeDecrypt(event.message);
+        _mergeMessage(decrypted);
+        _persistMessages();
+        _markMessageRead(decrypted);
+      }());
       return;
     }
 

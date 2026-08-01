@@ -27,6 +27,8 @@ export 'src/models/auth_challenge.dart';
 
 export 'src/registration_service.dart';
 export 'src/services/contact_api.dart';
+export 'src/services/e2ee_service.dart';
+export 'src/database/daos/omemo_dao.dart';
 export 'src/connection.dart';
 
 // NOISE Protocol
