@@ -104,7 +104,7 @@ openobserve_opts = [
   stream: System.get_env("OPENOBSERVE_STREAM", "backend"),
   dataset: System.get_env("OPENOBSERVE_DATASET", "_json"),
   username: System.get_env("OPENOBSERVE_USERNAME", "root@example.com"),
-  password: System.get_env("OPENOBSERVE_PASSWORD", "Complexpass#123"),
+  password: System.get_env("OPENOBSERVE_PASSWORD", ""),
   metadata: [:application, :module, :function, :line, :request_id, :pid],
   level: :debug,
   service: System.get_env("OPENOBSERVE_SERVICE", "msgr_backend_dev"),

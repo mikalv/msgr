@@ -451,20 +451,30 @@ defmodule Messngr.Auth do
     import Ecto.Query
 
     now = DateTime.utc_now() |> DateTime.truncate(:second)
+    max_attempts = @max_verify_attempts
 
-    # Atomic increment so concurrent wrong guesses cannot lose attempts.
+    # Single UPDATE: increment + lockout at threshold are atomic under concurrency.
     {updated, rows} =
       from(c in Challenge,
         where: c.id == ^id and is_nil(c.consumed_at),
+        update: [
+          set: [
+            attempt_count: fragment("? + 1", c.attempt_count),
+            consumed_at:
+              fragment(
+                "CASE WHEN ? + 1 >= ? THEN ? ELSE consumed_at END",
+                c.attempt_count,
+                ^max_attempts,
+                ^now
+              )
+          ]
+        ],
         select: c.attempt_count
       )
-      |> Repo.update_all(inc: [attempt_count: 1])
+      |> Repo.update_all([])
 
     case {updated, rows} do
-      {1, [count]} when is_integer(count) and count >= @max_verify_attempts ->
-        from(c in Challenge, where: c.id == ^id and is_nil(c.consumed_at))
-        |> Repo.update_all(set: [consumed_at: now])
-
+      {1, [count]} when is_integer(count) and count >= max_attempts ->
         {:error, :too_many_attempts}
 
       {1, _} ->
