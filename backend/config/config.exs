@@ -68,7 +68,8 @@ config :msgr, Messngr.Media.VirusScan,
   host: "127.0.0.1",
   port: 3310,
   scanner: Messngr.Media.VirusScan.Clamd,
-  quarantine_prefix: "quarantine/"
+  quarantine_prefix: "quarantine/",
+  max_scan_bytes: 50 * 1024 * 1024
 
 config :msgr, Messngr.Chat.WatcherPruner,
   enabled: true,

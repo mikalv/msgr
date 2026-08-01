@@ -60,9 +60,11 @@ config :msgr, Messngr.Chat.WatcherPruner, enabled: false
 config :msgr, Messngr.Media.VirusScan,
   enabled: true,
   scanner: Messngr.Media.VirusScan.Passthrough,
+  head_object: fn _bucket, _key -> {:ok, %{content_length: 10}} end,
   fetch_object: fn _bucket, _key -> {:ok, "test-bytes"} end,
   quarantine_object: fn _bucket, _key, _qkey -> :ok end,
-  quarantine_prefix: "quarantine/"
+  quarantine_prefix: "quarantine/",
+  max_scan_bytes: 50 * 1024 * 1024
 
 shared_repo_config =
   [

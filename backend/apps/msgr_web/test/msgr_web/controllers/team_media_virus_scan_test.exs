@@ -7,13 +7,15 @@ defmodule MessngrWeb.TeamMediaVirusScanTest do
   setup %{conn: conn} do
     ctx = setup_team(conn)
 
+    put_scan_env(
+      scanner: Messngr.Media.VirusScan.Passthrough,
+      quarantine_object: fn _b, _k, _q -> :ok end
+    )
+
     on_exit(fn ->
-      Application.put_env(:msgr, VirusScan,
-        enabled: true,
+      put_scan_env(
         scanner: Messngr.Media.VirusScan.Passthrough,
-        fetch_object: fn _b, _k -> {:ok, "test-bytes"} end,
-        quarantine_object: fn _b, _k, _q -> :ok end,
-        quarantine_prefix: "quarantine/"
+        quarantine_object: fn _b, _k, _q -> :ok end
       )
     end)
 
@@ -95,25 +97,26 @@ defmodule MessngrWeb.TeamMediaVirusScanTest do
         content_type: "application/pdf",
         filename: "doc.pdf",
         size: 10,
-        scan_status: :awaiting_upload
+        scan_status: :awaiting_upload,
+        scanned_at: DateTime.utc_now() |> DateTime.truncate(:second)
       })
 
     complete = post(conn, "/api/teams/#{slug}/media/#{upload.id}/complete")
     resp = json_response(complete, 200)
     assert resp["data"]["scan_status"] in ["scanning", "clean"]
 
-    Process.sleep(150)
-    reloaded = MediaUpload.get_by_id(prefix, upload.id)
-    assert reloaded.scan_status == :clean
+    # Retries clear stale scanned_at while scanning is in progress.
+    if resp["data"]["scan_status"] == "scanning" do
+      assert is_nil(resp["data"]["scanned_at"])
+    end
+
+    assert_scan_status(prefix, upload.id, :clean)
   end
 
   test "scan_upload quarantines infected files", %{prefix: prefix, team: team, profile: profile} do
-    Application.put_env(:msgr, VirusScan,
-      enabled: true,
+    put_scan_env(
       scanner: Messngr.Media.VirusScan.InfectedStub,
-      fetch_object: fn _b, _k -> {:ok, "eicar"} end,
-      quarantine_object: fn _b, _k, _q -> :ok end,
-      quarantine_prefix: "quarantine/"
+      quarantine_object: fn _b, _k, _q -> :ok end
     )
 
     {:ok, upload} =
@@ -132,6 +135,57 @@ defmodule MessngrWeb.TeamMediaVirusScanTest do
     assert String.starts_with?(updated.quarantine_key, "quarantine/")
   end
 
+  test "scan_upload omits quarantine_key when quarantine copy fails", %{
+    prefix: prefix,
+    team: team,
+    profile: profile
+  } do
+    put_scan_env(
+      scanner: Messngr.Media.VirusScan.InfectedStub,
+      quarantine_object: fn _b, _k, _q -> {:error, :copy_failed} end
+    )
+
+    {:ok, upload} =
+      MediaUpload.create(prefix, %{
+        profile_id: profile.id,
+        object_key: "teams/#{team.id}/#{Ecto.UUID.generate()}/eicar2.bin",
+        content_type: "application/octet-stream",
+        filename: "eicar2.bin",
+        size: 68,
+        scan_status: :scanning
+      })
+
+    assert {:ok, updated} = VirusScan.scan_upload(prefix, upload.id)
+    assert updated.scan_status == :infected
+    assert is_nil(updated.quarantine_key)
+  end
+
+  test "scan_upload rejects oversized objects before loading body", %{
+    prefix: prefix,
+    team: team,
+    profile: profile
+  } do
+    put_scan_env(
+      scanner: Messngr.Media.VirusScan.Passthrough,
+      head_object: fn _b, _k -> {:ok, %{content_length: 51 * 1024 * 1024}} end,
+      fetch_object: fn _b, _k -> flunk("must not fetch oversized object") end
+    )
+
+    {:ok, upload} =
+      MediaUpload.create(prefix, %{
+        profile_id: profile.id,
+        object_key: "teams/#{team.id}/#{Ecto.UUID.generate()}/huge.bin",
+        content_type: "application/octet-stream",
+        filename: "huge.bin",
+        size: 10,
+        scan_status: :scanning
+      })
+
+    assert {:error, :object_too_large} = VirusScan.scan_upload(prefix, upload.id)
+    reloaded = MediaUpload.get_by_id(prefix, upload.id)
+    assert reloaded.scan_status == :error
+  end
+
   test "authorize_download gates statuses", %{profile: profile, prefix: prefix, team: team} do
     {:ok, upload} =
       MediaUpload.create(prefix, %{
@@ -146,5 +200,42 @@ defmodule MessngrWeb.TeamMediaVirusScanTest do
     assert {:error, :scan_pending} = VirusScan.authorize_download(upload)
     assert :ok = VirusScan.authorize_download(%{upload | scan_status: :clean})
     assert {:error, :infected} = VirusScan.authorize_download(%{upload | scan_status: :infected})
+  end
+
+  defp put_scan_env(overrides) do
+    Application.put_env(
+      :msgr,
+      VirusScan,
+      Keyword.merge(
+        [
+          enabled: true,
+          scanner: Messngr.Media.VirusScan.Passthrough,
+          head_object: fn _b, _k -> {:ok, %{content_length: 10}} end,
+          fetch_object: fn _b, _k -> {:ok, "test-bytes"} end,
+          quarantine_object: fn _b, _k, _q -> :ok end,
+          delete_object: fn _b, _k -> :ok end,
+          quarantine_prefix: "quarantine/",
+          max_scan_bytes: 50 * 1024 * 1024
+        ],
+        overrides
+      )
+    )
+  end
+
+  defp assert_scan_status(prefix, upload_id, expected, attempts \\ 50) do
+    Enum.reduce_while(1..attempts, nil, fn _, _ ->
+      case MediaUpload.get_by_id(prefix, upload_id) do
+        %{scan_status: ^expected} = upload ->
+          {:halt, upload}
+
+        _ ->
+          Process.sleep(20)
+          {:cont, nil}
+      end
+    end)
+    |> case do
+      %{scan_status: ^expected} = upload -> upload
+      _ -> flunk("expected scan_status #{inspect(expected)} for #{upload_id}")
+    end
   end
 end

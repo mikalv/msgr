@@ -5,7 +5,7 @@ defmodule Messngr.Media.VirusScan do
   Flow:
   1. Client finishes PUT → `complete_upload/2`
   2. Status set to `:scanning` and a Task is enqueued
-  3. Object bytes are fetched from MinIO and scanned
+  3. Object size is checked via HEAD, then bytes are fetched and scanned
   4. Clean → `:clean`; infected → quarantine + `:infected`
   """
 
@@ -13,6 +13,9 @@ defmodule Messngr.Media.VirusScan do
 
   alias Messngr.Media.Storage
   alias Messngr.Metrics.Pipeline
+
+  # Keep in sync with TeamMediaController upload limit.
+  @default_max_scan_bytes 50 * 1024 * 1024
 
   @doc """
   Marks upload as scanning and enqueues an async scan job.
@@ -24,6 +27,7 @@ defmodule Messngr.Media.VirusScan do
       with {:ok, upload} <-
              media_upload().update(prefix, upload, %{
                scan_status: :scanning,
+               scanned_at: nil,
                threat_name: nil,
                quarantine_key: nil
              }) do
@@ -93,7 +97,7 @@ defmodule Messngr.Media.VirusScan do
     bucket = Storage.bucket()
 
     result =
-      case fetch_object(bucket, upload.object_key) do
+      case fetch_object_for_scan(bucket, upload.object_key) do
         {:ok, body} ->
           scanner().scan_bytes(body, scanner_opts())
 
@@ -105,7 +109,7 @@ defmodule Messngr.Media.VirusScan do
     finish(prefix, upload, bucket, result, duration)
   end
 
-  defp finish(prefix, upload, bucket, :clean, duration) do
+  defp finish(prefix, upload, _bucket, :clean, duration) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
     {:ok, updated} =
@@ -122,16 +126,20 @@ defmodule Messngr.Media.VirusScan do
 
   defp finish(prefix, upload, bucket, {:infected, threat}, duration) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
-    quarantine_key = quarantine_key(upload.object_key)
+    qkey = quarantine_key(upload.object_key)
 
-    _ = quarantine_object(bucket, upload.object_key, quarantine_key)
+    stored_quarantine_key =
+      case quarantine_object(bucket, upload.object_key, qkey) do
+        :ok -> qkey
+        {:error, _} -> nil
+      end
 
     {:ok, updated} =
       media_upload().update(prefix, upload, %{
         scan_status: :infected,
         scanned_at: now,
         threat_name: threat,
-        quarantine_key: quarantine_key
+        quarantine_key: stored_quarantine_key
       })
 
     emit_metric(duration, :infected, upload, threat)
@@ -162,6 +170,49 @@ defmodule Messngr.Media.VirusScan do
 
   # Runtime lookup avoids compile-time dependency on the Teams app.
   defp media_upload, do: Teams.TenantModels.MediaUpload
+
+  defp fetch_object_for_scan(bucket, object_key) do
+    max_bytes = max_scan_bytes()
+
+    with :ok <- ensure_object_within_limit(bucket, object_key, max_bytes),
+         {:ok, body} <- fetch_object(bucket, object_key) do
+      if byte_size(body) > max_bytes do
+        # Client-declared size can lie; never scan oversized payloads in memory.
+        _ = delete_object(bucket, object_key)
+        {:error, :object_too_large}
+      else
+        {:ok, body}
+      end
+    end
+  end
+
+  defp ensure_object_within_limit(bucket, object_key, max_bytes) do
+    case head_object(bucket, object_key) do
+      {:ok, %{content_length: length}} when is_integer(length) and length > max_bytes ->
+        _ = delete_object(bucket, object_key)
+        {:error, :object_too_large}
+
+      {:ok, _} ->
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp delete_object(bucket, object_key) do
+    case config(:delete_object, nil) do
+      fun when is_function(fun, 2) -> fun.(bucket, object_key)
+      _ -> Storage.delete_object(bucket, object_key)
+    end
+  end
+
+  defp head_object(bucket, object_key) do
+    case config(:head_object, nil) do
+      fun when is_function(fun, 2) -> fun.(bucket, object_key)
+      _ -> Storage.head_object(bucket, object_key)
+    end
+  end
 
   defp fetch_object(bucket, object_key) do
     case config(:fetch_object, nil) do
@@ -231,6 +282,10 @@ defmodule Messngr.Media.VirusScan do
       port: config(:port, 3310),
       timeout: config(:timeout, 60_000)
     ]
+  end
+
+  defp max_scan_bytes do
+    config(:max_scan_bytes, @default_max_scan_bytes)
   end
 
   defp enabled? do
