@@ -13,6 +13,7 @@ defmodule Messngr.Metrics.Pipeline do
   @delivery_rate_event [:msgr, :chat, :delivery, :rate]
   @app_start_event [:msgr, :app, :startup]
   @composer_event [:msgr, :composer, :render]
+  @media_scan_event [:msgr, :media, :scan, :stop]
 
   @doc """
   Starts the pipeline and attaches telemetry handlers.
@@ -33,7 +34,8 @@ defmodule Messngr.Metrics.Pipeline do
         {@delivery_latency_event, &handle_latency/4},
         {@delivery_rate_event, &handle_rate/4},
         {@app_start_event, &handle_app_start/4},
-        {@composer_event, &handle_composer/4}
+        {@composer_event, &handle_composer/4},
+        {@media_scan_event, &handle_media_scan/4}
       ]
       |> Enum.map(&attach_handler(&1, state))
 
@@ -78,6 +80,13 @@ defmodule Messngr.Metrics.Pipeline do
     :telemetry.execute(@composer_event, %{duration_ms: duration_ms}, metadata)
   end
 
+  @doc """
+  Emits a media virus-scan duration measurement.
+  """
+  def emit_media_scan(duration_ms, metadata \\ %{}) do
+    :telemetry.execute(@media_scan_event, %{duration_ms: duration_ms}, metadata)
+  end
+
   defp attach_handler({event, handler}, state) do
     id = System.unique_integer([:positive])
     :telemetry.attach({__MODULE__, id, event}, event, handler, state)
@@ -102,6 +111,10 @@ defmodule Messngr.Metrics.Pipeline do
 
   defp handle_composer(_event, %{duration_ms: duration}, metadata, %{reporter: reporter}) do
     report(reporter, :composer_render, %{duration_ms: duration}, metadata)
+  end
+
+  defp handle_media_scan(_event, %{duration_ms: duration}, metadata, %{reporter: reporter}) do
+    report(reporter, :media_scan, %{duration_ms: duration}, metadata)
   end
 
   defp report(reporter, metric, measurement, metadata) when is_atom(reporter) do

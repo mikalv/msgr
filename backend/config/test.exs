@@ -57,6 +57,13 @@ config :msgr, Messngr.Noise.DevHandshake,
 
 config :msgr, Messngr.Chat.WatcherPruner, enabled: false
 
+config :msgr, Messngr.Media.VirusScan,
+  enabled: true,
+  scanner: Messngr.Media.VirusScan.Passthrough,
+  fetch_object: fn _bucket, _key -> {:ok, "test-bytes"} end,
+  quarantine_object: fn _bucket, _key, _qkey -> :ok end,
+  quarantine_prefix: "quarantine/"
+
 shared_repo_config =
   [
     username: System.get_env("POSTGRES_USERNAME", "postgres"),

@@ -85,12 +85,43 @@ defmodule Messngr.Media.Storage do
     URI.merge(public_endpoint, "#{bucket}/#{object_key}") |> to_string()
   end
 
+  @spec get_object(String.t(), String.t()) :: {:ok, binary()} | {:error, term()}
+  def get_object(bucket, object_key) do
+    case ExAws.S3.get_object(bucket, object_key) |> ExAws.request(internal_overrides()) do
+      {:ok, %{body: body}} when is_binary(body) -> {:ok, body}
+      {:ok, %{body: body}} -> {:ok, IO.iodata_to_binary(body)}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   @spec delete_object(String.t(), String.t()) :: :ok | {:error, term()}
   def delete_object(bucket, object_key) do
     case ExAws.S3.delete_object(bucket, object_key) |> ExAws.request(internal_overrides()) do
       {:ok, _} -> :ok
       {:error, {:http_error, 404, _}} -> :ok
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Moves an object into quarantine by copying then deleting the original.
+  """
+  @spec quarantine_object(String.t(), String.t(), String.t()) :: :ok | {:error, term()}
+  def quarantine_object(bucket, object_key, quarantine_key) do
+    copy =
+      ExAws.S3.put_object_copy(bucket, quarantine_key, bucket, object_key)
+      |> ExAws.request(internal_overrides())
+
+    case copy do
+      {:ok, _} ->
+        _ = delete_object(bucket, object_key)
+        :ok
+
+      {:error, reason} ->
+        Logger.warning("Failed to quarantine object #{object_key}: #{inspect(reason)}")
+        # Still delete original so infected content cannot be served.
+        _ = delete_object(bucket, object_key)
+        {:error, reason}
     end
   end
 

@@ -20,6 +20,18 @@ defmodule MessngrWeb.FallbackController do
     |> json(%{error: "forbidden"})
   end
 
+  def call(conn, {:error, :scan_pending}) do
+    conn
+    |> put_status(:locked)
+    |> json(%{error: "scan_pending"})
+  end
+
+  def call(conn, {:error, :infected}) do
+    conn
+    |> put_status(:forbidden)
+    |> json(%{error: "infected"})
+  end
+
   def call(conn, {:error, :too_many_attempts}) do
     conn
     |> put_status(:too_many_requests)

@@ -113,7 +113,7 @@
 | **Database HA** | Ingen Patroni/HA-konfigurasjon | P0 |
 | **Database Backup** | Ingen backup-strategi dokumentert/implementert | P0 |
 | **SSL/TLS Sertifikater** | Produksjon krever gyldige sertifikater, kun toggle-støtte | P0 |
-| **Virus/Malware Scanning** | Media pipeline uten virusskanning | P0 |
+| **Virus/Malware Scanning** | ClamAV + async scan/quarantine for team media (se `#197`) | P0 |
 | **Security Audit** | Ingen dokumentert sikkerhetsrevisjon | P0 |
 
 ### 3.2 🟠 Høy Prioritet

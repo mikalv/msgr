@@ -271,6 +271,35 @@ config :msgr,
        |> Keyword.put(:interval_ms, pruner_interval)
        |> Keyword.put(:batch_size, pruner_batch_size)
 
+virus_scan_config = Application.get_env(:msgr, Messngr.Media.VirusScan, [])
+
+clamav_enabled =
+  bool_env.(
+    System.get_env("CLAMAV_ENABLED"),
+    Keyword.get(virus_scan_config, :enabled, false)
+  )
+
+clamav_port =
+  int_env.(
+    System.get_env("CLAMAV_PORT"),
+    Keyword.get(virus_scan_config, :port, 3310),
+    "CLAMAV_PORT"
+  )
+
+config :msgr,
+       Messngr.Media.VirusScan,
+       virus_scan_config
+       |> Keyword.put(:enabled, clamav_enabled)
+       |> Keyword.put(:host, System.get_env("CLAMAV_HOST", Keyword.get(virus_scan_config, :host, "127.0.0.1")))
+       |> Keyword.put(:port, clamav_port)
+       |> Keyword.put(
+         :quarantine_prefix,
+         System.get_env(
+           "CLAMAV_QUARANTINE_PREFIX",
+           Keyword.get(virus_scan_config, :quarantine_prefix, "quarantine/")
+         )
+       )
+
 watcher_pruner_config = Application.get_env(:msgr, Messngr.Chat.WatcherPruner, [])
 
 watcher_pruner_enabled =
