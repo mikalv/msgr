@@ -5,7 +5,7 @@ defmodule Messngr.AuthTest do
   alias Swoosh.Adapters.Local.Storage.Memory
 
   setup do
-    Memory.clear()
+    Memory.delete_all()
     :ok
   end
 
@@ -30,7 +30,7 @@ defmodule Messngr.AuthTest do
                Messngr.start_auth_challenge(%{"channel" => "email", "identifier" => identifier})
 
       assert [email] = Memory.all()
-      assert email.to == [{nil, identifier}]
+      assert match?([{_, ^identifier}], email.to)
       assert email.subject =~ "login code"
       assert String.contains?(email.text_body, code)
     end
@@ -64,6 +64,43 @@ defmodule Messngr.AuthTest do
       assert identity.kind == :phone
       assert identity.verified_at != nil
       assert account.phone_number == "+4798765432"
+    end
+
+    test "rejects after too many invalid attempts" do
+      {:ok, challenge, code} =
+        Messngr.start_auth_challenge(%{
+          "channel" => "email",
+          "identifier" => "attempts-#{System.unique_integer([:positive])}@example.com"
+        })
+
+      # Avoid accidentally guessing the real code
+      wrong = if code == "000000", do: "111111", else: "000000"
+
+      for _ <- 1..4 do
+        assert {:error, :invalid_code} =
+                 Messngr.verify_auth_challenge(challenge.id, wrong, %{})
+      end
+
+      assert {:error, :too_many_attempts} =
+               Messngr.verify_auth_challenge(challenge.id, wrong, %{})
+
+      # Even the correct code is rejected once locked out
+      assert {:error, :already_consumed} =
+               Messngr.verify_auth_challenge(challenge.id, code, %{})
+    end
+
+    test "stores HMAC hash rather than raw or plain SHA256" do
+      {:ok, challenge, code} =
+        Messngr.start_auth_challenge(%{
+          "channel" => "email",
+          "identifier" => "hmac-#{System.unique_integer([:positive])}@example.com"
+        })
+
+      plain_sha =
+        :crypto.hash(:sha256, code) |> Base.encode64()
+
+      assert challenge.code_hash != code
+      assert challenge.code_hash != plain_sha
     end
   end
 

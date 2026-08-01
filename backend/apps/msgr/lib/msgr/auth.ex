@@ -16,6 +16,7 @@ defmodule Messngr.Auth do
   alias Ecto.NoResultsError
 
   @challenge_ttl_minutes 10
+  @max_verify_attempts 5
 
   @type channel :: :email | :phone
 
@@ -34,50 +35,60 @@ defmodule Messngr.Auth do
   def verify_challenge(id, code, attrs \\ %{}) do
     # Rust Gateway handles Noise protocol
     # This function verifies OTP and binds the account to the Noise session
-    Repo.transaction(fn ->
-      challenge = Repo.get!(Challenge, id)
+    challenge = Repo.get!(Challenge, id)
+
+    with :ok <- ensure_not_consumed(challenge),
+         :ok <- ensure_not_expired(challenge),
+         :ok <- ensure_attempts_remaining(challenge),
+         :ok <- compare_or_record_failure(challenge, code) do
       # UUID from Rust Gateway
       session_id = Map.get(attrs, "session_id")
       # Token from Rust Gateway
       session_token = Map.get(attrs, "session_token")
 
-      with :ok <- ensure_not_consumed(challenge),
-           :ok <- ensure_not_expired(challenge),
-           :ok <- compare_code(challenge, code),
-           {:ok, identity} <- upsert_identity_from_challenge(challenge, attrs),
-           {:ok, _} <- mark_challenge_consumed(challenge),
-           {:ok, identity} <-
-             Accounts.verify_identity(identity, %{last_challenged_at: challenge.inserted_at}),
-           {:ok, %{identity: identity, device: device}} <-
-             Accounts.attach_device_for_identity(identity, device_attrs_from(challenge, attrs)),
-           :ok <-
-             bind_noise_session_to_account(
-               session_id,
-               session_token,
-               identity.account,
-               Map.get(identity, :profile),
-               device
-             ) do
-        account = identity.account
-        default_profile = List.first(List.wrap(account.profiles))
-        default_profile_id = default_profile && default_profile.id
+      Repo.transaction(fn ->
+        # Reload to ensure we still have a valid challenge inside the transaction
+        challenge = Repo.get!(Challenge, id)
 
-        # Build team memberships map and issue JWT tokens
-        {access_token, refresh_token} = issue_jwt_tokens(account, default_profile_id)
+        with :ok <- ensure_not_consumed(challenge),
+             :ok <- ensure_not_expired(challenge),
+             :ok <- ensure_attempts_remaining(challenge),
+             :ok <- compare_code(challenge, code),
+             {:ok, identity} <- upsert_identity_from_challenge(challenge, attrs),
+             {:ok, _} <- mark_challenge_consumed(challenge),
+             {:ok, identity} <-
+               Accounts.verify_identity(identity, %{last_challenged_at: challenge.inserted_at}),
+             {:ok, %{identity: identity, device: device}} <-
+               Accounts.attach_device_for_identity(identity, device_attrs_from(challenge, attrs)),
+             :ok <-
+               bind_noise_session_to_account(
+                 session_id,
+                 session_token,
+                 identity.account,
+                 Map.get(identity, :profile),
+                 device
+               ) do
+          account = identity.account
+          default_profile = List.first(List.wrap(account.profiles))
+          default_profile_id = default_profile && default_profile.id
 
-        %{
-          account: account,
-          identity: identity,
-          device: device,
-          session_id: session_id,
-          access_token: access_token,
-          refresh_token: refresh_token
-        }
-      else
-        {:error, reason} -> Repo.rollback(reason)
-        error -> Repo.rollback(error)
-      end
-    end)
+          # Build team memberships map and issue JWT tokens
+          {access_token, refresh_token} = issue_jwt_tokens(account, default_profile_id)
+
+          %{
+            account: account,
+            identity: identity,
+            device: device,
+            session_id: session_id,
+            access_token: access_token,
+            refresh_token: refresh_token
+          }
+        else
+          {:error, reason} -> Repo.rollback(reason)
+          error -> Repo.rollback(error)
+        end
+      end)
+    end
   end
 
   @doc """
@@ -409,6 +420,23 @@ defmodule Messngr.Auth do
     end
   end
 
+  defp ensure_attempts_remaining(%Challenge{attempt_count: count})
+       when is_integer(count) and count >= @max_verify_attempts do
+    {:error, :too_many_attempts}
+  end
+
+  defp ensure_attempts_remaining(_), do: :ok
+
+  defp compare_or_record_failure(challenge, code) do
+    case compare_code(challenge, code) do
+      :ok ->
+        :ok
+
+      {:error, :invalid_code} ->
+        record_failed_attempt(challenge)
+    end
+  end
+
   defp compare_code(%Challenge{code_hash: code_hash}, code) do
     hashed = hash_code(code)
 
@@ -416,6 +444,28 @@ defmodule Messngr.Auth do
       :ok
     else
       {:error, :invalid_code}
+    end
+  end
+
+  defp record_failed_attempt(%Challenge{} = challenge) do
+    next_count = (challenge.attempt_count || 0) + 1
+
+    attrs =
+      if next_count >= @max_verify_attempts do
+        %{"attempt_count" => next_count, "consumed_at" => DateTime.utc_now()}
+      else
+        %{"attempt_count" => next_count}
+      end
+
+    case challenge |> Challenge.changeset(attrs) |> Repo.update() do
+      {:ok, _updated} when next_count >= @max_verify_attempts ->
+        {:error, :too_many_attempts}
+
+      {:ok, _updated} ->
+        {:error, :invalid_code}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -467,8 +517,28 @@ defmodule Messngr.Auth do
   end
 
   defp generate_code do
-    :rand.uniform(1_000_000) |> Integer.to_string() |> String.pad_leading(6, "0")
+    :crypto.strong_rand_bytes(4)
+    |> :binary.decode_unsigned()
+    |> rem(1_000_000)
+    |> Integer.to_string()
+    |> String.pad_leading(6, "0")
   end
 
-  defp hash_code(code), do: :crypto.hash(:sha256, code) |> Base.encode64()
+  defp hash_code(code) do
+    secret = otp_hmac_secret()
+
+    :crypto.mac(:hmac, :sha256, secret, code)
+    |> Base.encode64()
+  end
+
+  defp otp_hmac_secret do
+    case Application.get_env(:msgr, :otp_hmac_secret) do
+      secret when is_binary(secret) and secret != "" ->
+        secret
+
+      _ ->
+        Application.get_env(:msgr_web, MessngrWeb.Endpoint)[:secret_key_base] ||
+          raise "OTP HMAC secret is not configured"
+    end
+  end
 end

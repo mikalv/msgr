@@ -16,6 +16,9 @@ config :msgr, :rate_limits,
   auth_challenge: [limit: 5, period: :timer.minutes(10)],
   conversation_message_event: [limit: 60, period: :timer.minutes(1)]
 
+# Used to HMAC OTP codes at rest. Override via OTP_HMAC_SECRET in runtime/prod.
+config :msgr, :otp_hmac_secret, "dev-otp-hmac-secret-change-me"
+
 config :msgr, :llm_client, Messngr.AI.LlmGatewayClient
 
 config :msgr, :secrets_manager, Messngr.Secrets.Aws

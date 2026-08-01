@@ -2,7 +2,7 @@
 {:ok, _} = Application.ensure_all_started(:hammer)
 {:ok, _} = Application.ensure_all_started(:decibel)
 
-{:ok, _} = Application.ensure_all_started(:msgr, permanent: false)
+{:ok, _} = Application.ensure_all_started(:msgr, type: :temporary)
 
 ExUnit.start()
 

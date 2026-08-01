@@ -1,8 +1,8 @@
 defmodule MessngrWeb.TeamMessageController do
   use MessngrWeb, :controller
 
+  alias Teams.Channels
   alias Teams.Messages
-  alias Teams.TeamManagement
   alias Teams.Pagination
 
   action_fallback MessngrWeb.FallbackController
@@ -10,26 +10,25 @@ defmodule MessngrWeb.TeamMessageController do
   @doc "GET /api/teams/:slug/channels/:channel_id/messages — cursor-paginated messages"
   def index(conn, %{"channel_id" => channel_id} = params) do
     prefix = conn.assigns.tenant_prefix
-    cursor_opts = Pagination.parse_params(params)
+    profile = conn.assigns.current_team_profile
 
-    {messages, meta} = Messages.list_messages(prefix, channel_id, cursor_opts)
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id) do
+      cursor_opts = Pagination.parse_params(params)
+      {messages, meta} = Messages.list_messages(prefix, channel_id, cursor_opts)
 
-    json(conn, %{
-      data: Enum.map(messages, &message_json/1),
-      meta: %{has_more: meta.has_more}
-    })
+      json(conn, %{
+        data: Enum.map(messages, &message_json/1),
+        meta: %{has_more: meta.has_more}
+      })
+    end
   end
 
   @doc "POST /api/teams/:slug/channels/:channel_id/messages — send a message"
   def create(conn, %{"channel_id" => channel_id} = params) do
     prefix = conn.assigns.tenant_prefix
-    account = conn.assigns.current_account
+    profile = conn.assigns.current_team_profile
 
-    profile = TeamManagement.get_profile_for_account(prefix, account.id)
-
-    unless profile do
-      {:error, :forbidden}
-    else
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id) do
       attrs = %{
         channel_id: channel_id,
         sender_profile_id: profile.id,
@@ -127,69 +126,58 @@ defmodule MessngrWeb.TeamMessageController do
   @doc "POST /api/teams/:slug/channels/:channel_id/typing — broadcast typing indicator"
   def typing(conn, %{"channel_id" => channel_id} = params) do
     prefix = conn.assigns.tenant_prefix
-    account = conn.assigns.current_account
-    profile = Teams.TeamManagement.get_profile_for_account(prefix, account.id)
+    profile = conn.assigns.current_team_profile
 
-    unless profile do
-      conn |> put_status(:forbidden) |> json(%{error: "not_a_member"}) |> halt()
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id) do
+      typing = Map.get(params, "typing", true)
+      event = if typing, do: "typing_started", else: "typing_stopped"
+
+      payload = %{
+        profile_id: profile.id,
+        profile_name: profile.display_name,
+        thread_id: nil
+      }
+
+      MessngrWeb.Endpoint.broadcast(
+        "channel:#{channel_id}",
+        event,
+        payload
+      )
+
+      json(conn, %{ok: true})
     end
-
-    typing = Map.get(params, "typing", true)
-    event = if typing, do: "typing_started", else: "typing_stopped"
-
-    payload = %{
-      profile_id: profile.id,
-      profile_name: profile.display_name,
-      thread_id: nil
-    }
-
-    MessngrWeb.Endpoint.broadcast(
-      "channel:#{channel_id}",
-      event,
-      payload
-    )
-
-    json(conn, %{ok: true})
   end
 
   @doc "PATCH /api/teams/:slug/channels/:channel_id/messages/:message_id — edit a message"
   def update(conn, %{"channel_id" => channel_id, "message_id" => message_id} = params) do
     prefix = conn.assigns.tenant_prefix
-    account = conn.assigns.current_account
-    profile = TeamManagement.get_profile_for_account(prefix, account.id)
+    profile = conn.assigns.current_team_profile
 
-    unless profile do
-      {:error, :forbidden}
-    else
-      case Messages.get_message(prefix, message_id) do
-        nil ->
-          {:error, :not_found}
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id),
+         {:ok, message} <- Messages.get_message_in_channel(prefix, channel_id, message_id) do
+      if message.sender_profile_id != profile.id do
+        {:error, :forbidden}
+      else
+        new_content = params["content"] || %{}
 
-        message ->
-          if message.sender_profile_id != profile.id do
-            {:error, :forbidden}
-          else
-            new_content = params["content"] || %{}
+        case Messages.update_message(prefix, message, %{
+               content: new_content,
+               edited_at: DateTime.utc_now() |> DateTime.truncate(:second)
+             }) do
+          {:ok, updated} ->
+            updated = Messages.get_message(prefix, updated.id)
 
-            case Messages.update_message(prefix, message, %{
-                   content: new_content,
-                   edited_at: DateTime.utc_now() |> DateTime.truncate(:second)
-                 }) do
-              {:ok, updated} ->
-                updated = Messages.get_message(prefix, updated.id)
+            MessngrWeb.Endpoint.broadcast(
+              "channel:#{channel_id}",
+              "message:edited",
+              message_json(updated)
+            )
 
-                MessngrWeb.Endpoint.broadcast(
-                  "channel:#{channel_id}",
-                  "message:edited",
-                  message_json(updated)
-                )
+            json(conn, %{data: message_json(updated)})
 
-                json(conn, %{data: message_json(updated)})
-
-              {:error, changeset} ->
-                {:error, changeset}
-            end
-          end
+          {:error, changeset} ->
+            {:error, changeset}
+        end
       end
     end
   end
@@ -197,124 +185,114 @@ defmodule MessngrWeb.TeamMessageController do
   @doc "DELETE /api/teams/:slug/channels/:channel_id/messages/:message_id — soft-delete"
   def delete(conn, %{"channel_id" => channel_id, "message_id" => message_id}) do
     prefix = conn.assigns.tenant_prefix
-    account = conn.assigns.current_account
-    profile = TeamManagement.get_profile_for_account(prefix, account.id)
+    profile = conn.assigns.current_team_profile
 
-    unless profile do
-      {:error, :forbidden}
-    else
-      case Messages.get_message(prefix, message_id) do
-        nil ->
-          {:error, :not_found}
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id),
+         {:ok, message} <- Messages.get_message_in_channel(prefix, channel_id, message_id) do
+      if message.sender_profile_id != profile.id do
+        {:error, :forbidden}
+      else
+        case Messages.delete_message(prefix, message) do
+          {:ok, _} ->
+            MessngrWeb.Endpoint.broadcast(
+              "channel:#{channel_id}",
+              "message:deleted",
+              %{id: message_id, channel_id: channel_id}
+            )
 
-        message ->
-          if message.sender_profile_id != profile.id do
-            {:error, :forbidden}
-          else
-            case Messages.delete_message(prefix, message) do
-              {:ok, _} ->
-                MessngrWeb.Endpoint.broadcast(
-                  "channel:#{channel_id}",
-                  "message:deleted",
-                  %{id: message_id, channel_id: channel_id}
-                )
+            json(conn, %{ok: true})
 
-                json(conn, %{ok: true})
-
-              {:error, _} ->
-                {:error, :bad_request}
-            end
-          end
+          {:error, _} ->
+            {:error, :bad_request}
+        end
       end
     end
   end
 
   @doc "GET /api/teams/:slug/channels/:channel_id/threads/:message_id — get a thread"
-  def thread(conn, %{"message_id" => message_id} = params) do
+  def thread(conn, %{"channel_id" => channel_id, "message_id" => message_id} = params) do
     prefix = conn.assigns.tenant_prefix
-    cursor_opts = Pagination.parse_params(params)
+    profile = conn.assigns.current_team_profile
 
-    case Messages.get_thread(prefix, message_id, cursor_opts) do
-      {:ok, %{parent: parent, replies: replies}} ->
-        json(conn, %{
-          data: %{
-            parent: message_json(parent),
-            replies: Enum.map(replies, &message_json/1)
-          }
-        })
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id),
+         {:ok, _parent} <- Messages.get_message_in_channel(prefix, channel_id, message_id) do
+      cursor_opts = Pagination.parse_params(params)
 
-      {:error, :not_found} ->
-        {:error, :not_found}
+      case Messages.get_thread(prefix, message_id, cursor_opts) do
+        {:ok, %{parent: parent, replies: replies}} ->
+          json(conn, %{
+            data: %{
+              parent: message_json(parent),
+              replies: Enum.map(replies, &message_json/1)
+            }
+          })
+
+        {:error, :not_found} ->
+          {:error, :not_found}
+      end
     end
   end
 
   @doc "POST /api/teams/:slug/channels/:channel_id/messages/:message_id/pin — pin a message"
-  def pin(conn, %{"channel_id" => _channel_id, "message_id" => message_id}) do
+  def pin(conn, %{"channel_id" => channel_id, "message_id" => message_id}) do
     prefix = conn.assigns.tenant_prefix
-    account = conn.assigns.current_account
-    profile = TeamManagement.get_profile_for_account(prefix, account.id)
+    profile = conn.assigns.current_team_profile
 
-    unless profile do
-      {:error, :forbidden}
-    else
-      case Messages.get_message(prefix, message_id) do
-        nil ->
-          {:error, :not_found}
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id),
+         {:ok, message} <- Messages.get_message_in_channel(prefix, channel_id, message_id) do
+      alias Teams.TenantModels.Message
 
-        message ->
-          alias Teams.TenantModels.Message
+      case Message.pin(prefix, message, profile.id) do
+        {:ok, pinned} ->
+          pinned = Messages.get_message(prefix, pinned.id)
 
-          case Message.pin(prefix, message, profile.id) do
-            {:ok, pinned} ->
-              pinned = Messages.get_message(prefix, pinned.id)
-              slug = conn.path_params["slug"]
+          MessngrWeb.Endpoint.broadcast(
+            "channel:#{channel_id}",
+            "message:pinned",
+            message_json(pinned)
+          )
 
-              MessngrWeb.Endpoint.broadcast(
-                "channel:#{pinned.channel_id}",
-                "message:pinned",
-                message_json(pinned)
-              )
+          json(conn, %{data: message_json(pinned)})
 
-              json(conn, %{data: message_json(pinned)})
-
-            {:error, changeset} ->
-              {:error, changeset}
-          end
+        {:error, changeset} ->
+          {:error, changeset}
       end
     end
   end
 
   @doc "DELETE /api/teams/:slug/channels/:channel_id/messages/:message_id/pin — unpin a message"
-  def unpin(conn, %{"channel_id" => _channel_id, "message_id" => message_id}) do
+  def unpin(conn, %{"channel_id" => channel_id, "message_id" => message_id}) do
     prefix = conn.assigns.tenant_prefix
+    profile = conn.assigns.current_team_profile
 
-    case Messages.get_message(prefix, message_id) do
-      nil ->
-        {:error, :not_found}
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id),
+         {:ok, message} <- Messages.get_message_in_channel(prefix, channel_id, message_id) do
+      alias Teams.TenantModels.Message
 
-      message ->
-        alias Teams.TenantModels.Message
+      case Message.unpin(prefix, message) do
+        {:ok, _} ->
+          MessngrWeb.Endpoint.broadcast("channel:#{channel_id}", "message:unpinned", %{
+            id: message_id
+          })
 
-        case Message.unpin(prefix, message) do
-          {:ok, _} ->
-            MessngrWeb.Endpoint.broadcast("channel:#{message.channel_id}", "message:unpinned", %{
-              id: message_id
-            })
+          json(conn, %{ok: true})
 
-            json(conn, %{ok: true})
-
-          {:error, changeset} ->
-            {:error, changeset}
-        end
+        {:error, changeset} ->
+          {:error, changeset}
+      end
     end
   end
 
   @doc "GET /api/teams/:slug/channels/:channel_id/pins — list pinned messages"
   def pins(conn, %{"channel_id" => channel_id}) do
     prefix = conn.assigns.tenant_prefix
-    alias Teams.TenantModels.Message
-    messages = Message.pinned_for_channel(prefix, channel_id)
-    json(conn, %{data: Enum.map(messages, &message_json/1)})
+    profile = conn.assigns.current_team_profile
+
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id) do
+      alias Teams.TenantModels.Message
+      messages = Message.pinned_for_channel(prefix, channel_id)
+      json(conn, %{data: Enum.map(messages, &message_json/1)})
+    end
   end
 
   defp message_json(message) do

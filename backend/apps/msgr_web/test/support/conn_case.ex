@@ -17,7 +17,11 @@ defmodule MessngrWeb.ConnCase do
 
   use ExUnit.CaseTemplate
 
+  import Phoenix.ConnTest
+
   alias Messngr.Noise.SessionFixtures
+
+  @endpoint MessngrWeb.Endpoint
 
   using do
     quote do
@@ -36,12 +40,8 @@ defmodule MessngrWeb.ConnCase do
 
   setup tags do
     Messngr.DataCase.setup_sandbox(tags)
-
-    # Teams.Repo shares the same database; sandbox it so tenant operations
-    # are rolled back after each test.
-    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(Teams.Repo, shared: not tags[:async])
-    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
-
+    # Teams.Repo is not sandboxed in test (see config/test.exs) — tenant
+    # migrations spawn Tasks that deadlock under SQL.Sandbox ownership.
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 
@@ -84,16 +84,25 @@ defmodule MessngrWeb.ConnCase do
   Creates an account, a team (with tenant schema), and a team profile.
   Returns a map with :account, :profile, :team, :team_profile, :conn (authenticated),
   and :prefix (the tenant schema name).
+
+  Account creation is committed outside the Messngr.Repo sandbox so Teams.Repo
+  (separate pool/connection) can satisfy FK checks to `accounts`.
   """
   def setup_team(conn) do
-    {:ok, account} = Messngr.Accounts.create_account(%{"display_name" => "Team Tester"})
+    {:ok, account} =
+      Ecto.Adapters.SQL.Sandbox.unboxed_run(Messngr.Repo, fn ->
+        Messngr.Accounts.create_account(%{
+          "display_name" => "Team Tester #{Ecto.UUID.generate()}"
+        })
+      end)
+
     profile = hd(account.profiles)
     conn = attach_jwt_session(conn, account, profile)
 
-    slug = "test-team-#{System.unique_integer([:positive])}"
+    slug = "test-team-#{Base.encode16(:crypto.strong_rand_bytes(8), case: :lower)}"
 
-    create_conn = Phoenix.ConnTest.post(conn, "/api/teams", %{name: "Test Team", slug: slug})
-    %{"data" => %{"id" => team_id}} = Phoenix.ConnTest.json_response(create_conn, 201)
+    create_conn = post(conn, "/api/teams", %{name: "Test Team", slug: slug})
+    %{"data" => %{"id" => team_id}} = json_response(create_conn, 201)
 
     team = Teams.Repo.get!(Teams.Schemas.Team, team_id)
     team_profile = Teams.TeamManagement.get_profile_for_account(team.schema_name, account.id)

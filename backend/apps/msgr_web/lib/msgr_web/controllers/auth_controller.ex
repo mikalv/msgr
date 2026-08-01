@@ -38,7 +38,7 @@ defmodule MessngrWeb.AuthController do
       configured_secret == nil || configured_secret == "" ->
         conn |> put_status(:not_found) |> json(%{error: "not_found"})
 
-      secret != configured_secret ->
+      not Plug.Crypto.secure_compare(to_string(secret), to_string(configured_secret)) ->
         conn |> put_status(:unauthorized) |> json(%{error: "invalid_secret"})
 
       true ->

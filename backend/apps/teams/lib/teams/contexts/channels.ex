@@ -198,6 +198,36 @@ defmodule Teams.Channels do
     ChannelMembership.members_of(prefix, channel_id)
   end
 
+  @doc "Returns true if the profile is a member of the channel."
+  def member?(prefix, channel_id, profile_id) do
+    ChannelMembership.member?(prefix, channel_id, profile_id)
+  end
+
+  @doc """
+  Authorizes access to a channel for a team member profile.
+
+  Public channels are readable/writable by any team member.
+  Private channels (including DMs) require channel membership.
+
+  Returns `:ok`, `{:error, :not_found}`, or `{:error, :forbidden}`.
+  """
+  def authorize_channel_access(prefix, channel_id, profile_id) do
+    case get_channel(prefix, channel_id) do
+      nil ->
+        {:error, :not_found}
+
+      %{visibility: "public"} ->
+        :ok
+
+      _channel ->
+        if ChannelMembership.member?(prefix, channel_id, profile_id) do
+          :ok
+        else
+          {:error, :forbidden}
+        end
+    end
+  end
+
   @doc """
   Removes a member from a channel.
   Returns `{count, nil}` where count is 0 or 1.

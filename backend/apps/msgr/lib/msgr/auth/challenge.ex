@@ -17,6 +17,7 @@ defmodule Messngr.Auth.Challenge do
     field :issued_for, :string
     field :expires_at, :utc_datetime
     field :consumed_at, :utc_datetime
+    field :attempt_count, :integer, default: 0
 
     belongs_to :identity, Messngr.Accounts.Identity
 
@@ -33,10 +34,12 @@ defmodule Messngr.Auth.Challenge do
       :expires_at,
       :consumed_at,
       :identity_id,
-      :issued_for
+      :issued_for,
+      :attempt_count
     ])
     |> validate_required([:channel, :target, :code_hash, :expires_at])
     |> validate_length(:target, min: 4)
+    |> validate_number(:attempt_count, greater_than_or_equal_to: 0)
     |> unique_constraint(:active_challenge,
       name: :auth_challenges_identity_id_consumed_at_index,
       message: "an active challenge already exists"

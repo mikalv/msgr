@@ -10,6 +10,7 @@ config :msgr, Messngr.Repo,
 
 config :msgr, :feature_flags, noise_handshake_required: false
 config :msgr, :dns_cluster_query, :ignore
+config :msgr, :otp_hmac_secret, "test-otp-hmac-secret"
 
 config :guardian, Guardian.DB,
   repo: Messngr.Repo,
@@ -67,7 +68,16 @@ shared_repo_config =
   ]
 
 config :auth_provider, AuthProvider.Repo, shared_repo_config
-config :teams, Teams.Repo, shared_repo_config
+
+# Teams.Repo intentionally does NOT use the SQL Sandbox in test: tenant schema
+# provisioning runs Ecto.Migrator (which spawns Tasks) and dual-repo sandbox
+# ownership causes checkout deadlocks. Tests use unique team UUIDs/slugs instead.
+config :teams, Teams.Repo,
+  username: System.get_env("POSTGRES_USERNAME", "postgres"),
+  password: System.get_env("POSTGRES_PASSWORD", "postgres"),
+  hostname: System.get_env("POSTGRES_HOST", "localhost"),
+  database: System.get_env("POSTGRES_DB", "msgr_test"),
+  pool_size: 10
 
 config :auth_provider, AuthProvider.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4003],

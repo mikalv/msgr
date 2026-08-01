@@ -70,6 +70,22 @@ defmodule Teams.Messages do
   end
 
   @doc """
+  Gets a message only when it belongs to the given channel.
+
+  Returns `{:ok, message}` or `{:error, :not_found}` (including when the
+  message exists in a different channel, to avoid cross-channel leakage).
+  """
+  def get_message_in_channel(prefix, channel_id, message_id) do
+    case get_message(prefix, message_id) do
+      %{channel_id: ^channel_id} = message ->
+        {:ok, message}
+
+      _ ->
+        {:error, :not_found}
+    end
+  end
+
+  @doc """
   Updates a message's content and/or edited_at timestamp.
   """
   def update_message(prefix, %Message{} = message, attrs) do

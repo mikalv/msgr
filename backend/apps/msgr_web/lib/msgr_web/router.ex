@@ -111,6 +111,7 @@ defmodule MessngrWeb.Router do
 
   pipeline :tenant do
     plug MessngrWeb.Plugs.TenantFromSlug
+    plug MessngrWeb.Plugs.RequireTeamMembership
   end
 
   # Endpoints scoped to a team via :slug → tenant resolution
