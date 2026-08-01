@@ -4,6 +4,7 @@ export 'src/constants.dart';
 export 'src/contracts/device.dart';
 export 'src/contracts/storage.dart';
 export 'src/crypto/key_manager.dart';
+export 'src/crypto/e2ee/e2ee.dart';
 export 'src/memory/memory_device_info.dart';
 export 'src/memory/memory_storage.dart';
 export 'src/network/server_resolver.dart';
