@@ -11,7 +11,12 @@ defmodule TeamsWeb.SubdomainRouter do
     plug :fetch_live_flash
     plug :put_root_layout, html: {TeamsWeb.Layouts, :root}
     plug :protect_from_forgery
-    plug :put_secure_browser_headers
+    plug :put_secure_browser_headers, %{
+      # connect-src 'self' covers same-origin fetch/XHR and same-origin WebSocket.
+      # Avoid bare ws:/wss: which would allow any host.
+      "content-security-policy" =>
+        "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'"
+    }
   end
 
   pipeline :api do

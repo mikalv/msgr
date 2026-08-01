@@ -24,4 +24,6 @@ Thumbs.db
 # Temporary files, for example, from tests.
 /tmp/
 
-
+# Dialyzer PLTs (cached in CI; regenerated locally)
+/priv/plts/*.plt
+/priv/plts/*.plt.hash

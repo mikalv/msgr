@@ -1,0 +1,12 @@
+[
+  verbose: false,
+  private: true,
+  skip: false,
+  exit: "high",
+  format: "txt",
+  ignore: [
+    "Config.CSWH",
+    "XSS.SendResp"
+  ],
+  ignore_files: []
+]
