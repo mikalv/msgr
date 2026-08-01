@@ -15,7 +15,10 @@ defmodule MessngrWeb.Router do
     plug :fetch_live_flash
     plug :put_root_layout, {MessngrWeb.Layouts, :root}
     plug :protect_from_forgery
-    plug :put_secure_browser_headers
+    plug :put_secure_browser_headers, %{
+      "content-security-policy" =>
+        "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' ws: wss:; frame-ancestors 'none'"
+    }
   end
 
   # Health and Metrics endpoints (no authentication required)

@@ -8,6 +8,12 @@ defmodule Messngr.Umbrella.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
+      dialyzer: [
+        plt_local_path: "priv/plts",
+        plt_core_path: "priv/plts",
+        ignore_warnings: ".dialyzer_ignore.exs",
+        list_unused_filters: true
+      ],
       releases: [
         chatd: [
           applications: [
@@ -72,11 +78,16 @@ defmodule Messngr.Umbrella.MixProject do
       lint: [
         "format --check-formatted",
         "credo --strict",
-        "sobelow --config"
+        "sobelow.apps"
+      ],
+      "sobelow.apps": [
+        "sobelow --root apps/msgr_web --config --private",
+        "sobelow --root apps/teams --config --private"
       ],
       quality: [
         "format --check-formatted",
-        "credo --strict --min-priority high",
+        "credo --strict",
+        "sobelow.apps",
         "dialyzer"
       ]
     ]

@@ -1,0 +1,14 @@
+[
+  verbose: false,
+  private: true,
+  skip: false,
+  exit: "high",
+  format: "txt",
+  ignore: [
+    # Mobile/API clients connect from varying origins; enforced at gateway/TLS.
+    "Config.CSWH",
+    # JSON API controllers use send_resp with encoded payloads (false positives).
+    "XSS.SendResp"
+  ],
+  ignore_files: []
+]
