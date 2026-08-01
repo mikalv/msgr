@@ -2,6 +2,8 @@ defmodule Messngr.Repo.Migrations.RecreateDevicePushTokens do
   use Ecto.Migration
 
   def change do
+    drop_if_exists table(:device_push_tokens)
+
     create table(:device_push_tokens, primary_key: false) do
       add :id, :binary_id, primary_key: true, default: fragment("gen_random_uuid()")
 

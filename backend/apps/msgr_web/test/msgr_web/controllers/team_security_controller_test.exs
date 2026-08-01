@@ -10,14 +10,22 @@ defmodule MessngrWeb.TeamSecurityControllerTest do
 
     # Second authenticated user who is NOT a member of the owner's team
     {:ok, outsider_account} =
-      Messngr.Accounts.create_account(%{"display_name" => "Outsider"})
+      Ecto.Adapters.SQL.Sandbox.unboxed_run(Messngr.Repo, fn ->
+        Messngr.Accounts.create_account(%{
+          "display_name" => "Outsider #{Ecto.UUID.generate()}"
+        })
+      end)
 
     outsider_profile = hd(outsider_account.profiles)
     outsider_conn = attach_jwt_session(build_conn(), outsider_account, outsider_profile)
 
     # Member of the team (non-admin)
     {:ok, member_account} =
-      Messngr.Accounts.create_account(%{"display_name" => "Member"})
+      Ecto.Adapters.SQL.Sandbox.unboxed_run(Messngr.Repo, fn ->
+        Messngr.Accounts.create_account(%{
+          "display_name" => "Member #{Ecto.UUID.generate()}"
+        })
+      end)
 
     member_profile = hd(member_account.profiles)
 
@@ -111,16 +119,13 @@ defmodule MessngrWeb.TeamSecurityControllerTest do
       member_conn: member_conn,
       owner: owner
     } do
-      # Create webhook as owner
-      {:ok, endpoint} =
-        Messngr.Teams.WebhookEndpoint.create(%{
-          team_id: owner.team.id,
-          channel_id: Ecto.UUID.generate(),
-          name: "CI",
-          created_by_account_id: owner.account.id
-        })
+      # Admin check happens before webhook lookup, so a random id is enough
+      conn =
+        delete(
+          member_conn,
+          "/api/teams/#{owner.slug}/webhooks/#{Ecto.UUID.generate()}"
+        )
 
-      conn = delete(member_conn, "/api/teams/#{owner.slug}/webhooks/#{endpoint.id}")
       assert json_response(conn, 403)["error"] == "forbidden"
     end
   end
@@ -154,18 +159,9 @@ defmodule MessngrWeb.TeamSecurityControllerTest do
 
   describe "media object_key validation (SEC-3)" do
     test "rejects object_key for another team", %{owner: owner} do
+      # No MediaUpload row needed — prefix mismatch alone must forbid access
       other_team_id = Ecto.UUID.generate()
       foreign_key = "teams/#{other_team_id}/#{Ecto.UUID.generate()}/leak.pdf"
-
-      {:ok, _} =
-        MediaUpload.create(owner.prefix, %{
-          profile_id: owner.team_profile.id,
-          object_key: foreign_key,
-          content_type: "application/pdf",
-          filename: "leak.pdf",
-          size: 100
-        })
-
       encoded = URI.encode(foreign_key, &URI.char_unreserved?/1)
 
       conn = get(owner.conn, "/api/teams/#{owner.slug}/media/#{encoded}/url")

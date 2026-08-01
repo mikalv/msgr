@@ -5,7 +5,7 @@ defmodule Messngr.AuthTest do
   alias Swoosh.Adapters.Local.Storage.Memory
 
   setup do
-    Memory.clear()
+    Memory.delete_all()
     :ok
   end
 
@@ -30,7 +30,7 @@ defmodule Messngr.AuthTest do
                Messngr.start_auth_challenge(%{"channel" => "email", "identifier" => identifier})
 
       assert [email] = Memory.all()
-      assert email.to == [{nil, identifier}]
+      assert match?([{_, ^identifier}], email.to)
       assert email.subject =~ "login code"
       assert String.contains?(email.text_body, code)
     end

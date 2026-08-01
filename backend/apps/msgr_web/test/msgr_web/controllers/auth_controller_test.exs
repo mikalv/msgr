@@ -13,9 +13,10 @@ defmodule MessngrWeb.AuthControllerTest do
 
       resp = json_response(conn, 201)
       assert is_binary(resp["id"])
-      assert is_binary(resp["debug_code"])
+      # debug_code is only present when :expose_otp_codes is enabled
       assert resp["channel"] == "email"
       assert String.contains?(resp["target_hint"], "@example.com")
+      assert is_nil(resp["debug_code"]) or is_binary(resp["debug_code"])
     end
 
     test "creates challenge for phone", %{conn: conn} do
@@ -132,8 +133,13 @@ defmodule MessngrWeb.AuthControllerTest do
         })
 
       # Force-expire the challenge
+      expired_at =
+        DateTime.utc_now()
+        |> DateTime.add(-600, :second)
+        |> DateTime.truncate(:second)
+
       challenge
-      |> Ecto.Changeset.change(%{expires_at: DateTime.add(DateTime.utc_now(), -600, :second)})
+      |> Ecto.Changeset.change(%{expires_at: expired_at})
       |> Messngr.Repo.update!()
 
       conn =

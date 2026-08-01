@@ -14,8 +14,12 @@ defmodule Teams.Tenancy do
   """
   def create_tenant(team_id) do
     schema = prefix(team_id)
-    Ecto.Adapters.SQL.query!(Repo, "CREATE SCHEMA IF NOT EXISTS \"#{schema}\"")
-    migrate_tenant(schema)
+
+    run_outside_sandbox(fn ->
+      Ecto.Adapters.SQL.query!(Repo, "CREATE SCHEMA IF NOT EXISTS \"#{schema}\"")
+      migrate_tenant(schema)
+    end)
+
     schema
   end
 
@@ -24,14 +28,42 @@ defmodule Teams.Tenancy do
   """
   def drop_tenant(team_id) do
     schema = prefix(team_id)
-    Ecto.Adapters.SQL.query!(Repo, "DROP SCHEMA IF EXISTS \"#{schema}\" CASCADE")
+
+    run_outside_sandbox(fn ->
+      Ecto.Adapters.SQL.query!(Repo, "DROP SCHEMA IF EXISTS \"#{schema}\" CASCADE")
+    end)
   end
 
   @doc """
   Runs all pending tenant migrations for the given schema.
   """
   def migrate_tenant(schema) do
-    Ecto.Migrator.run(Repo, tenant_migrations_path(), :up, prefix: schema, all: true)
+    # Serialize migration module compilation — Ecto reloads the same module
+    # names for every tenant schema, and concurrent loads race on Elixir 1.19.
+    :global.trans({:teams_tenant_migrate, :global}, fn ->
+      previous = Code.get_compiler_option(:ignore_module_conflict)
+      Code.put_compiler_option(:ignore_module_conflict, true)
+
+      try do
+        Ecto.Migrator.run(Repo, tenant_migrations_path(), :up,
+          prefix: schema,
+          all: true,
+          disable_migration_lock: true
+        )
+      after
+        Code.put_compiler_option(:ignore_module_conflict, previous)
+      end
+    end)
+  end
+
+  # DDL/migrator work needs connections outside the test sandbox transaction.
+  defp run_outside_sandbox(fun) do
+    if Code.ensure_loaded?(Ecto.Adapters.SQL.Sandbox) and
+         Repo.config()[:pool] == Ecto.Adapters.SQL.Sandbox do
+      Ecto.Adapters.SQL.Sandbox.unboxed_run(Repo, fun)
+    else
+      fun.()
+    end
   end
 
   @doc """
