@@ -37,6 +37,14 @@ defmodule Teams.TenantModels.ChannelMembership do
     |> Teams.Repo.all(prefix: prefix)
   end
 
+  @doc "Returns true if the profile is a member of the channel."
+  def member?(prefix, channel_id, profile_id) do
+    from(cm in __MODULE__,
+      where: cm.channel_id == ^channel_id and cm.profile_id == ^profile_id
+    )
+    |> Teams.Repo.exists?(prefix: prefix)
+  end
+
   def channels_for(prefix, profile_id) do
     from(cm in __MODULE__,
       where: cm.profile_id == ^profile_id,

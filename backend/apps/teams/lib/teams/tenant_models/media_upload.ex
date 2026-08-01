@@ -36,6 +36,14 @@ defmodule Teams.TenantModels.MediaUpload do
     Teams.Repo.get(__MODULE__, id, prefix: prefix)
   end
 
+  @doc "Looks up a media upload by object_key within the tenant schema."
+  def get_by_object_key(prefix, object_key) when is_binary(object_key) do
+    import Ecto.Query
+
+    from(u in __MODULE__, where: u.object_key == ^object_key)
+    |> Teams.Repo.one(prefix: prefix)
+  end
+
   def for_profile(prefix, profile_id) do
     import Ecto.Query
 

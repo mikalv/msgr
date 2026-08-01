@@ -82,19 +82,46 @@ defmodule MessngrWeb.AuthControllerTest do
     end
 
     test "wrong code returns error", %{conn: conn} do
-      {:ok, challenge, _code} =
+      {:ok, challenge, code} =
         Messngr.start_auth_challenge(%{
           "channel" => "email",
           "identifier" => "wrong-code@example.com"
         })
 
+      wrong = if code == "000000", do: "111111", else: "000000"
+
       conn =
         post(conn, "/api/v1/auth/verify", %{
           challenge_id: challenge.id,
-          code: "000000"
+          code: wrong
         })
 
       assert json_response(conn, 400)
+    end
+
+    test "too many wrong codes returns 429", %{conn: conn} do
+      {:ok, challenge, code} =
+        Messngr.start_auth_challenge(%{
+          "channel" => "email",
+          "identifier" => "lockout-#{System.unique_integer([:positive])}@example.com"
+        })
+
+      wrong = if code == "000000", do: "111111", else: "000000"
+
+      for _ <- 1..4 do
+        post(conn, "/api/v1/auth/verify", %{
+          challenge_id: challenge.id,
+          code: wrong
+        })
+      end
+
+      locked =
+        post(conn, "/api/v1/auth/verify", %{
+          challenge_id: challenge.id,
+          code: wrong
+        })
+
+      assert json_response(locked, 429)["error"] == "too_many_attempts"
     end
 
     test "expired challenge returns error", %{conn: conn} do

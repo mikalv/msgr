@@ -361,6 +361,14 @@ end
 # Bot authentication secret (for headless bot clients)
 config :msgr_web, :bot_auth_secret, blank_to_nil.(System.get_env("BOT_AUTH_SECRET"))
 
+# OTP HMAC secret for hashing challenge codes at rest
+otp_hmac_secret =
+  blank_to_nil.(System.get_env("OTP_HMAC_SECRET")) ||
+    System.get_env("SECRET_KEY_BASE") ||
+    secret_key
+
+config :msgr, :otp_hmac_secret, otp_hmac_secret
+
 if bool_env.(System.get_env("SWOOSH_LOCAL_ADAPTER"), false) do
   config :msgr, Messngr.Mailer, adapter: Swoosh.Adapters.Local
   config :swoosh, :api_client, false

@@ -10,6 +10,7 @@ config :msgr, Messngr.Repo,
 
 config :msgr, :feature_flags, noise_handshake_required: false
 config :msgr, :dns_cluster_query, :ignore
+config :msgr, :otp_hmac_secret, "test-otp-hmac-secret"
 
 config :guardian, Guardian.DB,
   repo: Messngr.Repo,
