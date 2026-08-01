@@ -153,36 +153,31 @@ defmodule MessngrWeb.TeamMessageController do
     prefix = conn.assigns.tenant_prefix
     profile = conn.assigns.current_team_profile
 
-    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id) do
-      case Messages.get_message(prefix, message_id) do
-        nil ->
-          {:error, :not_found}
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id),
+         {:ok, message} <- Messages.get_message_in_channel(prefix, channel_id, message_id) do
+      if message.sender_profile_id != profile.id do
+        {:error, :forbidden}
+      else
+        new_content = params["content"] || %{}
 
-        message ->
-          if message.sender_profile_id != profile.id do
-            {:error, :forbidden}
-          else
-            new_content = params["content"] || %{}
+        case Messages.update_message(prefix, message, %{
+               content: new_content,
+               edited_at: DateTime.utc_now() |> DateTime.truncate(:second)
+             }) do
+          {:ok, updated} ->
+            updated = Messages.get_message(prefix, updated.id)
 
-            case Messages.update_message(prefix, message, %{
-                   content: new_content,
-                   edited_at: DateTime.utc_now() |> DateTime.truncate(:second)
-                 }) do
-              {:ok, updated} ->
-                updated = Messages.get_message(prefix, updated.id)
+            MessngrWeb.Endpoint.broadcast(
+              "channel:#{channel_id}",
+              "message:edited",
+              message_json(updated)
+            )
 
-                MessngrWeb.Endpoint.broadcast(
-                  "channel:#{channel_id}",
-                  "message:edited",
-                  message_json(updated)
-                )
+            json(conn, %{data: message_json(updated)})
 
-                json(conn, %{data: message_json(updated)})
-
-              {:error, changeset} ->
-                {:error, changeset}
-            end
-          end
+          {:error, changeset} ->
+            {:error, changeset}
+        end
       end
     end
   end
@@ -192,29 +187,24 @@ defmodule MessngrWeb.TeamMessageController do
     prefix = conn.assigns.tenant_prefix
     profile = conn.assigns.current_team_profile
 
-    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id) do
-      case Messages.get_message(prefix, message_id) do
-        nil ->
-          {:error, :not_found}
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id),
+         {:ok, message} <- Messages.get_message_in_channel(prefix, channel_id, message_id) do
+      if message.sender_profile_id != profile.id do
+        {:error, :forbidden}
+      else
+        case Messages.delete_message(prefix, message) do
+          {:ok, _} ->
+            MessngrWeb.Endpoint.broadcast(
+              "channel:#{channel_id}",
+              "message:deleted",
+              %{id: message_id, channel_id: channel_id}
+            )
 
-        message ->
-          if message.sender_profile_id != profile.id do
-            {:error, :forbidden}
-          else
-            case Messages.delete_message(prefix, message) do
-              {:ok, _} ->
-                MessngrWeb.Endpoint.broadcast(
-                  "channel:#{channel_id}",
-                  "message:deleted",
-                  %{id: message_id, channel_id: channel_id}
-                )
+            json(conn, %{ok: true})
 
-                json(conn, %{ok: true})
-
-              {:error, _} ->
-                {:error, :bad_request}
-            end
-          end
+          {:error, _} ->
+            {:error, :bad_request}
+        end
       end
     end
   end
@@ -224,7 +214,8 @@ defmodule MessngrWeb.TeamMessageController do
     prefix = conn.assigns.tenant_prefix
     profile = conn.assigns.current_team_profile
 
-    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id) do
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id),
+         {:ok, _parent} <- Messages.get_message_in_channel(prefix, channel_id, message_id) do
       cursor_opts = Pagination.parse_params(params)
 
       case Messages.get_thread(prefix, message_id, cursor_opts) do
@@ -247,29 +238,24 @@ defmodule MessngrWeb.TeamMessageController do
     prefix = conn.assigns.tenant_prefix
     profile = conn.assigns.current_team_profile
 
-    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id) do
-      case Messages.get_message(prefix, message_id) do
-        nil ->
-          {:error, :not_found}
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id),
+         {:ok, message} <- Messages.get_message_in_channel(prefix, channel_id, message_id) do
+      alias Teams.TenantModels.Message
 
-        message ->
-          alias Teams.TenantModels.Message
+      case Message.pin(prefix, message, profile.id) do
+        {:ok, pinned} ->
+          pinned = Messages.get_message(prefix, pinned.id)
 
-          case Message.pin(prefix, message, profile.id) do
-            {:ok, pinned} ->
-              pinned = Messages.get_message(prefix, pinned.id)
+          MessngrWeb.Endpoint.broadcast(
+            "channel:#{channel_id}",
+            "message:pinned",
+            message_json(pinned)
+          )
 
-              MessngrWeb.Endpoint.broadcast(
-                "channel:#{pinned.channel_id}",
-                "message:pinned",
-                message_json(pinned)
-              )
+          json(conn, %{data: message_json(pinned)})
 
-              json(conn, %{data: message_json(pinned)})
-
-            {:error, changeset} ->
-              {:error, changeset}
-          end
+        {:error, changeset} ->
+          {:error, changeset}
       end
     end
   end
@@ -279,25 +265,20 @@ defmodule MessngrWeb.TeamMessageController do
     prefix = conn.assigns.tenant_prefix
     profile = conn.assigns.current_team_profile
 
-    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id) do
-      case Messages.get_message(prefix, message_id) do
-        nil ->
-          {:error, :not_found}
+    with :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id),
+         {:ok, message} <- Messages.get_message_in_channel(prefix, channel_id, message_id) do
+      alias Teams.TenantModels.Message
 
-        message ->
-          alias Teams.TenantModels.Message
+      case Message.unpin(prefix, message) do
+        {:ok, _} ->
+          MessngrWeb.Endpoint.broadcast("channel:#{channel_id}", "message:unpinned", %{
+            id: message_id
+          })
 
-          case Message.unpin(prefix, message) do
-            {:ok, _} ->
-              MessngrWeb.Endpoint.broadcast("channel:#{message.channel_id}", "message:unpinned", %{
-                id: message_id
-              })
+          json(conn, %{ok: true})
 
-              json(conn, %{ok: true})
-
-            {:error, changeset} ->
-              {:error, changeset}
-          end
+        {:error, changeset} ->
+          {:error, changeset}
       end
     end
   end

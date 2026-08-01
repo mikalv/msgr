@@ -155,6 +155,41 @@ defmodule MessngrWeb.TeamSecurityControllerTest do
 
       assert json_response(conn, 200)
     end
+
+    test "cannot access private message via authorized public channel_id", %{
+      member_conn: member_conn,
+      owner: owner,
+      public_channel_id: public_channel_id,
+      private_channel_id: private_channel_id
+    } do
+      create_msg =
+        post(owner.conn, "/api/teams/#{owner.slug}/channels/#{private_channel_id}/messages", %{
+          content: %{"text" => "secret private message"}
+        })
+
+      %{"data" => %{"id" => private_message_id}} = json_response(create_msg, 201)
+
+      base = "/api/teams/#{owner.slug}/channels/#{public_channel_id}/messages/#{private_message_id}"
+
+      # Cross-channel message_id must not leak via an authorized channel path
+      assert json_response(get(member_conn, "/api/teams/#{owner.slug}/channels/#{public_channel_id}/threads/#{private_message_id}"), 404)[
+               "error"
+             ] == "not_found"
+
+      assert json_response(
+               patch(member_conn, base, %{content: %{"text" => "hijack"}}),
+               404
+             )["error"] == "not_found"
+
+      assert json_response(delete(member_conn, base), 404)["error"] == "not_found"
+      assert json_response(post(member_conn, "#{base}/pin"), 404)["error"] == "not_found"
+      assert json_response(delete(member_conn, "#{base}/pin"), 404)["error"] == "not_found"
+
+      assert json_response(
+               post(member_conn, "#{base}/reactions", %{emoji: "👍"}),
+               404
+             )["error"] == "not_found"
+    end
   end
 
   describe "media object_key validation (SEC-3)" do

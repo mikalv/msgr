@@ -1,40 +1,38 @@
 defmodule MessngrWeb.TeamReactionController do
   use MessngrWeb, :controller
 
+  alias Teams.Channels
+  alias Teams.Messages
   alias Teams.Reactions
-  alias Teams.TeamManagement
 
   action_fallback MessngrWeb.FallbackController
 
   @doc "POST /api/teams/:slug/channels/:channel_id/messages/:message_id/reactions — toggle reaction"
-  def toggle(conn, %{"message_id" => message_id} = params) do
+  def toggle(conn, %{"channel_id" => channel_id, "message_id" => message_id} = params) do
     prefix = conn.assigns.tenant_prefix
-    account = conn.assigns.current_account
+    profile = conn.assigns.current_team_profile
     emoji = params["emoji"]
 
-    unless emoji do
-      {:error, :bad_request}
-    else
-      profile = TeamManagement.get_profile_for_account(prefix, account.id)
+    with :ok <- require_emoji(emoji),
+         :ok <- Channels.authorize_channel_access(prefix, channel_id, profile.id),
+         {:ok, _message} <- Messages.get_message_in_channel(prefix, channel_id, message_id) do
+      case Reactions.toggle_reaction(prefix, message_id, profile.id, emoji) do
+        {:ok, :removed} ->
+          json(conn, %{data: %{action: "removed", emoji: emoji, message_id: message_id}})
 
-      unless profile do
-        {:error, :forbidden}
-      else
-        case Reactions.toggle_reaction(prefix, message_id, profile.id, emoji) do
-          {:ok, :removed} ->
-            json(conn, %{data: %{action: "removed", emoji: emoji, message_id: message_id}})
+        {:ok, reaction} ->
+          conn
+          |> put_status(:created)
+          |> json(%{
+            data: %{action: "added", emoji: reaction.emoji, message_id: reaction.message_id}
+          })
 
-          {:ok, reaction} ->
-            conn
-            |> put_status(:created)
-            |> json(%{
-              data: %{action: "added", emoji: reaction.emoji, message_id: reaction.message_id}
-            })
-
-          {:error, changeset} ->
-            {:error, changeset}
-        end
+        {:error, changeset} ->
+          {:error, changeset}
       end
     end
   end
+
+  defp require_emoji(emoji) when is_binary(emoji) and emoji != "", do: :ok
+  defp require_emoji(_), do: {:error, :bad_request}
 end
