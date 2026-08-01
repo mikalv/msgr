@@ -13,7 +13,8 @@ defmodule SlackApi.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      test_coverage: [tool: ExCoveralls]
     ]
   end
 
@@ -45,7 +46,8 @@ defmodule SlackApi.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.1.1"},
       {:bandit, "~> 1.5"},
-      {:msgr, in_umbrella: true}
+      {:msgr, in_umbrella: true},
+      {:excoveralls, "~> 0.18", only: :test}
     ]
   end
 

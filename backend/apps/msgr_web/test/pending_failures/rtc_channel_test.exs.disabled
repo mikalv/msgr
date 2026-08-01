@@ -69,7 +69,8 @@ defmodule MessngrWeb.RTCChannelTest do
     assert_broadcast "signal:offer", %{
       "sdp" => "offer",
       "from" => host_profile.id,
-      "target" => ^peer_profile.id
+      peer_profile_id = peer_profile.id
+      "target" => ^peer_profile_id
     }
   end
 

@@ -1,8 +1,30 @@
 # msgr
 
+[![CI](https://github.com/mikalv/msgr/actions/workflows/ci.yaml/badge.svg)](https://github.com/mikalv/msgr/actions/workflows/ci.yaml)
+[![Backend coverage](https://img.shields.io/badge/backend%20coverage-CI%20artifact-informational)](backend/coveralls.json)
+
 En eksperimentell norsk meldingstjeneste bygget på en Phoenix-backend og en
 Flutter-klient. Repoet er organisert som et monorepo med flere tjenester,
 Flutter-appar og støtteverktøy.
+
+## Testing
+
+```bash
+# Backend unit tests + coverage (requires local Postgres)
+cd backend && mix coveralls.html --umbrella
+
+# Flutter tests + lcov
+cd flutter_frontend && flutter test --coverage
+
+# Docker integration tests (CLI against live stack)
+bash scripts/ci_integration_env.sh
+pytest -m integration -v
+```
+
+Coverage threshold for the backend umbrella is configured in
+`backend/coveralls.json` (non-regression floor today; target 70% as parked
+suites in `**/test/pending_*` are restored). CI uploads `excoveralls.json` and
+Flutter `coverage/lcov.info` as workflow artifacts.
 
 ## Arkitektur-sjekkliste
 

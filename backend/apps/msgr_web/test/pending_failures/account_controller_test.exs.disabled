@@ -40,9 +40,10 @@ defmodule MessngrWeb.AccountControllerTest do
           "read_receipts_enabled" => false
         })
 
+      account_id = account.id
       assert %{
                "data" => %{
-                 "id" => ^account.id,
+                 "id" => ^account_id,
                  "read_receipts_enabled" => false
                }
              } = json_response(conn, 200)
@@ -58,9 +59,10 @@ defmodule MessngrWeb.AccountControllerTest do
 
       conn = get(conn, ~p"/api/account/me")
 
+      account_id = account.id
       assert %{
                "data" => %{
-                 "id" => ^account.id,
+                 "id" => ^account_id,
                  "display_name" => "Kari"
                }
              } = json_response(conn, 200)

@@ -1,0 +1,33 @@
+# CI / integration-test overrides for docker-compose.yml
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build \
+#     db msgr_redis msgr-minio minio_init stonemq backend rust_gateway
+#
+# Removes host-specific volume mounts, drops ClamAV dependency, and enables
+# legacy actor headers needed by the CLI integration flow.
+
+services:
+  clamav:
+    profiles: ["clamav"]
+
+  backend:
+    volumes: !reset []
+    depends_on: !reset
+      db:
+        condition: service_healthy
+      stonemq:
+        condition: service_started
+      msgr_redis:
+        condition: service_healthy
+      msgr-minio:
+        condition: service_healthy
+      minio_init:
+        condition: service_completed_successfully
+    environment:
+      CLAMAV_ENABLED: "false"
+      MSGR_WEB_LEGACY_ACTOR_HEADERS: "true"
+
+  rust_gateway:
+    depends_on:
+      backend:
+        condition: service_started

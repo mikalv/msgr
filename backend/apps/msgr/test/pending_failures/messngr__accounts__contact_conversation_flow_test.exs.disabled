@@ -43,7 +43,9 @@ defmodule Messngr.Accounts.ContactConversationFlowTest do
     :ok = Chat.subscribe_to_conversation(conversation.id)
 
     assert {:ok, message} = Chat.send_message(conversation.id, profile_a.id, %{"body" => "Hei"})
+    message_id = message.id
+    profile_a_id = profile_a.id
 
-    assert_receive {:message_created, %Message{id: ^message.id, profile_id: ^profile_a.id}}, 500
+    assert_receive {:message_created, %Message{id: ^message_id, profile_id: ^profile_a_id}}, 500
   end
 end

@@ -60,7 +60,8 @@ defmodule MessngrWeb.MessageControllerTest do
     assert %{"data" => %{"body" => "Hei", "type" => "text", "receipts" => receipts}} =
              json_response(conn, 201)
 
-    assert [%{"status" => "pending", "recipient_id" => ^other.id}] =
+    other_id = other.id
+    assert [%{"status" => "pending", "recipient_id" => ^other_id}] =
              Enum.map(receipts, &Map.take(&1, ["status", "recipient_id"]))
   end
 

@@ -25,7 +25,8 @@ defmodule MessngrWeb.FamilyControllerTest do
 
     conn = get(conn, ~p"/api/families")
 
-    assert %{"data" => [%{"id" => ^family.id}]} = json_response(conn, 200)
+    family_id = family.id
+    assert %{"data" => [%{"id" => ^family_id}]} = json_response(conn, 200)
   end
 
   test "manages events", %{conn: conn, profile: profile} do
@@ -39,7 +40,8 @@ defmodule MessngrWeb.FamilyControllerTest do
         event: %{title: "Middag", starts_at: starts_at}
       })
 
-    assert %{"data" => %{"title" => "Middag", "space_id" => ^family.id}} =
+    family_id = family.id
+    assert %{"data" => %{"title" => "Middag", "space_id" => ^family_id}} =
              json_response(conn, 201)
 
     conn = get(conn, ~p"/api/families/#{family.id}/events")

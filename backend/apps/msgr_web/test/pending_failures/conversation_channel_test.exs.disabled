@@ -315,8 +315,9 @@ defmodule MessngrWeb.ConversationChannelTest do
       ref = push(socket, "message:delete", %{"message_id" => message.id})
       assert_reply ref, :ok, %{"data" => %{"id" => message.id}}
 
+      message_id = message.id
       assert_push peer_socket, "message_deleted", %{
-        :message_id => ^message.id,
+        :message_id => ^message_id,
         :deleted_at => deleted_at
       }
 
@@ -342,9 +343,11 @@ defmodule MessngrWeb.ConversationChannelTest do
       ref = push(socket, "message:read", %{"message_id" => inbound.id})
       assert_reply ref, :ok, %{"status" => "read"}
 
+      profile_id = profile.id
+      inbound_id = inbound.id
       assert_push peer_socket, "message_read", %{
-        :profile_id => ^profile.id,
-        :message_id => ^inbound.id,
+        :profile_id => ^profile_id,
+        :message_id => ^inbound_id,
         :read_at => read_at
       }
 
@@ -360,14 +363,16 @@ defmodule MessngrWeb.ConversationChannelTest do
 
       assert_reply ref, :ok, %{"pinned" => %{"metadata" => %{"section" => "top"}}}
 
+      message_id = message.id
       assert_push peer_socket, "message_pinned", %{
-        :message_id => ^message.id,
+        :message_id => ^message_id,
         :metadata => %{"section" => "top"}
       }
 
       ref_unpin = push(socket, "message:unpin", %{"message_id" => message.id})
       assert_reply ref_unpin, :ok, %{"status" => "unpinned"}
-      assert_push peer_socket, "message_unpinned", %{:message_id => ^message.id}
+      message_id = message.id
+      assert_push peer_socket, "message_unpinned", %{:message_id => ^message_id}
     end
 
     defp join_conversation(account, profile, conversation) do

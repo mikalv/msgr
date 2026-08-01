@@ -13,7 +13,8 @@ defmodule LlmGateway.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      test_coverage: [tool: ExCoveralls]
     ]
   end
 
@@ -32,6 +33,7 @@ defmodule LlmGateway.MixProject do
       {:finch, "~> 0.16"},
       {:jason, "~> 1.4"},
       {:mox, "~> 0.5", only: :test},
+      {:excoveralls, "~> 0.18", only: :test},
       {:telemetry, "~> 1.2"}
     ]
   end

@@ -44,7 +44,8 @@ defmodule AuthProvider.NoiseHandshakeFlowTest do
         "device_id" => device_key
       })
 
-    assert {:ok, %{noise_session: %{id: ^Session.id(session), token: token}}} =
+    session_id = Session.id(session)
+    assert {:ok, %{noise_session: %{id: ^session_id, token: token}}} =
              Auth.verify_challenge(challenge.id, code, %{
                "noise_session_id" => Session.id(session),
                "noise_signature" => signature,

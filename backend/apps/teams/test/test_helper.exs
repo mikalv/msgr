@@ -1,2 +1,2 @@
 ExUnit.start()
-Ecto.Adapters.SQL.Sandbox.mode(Teams.Repo, :manual)
+# Teams.Repo does not use SQL Sandbox in test (see config/test.exs).

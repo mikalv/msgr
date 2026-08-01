@@ -30,40 +30,32 @@ defmodule Messngr.Apps.Executors.PollExecutor do
     do: {:error, "Bruk: /poll \"Spørsmål\" \"Alternativ 1\" \"Alternativ 2\""}
 
   def parse_poll_args(args) when is_binary(args) do
-    parts = extract_quoted_parts(args)
-
-    case parts do
-      [question | options] when length(options) >= 2 ->
+    case extract_quoted_parts(args) do
+      {:quoted, [question | options]} when length(options) >= 2 ->
         {:ok, question, options}
 
-      [_question | options] when length(options) < 2 ->
-        # Try splitting by whitespace if no quotes were used
-        words = String.split(args)
+      {:quoted, _parts} ->
+        {:error,
+         "En poll trenger minst 2 alternativer. Bruk: /poll \"Spørsmål\" \"Alt 1\" \"Alt 2\""}
 
-        if length(words) >= 3 do
-          [question | options] = words
-          {:ok, question, options}
-        else
-          {:error,
-           "En poll trenger minst 2 alternativer. Bruk: /poll \"Spørsmål\" \"Alt 1\" \"Alt 2\""}
-        end
+      {:words, [question | options]} when length(options) >= 2 ->
+        {:ok, question, options}
 
-      _ ->
-        {:error, "Bruk: /poll \"Spørsmål\" \"Alternativ 1\" \"Alternativ 2\""}
+      {:words, _parts} ->
+        {:error,
+         "En poll trenger minst 2 alternativer. Bruk: /poll \"Spørsmål\" \"Alt 1\" \"Alt 2\""}
     end
   end
 
   defp extract_quoted_parts(text) do
-    # Match quoted strings, or fall back to whitespace-split
     regex = ~r/"([^"]+)"/
 
     case Regex.scan(regex, text) do
       [] ->
-        # No quoted parts found -- split by whitespace
-        String.split(text, ~r/\s+/, trim: true)
+        {:words, String.split(text, ~r/\s+/, trim: true)}
 
       matches ->
-        Enum.map(matches, fn [_full, captured] -> captured end)
+        {:quoted, Enum.map(matches, fn [_full, captured] -> captured end)}
     end
   end
 

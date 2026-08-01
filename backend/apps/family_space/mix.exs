@@ -11,7 +11,8 @@ defmodule FamilySpace.MixProject do
       lockfile: "../../mix.lock",
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      test_coverage: [tool: ExCoveralls]
     ]
   end
 
@@ -22,7 +23,8 @@ defmodule FamilySpace.MixProject do
   defp deps do
     [
       {:ecto_sql, "~> 3.10"},
-      {:msgr, in_umbrella: true}
+      {:msgr, in_umbrella: true},
+      {:excoveralls, "~> 0.18", only: :test}
     ]
   end
 end

@@ -24,7 +24,7 @@ defmodule Messngr.Noise.SessionFixtures do
     %{
       token:
         Map.get(attrs, :token) ||
-          ("noise-test-" <> Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)),
+          "noise-test-" <> Base.encode16(:crypto.strong_rand_bytes(16), case: :lower),
       device: device,
       account: account,
       profile: profile,
