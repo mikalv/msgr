@@ -62,7 +62,8 @@ defmodule Messngr.Noise.DevHandshakeTest do
     assert DateTime.compare(payload.expires_at, DateTime.utc_now()) == :gt
 
     session_id = Session.id(payload.session)
-    assert {:ok, ^payload.session} = Registry.fetch(session_id)
+    payload_session = payload.session
+    assert {:ok, ^payload_session} = Registry.fetch(session_id)
 
     expected_public_key = Base.encode64(public_key)
 

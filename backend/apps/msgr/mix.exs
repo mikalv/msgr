@@ -13,7 +13,8 @@ defmodule Messngr.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      test_coverage: [tool: ExCoveralls]
     ]
   end
 
@@ -54,6 +55,7 @@ defmodule Messngr.MixProject do
       {:grpc, "~> 0.9.0"},
       {:protobuf, "~> 0.12.0"},
       {:mox, "~> 0.5", only: :test},
+      {:excoveralls, "~> 0.18", only: :test},
       {:ex_aws, "~> 2.5"},
       {:ex_aws_s3, "~> 2.5"},
       {:sweet_xml, "~> 0.7"},

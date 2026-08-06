@@ -169,10 +169,17 @@ defmodule MessngrWeb.TeamSecurityControllerTest do
 
       %{"data" => %{"id" => private_message_id}} = json_response(create_msg, 201)
 
-      base = "/api/teams/#{owner.slug}/channels/#{public_channel_id}/messages/#{private_message_id}"
+      base =
+        "/api/teams/#{owner.slug}/channels/#{public_channel_id}/messages/#{private_message_id}"
 
       # Cross-channel message_id must not leak via an authorized channel path
-      assert json_response(get(member_conn, "/api/teams/#{owner.slug}/channels/#{public_channel_id}/threads/#{private_message_id}"), 404)[
+      assert json_response(
+               get(
+                 member_conn,
+                 "/api/teams/#{owner.slug}/channels/#{public_channel_id}/threads/#{private_message_id}"
+               ),
+               404
+             )[
                "error"
              ] == "not_found"
 

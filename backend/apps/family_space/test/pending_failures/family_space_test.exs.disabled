@@ -99,7 +99,8 @@ defmodule FamilySpaceTest do
         assignee_profile_id: partner.id
       })
 
-    assert %TodoItem{status: :pending, assignee_profile_id: ^partner.id} = item
+    partner_id = partner.id
+    assert %TodoItem{status: :pending, assignee_profile_id: ^partner_id} = item
 
     {:ok, completed} =
       FamilySpace.update_todo_item(space.id, list.id, item.id, partner.id, %{status: :done})
@@ -123,7 +124,8 @@ defmodule FamilySpaceTest do
         "color" => "sunshine"
       })
 
-    assert %Note{pinned: true, created_by_profile_id: ^partner.id} = note
+    partner_id = partner.id
+    assert %Note{pinned: true, created_by_profile_id: ^partner_id} = note
 
     {:ok, updated} =
       FamilySpace.update_note(space.id, note.id, parent.id, %{

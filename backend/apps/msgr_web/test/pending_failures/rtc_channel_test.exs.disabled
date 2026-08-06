@@ -64,12 +64,14 @@ defmodule MessngrWeb.RTCChannelTest do
         "call_id" => host_response["call_id"]
       })
 
-    push(host_socket, "signal:offer", %{"sdp" => "offer", "target" => peer_profile.id})
+    peer_profile_id = peer_profile.id
+    host_profile_id = host_profile.id
+    push(host_socket, "signal:offer", %{"sdp" => "offer", "target" => peer_profile_id})
 
     assert_broadcast "signal:offer", %{
       "sdp" => "offer",
-      "from" => host_profile.id,
-      "target" => ^peer_profile.id
+      "from" => ^host_profile_id,
+      "target" => ^peer_profile_id
     }
   end
 
@@ -100,7 +102,8 @@ defmodule MessngrWeb.RTCChannelTest do
 
     ref = push(peer_socket, "call:leave", %{})
     assert_reply ref, :ok
-    assert_broadcast "participant:left", %{"profile_id" => peer_profile.id}
+    peer_profile_id = peer_profile.id
+    assert_broadcast "participant:left", %{"profile_id" => ^peer_profile_id}
 
     ref = push(host_socket, "call:end", %{})
     assert_reply ref, :ok

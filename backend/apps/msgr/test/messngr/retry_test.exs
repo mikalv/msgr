@@ -21,7 +21,10 @@ defmodule Messngr.RetryTest do
             else
               :done
             end
-          end, backoff: 0, attempts: 3)
+          end,
+          backoff: 0,
+          attempts: 3
+        )
 
       assert :done = result
       assert Agent.get(agent, & &1) == 2

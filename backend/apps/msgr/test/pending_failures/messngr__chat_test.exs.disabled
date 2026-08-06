@@ -119,7 +119,8 @@ defmodule Messngr.ChatTest do
     assert page.meta.has_more == %{before: false, after: false}
 
     receipts = Repo.all(from r in MessageReceipt, where: r.message_id == ^message.id)
-    assert [%MessageReceipt{status: :pending, recipient_id: ^profile_b.id}] = receipts
+    profile_b_id = profile_b.id
+    assert [%MessageReceipt{status: :pending, recipient_id: ^profile_b_id}] = receipts
   end
 
   test "list_messages/2 respects limit", %{profile_a: profile_a, profile_b: profile_b} do

@@ -13,7 +13,8 @@ defmodule AuthProvider.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      deps: deps(),
+      test_coverage: [tool: ExCoveralls]
     ]
   end
 
@@ -72,7 +73,7 @@ defmodule AuthProvider.MixProject do
       {:tailwind, "~> 0.2", runtime: Mix.env() == :dev},
       # Tests
       {:mox, "~> 0.5", only: :test},
-      {:excoveralls, "~> 0.14", only: :test},
+      {:excoveralls, "~> 0.18", only: :test},
       {:coverex, "~> 1.4", only: :test},
       {:ex_machina, "~> 2.6", only: :test},
       {:faker, "~> 0.14", only: :test},

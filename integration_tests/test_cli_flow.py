@@ -10,14 +10,49 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCKER_COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
+DOCKER_COMPOSE_CI_FILE = REPO_ROOT / "docker-compose.ci.yml"
 LIBMSGR_CLI_PACKAGE_DIR = REPO_ROOT / "flutter_frontend" / "packages" / "libmsgr_cli"
-DEFAULT_TIMEOUT = 180
+DEFAULT_TIMEOUT = int(os.environ.get("MSGR_INTEGRATION_TIMEOUT", "300"))
+
+# Services required for the CLI registration + messaging flow.
+INTEGRATION_SERVICES = [
+    "db",
+    "msgr_redis",
+    "msgr-minio",
+    "minio_init",
+    "stonemq",
+    "backend",
+    "rust_gateway",
+]
+
+# CLI (libmsgr_core) talks to the Rust gateway on :8443 via nip.io.
+GATEWAY_HEALTH_URL = os.environ.get(
+    "MSGR_GATEWAY_HEALTH_URL",
+    "http://clients.7f000001.nip.io:8443/gateway/health",
+)
+BACKEND_HEALTH_URL = os.environ.get(
+    "MSGR_BACKEND_HEALTH_URL",
+    "http://127.0.0.1:4001/api/health",
+)
+
+
+def _compose_cmd(*args: str) -> List[str]:
+    cmd = [
+        "docker",
+        "compose",
+        "-f",
+        str(DOCKER_COMPOSE_FILE),
+    ]
+    if DOCKER_COMPOSE_CI_FILE.exists():
+        cmd.extend(["-f", str(DOCKER_COMPOSE_CI_FILE)])
+    cmd.extend(args)
+    return cmd
 
 
 def _http_request(
@@ -67,6 +102,19 @@ def _wait_for_http(url: str, *, timeout: int = DEFAULT_TIMEOUT) -> None:
     raise TimeoutError(f"Timed out waiting for {url}") from last_error
 
 
+def _ensure_env_file(env: Dict[str, str]) -> None:
+    env_path = REPO_ROOT / ".env"
+    if env_path.exists():
+        return
+    script = REPO_ROOT / "scripts" / "ci_integration_env.sh"
+    if script.exists():
+        subprocess.run(["bash", str(script), str(env_path)], check=True, cwd=REPO_ROOT, env=env)
+        return
+    raise FileNotFoundError(
+        "Missing .env for docker compose. Run scripts/ci_integration_env.sh or copy .env.example."
+    )
+
+
 @pytest.fixture(scope="session")
 def backend_stack() -> Dict[str, Any]:
     if shutil.which("docker") is None:
@@ -74,32 +122,18 @@ def backend_stack() -> Dict[str, Any]:
 
     env = os.environ.copy()
     env.setdefault("MSGR_WEB_LEGACY_ACTOR_HEADERS", "true")
+    env.setdefault("CLAMAV_ENABLED", "false")
+    _ensure_env_file(env)
 
-    up_cmd = [
-        "docker",
-        "compose",
-        "-f",
-        str(DOCKER_COMPOSE_FILE),
-        "up",
-        "-d",
-        "db",
-        "stonemq",
-        "backend",
-    ]
+    up_cmd = _compose_cmd("up", "-d", "--build", *INTEGRATION_SERVICES)
     subprocess.run(up_cmd, check=True, cwd=REPO_ROOT, env=env)
 
     try:
-        _wait_for_http("http://auth.7f000001.nip.io:4080/", timeout=DEFAULT_TIMEOUT)
+        _wait_for_http(BACKEND_HEALTH_URL, timeout=DEFAULT_TIMEOUT)
+        _wait_for_http(GATEWAY_HEALTH_URL, timeout=DEFAULT_TIMEOUT)
         yield {"env": env}
     finally:
-        down_cmd = [
-            "docker",
-            "compose",
-            "-f",
-            str(DOCKER_COMPOSE_FILE),
-            "down",
-            "--volumes",
-        ]
+        down_cmd = _compose_cmd("down", "--volumes", "--remove-orphans")
         subprocess.run(down_cmd, check=False, cwd=REPO_ROOT, env=env)
 
 

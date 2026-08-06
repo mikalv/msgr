@@ -304,7 +304,10 @@ config :msgr,
        Messngr.Media.VirusScan,
        virus_scan_config
        |> Keyword.put(:enabled, clamav_enabled)
-       |> Keyword.put(:host, System.get_env("CLAMAV_HOST", Keyword.get(virus_scan_config, :host, "127.0.0.1")))
+       |> Keyword.put(
+         :host,
+         System.get_env("CLAMAV_HOST", Keyword.get(virus_scan_config, :host, "127.0.0.1"))
+       )
        |> Keyword.put(:port, clamav_port)
        |> Keyword.put(
          :quarantine_prefix,

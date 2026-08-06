@@ -113,7 +113,8 @@ defmodule Messngr.Media.RetentionPrunerTest do
 
     result = Media.prune_expired_uploads(limit: 5)
 
-    assert %{scanned: 1, deleted: 0, errors: [%{id: ^upload.id, reason: :timeout}]} = result
+    upload_id = upload.id
+    assert %{scanned: 1, deleted: 0, errors: [%{id: ^upload_id, reason: :timeout}]} = result
     assert Repo.get!(Upload, upload.id)
   end
 end

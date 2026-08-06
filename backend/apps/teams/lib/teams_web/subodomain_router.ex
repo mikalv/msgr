@@ -11,6 +11,7 @@ defmodule TeamsWeb.SubdomainRouter do
     plug :fetch_live_flash
     plug :put_root_layout, html: {TeamsWeb.Layouts, :root}
     plug :protect_from_forgery
+
     plug :put_secure_browser_headers, %{
       # connect-src 'self' covers same-origin fetch/XHR and same-origin WebSocket.
       # Avoid bare ws:/wss: which would allow any host.

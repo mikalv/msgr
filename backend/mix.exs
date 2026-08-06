@@ -8,6 +8,7 @@ defmodule Messngr.Umbrella.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
+      test_coverage: [tool: ExCoveralls],
       dialyzer: [
         plt_local_path: "priv/plts",
         plt_core_path: "priv/plts",
@@ -22,6 +23,20 @@ defmodule Messngr.Umbrella.MixProject do
           ],
           include_executables_for: [:unix]
         ]
+      ]
+    ]
+  end
+
+  def cli do
+    [
+      preferred_envs: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.json": :test,
+        "coveralls.github": :test,
+        "coveralls.lcov": :test
       ]
     ]
   end
@@ -52,6 +67,7 @@ defmodule Messngr.Umbrella.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
+      {:excoveralls, "~> 0.18", only: :test},
 
       # Runtime debugging/observability
       {:recon, "~> 2.5.6"}

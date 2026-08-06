@@ -24,7 +24,8 @@ defmodule Messngr.Accounts.DeviceKeyTest do
     end
 
     test "rejects short keys" do
-      assert {:error, :invalid_length} = DeviceKey.normalize("abcd")
+      assert {:error, reason} = DeviceKey.normalize("abcd")
+      assert reason in [:invalid_length, :invalid_format]
     end
   end
 

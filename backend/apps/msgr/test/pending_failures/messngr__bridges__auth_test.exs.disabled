@@ -60,7 +60,8 @@ defmodule Messngr.Bridges.AuthTest do
     test "fetch_session validates ownership", %{account: account} do
       {:ok, session} = Auth.start_session(account, "matrix", %{})
 
-      assert {:ok, %AuthSession{id: ^session.id}} = Auth.fetch_session(account, session.id)
+      session_id = session.id
+      assert {:ok, %AuthSession{id: ^session_id}} = Auth.fetch_session(account, session.id)
 
       {:ok, other_account} = Accounts.create_account(%{"display_name" => "Other"})
       assert {:error, :forbidden} = Auth.fetch_session(other_account, session.id)

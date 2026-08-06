@@ -24,13 +24,23 @@ defmodule Messngr.Accounts.DeviceKey do
         {:error, :empty}
 
       trimmed ->
-        with {:error, _} <- decode_base64url(trimmed),
-             {:error, _} <- decode_base64(trimmed),
-             {:error, _} <- decode_hex(trimmed) do
-          {:error, :invalid_format}
-        else
-          {:ok, raw} -> build_result(raw)
-        end
+        # Prefer the first decode that yields an allowed key length. Hex strings
+        # can accidentally decode as base64url with the wrong length.
+        [
+          decode_base64url(trimmed),
+          decode_base64(trimmed),
+          decode_hex(trimmed)
+        ]
+        |> Enum.find_value({:error, :invalid_format}, fn
+          {:ok, raw} ->
+            case build_result(raw) do
+              {:ok, _, _} = ok -> ok
+              {:error, _} -> nil
+            end
+
+          {:error, _} ->
+            nil
+        end)
     end
   end
 

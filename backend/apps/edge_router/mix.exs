@@ -11,7 +11,8 @@ defmodule EdgeRouter.MixProject do
       lockfile: "../../mix.lock",
       elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      test_coverage: [tool: ExCoveralls]
     ]
   end
 
@@ -29,10 +30,8 @@ defmodule EdgeRouter.MixProject do
   defp deps do
     [
       {:plug_cowboy, ">= 2.6.0"},
-      {:phoenix, "~> 1.7"}
-      # {:dep_from_hexpm, "~> 0.3.0"},
-      # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},
-      # {:sibling_app_in_umbrella, in_umbrella: true}
+      {:phoenix, "~> 1.7"},
+      {:excoveralls, "~> 0.18", only: :test}
     ]
   end
 end
