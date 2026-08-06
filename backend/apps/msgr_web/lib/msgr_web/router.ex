@@ -72,6 +72,11 @@ defmodule MessngrWeb.Router do
     delete "/conversations/:id/watch", ConversationController, :unwatch
     get "/conversations/:id/watchers", ConversationController, :watchers
 
+    # Optional async E2EE key directory (empty bundles are OK; never a send gate)
+    put "/v1/e2ee/keys", E2eeController, :put_keys
+    get "/v1/e2ee/bundles/:profile_id", E2eeController, :bundles
+    get "/v1/e2ee/keys/count", E2eeController, :count
+
     resources "/families", FamilyController, only: [:index, :create, :show] do
       resources "/events", FamilyEventController, only: [:index, :create, :show, :update, :delete]
 

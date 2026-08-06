@@ -27,7 +27,8 @@ defmodule Messngr.Chat.Message do
         :voice,
         :file,
         :thumbnail,
-        :location
+        :location,
+        :encrypted
       ],
       default: :text
 
@@ -99,6 +100,11 @@ defmodule Messngr.Chat.Message do
         |> validate_required([:body])
         |> validate_length(:body, min: 1, max: 4000)
 
+      kind == :encrypted ->
+        # Body is unused; clients send empty string. Envelope lives in payload.
+        changeset
+        |> put_change(:body, get_field(changeset, :body) || "")
+
       true ->
         changeset
     end
@@ -115,7 +121,23 @@ defmodule Messngr.Chat.Message do
       kind == :location ->
         require_payload_keys(changeset, payload, ["latitude", "longitude"])
 
+      kind == :encrypted ->
+        validate_encrypted_payload(changeset, payload)
+
       true ->
+        changeset
+    end
+  end
+
+  defp validate_encrypted_payload(changeset, payload) do
+    e2ee = Map.get(payload, "e2ee") || Map.get(payload, :e2ee)
+
+    cond do
+      not is_map(e2ee) ->
+        add_error(changeset, :payload, "encrypted messages require payload.e2ee")
+
+      true ->
+        # Opaque to the server — do not inspect cryptographic fields.
         changeset
     end
   end

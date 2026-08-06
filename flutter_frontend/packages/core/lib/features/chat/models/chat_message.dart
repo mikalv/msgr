@@ -60,10 +60,13 @@ class ChatMessage {
   /// Parses a message payload received from the backend.
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     final profile = json['profile'] as Map<String, dynamic>? ?? const {};
+    final rawType = json['type'] as String? ?? 'text';
+    // Encrypted envelopes are shown as text after client-side decrypt.
+    final type = rawType == 'encrypted' ? 'text' : rawType;
     final base = <String, dynamic>{
-      'type': json['type'] as String? ?? 'text',
+      'type': type,
       'id': json['id'] as String,
-      'body': json['body'],
+      'body': rawType == 'encrypted' ? (json['body'] ?? '') : json['body'],
       'profileId': profile['id'] as String? ?? '',
       'profileName': profile['name'] as String? ?? 'Ukjent',
       'profileMode': profile['mode'] as String? ?? 'private',
@@ -98,6 +101,12 @@ class ChatMessage {
     final metadata = Map<String, dynamic>.from(
       (json['metadata'] as Map?)?.cast<String, dynamic>() ?? const {},
     );
+    if (rawType == 'encrypted') {
+      metadata['e2ee_raw_type'] = 'encrypted';
+      if (jsonPayload is Map<String, dynamic>) {
+        metadata['e2ee_payload'] = Map<String, dynamic>.from(jsonPayload);
+      }
+    }
 
     DateTime? parseDate(dynamic value) {
       if (value is String && value.isNotEmpty) {

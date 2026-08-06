@@ -367,7 +367,8 @@ class ChatApi {
     if (message != null) {
       payloadMap.addAll(message);
     }
-    if (body != null && body.isNotEmpty) {
+    if (body != null) {
+      // Allow empty body for kind=encrypted envelopes.
       payloadMap['body'] = body;
     }
     if (kind != null && kind.isNotEmpty) {

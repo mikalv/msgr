@@ -146,13 +146,11 @@ defmodule MessngrWeb.ConversationChannel do
         end
       end
     else
-      # Legacy Messngr context
+      # Legacy Messngr context (plaintext or opaque encrypted envelopes)
       with :ok <- enforce_rate_limit(socket, :conversation_message_event),
-           {:ok, body} <- extract_body(payload),
+           {:ok, attrs} <- extract_message_attrs(payload),
            {:ok, message} <-
-             Messngr.send_message(channel_id, socket.assigns.current_profile.id, %{
-               "body" => body
-             }) do
+             Messngr.send_message(channel_id, socket.assigns.current_profile.id, attrs) do
         SocketTelemetry.message_sent(channel_id, socket.assigns.current_profile.id, %{
           message_id: message.id
         })
@@ -542,6 +540,43 @@ defmodule MessngrWeb.ConversationChannel do
     end
   rescue
     Ecto.NoResultsError -> {:error, %{reason: "forbidden"}}
+  end
+
+  defp extract_message_attrs(%{"kind" => kind} = payload)
+       when kind in ["encrypted", :encrypted] do
+    payload_map = Map.get(payload, "payload") || %{}
+
+    if is_map(payload_map) and (Map.has_key?(payload_map, "e2ee") or Map.has_key?(payload_map, :e2ee)) do
+      {:ok,
+       %{
+         "kind" => "encrypted",
+         "body" => Map.get(payload, "body") || "",
+         "payload" => payload_map,
+         "metadata" => Map.get(payload, "metadata") || %{}
+       }}
+    else
+      {:error, %{errors: ["encrypted messages require payload.e2ee"]}}
+    end
+  end
+
+  defp extract_message_attrs(payload) when is_map(payload) do
+    with {:ok, body} <- extract_body(payload) do
+      attrs = %{"body" => body}
+
+      attrs =
+        case Map.get(payload, "kind") || Map.get(payload, "type") do
+          nil -> attrs
+          kind -> Map.put(attrs, "kind", kind)
+        end
+
+      attrs =
+        case Map.get(payload, "payload") do
+          %{} = p -> Map.put(attrs, "payload", p)
+          _ -> attrs
+        end
+
+      {:ok, attrs}
+    end
   end
 
   defp extract_body(%{"body" => body}) when is_binary(body) do
