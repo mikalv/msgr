@@ -101,9 +101,10 @@ defmodule Messngr.Chat.Message do
         |> validate_length(:body, min: 1, max: 4000)
 
       kind == :encrypted ->
-        # Body is unused; clients send empty string. Envelope lives in payload.
+        # Never persist client-supplied plaintext for encrypted messages.
+        # Envelope lives entirely in payload.e2ee.
         changeset
-        |> put_change(:body, get_field(changeset, :body) || "")
+        |> put_change(:body, "")
 
       true ->
         changeset
