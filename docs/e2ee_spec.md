@@ -252,7 +252,15 @@ Local SQLCipher tables (names already reserved):
 Ratchet state MUST be persisted after every successful encrypt/decrypt. Never
 reuse a stale in-memory state after persistence.
 
-## 8. Out of scope
+## 8. Verification
+
+| Layer | How to run |
+|-------|------------|
+| Crypto unit/integration | `cd flutter_frontend/packages/libmsgr_core && dart test test/e2ee` |
+| Opaque REST/DB relay | `cd backend && PROMETHEUS_ENABLED=false mix test apps/msgr_web/test/msgr_web/controllers/e2ee_wire_flow_test.exs` |
+| Full HTTP E2E (crypto on the wire) | `./scripts/run_e2ee_e2e.sh` (starts Phoenix with `BOT_AUTH_SECRET`, runs Dart HTTP suite) |
+
+## 9. Out of scope
 
 - Media CEK wrapping (#236)
 - Sender Keys / groups (#237)
