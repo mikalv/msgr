@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added — E2EE end-to-end verification
+- ExUnit wire-flow suite for personal-mode encrypted relay (`init` → `init_ack` → `msg`) asserting empty `body` and no plaintext leakage in stored/listed payloads
+- Dart HTTP E2E (`libmsgr_core` + `scripts/run_e2ee_e2e.sh`) that runs two real `E2eeService` clients against Phoenix via bot-token auth and decrypts across the wire
+- Encrypted messages now force `body` to `""` server-side so clients cannot persist plaintext by accident
+
 ## [0.8.0] — 2026-03-26 to 2026-03-27
 
 ### Added — App Platform & Marketplace (#96, #97, #98)
