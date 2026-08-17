@@ -49,6 +49,14 @@ skriver controller-tester.
 I dev kan du deretter generere en midlertidig Noise-handshake med
 `curl -X POST http://localhost:4000/api/noise/handshake` før du starter OTP-flowen.
 
+## ClamAV / team-media
+
+Docker-stacken kan kjøre `clamav` og skanne team-opplastinger etter
+`POST /api/teams/:slug/media/:upload_id/complete`. Styres av `CLAMAV_*` i
+`.env` / `runtime.exs`. Sett `CLAMAV_ENABLED=false` hvis du kjører uten
+clamd-container. Full flyt, statuskoder og fallgruver:
+[media_virus_scan.md](media_virus_scan.md).
+
 ## Scripts og hurtigkommandoer
 
 For å kutte ned på copy/paste av lange kommandoer finnes det nå to hjelpeskript i

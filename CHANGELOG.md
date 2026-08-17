@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Docs — engineering documentation refresh
+- Added `docs/media_virus_scan.md` runbook for team ClamAV scan/quarantine (API, env, pitfalls)
+- Updated `docs/CODEBASE_ANALYSIS.md` for delivered E2EE 1:1, ClamAV, CI quality/coverage/integration, and security review status
+- Refreshed `docs/rtc.md` for shipped Flutter WebRTC client + TURN credentials endpoint
+- Linked media/E2EE/RTC docs from `README.md` and `docs/backend_setup.md`
+
 ### Added — E2EE end-to-end verification
 - ExUnit wire-flow suite for personal-mode encrypted relay (`init` → `init_ack` → `msg`) asserting empty `body` and no plaintext leakage in stored/listed payloads
 - Dart HTTP E2E (`libmsgr_core` + `scripts/run_e2ee_e2e.sh`) that runs two real `E2eeService` clients against Phoenix via bot-token auth and decrypts across the wire

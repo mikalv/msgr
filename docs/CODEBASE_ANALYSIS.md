@@ -1,13 +1,15 @@
 # Kodebase-analyse: msgr
 
-**Analysedato:** 2026-07-31  
-**Versjon:** 0.1.0
+**Analysedato:** 2026-07-31 (statusoppdatert 2026-08-10)  
+**Versjon:** 0.1.1
 
 ---
 
 ## Sammendrag
 
 **msgr** er en eksperimentell norsk/europeisk personvern-fokusert meldingsplattform bygget som et monorepo. Prosjektet har en solid arkitektur med E2EE-design, multi-profil støtte, og GDPR-først tilnærming. Det er **utviklingsklart** og har god **lokal dev-stack**, men mangler flere kritiske elementer for produksjon.
+
+Siden første analyse er bl.a. 1:1 E2EE (Double Ratchet), team-media ClamAV-pipeline, CI (credo/sobelow/dialyzer/coveralls/integration), og manuell sikkerhetsgjennomgang levert — se tabellene under.
 
 ---
 
@@ -20,7 +22,7 @@
 | **Kontoer & Profiler** | ✅ Implementert | Accounts, profiles, devices, key store |
 | **Autentisering** | ✅ Implementert | OTP/SMS, OIDC, JWT (Guardian), refresh tokens |
 | **Chat/Meldinger** | ✅ Implementert | Conversations, messages, receipts, reactions, threads, pins |
-| **Media** | ✅ Implementert | Presigned S3/MinIO uploads, retention pruning |
+| **Media** | ✅ Implementert | Presigned S3/MinIO uploads, retention pruning; team ClamAV scan/quarantine (se `docs/media_virus_scan.md`) |
 | **Realtime** | ✅ Implementert | Phoenix Channels (Conversation, Device, RTC) |
 | **Rate Limiting** | ✅ Implementert | Hammer-basert (auth: 5/10min, meldinger: 60/min) |
 | **Teams/Workspaces** | ✅ Implementert | Multi-tenant, channels, DMs, invites, reminders |
@@ -47,9 +49,10 @@
 |---------|--------|----------|
 | **Auth** | ⚠️ Delvis | OTP/OIDC flow, mange TODO-er |
 | **Chat UI** | ✅ Implementert | Bubbles, composer, realtime state (Riverpod) |
+| **E2EE (1:1 text)** | ✅ Implementert | XX Double Ratchet i `libmsgr_core` + OMEMO store / `E2eeService`; media CEK og Sender Keys ute av scope (`docs/e2ee_spec.md`) |
 | **Noise Protocol** | ✅ Implementert | Full implementasjon i `libmsgr` |
 | **Local Storage** | ✅ Implementert | Hive/Sembast/Drift, secure storage |
-| **WebRTC** | ✅ Implementert | 1:1 voice/video calls (nylig lagt til) |
+| **WebRTC** | ✅ Implementert | 1:1 voice/video via `RTCChannel` + Flutter `CallProvider` / `flutter_webrtc` |
 | **Bridges UI** | ⚠️ Delvis | Catalog og session management struktur |
 | **Contacts** | ⚠️ Delvis | Import/lookup strukturer |
 
@@ -57,8 +60,8 @@
 
 | Komponent | Status | Detaljer |
 |-----------|--------|----------|
-| **Docker Compose** | ✅ Komplett | 13 tjenester: PG, Redis, MinIO, StoneMQ, coturn, etc. |
-| **CI (GitHub Actions)** | ✅ Fungerer | Backend tests, Flutter tests, Dart packages |
+| **Docker Compose** | ✅ Komplett | PG, Redis, MinIO, StoneMQ, coturn, ClamAV, etc. |
+| **CI (GitHub Actions)** | ✅ Fungerer | Backend tests + credo/sobelow/dialyzer/coveralls, Flutter tests, Docker pytest integration |
 | **Deploy Pipeline** | ✅ Fungerer | SSH/rsync til `/var/www/msgr.no`, systemd |
 | **Prometheus/Grafana** | ✅ Konfigurert | Pre-provisioned dashboards |
 | **OpenObserve** | ✅ Konfigurert | Log aggregation |
@@ -108,21 +111,18 @@
 
 | Mangel | Beskrivelse | Prioritet |
 |--------|-------------|-----------|
-| **Double Ratchet E2EE** | Kun tabellstruktur (`OmemoRatchets`), ingen faktisk implementasjon | P0 |
-| **Secret Management** | Secrets skal komme fra `.env` / secret store (se `docs/SECRET_MANAGEMENT.md`) | P0 |
+| **E2EE gaps** | 1:1 tekst er på plass; media CEK (`#236`), Sender Keys (`#237`), bedre device discovery (`#235`) mangler | P0 |
+| **Secret Management (prod)** | Compose/dev bruker `.env` (se `docs/SECRET_MANAGEMENT.md`); prod vault/rotasjon fortsatt åpent | P0 |
 | **Database HA** | Ingen Patroni/HA-konfigurasjon | P0 |
 | **Database Backup** | Ingen backup-strategi dokumentert/implementert | P0 |
 | **SSL/TLS Sertifikater** | Produksjon krever gyldige sertifikater, kun toggle-støtte | P0 |
-| **Virus/Malware Scanning** | ClamAV + async scan/quarantine for team media (se `#197`) | P0 |
-| **Security Audit** | Ingen dokumentert sikkerhetsrevisjon | P0 |
+| **Uavhengig Security Audit** | Manuell review i `docs/SECURITY_REVIEW.md` (SEC-1–8 fikset); ekstern revisjon/pentest (`#196`) mangler | P0 |
 
 ### 3.2 🟠 Høy Prioritet
 
 | Mangel | Beskrivelse | Prioritet |
 |--------|-------------|-----------|
-| **Test Coverage** | Ingen coverage thresholds eller reporting (excoveralls kun i 2 apps) | P1 |
-| **CI Lint/Quality** | credo/sobelow/dialyxir ikke kjørt i CI | P1 |
-| **Integration Tests i CI** | pytest-tester ikke kjørt automatisk | P1 |
+| **Test Coverage depth** | Umbrella coveralls + CI-artifact finnes; mange suiter i `**/test/pending_*`, floor under 70%-mål | P1 |
 | **Rust Gateway Tests i CI** | cargo test ikke i workflow | P1 |
 | **CDN** | Ingen EU-edge CDN for media | P1 |
 | **Error Tracking** | Sentry nevnt i docs men ikke konfigurert | P1 |
@@ -166,11 +166,11 @@
 
 ### 4.2 Bekymringer
 
-1. **E2EE ikke fullført** - Kritisk funksjonalitet kun strukturert
+1. **E2EE ikke komplett for alle modus** - 1:1 tekst OK; media/grupper og team-modus fortsatt plaintext
 2. **Noise modules disabled** - `Transport.Noise.Registry` og gRPC endepunkter kommentert ut
-3. **Test coverage ukjent** - Mange tester, men ingen coverage metrics
+3. **Coverage under mål** - CI rapporterer coveralls, men mange parked suiter
 4. **Single point of failure** - Postgres uten HA i docker-compose
-5. **Hardkodede hemmeligheter** - I dev/docker-filer (OK for dev, farlig om kopiert til prod)
+5. **Prod secret store** - Dev/compose er `.env`-basert; vault/rotasjon for prod mangler
 
 ---
 
@@ -178,17 +178,17 @@
 
 ### Fase 1: Sikkerhet & Stabilitet (Pre-prod)
 
-1. **Implementer Double Ratchet E2EE** - Kritisk for produktets kjerneverdi
-2. **Flytt secrets til env/vault** - Fjern alle hardkodede hemmeligheter
+1. ~~**Implementer Double Ratchet E2EE**~~ — 1:1 tekst levert; gjenstår media CEK / Sender Keys
+2. **Prod secret store** - Vault/rotasjon utover `.env` (dev cleanup gjort)
 3. **Sett opp database HA** - Patroni eller managed PostgreSQL
 4. **Implementer backup-strategi** - pg_dump + S3/MinIO backup
-5. **Legg til virusskanning** - ClamAV i media pipeline
-6. **Kjør security tools i CI** - credo --strict, sobelow, dialyxir
+5. ~~**Legg til virusskanning**~~ — team ClamAV pipeline levert (`docs/media_virus_scan.md`)
+6. ~~**Kjør security tools i CI**~~ — credo --strict, sobelow, dialyxir i workflow
 
 ### Fase 2: Kvalitet & Observability
 
-1. **Test coverage reporting** - excoveralls + GitHub badge
-2. **Integration tests i CI** - Docker-basert pytest
+1. ~~**Test coverage reporting**~~ — umbrella coveralls + CI artifact (hev terskel / gjenopprett pending)
+2. ~~**Integration tests i CI**~~ — Docker-basert pytest i workflow
 3. **Sentry/error tracking** - Klient og server
 4. **CDN-oppsett** - Cloudflare/Bunny for EU-edge
 
