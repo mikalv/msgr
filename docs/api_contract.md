@@ -54,9 +54,12 @@ Feil:
 
 ### OTP-innlogging (e-post og mobil)
 
+Ruter (verifisert i `MessngrWeb.Router`): `POST /api/v1/auth/challenge`,
+`/verify`, `/oidc`, `/refresh`, `/bot-token`.
+
 1. **Start utfordring**
 
-   `POST /api/auth/challenge`
+   `POST /api/v1/auth/challenge`
 
    ```json
    {
@@ -79,10 +82,12 @@ Feil:
    ```
 
    `debug_code` returneres kun i dev/test og skal aldri vises i produksjon.
+   Challenge-TTL er **10 minutter**. Koden lagres som HMAC (`OTP_HMAC_SECRET`,
+   fallback `SECRET_KEY_BASE`) — se `docs/SECRET_MANAGEMENT.md`.
 
 2. **Verifiser engangskode**
 
-   `POST /api/auth/verify`
+   `POST /api/v1/auth/verify`
 
    ```json
    {
@@ -97,6 +102,12 @@ Feil:
 
    Se også `docs/noise_handshake_rollout.md` for handshake-detaljer og hvordan
    signaturen genereres.
+
+   **Feil / lockout (SEC-4):** Maks **5** mislykkede verifiseringsforsøk per
+   challenge (`Messngr.Auth` `@max_verify_attempts`). Tellere økes atomisk.
+   Når grensen er nådd: **429** med `{"error":"too_many_attempts"}` — start en
+   ny challenge. Feil kode før lockout: typisk **400**. Utløpt/konsumert
+   challenge: **400** med tilhørende feilkode.
 
    **Respons 200**
 
@@ -131,7 +142,7 @@ Feil:
 
 ### Federert pålogging (OIDC)
 
-`POST /api/auth/oidc`
+`POST /api/v1/auth/oidc`
 
 ```json
 {
@@ -307,13 +318,16 @@ Returnerer kontoen/profilene som er knyttet til gjeldende Noise-sesjon.
 
 `POST /api/conversations`
 
+Krever autentisert actor-pipeline (`CurrentActor`). Idempotent 1:1 via
+`Messngr.ensure_direct_conversation/2`.
+
 ```json
 {
   "target_profile_id": "peer-profile-uuid"
 }
 ```
 
-**Respons 201**
+**Respons 200** (render `:show`)
 
 ```json
 {
@@ -333,6 +347,43 @@ Returnerer kontoen/profilene som er knyttet til gjeldende Noise-sesjon.
   }
 }
 ```
+
+### Opprette gruppe- eller kanal-samtale
+
+Samme endepunkt, med `kind` i stedet for `target_profile_id`
+(`MessngrWeb.ConversationController` → `create_group_conversation` /
+`create_channel_conversation`).
+
+**Gruppe (privat group DM / gruppechat)**
+
+```json
+{
+  "kind": "group",
+  "participant_ids": ["profile-uuid-a", "profile-uuid-b"],
+  "topic": "Helgetur",
+  "structure_type": "optional-string",
+  "read_receipts_enabled": true
+}
+```
+
+- `participant_ids` (eller `participantIds`) er påkrevd listen utover eier;
+  innlogget profil blir eier.
+- Backend setter alltid `visibility: :private` for `kind: "group"`.
+
+**Kanal**
+
+```json
+{
+  "kind": "channel",
+  "participant_ids": ["profile-uuid-a"],
+  "topic": "general",
+  "visibility": "public",
+  "read_receipts_enabled": false
+}
+```
+
+`visibility` kan også komme fra `access`, eller `hidden: true` → `"private"`.
+Ukjent `kind` eller manglende felter → **400** `bad_request`.
 
 ### Hente meldinger
 
@@ -453,6 +504,11 @@ intern lagringsstruktur.
 Klienten laster opp binæren direkte til `upload.url` før `expires_at` og sender deretter en melding med `media.upload_id` og valgfri metadata (caption, waveform, dimensjoner, checksum). Alle opplastinger må inkludere de signerede headerne – `content-type` og eventuelle `x-amz-server-side-encryption*`-felt – slik at objekter lagres kryptert i S3-kompatibel lagring.
 
 Backend-konfigurasjonen støtter både standard SSE-S3 (`MEDIA_SSE_ALGORITHM`, default `AES256`) og KMS-nøkler (`MEDIA_SSE_KMS_KEY_ID`). Når en KMS-nøkkel er konfigurert returneres både algoritme- og nøkkel-ID-headere i opplastingsinstruksjonene.
+
+**Team-media (annen pipeline):** Presign / complete / download under
+`/api/teams/:slug/media…` går via ClamAV-skanning og er **ikke** det samme som
+personlige conversation-uploads over. Se `docs/media_virus_scan.md` for statuskoder,
+quarantine og miljøvariabler. Personlig media har fortsatt ikke virus-scan.
 
 ### Eksempel på mediamelding
 
