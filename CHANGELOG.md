@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Docs — CI coverage runbook + API contract sync
+- Added `docs/ci_and_coverage.md` for GitHub Actions jobs, ExCoveralls floor,
+  `pending_*` / `*.disabled` restore steps, and common local pitfalls
+- Updated `docs/api_contract.md`: correct `/api/v1/auth/*` paths, OTP lockout
+  (5 attempts → 429), group/channel conversation create, team-media cross-link
+- Linked CI/OTP notes from `README.md` and `docs/backend_setup.md`
+
 ### Docs — engineering documentation refresh
 - Added `docs/media_virus_scan.md` runbook for team ClamAV scan/quarantine (API, env, pitfalls)
 - Updated `docs/CODEBASE_ANALYSIS.md` for delivered E2EE 1:1, ClamAV, CI quality/coverage/integration, and security review status

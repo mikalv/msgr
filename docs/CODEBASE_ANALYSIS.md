@@ -1,6 +1,6 @@
 # Kodebase-analyse: msgr
 
-**Analysedato:** 2026-07-31 (statusoppdatert 2026-08-10)  
+**Analysedato:** 2026-07-31 (statusoppdatert 2026-08-17)  
 **Versjon:** 0.1.1
 
 ---
@@ -61,7 +61,7 @@ Siden første analyse er bl.a. 1:1 E2EE (Double Ratchet), team-media ClamAV-pipe
 | Komponent | Status | Detaljer |
 |-----------|--------|----------|
 | **Docker Compose** | ✅ Komplett | PG, Redis, MinIO, StoneMQ, coturn, ClamAV, etc. |
-| **CI (GitHub Actions)** | ✅ Fungerer | Backend tests + credo/sobelow/dialyzer/coveralls, Flutter tests, Docker pytest integration |
+| **CI (GitHub Actions)** | ✅ Fungerer | Backend tests + credo/sobelow/dialyzer/coveralls, Flutter tests, Docker pytest integration — se `docs/ci_and_coverage.md` |
 | **Deploy Pipeline** | ✅ Fungerer | SSH/rsync til `/var/www/msgr.no`, systemd |
 | **Prometheus/Grafana** | ✅ Konfigurert | Pre-provisioned dashboards |
 | **OpenObserve** | ✅ Konfigurert | Log aggregation |
@@ -122,7 +122,7 @@ Siden første analyse er bl.a. 1:1 E2EE (Double Ratchet), team-media ClamAV-pipe
 
 | Mangel | Beskrivelse | Prioritet |
 |--------|-------------|-----------|
-| **Test Coverage depth** | Umbrella coveralls + CI-artifact finnes; mange suiter i `**/test/pending_*`, floor under 70%-mål | P1 |
+| **Test Coverage depth** | Umbrella coveralls + CI-artifact finnes; mange suiter i `**/test/pending_*`, floor under 70%-mål — restore-prosess i `docs/ci_and_coverage.md` | P1 |
 | **Rust Gateway Tests i CI** | cargo test ikke i workflow | P1 |
 | **CDN** | Ingen EU-edge CDN for media | P1 |
 | **Error Tracking** | Sentry nevnt i docs men ikke konfigurert | P1 |

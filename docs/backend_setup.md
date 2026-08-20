@@ -57,6 +57,19 @@ Docker-stacken kan kjøre `clamav` og skanne team-opplastinger etter
 clamd-container. Full flyt, statuskoder og fallgruver:
 [media_virus_scan.md](media_virus_scan.md).
 
+## CI, coverage og pending tester
+
+GitHub Actions kjører format/credo/sobelow/dialyzer, umbrella coveralls,
+Flutter-tester og pytest-integrasjon. Parkerte suiter ligger som
+`*.exs.disabled` under `**/test/pending_*`. Se [ci_and_coverage.md](ci_and_coverage.md).
+
+## OTP lockout
+
+`POST /api/v1/auth/verify` tillater maks **5** feilforsøk per challenge
+(429 `too_many_attempts`). TTL 10 minutter. Detaljer i
+[api_contract.md](api_contract.md) (OTP-seksjonen) og
+[SECURITY_REVIEW.md](SECURITY_REVIEW.md) SEC-4.
+
 ## Scripts og hurtigkommandoer
 
 For å kutte ned på copy/paste av lange kommandoer finnes det nå to hjelpeskript i
