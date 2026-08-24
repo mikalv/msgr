@@ -93,8 +93,8 @@ pytest -m integration -v --tb=short
 collect compose logs the same way CI does (`docker compose … logs`). Tear down
 with volumes when finished so the next run starts clean.
 
-E2EE wire verification (separate from pytest): see `docs/e2ee_spec.md` and
-`scripts/run_e2ee_e2e.sh`.
+E2EE wire verification (separate from pytest): see `docs/e2ee_developer.md`,
+`docs/e2ee_spec.md`, and `scripts/run_e2ee_e2e.sh`.
 
 ## Common pitfalls
 
