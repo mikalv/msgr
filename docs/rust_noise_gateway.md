@@ -123,7 +123,7 @@ Flutter Client                Rust Gateway              Elixir Backend
       │  handshake_msg, signature}  │                          │
       │<────────────────────────────┤                          │
       │                             │                          │
-      │ POST /api/auth/verify       │                          │
+      │ POST /api/v1/auth/verify    │                          │
       │ (OTP, noise_session_id)     │                          │
       ├────────────────────────────────────────────────────────>│
       │                             │                          │
@@ -198,7 +198,7 @@ Rust Gateway støtter **to transport modes** for fleksibilitet:
 1. Flutter → POST /noise/handshake (pattern, psk)
 2. Rust → Opprett Noise session
 3. Rust → Return {session_id, token, handshake_msg}
-4. Flutter → POST /api/auth/verify (OTP + noise_session_id) til Elixir
+4. Flutter → POST /api/v1/auth/verify (OTP + noise_session_id) til Elixir
 5. Elixir → Verifiser session via Rust Gateway gRPC
 6. Flutter → WebSocket til Elixir Phoenix med noise_token
 ```

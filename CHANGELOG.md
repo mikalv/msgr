@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Docs — E2EE developer runbook + auth/API contract sync
+- Added `docs/e2ee_developer.md` (architecture map, key directory + encrypted
+  message surfaces, client wiring, verification commands, pitfalls)
+- Updated `docs/api_contract.md`: JWT Bearer identity (not `X-Account-Id`),
+  verify response `access_token`/`refresh_token`, E2EE REST endpoints, WS connect
+- Corrected stale `/api/auth/*` → `/api/v1/auth/*` in Noise/setup docs; fixed
+  `backend_setup.md` auth section (JWT vs Noise for `:actor` routes)
+
 ### Docs — CI coverage runbook + API contract sync
 - Added `docs/ci_and_coverage.md` for GitHub Actions jobs, ExCoveralls floor,
   `pending_*` / `*.disabled` restore steps, and common local pitfalls

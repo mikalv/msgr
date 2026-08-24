@@ -20,23 +20,24 @@ som brukes av OTP-flyten.
   `allow_without_transport` er satt, svarer controlleren med `404`/`503` slik at
   klientene tydelig får vite at stubben ikke er tilgjengelig.
 
-## Autorisasjon med Noise-token
+## Autorisasjon (JWT)
 
-Alle samtaleendepunkter (bl.a. `POST /api/conversations`) går nå gjennom
-`MessngrWeb.Plugs.CurrentActor` med `authorization_schemes: [:noise]`. Det betyr
-at `Authorization: Noise <token>` eller `x-noise-session` må være satt; gamle
-`Bearer`-tokens blir blankt avvist med `401`.
+Beskyttede samtale-/API-endepunkter går gjennom `MessngrWeb.Plugs.CurrentActor`
+→ `SessionContext`, som krever `Authorization: Bearer <access JWT>`. Konto og
+profil leses fra claims (`sub`, `pid`). Legacy `X-Account-Id` /
+`X-Profile-Id` er ikke tillitvekkende.
 
-Testhjelperen `attach_noise_session/3` i `ConnCase` setter riktig header når du
-skriver controller-tester.
+Testhjelperen `attach_jwt_session/3` i `ConnCase` setter riktig header.
+`attach_noise_session/3` finnes for eldre Noise-tester (parkert under
+`pending_noise/`); den erstatter ikke JWT for `:actor`-ruter i dag.
 
 ## Kontoendepunkter
 
-- OTP-responsen fra `/api/auth/verify` inkluderer nå `profile_id` og en
-  `profile`-payload slik at klienten vet hvilken profil som ble logget inn.
+- OTP-responsen fra `/api/v1/auth/verify` inkluderer `profile_id`, `profile`,
+  `access_token` og `refresh_token` slik at klienten kan fortsette med Bearer.
 - Standard profilnavn arver fornavnet fra `display_name` (eller e-postens
   lokal-del) i stedet for det generiske «Privat».
-- `GET /api/account/me` (i API-scope med Noise-token) returnerer den samme
+- `GET /api/account/me` (i API-scope med JWT) returnerer den samme
   kontostrukturen som `AccountController.show/2`, slik at klienter kan hente
   gjeldende konto uten å gå via admin-endepunktene i `/api/users`.
 
@@ -62,6 +63,13 @@ clamd-container. Full flyt, statuskoder og fallgruver:
 GitHub Actions kjører format/credo/sobelow/dialyzer, umbrella coveralls,
 Flutter-tester og pytest-integrasjon. Parkerte suiter ligger som
 `*.exs.disabled` under `**/test/pending_*`. Se [ci_and_coverage.md](ci_and_coverage.md).
+
+## E2EE (1:1 tekst)
+
+Personlig Direct med `kind: "encrypted"` + valgfri nøkkelkatalog under
+`/api/v1/e2ee/*`. Normativt: [e2ee_spec.md](e2ee_spec.md). Utvikler-flyt,
+testkommandoer og fallgruver: [e2ee_developer.md](e2ee_developer.md).
+Hurtig E2E: `./scripts/run_e2ee_e2e.sh`.
 
 ## OTP lockout
 

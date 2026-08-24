@@ -25,8 +25,10 @@ hvordan dagens mapper/konfigurasjon matcher prinsippene i
 ## Integrasjonsbeslutninger (Noise + Flutter)
 
 - `libmsgr_core` håndterer Noise-handshake automatisk før OTP-flowen og sender
-  `noise_session_id`/`noise_signature` videre til `/api/auth/verify`, slik at
+  `noise_session_id`/`noise_signature` videre til `/api/v1/auth/verify`, slik at
   CLI- og Flutter-integrasjonene tilfredsstiller kravet om Noise-transport.
+  REST `:actor`-ruter autentiseres i dag med JWT Bearer fra verify-responsen
+  (`access_token`), ikke Noise-token alene.
 - Backend tester (`messngr/noise/dev_handshake_test.exs`) validerer at
   `Messngr.Noise.DevHandshake` kun lykkes når transport og nøkler er aktivert,
   og at sesjonen virkelig blir persistert i registriet.

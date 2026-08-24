@@ -83,10 +83,10 @@ Flutter → POST /noise/handshake → Rust Gateway
 ### 2. OTP Verification (proxied)
 
 ```
-Flutter → POST /api/auth/verify (OTP code, noise_session_id)
+Flutter → POST /api/v1/auth/verify (OTP code, noise_session_id)
        → Rust Gateway
        → Validate noise_session_id exists
-       → Proxy to Elixir: http://localhost:4000/api/auth/verify
+       → Proxy to Elixir: http://localhost:4000/api/v1/auth/verify
        → Elixir verifies OTP
        → Rust intercepts response
        → Bind account_id to noise session
@@ -249,8 +249,8 @@ config :msgr_web, MessngrWeb.Endpoint,
 | Flutter Request | Rust Gateway | Elixir Backend |
 |----------------|--------------|----------------|
 | POST /noise/handshake | Handle internally | N/A |
-| POST /api/auth/challenge | Proxy | POST /api/auth/challenge |
-| POST /api/auth/verify | Proxy + bind account | POST /api/auth/verify |
+| POST /api/v1/auth/challenge | Proxy | POST /api/v1/auth/challenge |
+| POST /api/v1/auth/verify | Proxy + bind account | POST /api/v1/auth/verify |
 | GET /api/conversations | Proxy + session headers | GET /api/conversations |
 | WSS /socket | WebSocket proxy | WSS /socket |
 | GET /health | Combine (Rust + Elixir) | GET /health |

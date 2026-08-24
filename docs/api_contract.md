@@ -4,11 +4,14 @@ Denne siden dokumenterer forventet kontrakt mellom msgr-backend og Flutter-klien
 
 ## Autentisering og identitet
 
-- HTTP-klienten identifiserer seg med to obligatoriske headere på alle samtalerelaterte kall:
-  - `x-account-id`: UUID for kontoen som er aktiv i klienten.
-  - `x-profile-id`: UUID for profilen som sender/leser meldinger.
-- Backend verifiserer at profilen tilhører kontoen. Mismatch gir `401 Unauthorized`.
-- WebSocket-tilkoblingen bruker de samme verdiene som join-parametre (se under).
+- Beskyttede HTTP-kall under `/api` (pipeline `:actor`) krever
+  `Authorization: Bearer <access JWT>` (`MessngrWeb.Plugs.SessionContext`).
+- Konto (`sub`) og profil (`pid`) tas **kun** fra verifiserte JWT-claims.
+  Legacy-headere `X-Account-Id` / `X-Profile-Id` er **ikke** tillitvekkende
+  og erstatter ikke Bearer-token.
+- Ugyldig/manglende token → `401 Unauthorized`.
+- WebSocket: foretrekk connect-param `token` (samme access JWT). Gateway kan
+  fortsatt sende `account_id` / `profile_id` etter egen validering (se under).
 
 ## Noise-håndtrykk og nøkkelhåndtering
 
@@ -117,26 +120,42 @@ Ruter (verifisert i `MessngrWeb.Router`): `POST /api/v1/auth/challenge`,
        "id": "acct-uuid",
        "display_name": "Kari Nordmann",
        "email": "kari@example.com",
-       "phone_number": null
+       "phone_number": null,
+       "profiles": [
+         {
+           "id": "profile-uuid",
+           "name": "Kari",
+           "slug": "kari",
+           "mode": "personal",
+           "avatar_url": null
+         }
+       ]
      },
      "profile_id": "profile-uuid",
      "profile": {
        "id": "profile-uuid",
        "name": "Kari",
        "slug": "kari",
-       "mode": "personal"
+       "mode": "personal",
+       "avatar_url": null
      },
      "identity": {
        "id": "identity-uuid",
        "kind": "email",
        "verified_at": "2024-10-04T12:01:00Z"
      },
-     "noise_session": {
-       "id": "session-uuid",
-       "token": "NoiseEncodedToken"
-     }
+     "access_token": "GuardianAccessJWT",
+     "refresh_token": "GuardianRefreshJWT"
    }
    ```
+
+   Bruk `access_token` som `Authorization: Bearer …` på videre REST/WS-kall.
+   Forny med `POST /api/v1/auth/refresh` `{ "refresh_token": "…" }` →
+   `{ "access_token": "…" }`.
+
+   Når Noise-handshake er bundet inn (valgfritt / feature-flag), kan responsen
+   også inneholde `noise_session: { "id", "token" }`. Det erstatter **ikke**
+   JWT for `:actor`-ruter i dagens `SessionContext`.
 
    Samme flyt gjelder for `channel: "phone"` hvor `identifier` er et E.164-nummer.
 
@@ -163,8 +182,8 @@ Ruter (verifisert i `MessngrWeb.Router`): `POST /api/v1/auth/challenge`,
 
 Klienten sender inn en batch med kontakter som skal knyttes til den aktive
 kontoen. Backend lagrer (eller oppdaterer) kontakter per konto/profil og
-returnerer de normaliserte radene. Requesten må inkludere
-`x-account-id` og `x-profile-id`-headerne for å identifisere avsenderen.
+returnerer de normaliserte radene. Requesten må autentiseres med
+`Authorization: Bearer <access JWT>` (profil fra JWT `pid`).
 
 **Request**
 
@@ -957,6 +976,78 @@ før den sender meldingen med `upload_id`.
 
 Ved valideringsfeil returneres `422` med `{"errors": {"field": ["message"]}}`.
 
+## E2EE (personlig 1:1 tekst)
+
+Normativt: [e2ee_spec.md](e2ee_spec.md). Utvikler-runbook: [e2ee_developer.md](e2ee_developer.md).
+
+Valgfri nøkkelkatalog (tom liste er OK — aldri send-blokkering):
+
+### Last opp enhetsnøkler
+
+`PUT /api/v1/e2ee/keys`
+
+```json
+{
+  "device_id": "dev-1",
+  "identity_key": "BASE64_32B",
+  "signed_prekey": "BASE64_32B",
+  "spk_id": 1,
+  "spk_signature": "BASE64_64B",
+  "one_time_prekeys": [
+    { "opk_id": 10, "public_key": "BASE64_32B" }
+  ]
+}
+```
+
+**Respons 200:** `{ "data": { "device_id", "spk_id", "one_time_prekey_count" } }`.
+Ubrukte OPK-er for enheten erstattes av batchen.
+
+### Hent bundles
+
+`GET /api/v1/e2ee/bundles/:profile_id` → `{ "data": [ … ] }` (kan være `[]`).
+Hvert kall **konsumerer** én ubrukt OPK per enhet når den finnes.
+
+### Tell gjenværende OPK-er
+
+`GET /api/v1/e2ee/keys/count?device_id=dev-1` →
+`{ "data": { "device_id", "one_time_prekey_count" } }`.
+Uten `device_id`: `400`.
+
+### Kryptert melding (opaque relay)
+
+`POST /api/conversations/{conversation_id}/messages`
+
+```json
+{
+  "message": {
+    "kind": "encrypted",
+    "body": "",
+    "payload": {
+      "v": 1,
+      "e2ee": {
+        "sid": "dev-1",
+        "iv_ct": null,
+        "keys": [
+          {
+            "rid": "*",
+            "type": "init",
+            "ik": "BASE64",
+            "ek": "BASE64",
+            "header": { "dh": "BASE64", "pn": 0, "n": 0 },
+            "ct": null
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+**Respons 201:** `type` er `"encrypted"`, `body` er tom (server tvinger `""`),
+`payload.e2ee` returneres uendret. Mangler `payload.e2ee` → valideringsfeil.
+Ved `rid: "*"` kan `metadata.e2ee_fanout_device_ids` fylles med enhets-IDer
+fra nøkkelkatalogen (hint til klienter; midlertidig til #235).
+
 ## WebSocket / WSS
 
 Sanntid skjer via Phoenix Channels. Klienter skal koble til `ws://` eller `wss://` basert på API-basens skjema.
@@ -965,16 +1056,12 @@ Sanntid skjer via Phoenix Channels. Klienter skal koble til `ws://` eller `wss:/
 
 - URL: `wss://{vert}/socket/websocket?vsn=2.0.0`
 - Protokoll: Phoenix Channel
-- Etter tilkobling må klienten joine `conversation:{conversation_id}` med payload:
-
-```json
-{
-  "account_id": "acct-uuid",
-  "profile_id": "profile-uuid"
-}
-```
-
-Manglende eller ugyldige verdier gir `{ "reason": "unauthorized" }` eller `{ "reason": "forbidden" }` som join-feil.
+- **Anbefalt:** connect med `{ "token": "<access JWT>" }` (`UserSocket` JWT-gren).
+- Alternativ (f.eks. Rust gateway): `account_id` / `profile_id` (og valgfritt
+  `device_id` / `session_id`) etter gateway-validering.
+- Team/kanal-topics: `channel:*`, `team:*`, `presence:*`, `rtc:*` (se
+  `MessngrWeb.UserSocket`). Join-autorisasjon bruker socket-assigns, ikke
+  trustede klient-headere alene.
 
 ### Hendelser
 
@@ -994,10 +1081,11 @@ Klienten bør lytte på `message_created` og merge meldinger basert på `id` for
 
 ## Statuskoder og feilformat
 
-- `401 Unauthorized`: Manglende eller ugyldige identitetsheadere.
+- `401 Unauthorized`: Manglende eller ugyldig `Authorization: Bearer` JWT.
 - `403 Forbidden`: Profil er ikke deltaker i samtalen.
 - `404 Not Found`: Samtale eller ressurs finnes ikke.
 - `422 Unprocessable Entity`: Valideringsfeil. Body: `{ "errors": {"felt": ["beskjed"]} }`.
+- `429 Too Many Requests`: OTP lockout (`too_many_attempts`) eller rate limits.
 - `500 Internal Server Error`: Uventet feil. Body: `{ "errors": ["internal_error"] }`.
 
 ## Versjonering
