@@ -15,7 +15,7 @@ rulles ut kontrollert.
    - Klientens statiske nøkkel i URL-safe Base64 (`Messngr.Noise.Handshake.device_key/1`).
 2. Send OTP-challenge som tidligere, men inkluder `device_id` lik
    Base64-varianten av den statiske nøkkelen.
-3. Når OTP-koden postes til `/api/auth/verify` **må** klienten sende:
+3. Når OTP-koden postes til `/api/v1/auth/verify` **må** klienten sende:
    ```json
    {
      "challenge_id": "…",

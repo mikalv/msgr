@@ -3,6 +3,9 @@
 Status: normative for issue #195  
 Scope: personal-mode 1:1 text only. Media CEK (#236) and Sender Keys (#237) are out of scope.
 
+Developer runbook (architecture map, HTTP, client wiring, verification, pitfalls):
+[e2ee_developer.md](e2ee_developer.md).
+
 ## 1. Hard constraints
 
 ### Forbidden

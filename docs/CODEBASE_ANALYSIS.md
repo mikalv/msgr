@@ -49,7 +49,7 @@ Siden første analyse er bl.a. 1:1 E2EE (Double Ratchet), team-media ClamAV-pipe
 |---------|--------|----------|
 | **Auth** | ⚠️ Delvis | OTP/OIDC flow, mange TODO-er |
 | **Chat UI** | ✅ Implementert | Bubbles, composer, realtime state (Riverpod) |
-| **E2EE (1:1 text)** | ✅ Implementert | XX Double Ratchet i `libmsgr_core` + OMEMO store / `E2eeService`; media CEK og Sender Keys ute av scope (`docs/e2ee_spec.md`) |
+| **E2EE (1:1 text)** | ✅ Implementert | XX Double Ratchet i `libmsgr_core` + OMEMO store / `E2eeService`; media CEK og Sender Keys ute av scope (`docs/e2ee_spec.md`, `docs/e2ee_developer.md`) |
 | **Noise Protocol** | ✅ Implementert | Full implementasjon i `libmsgr` |
 | **Local Storage** | ✅ Implementert | Hive/Sembast/Drift, secure storage |
 | **WebRTC** | ✅ Implementert | 1:1 voice/video via `RTCChannel` + Flutter `CallProvider` / `flutter_webrtc` |

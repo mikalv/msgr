@@ -58,7 +58,8 @@ Backenden starter da på port `4000` (HTTP) og, dersom TLS er aktivert, på
 - [docs/SECRET_MANAGEMENT.md](docs/SECRET_MANAGEMENT.md) – secrets for lokal og prod.
 - [docs/ci_and_coverage.md](docs/ci_and_coverage.md) – CI-jobber, coveralls, pending suites.
 - [docs/media_virus_scan.md](docs/media_virus_scan.md) – ClamAV-pipeline for team-media.
-- [docs/e2ee_spec.md](docs/e2ee_spec.md) – 1:1 E2EE (XX Double Ratchet) og verifikasjon.
+- [docs/e2ee_spec.md](docs/e2ee_spec.md) – 1:1 E2EE (XX Double Ratchet) normative wire/crypto.
+- [docs/e2ee_developer.md](docs/e2ee_developer.md) – E2EE developer runbook (API, client, tests).
 - [docs/rtc.md](docs/rtc.md) – WebRTC-signalisering og TURN.
 - [backend/README.md](backend/README.md) – detaljer om Docker-stacken og
   backend-konfigurasjon.
