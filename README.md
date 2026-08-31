@@ -60,6 +60,8 @@ Backenden starter da på port `4000` (HTTP) og, dersom TLS er aktivert, på
 - [docs/media_virus_scan.md](docs/media_virus_scan.md) – ClamAV-pipeline for team-media.
 - [docs/e2ee_spec.md](docs/e2ee_spec.md) – 1:1 E2EE (XX Double Ratchet) normative wire/crypto.
 - [docs/e2ee_developer.md](docs/e2ee_developer.md) – E2EE developer runbook (API, client, tests).
+- [docs/realtime_channels.md](docs/realtime_channels.md) – Phoenix WS-topics,
+  team vs personlig realtime, `RequireTeamMembership`.
 - [docs/rtc.md](docs/rtc.md) – WebRTC-signalisering og TURN.
 - [backend/README.md](backend/README.md) – detaljer om Docker-stacken og
   backend-konfigurasjon.

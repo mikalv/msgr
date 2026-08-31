@@ -23,7 +23,7 @@ Siden første analyse er bl.a. 1:1 E2EE (Double Ratchet), team-media ClamAV-pipe
 | **Autentisering** | ✅ Implementert | OTP/SMS, OIDC, JWT (Guardian), refresh tokens |
 | **Chat/Meldinger** | ✅ Implementert | Conversations, messages, receipts, reactions, threads, pins |
 | **Media** | ✅ Implementert | Presigned S3/MinIO uploads, retention pruning; team ClamAV scan/quarantine (se `docs/media_virus_scan.md`) |
-| **Realtime** | ✅ Implementert | Phoenix Channels (Conversation, Device, RTC) |
+| **Realtime** | ⚠️ Delvis | Team: `TeamsWeb.ChatChannel`/`TeamChannel`/`PresenceChannel` montert. Personlig `conversation:*` **ikke** montert på `MessngrWeb.UserSocket` — se `docs/realtime_channels.md` |
 | **Rate Limiting** | ✅ Implementert | Hammer-basert (auth: 5/10min, meldinger: 60/min) |
 | **Teams/Workspaces** | ✅ Implementert | Multi-tenant, channels, DMs, invites, reminders |
 | **Bridge connectors** | ⚠️ Delvis | Slack, Telegram, Signal, Matrix, WhatsApp, Teams, Snapchat (strukturer finnes) |
@@ -48,7 +48,7 @@ Siden første analyse er bl.a. 1:1 E2EE (Double Ratchet), team-media ClamAV-pipe
 | Feature | Status | Detaljer |
 |---------|--------|----------|
 | **Auth** | ⚠️ Delvis | OTP/OIDC flow, mange TODO-er |
-| **Chat UI** | ✅ Implementert | Bubbles, composer, realtime state (Riverpod) |
+| **Chat UI** | ⚠️ Delvis | Bubbles/composer/state; personlig WS joiner `conversation:` som ikke er montert (REST fallback) |
 | **E2EE (1:1 text)** | ✅ Implementert | XX Double Ratchet i `libmsgr_core` + OMEMO store / `E2eeService`; media CEK og Sender Keys ute av scope (`docs/e2ee_spec.md`, `docs/e2ee_developer.md`) |
 | **Noise Protocol** | ✅ Implementert | Full implementasjon i `libmsgr` |
 | **Local Storage** | ✅ Implementert | Hive/Sembast/Drift, secure storage |

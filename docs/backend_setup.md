@@ -64,6 +64,14 @@ GitHub Actions kjører format/credo/sobelow/dialyzer, umbrella coveralls,
 Flutter-tester og pytest-integrasjon. Parkerte suiter ligger som
 `*.exs.disabled` under `**/test/pending_*`. Se [ci_and_coverage.md](ci_and_coverage.md).
 
+## Realtime (Phoenix Channels)
+
+Primær socket: `MessngrWeb.UserSocket` (`/socket`). Monterte topics er
+`channel:*` (team `TeamsWeb.ChatChannel`), `team:*`, `presence:*`, `rtc:*`,
+`msgr:device`. Personlig `conversation:*` er **ikke** montert — se
+[realtime_channels.md](realtime_channels.md). Team HTTP under
+`/api/teams/:slug` krever `RequireTeamMembership` etter `TenantFromSlug`.
+
 ## E2EE (1:1 tekst)
 
 Personlig Direct med `kind: "encrypted"` + valgfri nøkkelkatalog under
