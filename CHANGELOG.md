@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Docs — realtime channel ownership + team authz
+- Added `docs/realtime_channels.md` (mounted `UserSocket` topics, team chat
+  events, personal conversation WS gap, `RequireTeamMembership` pipeline)
+- Corrected stale `conversation:*` / ConversationChannel claims in
+  `docs/api_contract.md`; documented live team channel events and tenant plugs
+- Linked from `README.md` / `docs/backend_setup.md`; noted SEC-2 fix path in
+  `docs/SECURITY_REVIEW.md`
+
 ### Docs — E2EE developer runbook + auth/API contract sync
 - Added `docs/e2ee_developer.md` (architecture map, key directory + encrypted
   message surfaces, client wiring, verification commands, pitfalls)

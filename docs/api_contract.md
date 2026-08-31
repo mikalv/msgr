@@ -13,6 +13,19 @@ Denne siden dokumenterer forventet kontrakt mellom msgr-backend og Flutter-klien
 - WebSocket: foretrekk connect-param `token` (samme access JWT). Gateway kan
   fortsatt sende `account_id` / `profile_id` etter egen validering (se under).
 
+### Team-API (`/api/teams/:slug/…`)
+
+Ruter under `/api/teams/:slug` går gjennom pipeline `:actor` + `:tenant`:
+
+1. `TenantFromSlug` — slår opp team på `slug` (404 hvis ukjent).
+2. `RequireTeamMembership` — krever tenant-profil + `TeamMembership` for
+   innlogget konto (403 `{ "error": "forbidden" }` ellers). Assigns
+   `:current_team_profile` / `:current_team_membership`.
+
+`GET|POST /api/teams`, `POST /api/teams/:slug/join`, rolle/medlem-admin under
+`/api/teams/:slug/members…`, og invite-innløsning ligger utenfor denne
+medlemskaps-pluggen (kun `:actor`). Detaljer: [realtime_channels.md](realtime_channels.md).
+
 ## Noise-håndtrykk og nøkkelhåndtering
 
 - Klienten fungerer alltid som **initiator**, serveren som **responder** i `Noise_NX_25519_ChaChaPoly_Blake2b`-handtrykket. Transporten er feature-togglet i backend via `NOISE_TRANSPORT_ENABLED` og lytter på en dedikert TCP-port (default `5443`).
@@ -585,44 +598,36 @@ quarantine og miljøvariabler. Personlig media har fortsatt ikke virus-scan.
 ```
 
 Backenden normaliserer også lydmeldinger (`type: "audio"` eller `"voice"`) med `waveform` og `duration`, samt generiske filer (`type: "file"`) som eksponerer `fileName`, `byteSize`, `checksum` og valgfritt `thumbnail`.
-### Realtime ConversationChannel
+### Realtime (personlig samtale vs team-kanal)
 
-- **Join**: `conversation:{conversation_id}`
-  - Params: `{ "account_id": "...", "profile_id": "..." }`
-- **Events**:
-  - `message_created` / `message_updated`: `{ "data": { ...message payload med metadata, edited_at, deleted_at, thread_id } }`
-  - `message_deleted`: `{ "message_id": "uuid", "deleted_at": "2024-10-04T12:10:00Z" }`
-  - `reaction_added` / `reaction_removed`:
+**Live mount** på `MessngrWeb.UserSocket` er dokumentert i
+[realtime_channels.md](realtime_channels.md). Kortversjon:
 
-    ```json
-    {
-      "id": "reaction-uuid",
-      "message_id": "message-uuid",
-      "profile_id": "profile-uuid",
-      "emoji": "👍",
-      "metadata": {},
-      "aggregates": [
-        { "emoji": "👍", "count": 2, "profile_ids": ["profile-uuid", "peer-uuid"] }
-      ]
-    }
-    ```
+| Modus | Join-topic | Modul | Status |
+|-------|------------|-------|--------|
+| Team-kanal | `channel:{channel_id}` (+ `team_slug` i join hvis tenant mangler på socket) | `TeamsWeb.ChatChannel` | ✅ Montert |
+| Team-struktur | `team:{slug}` | `TeamsWeb.TeamChannel` | ✅ Montert |
+| Team-presence | `presence:{slug}` | `TeamsWeb.PresenceChannel` | ✅ Montert |
+| Personlig DM | — | — | ❌ Ingen montert `conversation:*`-handler |
 
-  - `message_pinned` / `message_unpinned`: `{ "message_id": "uuid", "pinned_by_id": "profile", "pinned_at": "2024-10-04T12:15:00Z", "metadata": {} }`
-  - `message_read`: `{ "profile_id": "profile-uuid", "message_id": "message-uuid", "read_at": "2024-10-04T12:12:00Z" }`
-  - `typing_started` / `typing_stopped`: `{ "profile_id": "profile-uuid", "profile_name": "Kari", "thread_id": null, "expires_at": "2024-10-04T12:05:05Z" }`
-  - `conversation_watchers`: `{ "count": 2, "watchers": [{ "id": "profile-uuid", "name": "Kari", "mode": "private" }] }`
-  - Presence diff/stat er levert via Phoenix `presence_state` og `presence_diff` events.
+Personlig chat bruker REST under `/api/conversations…`. Domene-PubSub
+(`Messngr.Chat`) publiserer fortsatt på `conversation:{id}`, og
+`MessngrWeb.ConversationChannel` finnes i treet, men er **ikke** registrert på
+socketen. Flutter `ChatSocket` joiner `conversation:{id}` i dag — det vil feile
+mot gjeldende backend til realtime remountes.
 
-- **Client events**:
-  - `typing:start` / `typing:stop` (payload `{ "thread_id": "optional-thread" }`)
-  - `message:read`, `reaction:add`, `reaction:remove`, `message:update`, `message:delete`
-  - `message:pin`, `message:unpin`
-  - `conversation:watch`, `conversation:unwatch`
+**Team-kanal (live) — klient → server:** `message:create` / `new:message`
+(`content`), `new:thread_reply`, `toggle:reaction`, `typing:start` /
+`typing:stop`, `update:read_cursor`.
 
-`conversation:watch` holder en profiler-liste aktiv i maks 30 sekunder per invitasjon
-(`conversation_watcher_ttl_ms` kan overstyres i konfig). Når tiden utløper vil
-backenden automatisk droppe profilen fra `conversation_watchers`-strømmen og
-returnere en tom liste ved neste `list_watchers`-kall.
+**Team-kanal — server → klient:** `new:message`, `new:thread_reply`,
+`reaction:updated`, `typing:update`, `read_cursor:updated` (pluss REST-drevne
+`message:updated` / pin-events via `Endpoint.broadcast`).
+
+HTTP watchers for personlige samtaler (REST, ikke WS-join):
+
+- `POST|DELETE /api/conversations/:id/watch`, `GET …/watchers`
+- Watcher-TTL styres av `conversation_watcher_ttl_ms` (default 30s)
 
 ### Familie-spaces med kalender, handleliste og todo
 
@@ -1050,7 +1055,7 @@ fra nøkkelkatalogen (hint til klienter; midlertidig til #235).
 
 ## WebSocket / WSS
 
-Sanntid skjer via Phoenix Channels. Klienter skal koble til `ws://` eller `wss://` basert på API-basens skjema.
+Sanntid skjer via Phoenix Channels på `MessngrWeb.UserSocket`. Full topic-/eierskapstabell: [realtime_channels.md](realtime_channels.md).
 
 ### Handshake
 
@@ -1059,31 +1064,39 @@ Sanntid skjer via Phoenix Channels. Klienter skal koble til `ws://` eller `wss:/
 - **Anbefalt:** connect med `{ "token": "<access JWT>" }` (`UserSocket` JWT-gren).
 - Alternativ (f.eks. Rust gateway): `account_id` / `profile_id` (og valgfritt
   `device_id` / `session_id`) etter gateway-validering.
-- Team/kanal-topics: `channel:*`, `team:*`, `presence:*`, `rtc:*` (se
-  `MessngrWeb.UserSocket`). Join-autorisasjon bruker socket-assigns, ikke
-  trustede klient-headere alene.
+- Monterte topics: `channel:*` → `TeamsWeb.ChatChannel`, `team:*`,
+  `presence:*`, `rtc:*`, `msgr:device`. Join-autorisasjon bruker
+  socket-assigns + medlemskap/tenant, ikke trustede klient-headere alene.
 
-### Hendelser
+### Team-kanal hendelser (`channel:{id}`)
 
 | Retning | Event | Payload | Beskrivelse |
 |---------|-------|---------|-------------|
-| Klient → Server | `message:create` | `{ "body": "tekst" }` | Sender en ny melding i samtalen. Tomme strenger avvises. |
-| Server → Klient | `message_created` | `{ "data": { ... } }` | Sendes til alle deltakere når en melding lagres. Strukturen matcher REST-responsen for melding. |
-| Server → Klient (reply) | `{:ok, {"data": { ... }}}` | Returneres som svar på `message:create` ved suksess. Feil gir `{ "errors": ... }`. |
+| Klient → Server | `message:create` / `new:message` | `{ "content": "tekst", "media_refs": [] }` | Oppretter melding i tenant-kanal. |
+| Klient → Server | `typing:start` / `typing:stop` | `{}` | Typing-indikator. |
+| Klient → Server | `toggle:reaction` | `{ "message_id", "emoji" }` | Toggle reaksjon. |
+| Klient → Server | `update:read_cursor` | `{ "last_read_message_id" }` | Oppdater lesemarkør. |
+| Server → Klient | `new:message` | serialisert melding | Broadcast til kanal-topic. |
+| Server → Klient | `typing:update` | `{ "profile_id", "is_typing" }` | Typing-state. |
+| Server → Klient | `reaction:updated` | `{ "message_id", "reactions" }` | Oppdatert reaksjonsliste. |
+| Server → Klient | `read_cursor:updated` | cursor-felter | Etter join/upsert. |
 
-Klienten bør lytte på `message_created` og merge meldinger basert på `id` for å unngå duplikater.
+Merge på `id` for å unngå duplikater mellom REST-create og WS-broadcast.
 
 ### Feilhåndtering
 
-- Join uten gyldig medlemskap gir `{ "reason": "forbidden" }`.
-- `message:create` kan svare med `{ "errors": {"body": ["can't be blank"]} }` for valideringsfeil.
-- Timeout på push håndteres som transportfeil; klient bør prøve HTTP som fallback.
+- Join uten tenant → `{ "reason": "tenant_not_resolved" }`; uten tilgang →
+  `unauthorized` / `forbidden` / `not_a_member` avhengig av kanal.
+- Ukjent `conversation:*`-join feiler (ingen handler montert) — bruk REST for
+  personlige samtaler inntil remount.
+- Timeout på push: klient bør falle tilbake til HTTP.
 
 ## Statuskoder og feilformat
 
 - `401 Unauthorized`: Manglende eller ugyldig `Authorization: Bearer` JWT.
-- `403 Forbidden`: Profil er ikke deltaker i samtalen.
-- `404 Not Found`: Samtale eller ressurs finnes ikke.
+- `403 Forbidden`: Ikke deltaker i samtale, eller ikke team-medlem
+  (`RequireTeamMembership` / kanal-ACL).
+- `404 Not Found`: Samtale, team (`TenantFromSlug`) eller ressurs finnes ikke.
 - `422 Unprocessable Entity`: Valideringsfeil. Body: `{ "errors": {"felt": ["beskjed"]} }`.
 - `429 Too Many Requests`: OTP lockout (`too_many_attempts`) eller rate limits.
 - `500 Internal Server Error`: Uventet feil. Body: `{ "errors": ["internal_error"] }`.

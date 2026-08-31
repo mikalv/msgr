@@ -53,6 +53,11 @@ Vurder også å øke kodelengden til 8 sifre og begrense antall verifiseringsfor
 
 ## SEC-2 🔴 Brutt tilgangskontroll i team-API (cross-tenant IDOR)
 
+> **Status (fikset):** Pipeline `:tenant` kjører `TenantFromSlug` +
+> `RequireTeamMembership` på `/api/teams/:slug/…` (se
+> [realtime_channels.md](realtime_channels.md)). Teksten under er den
+> opprinnelige funnbeskrivelsen.
+
 **Filer:**
 - `backend/apps/msgr_web/lib/msgr_web/plugs/tenant_from_slug.ex`
 - `backend/apps/msgr_web/lib/msgr_web/controllers/team_channel_controller.ex`
